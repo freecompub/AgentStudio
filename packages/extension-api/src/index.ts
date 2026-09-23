@@ -57,6 +57,8 @@ export interface ExtensionManifest {
   version: string;
   publisher: string;
   engines: { appApi: string };
+  /** Entrée compilée, relative au dossier de l'extension (ex. `dist/index.js`). */
+  main?: string;
   permissions: Permission[];
   contributes: {
     commands?: ManifestCommand[];

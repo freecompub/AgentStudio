@@ -164,6 +164,19 @@ importers:
         specifier: workspace:*
         version: link:../workspace
 
+  packages/extension-manifest:
+    dependencies:
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@agent-studio/ext-tdd':
+        specifier: workspace:*
+        version: link:../../extensions/tdd
+
   packages/github-auth: {}
 
   packages/runtime-copilot:
