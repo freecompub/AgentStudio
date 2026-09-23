@@ -7,6 +7,13 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/task-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/workspace": "workspace:*"
   }
 }

@@ -93,9 +93,25 @@ importers:
 
   extensions/tdd:
     dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../../packages/extension-api
       '@agent-studio/task-engine':
         specifier: workspace:*
         version: link:../../packages/task-engine
+    devDependencies:
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../../packages/extension-host
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../../packages/stack-adapters
+      '@agent-studio/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
 
   packages/core:
     dependencies:
