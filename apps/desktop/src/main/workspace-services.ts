@@ -149,6 +149,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       createdAt: r.createdAt,
       ...(r.detail ? { detail: r.detail } : {}),
       ...(r.requiredRoles ? { requiredRoles: r.requiredRoles } : {}),
+      ...(r.freeText ? { freeText: true } : {}),
     });
     const offInteractions = interactions.onChange((pending) => onInteractions(pending.map(toDto)));
     const latestCards = new Map<string, TaskCardDto>();

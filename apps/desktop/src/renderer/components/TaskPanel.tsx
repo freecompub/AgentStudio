@@ -12,6 +12,7 @@ export function TaskPanel() {
   const [pending, setPending] = useState<InteractionDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [texts, setTexts] = useState<Record<string, string>>({});
   const advanced = useAdvanced();
 
   useEffect(() => {
@@ -28,7 +29,8 @@ export function TaskPanel() {
     setBusy(id);
     setError(null);
     try {
-      await api.call("interaction:respond", { id, option });
+      const comment = texts[id]?.trim();
+      await api.call("interaction:respond", { id, option, ...(comment ? { comment } : {}) });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -51,6 +53,12 @@ export function TaskPanel() {
               <h3>{p.title}</h3>
               {p.detail &&
                 (advanced ? <pre className="decision-detail">{p.detail}</pre> : <p className="decision-detail">{summarize(p.detail)}</p>)}
+              {p.freeText && (
+                <label className="decision-text">
+                  Votre réponse
+                  <textarea rows={2} value={texts[p.id] ?? ""} onChange={(e) => setTexts((t) => ({ ...t, [p.id]: e.target.value }))} />
+                </label>
+              )}
               <div className="row">
                 {p.options.map((o, i) => (
                   <button key={o.id} className={i === 0 ? "primary" : ""} disabled={busy === p.id} onClick={() => void respond(p.id, o.id)}>

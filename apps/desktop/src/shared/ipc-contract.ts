@@ -74,6 +74,7 @@ export const interactionSchema = z.object({
   detail: z.string().optional(),
   options: z.array(z.object({ id: z.string(), label: z.string() })),
   requiredRoles: z.array(roleSchema).optional(),
+  freeText: z.boolean().optional(),
   createdAt: z.string(),
 });
 export type InteractionDto = z.infer<typeof interactionSchema>;

@@ -136,6 +136,35 @@ describe("Un profil non-développeur mène une tâche sans aide (J6)", () => {
   });
 });
 
+describe("Question ouverte à réponse libre (S2)", () => {
+  it("le texte saisi accompagne la réponse", async () => {
+    render(<App />);
+    await screen.findByText("(PO / BA)");
+    act(() =>
+      api.emit("interactions:changed", {
+        pending: [
+          {
+            id: "int-q1",
+            taskId: "t1",
+            extensionId: "agent-studio.skraft",
+            title: "Question ouverte (US-12)",
+            detail: "Le plafond s'applique-t-il par prise ou par jour ?",
+            options: [
+              { id: "answer:q1", label: "Répondre" },
+              { id: "defer:q1", label: "Reporter" },
+            ],
+            freeText: true,
+            createdAt: "",
+          },
+        ],
+      }),
+    );
+    fireEvent.change(screen.getByLabelText("Votre réponse"), { target: { value: "par prise" } });
+    fireEvent.click(screen.getByRole("button", { name: "Répondre" }));
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "interaction:respond", input: { id: "int-q1", option: "answer:q1", comment: "par prise" } }));
+  });
+});
+
 describe("Installation d'une extension tierce depuis un fichier (J6)", () => {
   it("écran Extensions : installation, accord sur des permissions en langage clair, confirmation", async () => {
     let resolveInstall: (v: unknown) => void = () => {};
