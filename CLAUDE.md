@@ -9,6 +9,8 @@ Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, bl
 (`feat/j3-preuves-interactions`, `docs/jalons/J3-bilan.md`), J4 livré (`feat/j4-isolation-extensions`,
 `docs/jalons/J4-bilan.md`). Les extensions internes sont compilées par
 `pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`).
+J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift utilisent la chaîne de
+`~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 
 ```bash
