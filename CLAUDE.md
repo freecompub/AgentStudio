@@ -13,6 +13,8 @@ J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift u
 `~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
+skraft : S0 en attente de décision de licence (ADR 0012, aucune reprise de skraft-plugin, prompts de
+substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 
 ```bash
