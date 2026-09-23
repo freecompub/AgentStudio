@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## État du dépôt et commandes
 
-Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalon en cours : **J1** (branche `feat/j1-socle`).
+Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, blocages dans
+`docs/jalons/J1-blocages.md`), J2 livré (`feat/j2-moteur-taches`, bilan dans `docs/jalons/J2-bilan.md`).
+Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # un seul paquet (core, workspace, runtime-copilot, github-auth, desktop)
+pnpm vitest run --project core  # un seul projet : core, workspace, task-engine, stack-adapters, extension-host, runtime-copilot, github-auth, ext-tdd, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)
