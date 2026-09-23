@@ -12,5 +12,8 @@
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
     "@agent-studio/workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

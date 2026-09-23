@@ -163,6 +163,10 @@ importers:
       '@agent-studio/workspace':
         specifier: workspace:*
         version: link:../workspace
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   packages/extension-manifest:
     dependencies:
