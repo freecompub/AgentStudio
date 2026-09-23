@@ -38,7 +38,7 @@ function deps() {
     root: "/projets/demo",
     files: { read: async () => "", write: async () => {}, list: async () => ["a.ts", "b.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-    repo: { head: async () => "h", commit: async () => "sha", sync: async () => ({ pulled: 0, pushed: 0 }) },
+    repo: { head: async () => "h", commit: async () => "sha", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
   const stack: StackAdapter = {
     id: "typescript",

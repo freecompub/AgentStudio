@@ -40,7 +40,7 @@ export interface ManifestAgent {
   /** Périmètre d'écriture (globs) ; absent = lecture seule. */
   write?: string[];
   /** Outils standard fournis par le cœur (§6.5). `run_tests` exige `shell:test`. */
-  tools?: "run_tests"[];
+  tools?: ("run_tests" | "report_blocker")[];
 }
 
 export interface ManifestTask {
@@ -95,13 +95,20 @@ export interface AgentRunOptions {
   freezeTestsAfterRed?: boolean;
 }
 
+/** Sortie structurée du rôle, ou question bloquante (`report_blocker`, si le rôle le déclare). */
+export type AgentRunResult<N extends TerminalToolName> =
+  | { output: TerminalOutput<N>; blocker?: undefined }
+  | { output?: undefined; blocker: { question: string; choices: string[] } };
+
 export interface AgentsApi {
   /** Lance un agent déclaré par l'extension ; ne renvoie qu'un résultat sérialisé. */
-  run<N extends TerminalToolName>(name: string, prompt: string, opts?: AgentRunOptions): Promise<{ output: TerminalOutput<N> }>;
+  run<N extends TerminalToolName>(name: string, prompt: string, opts?: AgentRunOptions): Promise<AgentRunResult<N>>;
 }
 
 export interface WorkspaceApi {
   readFile(path: string): Promise<string>;
+  /** Écriture par le code de l'extension, limitée aux motifs `fs:write:<glob>` déclarés (D11, D29). */
+  writeFile(path: string, content: string): Promise<void>;
   listFiles(): Promise<string[]>;
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;
@@ -114,6 +121,8 @@ export interface WorkspaceApi {
 export interface GitApi {
   /** Commit de tous les changements, ou des seuls `paths`. */
   commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
+  /** Crée la branche (ou s'y place si elle existe) : exige `git:branch`. */
+  branch(name: string): Promise<void>;
   head(): Promise<string>;
 }
 

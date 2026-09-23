@@ -12,6 +12,7 @@ export { globToRegExp, matchesAny } from "./guards/glob.js";
 export { terminalTool, terminalSchemas, type TerminalOutput, type TerminalToolName } from "./agents/terminal-tools.js";
 export {
   createTaskAgentRunner,
+  type TaskAgentResult,
   type TaskAgentRunner,
   type TaskAgentRunnerDeps,
   type TaskAgentRunOptions,

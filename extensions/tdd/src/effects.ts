@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { EnvFailureError } from "@agent-studio/core";
-import type { EffectContext, ExtensionContext } from "@agent-studio/extension-api";
+import { EnvFailureError, WorkDefectError } from "@agent-studio/core";
+import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import type { TddEffect, TddState } from "./model.js";
 import type { Ev } from "./reducer.js";
@@ -24,7 +24,7 @@ export async function runTddEffect(effect: TddEffect, ctx: ExtensionContext, ec:
   switch (effect.kind) {
     case "runPlanner": {
       const prompt = `Fonctionnalité : ${effect.feature}${effect.feedback ? `\n\nTon plan précédent a été refusé : ${effect.feedback}` : ""}`;
-      const { output } = await ctx.agents.run<"submit_plan">("tdd-planner", prompt, { signal, evidence: tag("PLANNING") });
+      const output = expectOutput(await ctx.agents.run<"submit_plan">("tdd-planner", prompt, { signal, evidence: tag("PLANNING") }));
       return { type: "PLAN_SUBMITTED", steps: output.steps };
     }
 
@@ -62,11 +62,11 @@ export async function runTddEffect(effect: TddEffect, ctx: ExtensionContext, ec:
     case "runPairAgent": {
       const runId = randomUUID();
       const brief = buildBrief(state, { phase: "CYCLE", ...(effect.feedback ? { feedback: effect.feedback } : {}) });
-      const { output } = await ctx.agents.run<"report_phase">("tdd-pair", brief, {
+      const output = expectOutput(await ctx.agents.run<"report_phase">("tdd-pair", brief, {
         signal,
         evidence: tag(`CYCLE:${runId}`),
         freezeTestsAfterRed: true,
-      });
+      }));
       return { type: "AGENT_DONE", summary: output.summary, files: output.files, runId };
     }
 
@@ -75,14 +75,14 @@ export async function runTddEffect(effect: TddEffect, ctx: ExtensionContext, ec:
 
     case "runTestAgent": {
       const brief = buildBrief(state, { phase: "RED", ...(effect.feedback ? { feedback: effect.feedback } : {}) });
-      const { output } = await ctx.agents.run<"report_phase">("tdd-test", brief, { signal, evidence: tag("RED") });
+      const output = expectOutput(await ctx.agents.run<"report_phase">("tdd-test", brief, { signal, evidence: tag("RED") }));
       return { type: "AGENT_DONE", summary: output.summary, files: output.files };
     }
 
     case "runDevAgent": {
       const phase = effect.mode === "green" ? "GREEN" : "REFACTOR";
       const brief = buildBrief(state, { phase, testIds: effect.testIds, ...(effect.feedback ? { feedback: effect.feedback } : {}) });
-      const { output } = await ctx.agents.run<"report_phase">("tdd-dev", brief, { signal, evidence: tag(phase) });
+      const output = expectOutput(await ctx.agents.run<"report_phase">("tdd-dev", brief, { signal, evidence: tag(phase) }));
       return { type: "AGENT_DONE", summary: output.summary, files: output.files };
     }
 
@@ -99,6 +99,12 @@ export async function runTddEffect(effect: TddEffect, ctx: ExtensionContext, ec:
 }
 
 type Tag = { taskId: string; stepId?: string; phase: string };
+
+/** Les rôles de tdd ne déclarent pas report_blocker : un blocage est un défaut de travail. */
+function expectOutput<N extends TerminalToolName>(r: AgentRunResult<N>): TerminalOutput<N> {
+  if (r.blocker) throw new WorkDefectError(`Blocage inattendu : ${r.blocker.question}`);
+  return r.output;
+}
 
 async function verifyRed(ctx: ExtensionContext, e: Extract<TddEffect, { kind: "verifyRed" }>, signal: AbortSignal, tag: Tag): Promise<Ev> {
   const changed = await ctx.workspace.changedFiles(e.since);

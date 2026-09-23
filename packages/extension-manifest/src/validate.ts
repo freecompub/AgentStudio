@@ -26,7 +26,7 @@ const schema = z.object({
           role: text(20_000),
           output: z.enum(["report_phase", "submit_plan"]),
           write: z.array(z.string().min(1)).optional(),
-          tools: z.array(z.literal("run_tests")).optional(),
+          tools: z.array(z.enum(["run_tests", "report_blocker"])).optional(),
         }),
       )
       .optional(),

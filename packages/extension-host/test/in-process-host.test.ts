@@ -32,7 +32,7 @@ function fakeWorkspace(): Workspace {
       diff: async () => ({ files: [{ path: "tests/a.test.ts", status: "modified" }], patch: "" }),
       rollback: async () => {},
     },
-    repo: { head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }) },
+    repo: { head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 
@@ -104,7 +104,7 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, runs } = await activateWith(() => {});
     const r = await ctx.agents.run("writer", "Écris un test");
     expect(r).toEqual({ output: { summary: "ok", files: [] } });
-    expect(runs[0]?.spec).toEqual({ role: "diabeo.demo/writer", systemPrompt: "Tu écris des tests.", writable: ["tests/**"], output: "report_phase" });
+    expect(runs[0]?.spec).toEqual({ role: "diabeo.demo/writer", systemPrompt: "Tu écris des tests.", writable: ["tests/**"], output: "report_phase", blocker: false });
     await expect(ctx.agents.run("inconnu", "x")).rejects.toThrow(/non déclaré/);
   });
 

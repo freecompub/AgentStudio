@@ -28,6 +28,15 @@ export function createGitRepository(git: GitRunner): Repository {
       return head();
     },
 
+    async switchBranch(name) {
+      if (!/^[A-Za-z0-9._/-]{1,100}$/.test(name) || name.startsWith("-") || name.includes("..")) throw new Error(`Nom de branche refusé : ${name}`);
+      const exists = await git.run(["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]).then(
+        () => true,
+        () => false,
+      );
+      await git.run(exists ? ["switch", "-q", name] : ["switch", "-q", "-c", name]);
+    },
+
     async sync() {
       await git.run(["fetch", "-q", "--prune"], { timeoutMs: 300_000 });
       const [ahead = 0, behind = 0] = (await git.run(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]))

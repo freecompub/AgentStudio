@@ -62,6 +62,8 @@ export interface Repository {
   commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
   /** Avance rapide depuis l'amont puis push ; échoue en cas de divergence. */
   sync(): Promise<SyncResult>;
+  /** Se place sur la branche `name`, créée depuis HEAD si besoin (modifications en cours conservées). */
+  switchBranch(name: string): Promise<void>;
 }
 
 /** Façade composée, seule porte d'accès au disque et à Git. */

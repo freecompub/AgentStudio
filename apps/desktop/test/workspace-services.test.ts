@@ -21,7 +21,7 @@ function fakeWorkspace(): Workspace {
       diff: async () => ({ files: [], patch: "" }),
       rollback: async () => {},
     },
-    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }) },
+    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 

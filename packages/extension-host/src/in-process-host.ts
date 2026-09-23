@@ -14,7 +14,8 @@ import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agen
 import { fingerprintFiles, type StackAdapter } from "@agent-studio/stack-adapters";
 import type { TaskEngine } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { permissionChecker } from "./permissions.js";
+import { matchesAny } from "@agent-studio/core";
+import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, runTestsTool, testFreezeGuard } from "./test-runs.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -100,7 +101,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const taskId = opts?.evidence?.taskId;
         const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
         const r = await deps.agents.run(
-          { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: a.write ?? [], output: a.output },
+          { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: a.write ?? [], output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
@@ -125,12 +126,17 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             ],
           },
         );
-        return { output: structuredClone(r.output) } as never;
+        return (r.blocker ? { blocker: structuredClone(r.blocker) } : { output: structuredClone(r.output) }) as never;
       },
     },
 
     workspace: {
       readFile: async (p) => (perm.require("fs:read"), deps.workspace.files.read(p)),
+      async writeFile(p, content) {
+        const rel = p.replaceAll("\\", "/");
+        if (!matchesAny(perm.writeGlobs(), rel)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
+        await deps.workspace.files.write(rel, content);
+      },
       listFiles: async () => (perm.require("fs:read"), deps.workspace.files.list()),
       checkpoint: async (label) => ({ id: (await deps.workspace.checkpoints.create(label)).id }),
       rollback: async (id) => (perm.require("git:revert"), deps.workspace.checkpoints.rollback(id)),
@@ -144,6 +150,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     git: {
       commit: async (message, opts) => (perm.require("git:commit"), deps.workspace.repo.commit(message, opts)),
       head: () => deps.workspace.repo.head(),
+      branch: async (name) => (perm.require("git:branch"), deps.workspace.repo.switchBranch(name)),
     },
 
     stack: {

@@ -51,7 +51,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
     root: "/projets/demo",
     files: { read: async () => "contenu", write: async () => {}, list: async () => ["tests/a.test.ts", "src/a.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-    repo: { head: async () => "abc123", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }) },
+    repo: { head: async () => "abc123", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   let ctx!: ExtensionContext;

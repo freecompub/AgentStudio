@@ -20,6 +20,29 @@ export const terminalSchemas = {
       )
       .max(50),
   }),
+  submit_difficulty: z.object({
+    level: z.enum(["simple", "medium", "medium-hard", "challenging"]).describe("Niveau retenu"),
+    justification: z.string().min(1).max(1_000).describe("Justification courte"),
+  }),
+  submit_lens_verdict: z.object({
+    lens: z.string().min(1).max(60),
+    // Enum unique de verdict (défaut C6 de skraft-plugin rendu impossible).
+    verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
+    defects: z
+      .array(
+        z.object({
+          severity: z.enum(["blocker", "major", "minor"]),
+          file: z.string().max(1_000).optional(),
+          line: z.number().int().min(1).optional(),
+          description: z.string().min(1).max(2_000),
+        }),
+      )
+      .max(100),
+  }),
+  report_blocker: z.object({
+    question: z.string().min(1).max(2_000).describe("Question métier ou technique qui bloque"),
+    choices: z.array(z.string().min(1).max(300)).max(10).describe("Réponses possibles, si elles sont connues"),
+  }),
 } as const;
 
 export type TerminalToolName = keyof typeof terminalSchemas;
@@ -28,6 +51,9 @@ export type TerminalOutput<N extends TerminalToolName> = z.infer<(typeof termina
 const DESCRIPTIONS: Record<TerminalToolName, string> = {
   report_phase: "Appelle cet outil quand ta phase est terminée : il clôt ton tour.",
   submit_plan: "Soumets la liste ordonnée des comportements à implémenter : cet appel clôt ton tour.",
+  submit_difficulty: "Soumets le niveau de difficulté retenu et sa justification : cet appel clôt ton tour.",
+  submit_lens_verdict: "Soumets ton verdict de revue et les défauts trouvés : cet appel clôt ton tour.",
+  report_blocker: "Signale une question qui t'empêche de continuer (valeur ou règle manquante) : ta tâche est suspendue jusqu'à la réponse.",
 };
 
 export function terminalTool<N extends TerminalToolName>(name: N, sink: (output: TerminalOutput<N>) => void): ToolSpec {

@@ -13,6 +13,8 @@ export interface TaskAgentSpec<N extends TerminalToolName = TerminalToolName> {
   writable: string[];
   /** Outil terminal qui porte la sortie du rôle. */
   output: N;
+  /** Le rôle peut suspendre sa tâche par `report_blocker` (D31). */
+  blocker?: boolean;
   model?: string;
 }
 
@@ -27,8 +29,13 @@ export interface TaskAgentRunOptions {
   onUsage?: (delta: UsageDelta) => void;
 }
 
+/** Sortie structurée du rôle, ou blocage signalé par `report_blocker`. */
+export type TaskAgentResult<N extends TerminalToolName> =
+  | { output: TerminalOutput<N>; blocker?: undefined }
+  | { output?: undefined; blocker: TerminalOutput<"report_blocker"> };
+
 export interface TaskAgentRunner {
-  run<N extends TerminalToolName>(spec: TaskAgentSpec<N>, prompt: string, opts?: TaskAgentRunOptions): Promise<{ output: TerminalOutput<N> }>;
+  run<N extends TerminalToolName>(spec: TaskAgentSpec<N>, prompt: string, opts?: TaskAgentRunOptions): Promise<TaskAgentResult<N>>;
 }
 
 export interface TaskAgentRunnerDeps {
@@ -47,6 +54,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
   return {
     async run(spec, prompt, opts = {}) {
       let output: TerminalOutput<typeof spec.output> | undefined;
+      let blocker: TerminalOutput<"report_blocker"> | undefined;
       let session: AgentSession | undefined;
       const heartbeat = createHeartbeat();
       const turn = async (text: string) => {
@@ -78,7 +86,11 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
             role: spec.role,
             workingDirectory: deps.root,
             systemPrompt: spec.systemPrompt,
-            tools: [terminalTool(spec.output, (o) => void (output = o)), ...(opts.tools?.(() => heartbeat.beat()) ?? [])],
+            tools: [
+              terminalTool(spec.output, (o) => void (output = o)),
+              ...(spec.blocker ? [terminalTool("report_blocker", (b) => void (blocker = b))] : []),
+              ...(opts.tools?.(() => heartbeat.beat()) ?? []),
+            ],
             guard: composeGuards([createTaskAgentGuard({ root: deps.root, writable: spec.writable }), ...(opts.guards ?? [])]),
             ...(spec.model ? { model: spec.model } : {}),
           })
@@ -89,9 +101,11 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         deps.logger?.info("agent de tâche lancé", { role: spec.role, sessionId: session.id });
 
         await turn(prompt);
+        if (blocker && !output) return { blocker };
         if (!output && !opts.signal?.aborted)
           await turn(`Tu n'as pas appelé l'outil ${spec.output}. Termine maintenant ta phase en l'appelant avec des arguments valides.`);
         if (opts.signal?.aborted) throw new Error("Annulé");
+        if (blocker && !output) return { blocker };
         if (!output) throw new WorkDefectError(`L'agent ${spec.role} n'a pas clôturé sa phase par ${spec.output}.`);
         return { output };
       } finally {

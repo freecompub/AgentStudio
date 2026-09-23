@@ -28,7 +28,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
         rolledBack.push(id);
       },
     },
-    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 1, pushed: 0 }) },
+    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 1, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 

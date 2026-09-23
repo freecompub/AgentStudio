@@ -142,4 +142,24 @@ describe("Exécuteur d'agent de tâche", () => {
       { requests: 2, inputTokens: 150, outputTokens: 15 },
     ]);
   });
+
+  it("report_blocker : le rôle qui le déclare peut suspendre sa tâche avec une question", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async (t) => void (await t.callTool("report_blocker", { question: "Plafond par prise ou par jour ?", choices: ["par prise", "par jour"] })));
+    const r = await runner.run({ ...TEST_AGENT, blocker: true }, "x");
+    expect(r).toEqual({ blocker: { question: "Plafond par prise ou par jour ?", choices: ["par prise", "par jour"] } });
+    expect(runtime.configs.get("fake-1")?.tools.map((t) => t.name)).toEqual(["report_phase", "report_blocker"]);
+  });
+
+  it("verdict de lentille : enum unique, défauts à schéma", async () => {
+    const { runtime, runner } = setup();
+    const errors: string[] = [];
+    runtime.behave("lens", async (t) => {
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "NEEDS_REWORK", defects: [] }).catch((e: Error) => errors.push(e.message));
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+    });
+    const r = await runner.run({ role: "lens", systemPrompt: "Relis.", writable: [], output: "submit_lens_verdict" }, "x");
+    expect(errors[0]).toMatch(/invalides/);
+    expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+  });
 });

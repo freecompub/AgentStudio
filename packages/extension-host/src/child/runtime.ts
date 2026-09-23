@@ -95,6 +95,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       },
       workspace: {
         readFile: (p) => call("workspace.readFile", [p]),
+        writeFile: (p, content) => call("workspace.writeFile", [p, content]),
         listFiles: () => call("workspace.listFiles", []),
         checkpoint: (label) => call("workspace.checkpoint", [label]),
         rollback: (id) => call("workspace.rollback", [id]),
@@ -104,6 +105,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       git: {
         commit: (message, opts) => call("git.commit", [message, opts ?? {}]),
         head: () => call("git.head", []),
+        branch: (name) => call("git.branch", [name]),
       },
       stack: {
         runTests: (opts) => {

@@ -70,7 +70,7 @@ describe("Extension tierce installée depuis un fichier (J6)", () => {
       root: join(dir, "projet"),
       files: { read: async () => "", write: async () => {}, list: async () => ["src/a.ts", "src/b.ts", "README.md"] },
       checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-      repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }) },
+      repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
     };
     await mkdir(workspace.root, { recursive: true });
     services = await workspaceServicesFactory({

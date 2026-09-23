@@ -68,6 +68,18 @@ describe("Workspace — clonage, commit, synchronisation", () => {
     expect(await ws.repo.commit("rien")).toBeNull();
   });
 
+  it("branche : créée depuis HEAD puis réutilisée, modifications conservées ; nom dangereux refusé", async () => {
+    const ws = await cloneWorkspace(`file://${remote}`, join(base, "clone"));
+    await put(ws.root, "wip.txt", "en cours\n");
+    await ws.repo.switchBranch("skraft/us-12");
+    expect(await git(ws.root, "branch", "--show-current")).toBe("skraft/us-12");
+    expect(await git(ws.root, "status", "--porcelain")).toBe("?? wip.txt");
+    await git(ws.root, "switch", "-q", "main");
+    await ws.repo.switchBranch("skraft/us-12");
+    expect(await git(ws.root, "branch", "--show-current")).toBe("skraft/us-12");
+    await expect(ws.repo.switchBranch("--orphan")).rejects.toThrow(/refusé/);
+  });
+
   it("sync : déjà à jour", async () => {
     const ws = await cloneWorkspace(`file://${remote}`, join(base, "clone"));
     expect(await ws.repo.sync()).toEqual({ pulled: 0, pushed: 0 });
