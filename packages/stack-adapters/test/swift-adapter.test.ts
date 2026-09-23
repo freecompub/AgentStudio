@@ -50,8 +50,9 @@ final class CapTests: XCTestCase {
     const run = await adapter.runTests({ root });
     expect(run.timedOut).toBe(false);
     expect(run.results).toEqual([
-      expect.objectContaining({ id: "DomainTests.CapTests/testOverCap", file: "Tests/DomainTests/CapTests.swift", status: "failed", failureKind: "assertion" }),
-      { id: "DomainTests.CapTests/testUnderCap", file: "", status: "passed" },
+      expect.objectContaining({ id: "Tests/DomainTests/CapTests.swift > DomainTests.CapTests/testOverCap", file: "Tests/DomainTests/CapTests.swift", status: "failed", failureKind: "assertion" }),
+      // Réussi : le fichier est retrouvé depuis la classe de test.
+      { id: "Tests/DomainTests/CapTests.swift > DomainTests.CapTests/testUnderCap", file: "Tests/DomainTests/CapTests.swift", status: "passed" },
     ]);
   }, 300_000);
 

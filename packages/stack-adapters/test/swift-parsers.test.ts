@@ -71,3 +71,10 @@ error: fatalError`;
     expect(classifySwiftBuildError(msg)).toBe(kind);
   });
 });
+
+describe("parseTestClasses", () => {
+  it("classes déclarées, commentaires ignorés", async () => {
+    const { parseTestClasses } = await import("../src/swift/swift-adapter.js");
+    expect(parseTestClasses("// class Ancienne: XCTestCase {}\nfinal class CapTests: XCTestCase {}\n/* class X: Y */\nclass Aide: NSObject {}\n")).toEqual(["CapTests", "Aide"]);
+  });
+});
