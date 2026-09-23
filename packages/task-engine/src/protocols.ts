@@ -13,8 +13,10 @@ export type SystemEvent =
 
 export type TaskEvent<E> = E | SystemEvent;
 
-export interface EffectContext {
+export interface EffectContext<S = unknown> {
   taskId: string;
+  /** État courant de la tâche (lecture seule), pour construire un dossier de passation. */
+  state: S;
   /** Déclenché par une annulation : l'effet doit s'interrompre au plus tôt. */
   signal: AbortSignal;
 }
@@ -27,7 +29,7 @@ export interface TaskDefinition<S, E extends { type: string }, F, D> {
   /** PUR : aucune I/O. */
   transition(state: S, event: TaskEvent<E>): { state: S; effects: F[] };
   /** Exécute un effet ; renvoie l'événement suivant, ou rien (attente d'un événement externe). */
-  runEffect(effect: F, deps: D, ctx: EffectContext): Promise<TaskEvent<E> | void>;
+  runEffect(effect: F, deps: D, ctx: EffectContext<S>): Promise<TaskEvent<E> | void>;
   /** Checkpoint Git avant l'effet (D23). Défaut : oui. */
   checkpointBefore?(effect: F): boolean;
   /** État terminal : la tâche ne reprendra plus. */

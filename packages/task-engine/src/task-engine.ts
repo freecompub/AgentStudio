@@ -1,4 +1,4 @@
-import { EnvFailureError, TurnTimeoutError, type Clock, type IdGenerator, type Logger } from "@agent-studio/core";
+import { EnvFailureError, WorkDefectError, type Clock, type IdGenerator, type Logger } from "@agent-studio/core";
 import type { SystemEvent, TaskCheckpoints, TaskDefinition, TaskEvent, TaskRecord, TaskStore } from "./protocols.js";
 
 export interface TaskEngineDeps {
@@ -73,7 +73,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
   }
 
   function toSystemEvent(err: unknown): SystemEvent {
-    if (err instanceof TurnTimeoutError) return { type: "TIMEOUT", reason: err.message };
+    if (err instanceof WorkDefectError) return { type: "TIMEOUT", reason: err.message };
     if (err instanceof EnvFailureError) return { type: "ENV_FAILURE", reason: err.message };
     // Erreur imprévue : jamais de réessai aveugle, escalade (D25).
     return { type: "ENV_FAILURE", reason: `Erreur inattendue : ${err instanceof Error ? err.message : String(err)}` };
@@ -98,7 +98,11 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
       let next: TaskEvent<{ type: string }> | void;
       try {
-        next = await t.def.runEffect(effect, t.deps, { taskId: t.record.id, signal: t.abort.signal });
+        next = await t.def.runEffect(effect, t.deps, {
+          taskId: t.record.id,
+          state: structuredClone(t.record.state),
+          signal: t.abort.signal,
+        });
       } catch (err) {
         next = toSystemEvent(err);
         deps.logger?.warn("effet en échec", { taskId: t.record.id, event: next.type, reason: "reason" in next ? next.reason : "" });

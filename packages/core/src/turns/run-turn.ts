@@ -1,7 +1,18 @@
 import type { AgentEvent, AgentSession } from "../protocols/agent-runtime.js";
 
+/**
+ * Défaut de travail de l'agent (silence, sortie structurée absente…) : réessai ciblé
+ * si le budget le permet, jamais d'escalade immédiate (D24, D25).
+ */
+export class WorkDefectError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "WorkDefectError";
+  }
+}
+
 /** Silence de l'agent au-delà du seuil : traité comme un rejet par le réducteur (§6.2). */
-export class TurnTimeoutError extends Error {
+export class TurnTimeoutError extends WorkDefectError {
   constructor(readonly idleMs: number) {
     super(`Aucune activité de l'agent depuis ${Math.round(idleMs / 1000)} s`);
     this.name = "TurnTimeoutError";

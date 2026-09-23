@@ -11,6 +11,8 @@ export class ScriptedSession implements AgentSession {
   private listeners = new Set<(e: AgentEvent) => void>();
   private sendError: Error | undefined;
   private scripts: ((prompt: string, session: ScriptedSession) => void | Promise<void>)[] = [];
+  /** Réaction par défaut quand aucun script ponctuel n'est programmé. */
+  defaultScript: ((prompt: string, session: ScriptedSession) => void | Promise<void>) | undefined;
 
   constructor(readonly id: string) {}
 
@@ -35,7 +37,7 @@ export class ScriptedSession implements AgentSession {
       throw err;
     }
     this.sent.push(prompt);
-    const script = this.scripts.shift();
+    const script = this.scripts.shift() ?? this.defaultScript;
     if (script) queueMicrotask(() => void script(prompt, this));
   }
 

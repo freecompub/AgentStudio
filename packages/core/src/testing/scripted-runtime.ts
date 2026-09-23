@@ -1,6 +1,19 @@
 import type { AgentRuntime, AgentSessionConfig, RuntimeCapabilities } from "../protocols/agent-runtime.js";
 import { ScriptedSession } from "./scripted-session.js";
 
+/** Ce qu'un comportement d'agent scripté peut faire pendant un tour. */
+export interface ScriptedTurn {
+  prompt: string;
+  config: AgentSessionConfig;
+  session: ScriptedSession;
+  /** Appelle un de nos outils comme le ferait le modèle ; renvoie le résultat ou lève l'erreur du handler. */
+  callTool(name: string, args: unknown): Promise<unknown>;
+  /** Le tour ne se termine jamais (agent muet, plantage). */
+  hang(): void;
+}
+
+export type ScriptedBehavior = (turn: ScriptedTurn) => void | Promise<void>;
+
 /**
  * Faux `AgentRuntime` pour les tests d'intégration (§16) : aucune requête au LLM.
  * Les sessions sont des `ScriptedSession` que le test pilote.
@@ -18,10 +31,47 @@ export class ScriptedRuntime implements AgentRuntime {
   readonly sessions = new Map<string, ScriptedSession>();
   readonly configs = new Map<string, AgentSessionConfig>();
   readonly deleted: string[] = [];
+  /** Toutes les sessions ouvertes ou reprises, y compris supprimées depuis. */
+  readonly history: ScriptedSession[] = [];
   started = false;
   /** Identifiants que `resumeSession` doit refuser (session disparue côté runtime). */
   readonly unresumable = new Set<string>();
   private counter = 0;
+  private behaviors = new Map<string, ScriptedBehavior>();
+
+  /** Comportement joué à chaque tour des sessions ouvertes pour `role` (tâches, agents). */
+  behave(role: string, behavior: ScriptedBehavior): this {
+    this.behaviors.set(role, behavior);
+    return this;
+  }
+
+  private wire(session: ScriptedSession, cfg: AgentSessionConfig): void {
+    const behavior = this.behaviors.get(cfg.role);
+    if (!behavior) return;
+    session.defaultScript = async (prompt, s) => {
+      let hung = false;
+      try {
+        await behavior({
+          prompt,
+          config: cfg,
+          session: s,
+          hang: () => void (hung = true),
+          callTool: async (name, args) => {
+            const tool = cfg.tools.find((t) => t.name === name);
+            if (!tool) throw new Error(`Outil inconnu : ${name}`);
+            s.emit({ type: "tool-start", toolCallId: name, toolName: name });
+            const r = await tool.handler(args);
+            s.emit({ type: "tool-end", toolCallId: name, success: true });
+            return r;
+          },
+        });
+      } catch (err) {
+        s.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
+        return;
+      }
+      if (!hung) s.emit({ type: "idle" });
+    };
+  }
 
   async start(): Promise<void> {
     this.started = true;
@@ -35,6 +85,8 @@ export class ScriptedRuntime implements AgentRuntime {
     const session = new ScriptedSession(`fake-${++this.counter}`);
     this.sessions.set(session.id, session);
     this.configs.set(session.id, cfg);
+    this.history.push(session);
+    this.wire(session, cfg);
     return session;
   }
 
@@ -43,6 +95,7 @@ export class ScriptedRuntime implements AgentRuntime {
     const session = this.sessions.get(id) ?? new ScriptedSession(id);
     this.sessions.set(id, session);
     this.configs.set(id, cfg);
+    this.history.push(session);
     return session;
   }
 
@@ -53,8 +106,7 @@ export class ScriptedRuntime implements AgentRuntime {
 
   /** Dernière session ouverte ou reprise. */
   get last(): ScriptedSession {
-    const all = [...this.sessions.values()];
-    const s = all[all.length - 1];
+    const s = this.history[this.history.length - 1];
     if (!s) throw new Error("Aucune session ouverte");
     return s;
   }

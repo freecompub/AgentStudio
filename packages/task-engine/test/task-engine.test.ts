@@ -1,4 +1,4 @@
-import { EnvFailureError, TurnTimeoutError } from "@agent-studio/core";
+import { EnvFailureError, TurnTimeoutError, WorkDefectError } from "@agent-studio/core";
 import { fixedClock, RecordingCheckpoints, sequentialIds } from "@agent-studio/core/testing";
 import { describe, expect, it } from "vitest";
 import { createTaskEngine } from "../src/task-engine.js";
@@ -129,6 +129,31 @@ describe("Moteur de tâches", () => {
     const s = (await store.load(id))?.state as S;
     expect(s.log).toEqual(["TIMEOUT", "ENV_FAILURE"]);
     expect(s.phase).toBe("ESCALATED");
+  });
+
+  it("un défaut de travail (WorkDefectError) devient TIMEOUT : réessai, pas escalade", async () => {
+    let first = true;
+    const def = counterTask(async () => {
+      if (first) {
+        first = false;
+        throw new WorkDefectError("outil de fin non appelé");
+      }
+      return { type: "WORKED" };
+    });
+    const { engine, store } = start(def);
+    const id = await engine.start("compteur", { target: 1 });
+    await engine.idle(id);
+    expect(((await store.load(id))?.state as S).log).toEqual(["TIMEOUT", "WORKED"]);
+  });
+
+  it("l'effet reçoit une copie de l'état courant", async () => {
+    const seen: unknown[] = [];
+    const def = counterTask(async () => ({ type: "WORKED" }));
+    const spy: typeof def = { ...def, runEffect: async (f, d, ctx) => (seen.push(ctx.state), def.runEffect(f, d, ctx)) };
+    const { engine } = start(spy);
+    const id = await engine.start("compteur", { target: 2 });
+    await engine.idle(id);
+    expect(seen).toEqual([expect.objectContaining({ n: 0 }), expect.objectContaining({ n: 1 })]);
   });
 
   it("une erreur inattendue d'un effet est traitée comme un défaut d'environnement (escalade, jamais de boucle)", async () => {
