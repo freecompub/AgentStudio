@@ -1,6 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  },
   "include": [
     "packages/*/src",
     "packages/*/test",
@@ -9,5 +13,8 @@
     "apps/desktop/src/shared",
     "apps/desktop/test",
     "vitest.config.ts"
+  ],
+  "exclude": [
+    "apps/desktop/test/renderer"
   ]
 }

@@ -2,9 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## État du dépôt
+## État du dépôt et commandes
 
-Le dépôt ne contient **encore aucun code applicatif** : uniquement la spécification (`docs/`) et deux prototypes TypeScript. Il n'y a ni `package.json`, ni commandes de build, lint ou test pour l'instant. Quand le monorepo sera créé, mettre à jour ce fichier avec les commandes réelles (pnpm, Vitest, lancement d'Electron, exécution d'un seul test).
+Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalon en cours : **J1** (branche `feat/j1-socle`).
+
+```bash
+pnpm install
+pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
+pnpm vitest run --project core  # un seul paquet (core, workspace, runtime-copilot, github-auth, desktop)
+pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
+pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
+pnpm dev                        # Electron en développement (electron-vite)
+pnpm build                      # build Electron dans apps/desktop/out
+pnpm smoke:copilot              # essai réel contre Copilot (hors CI, consomme des requêtes)
+```
+
+Les paquets internes exportent directement `src/index.ts` (pas d'étape de build, ADR 0001).
+Chaque paquet décrit ses capacités dans `src/protocols.ts` (ou `src/protocols/`) ; les implémentations
+sont des fabriques `createX(deps)` injectables. Les doubles de test du cœur sont exportés par
+`@agent-studio/core/testing` (`ScriptedRuntime`, `ScriptedSession`…).
 
 Toute la documentation est en français ; écrire les ADR, messages et libellés en français.
 
