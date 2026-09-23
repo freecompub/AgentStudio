@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
   createHookRegistry,
+  createUsageRecorder,
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
@@ -18,7 +19,7 @@ import {
 } from "@agent-studio/core";
 import { ScriptedRuntime, sequentialIds, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { activateInProcess, activateIsolated, bundle, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
-import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
+import { createTypeScriptAdapter, type StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord } from "@agent-studio/task-engine";
 import { openWorkspace } from "@agent-studio/workspace";
 import { manifest, tddExtension, type TddState } from "../../src/index.js";
@@ -118,9 +119,17 @@ export async function shutdownHosts(): Promise<void> {
   for (const h of handles.splice(0)) await h.deactivate().catch(() => undefined);
 }
 
-export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, mode: HostMode = "in-process") {
+export async function assemble(
+  root: string,
+  runtime: ScriptedRuntime,
+  tasksDir: string,
+  mode: HostMode = "in-process",
+  opts: { stack?: StackAdapter } = {},
+) {
+  const usage = createUsageRecorder(join(tasksDir, "usage"));
   const workspace = await openWorkspace(root);
   const engine = createTaskEngine({
+    usage,
     store: createJsonTaskStore(tasksDir),
     checkpoints: workspace.checkpoints,
     clock: { now: () => new Date() },
@@ -139,11 +148,12 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     engine,
     agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
     workspace,
-    stack: createTypeScriptAdapter(),
+    stack: opts.stack ?? createTypeScriptAdapter(),
     interactions,
     chat: { post: (_ext, md) => void posted.push(md) },
     evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
     hooks: createHookRegistry(),
+    usage,
     clock: { now: () => new Date() },
     ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
   };
@@ -159,7 +169,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     );
   }
   const evidence = createJsonEvidenceStore(join(tasksDir, "evidence"));
-  return { engine, interactions, registry, posted, workspace, evidence };
+  return { engine, interactions, registry, posted, workspace, evidence, usage };
 }
 
 export async function until(check: () => Promise<boolean>, timeoutMs = 45_000): Promise<void> {
