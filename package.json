@@ -1,0 +1,21 @@
+{
+  "name": "agent-studio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "pnpm --filter @agent-studio/desktop dev",
+    "build": "pnpm --filter @agent-studio/desktop build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}
