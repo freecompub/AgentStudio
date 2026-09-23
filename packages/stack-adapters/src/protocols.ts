@@ -49,8 +49,16 @@ export interface ArchitectureReport {
   violations: { module: string; file: string; imported: string }[];
 }
 
+/** Emplacements conventionnels d'une stack (motifs `@stack:*` des manifestes, SPEC-skraft §10). */
+export interface StackLayout {
+  acceptanceTests: string[];
+  unitTests: string[];
+  sources: string[];
+}
+
 export interface StackAdapter {
   readonly id: "typescript" | "swift" | "dotnet";
+  readonly layout: StackLayout;
   /** Vrai si l'adaptateur reconnaît le projet. */
   detect(root: string): Promise<boolean>;
   runTests(opts: RunTestsOptions): Promise<TestRun>;

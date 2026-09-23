@@ -37,6 +37,7 @@ export function createSwiftAdapter(deps: SwiftAdapterDeps = {}): StackAdapter {
 
   return {
     id: "swift",
+    layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
     testFilePattern: TEST_FILE.source,
     isTestFile: (p) => TEST_FILE.test(p.replaceAll("\\", "/")),
 

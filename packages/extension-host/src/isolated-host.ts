@@ -49,6 +49,7 @@ const CALLS: Record<string, Dispatch> = {
   "workspace.rollback": (ctx, [id]) => ctx.workspace.rollback(String(id)),
   "workspace.changedFiles": (ctx, [id]) => ctx.workspace.changedFiles(String(id)),
   "workspace.fingerprintTests": (ctx) => ctx.workspace.fingerprintTests(),
+  "workspace.fingerprint": (ctx, [globs]) => ctx.workspace.fingerprint((globs as unknown[]).map(String)),
   "git.commit": (ctx, [message, opts]) => ctx.git.commit(String(message), opts as { paths?: string[] }),
   "git.head": (ctx) => ctx.git.head(),
   "git.branch": (ctx, [name]) => ctx.git.branch(String(name)),
@@ -124,7 +125,7 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
           },
         });
         rpc = endpoint;
-        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: ext.entry, testFilePattern: deps.stack.testFilePattern };
+        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: ext.entry, testFilePattern: deps.stack.testFilePattern, layout: deps.stack.layout };
         await endpoint.call("activate", [req], { timeoutMs: opts.activationTimeoutMs ?? 15_000 });
       },
       async deactivate() {

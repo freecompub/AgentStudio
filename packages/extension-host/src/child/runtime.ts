@@ -5,6 +5,7 @@ import type { MessageChannelLike } from "../rpc/protocol.js";
 
 export interface ActivationRequest {
   extensionId: string;
+  layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /** Chemin absolu de l'entrée compilée de l'extension. */
   entry: string;
   testFilePattern: string;
@@ -113,6 +114,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
         rollback: (id) => call("workspace.rollback", [id]),
         changedFiles: (id) => call("workspace.changedFiles", [id]),
         fingerprintTests: () => call("workspace.fingerprintTests", []),
+        fingerprint: (globs) => call("workspace.fingerprint", [globs]),
       },
       git: {
         commit: (message, opts) => call("git.commit", [message, opts ?? {}]),
@@ -125,6 +127,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
           return call("stack.runTests", [rest], signal);
         },
         isTestFile: (p) => testFile.test(p.replaceAll("\\", "/")),
+        layout: r.layout,
       },
       tasks: {
         register(def) {

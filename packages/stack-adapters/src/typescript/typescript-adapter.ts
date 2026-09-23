@@ -20,6 +20,7 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
 
   return {
     id: "typescript",
+    layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**", "src/**/*.test.ts"], sources: ["src/**"] },
 
     async detect(root) {
       try {

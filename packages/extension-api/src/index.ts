@@ -37,7 +37,7 @@ export interface ManifestAgent {
   /** Prompt de rôle (texte). */
   role: string;
   output: TerminalToolName;
-  /** Périmètre d'écriture (globs) ; absent = lecture seule. */
+  /** Périmètre d'écriture (globs, ou `@stack:acceptanceTests|unitTests|sources`) ; absent = lecture seule. */
   write?: string[];
   /**
    * Outils mis à disposition de l'agent : outils standard du cœur (§6.5, `run_tests` exige
@@ -125,6 +125,8 @@ export interface WorkspaceApi {
   changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
   /** Empreinte des fichiers de test du projet, au sens de l'adaptateur de stack (gel des tests, D21). */
   fingerprintTests(): Promise<string>;
+  /** Empreinte des fichiers correspondant aux motifs (`@stack:*` résolus), ex. tests d'acceptance gelés. */
+  fingerprint(globs: string[]): Promise<string>;
 }
 
 export interface GitApi {
@@ -136,6 +138,8 @@ export interface GitApi {
 }
 
 export interface StackApi {
+  /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources). */
+  readonly layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;

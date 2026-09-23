@@ -37,7 +37,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
   const queue = [...runs];
   const outputs: string[] = [];
   const stack: StackAdapter = {
-    id: "typescript",
+    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, 
     detect: async () => true,
     isTestFile: (p) => p.startsWith("tests/"),
     testFilePattern: "^tests/",

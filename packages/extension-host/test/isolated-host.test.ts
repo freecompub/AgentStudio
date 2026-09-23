@@ -41,7 +41,7 @@ function deps() {
     repo: { head: async () => "h", commit: async () => "sha", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
   const stack: StackAdapter = {
-    id: "typescript",
+    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, 
     detect: async () => true,
     isTestFile: (p) => p.startsWith("tests/"),
     testFilePattern: "^tests/",

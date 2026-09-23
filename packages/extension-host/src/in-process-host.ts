@@ -59,6 +59,12 @@ export interface ExtensionHandle {
 export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): Promise<ExtensionHandle> {
   const { manifest } = ext;
   const perm = permissionChecker(manifest);
+  /** Motifs `@stack:*` résolus par l'adaptateur de stack du projet (SPEC-skraft §10). */
+  const resolveGlobs = (globs: string[]): string[] =>
+    globs.flatMap((g) => {
+      const m = /^@stack:(acceptanceTests|unitTests|sources)$/.exec(g);
+      return m ? deps.stack.layout[m[1] as keyof typeof deps.stack.layout] : [g];
+    });
   const log = deps.logger?.child({ extensionId: manifest.id });
   const declared = {
     commands: new Map((manifest.contributes.commands ?? []).map((c) => [c.name, c])),
@@ -71,7 +77,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       if (!writeGlobs.has(g)) throw new Error(`L'agent ${a.name} écrit dans ${g} sans la permission fs:write:${g}`);
 
   for (const a of declared.agents.values())
-    deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: a.role, writable: a.write ?? [], output: a.output });
+    deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: a.role, writable: resolveGlobs(a.write ?? []), output: a.output });
 
   const taskName = (name: string) => `${manifest.id}/${name}`;
   const declaredTools = new Map((manifest.contributes.tools ?? []).map((t) => [t.name, t]));
@@ -109,7 +115,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const taskId = opts?.evidence?.taskId;
         const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
         const r = await deps.agents.run(
-          { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: a.write ?? [], output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
+          { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: resolveGlobs(a.write ?? []), output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
@@ -145,7 +151,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       readFile: async (p) => (perm.require("fs:read"), deps.workspace.files.read(p)),
       async writeFile(p, content) {
         const rel = p.replaceAll("\\", "/");
-        if (!matchesAny(perm.writeGlobs(), rel)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
+        if (!matchesAny(resolveGlobs(perm.writeGlobs()), rel)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
         await deps.workspace.files.write(rel, content);
       },
       listFiles: async () => (perm.require("fs:read"), deps.workspace.files.list()),
@@ -155,6 +161,11 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       async fingerprintTests() {
         perm.require("fs:read");
         return fingerprintFiles(deps.workspace.files, (p) => deps.stack.isTestFile(p));
+      },
+      async fingerprint(globs) {
+        perm.require("fs:read");
+        const resolved = resolveGlobs(globs);
+        return fingerprintFiles(deps.workspace.files, (p) => matchesAny(resolved, p));
       },
     },
 
@@ -170,6 +181,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         return testRuns.run({ source: "gate", ...(opts?.signal ? { signal: opts.signal } : {}), ...(opts?.evidence ? { tag: opts.evidence } : {}) });
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
+      layout: deps.stack.layout,
     },
 
     tasks: {
