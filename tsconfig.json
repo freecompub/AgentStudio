@@ -8,6 +8,8 @@
   "include": [
     "packages/*/src",
     "packages/*/test",
+    "extensions/*/src",
+    "extensions/*/test",
     "apps/desktop/src/main",
     "apps/desktop/src/preload",
     "apps/desktop/src/shared",
