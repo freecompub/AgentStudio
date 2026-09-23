@@ -2,13 +2,13 @@
  * API publique des extensions (§5.4), version 0.1 : non figée avant la 1.0 (D14).
  * Une extension ne voit que `ExtensionContext` : aucun objet du SDK, aucune session (D10).
  */
-import type { TerminalOutput, TerminalToolName } from "@agent-studio/core";
+import type { Evidence, TerminalOutput, TerminalToolName } from "@agent-studio/core";
 import type { TestRun } from "@agent-studio/stack-adapters";
 import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 
 export const API_VERSION = "0.1.0";
 
-export type { TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
+export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { TestResult } from "@agent-studio/stack-adapters";
 export type { TaskEvent, EffectContext } from "@agent-studio/task-engine";
 
@@ -39,6 +39,8 @@ export interface ManifestAgent {
   output: TerminalToolName;
   /** Périmètre d'écriture (globs) ; absent = lecture seule. */
   write?: string[];
+  /** Outils standard fournis par le cœur (§6.5). `run_tests` exige `shell:test`. */
+  tools?: "run_tests"[];
 }
 
 export interface ManifestTask {
@@ -76,9 +78,24 @@ export interface ChatApi {
   post(markdown: string): void;
 }
 
+/** Rattache les preuves produites pendant un appel à une tâche et une étape. */
+export interface EvidenceTag {
+  taskId: string;
+  stepId?: string;
+  phase?: string;
+}
+
+export interface AgentRunOptions {
+  signal?: AbortSignal;
+  /** Preuves des `run_tests` de l'agent rattachées à cette étiquette. */
+  evidence?: EvidenceTag;
+  /** Gel des tests actif dans le tour : après une exécution rouge, plus aucune écriture de test (D22). */
+  freezeTestsAfterRed?: boolean;
+}
+
 export interface AgentsApi {
   /** Lance un agent déclaré par l'extension ; ne renvoie qu'un résultat sérialisé. */
-  run<N extends TerminalToolName>(name: string, prompt: string, opts?: { signal?: AbortSignal }): Promise<{ output: TerminalOutput<N> }>;
+  run<N extends TerminalToolName>(name: string, prompt: string, opts?: AgentRunOptions): Promise<{ output: TerminalOutput<N> }>;
 }
 
 export interface WorkspaceApi {
@@ -98,8 +115,14 @@ export interface GitApi {
 }
 
 export interface StackApi {
-  runTests(opts?: { signal?: AbortSignal }): Promise<TestRun>;
+  /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
+  runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;
+}
+
+export interface EvidenceApi {
+  /** Preuves d'une tâche, dans l'ordre : produites par le cœur, en lecture seule. */
+  list(taskId: string): Promise<Evidence[]>;
 }
 
 export interface TasksApi {
@@ -128,6 +151,7 @@ export interface ExtensionContext {
   readonly stack: StackApi;
   readonly tasks: TasksApi;
   readonly interactions: InteractionsApi;
+  readonly evidence: EvidenceApi;
   readonly log: ExtensionLog;
 }
 

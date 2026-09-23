@@ -1,9 +1,10 @@
-import type { InteractionService, Logger, Registry, TaskAgentRunner } from "@agent-studio/core";
+import type { Clock, EvidenceStore, IdGenerator, InteractionService, Logger, Registry, TaskAgentRunner } from "@agent-studio/core";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agent-studio/extension-api";
 import { fingerprintFiles, type StackAdapter } from "@agent-studio/stack-adapters";
 import type { TaskEngine } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { permissionChecker } from "./permissions.js";
+import { createTestRunService, runTestsTool, testFreezeGuard } from "./test-runs.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
 export interface ExtensionChatSink {
@@ -17,7 +18,10 @@ export interface HostDeps {
   workspace: Workspace;
   stack: StackAdapter;
   interactions: InteractionService;
+  evidence: EvidenceStore;
   chat: ExtensionChatSink;
+  clock: Clock;
+  ids: IdGenerator;
   logger?: Logger;
 }
 
@@ -54,6 +58,10 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: a.role, writable: a.write ?? [], output: a.output });
 
   const taskName = (name: string) => `${manifest.id}/${name}`;
+  const testRuns = createTestRunService(deps);
+  for (const a of declared.agents.values())
+    if (a.tools?.includes("run_tests") && !perm.has("shell:test"))
+      throw new Error(`L'agent ${a.name} utilise run_tests sans la permission shell:test`);
 
   const ctx: ExtensionContext = {
     extensionId: manifest.id,
@@ -73,10 +81,28 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         perm.require("copilot:sessions");
         const a = declared.agents.get(name);
         if (!a) throw new Error(`Agent non déclaré dans le manifeste : ${name}`);
+        let frozen = false;
         const r = await deps.agents.run(
           { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: a.write ?? [], output: a.output },
           prompt,
-          opts?.signal ? { signal: opts.signal } : {},
+          {
+            ...(opts?.signal ? { signal: opts.signal } : {}),
+            ...(a.tools?.includes("run_tests")
+              ? {
+                  tools: (beat: () => void) => [
+                    runTestsTool(testRuns, {
+                      beat,
+                      ...(opts?.signal ? { signal: opts.signal } : {}),
+                      ...(opts?.evidence ? { tag: opts.evidence } : {}),
+                      onRun: (run) => {
+                        if (opts?.freezeTestsAfterRed && run.results.some((t) => t.status === "failed")) frozen = true;
+                      },
+                    }),
+                  ],
+                }
+              : {}),
+            ...(opts?.freezeTestsAfterRed ? { guards: [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] } : {}),
+          },
         );
         return { output: structuredClone(r.output) } as never;
       },
@@ -102,7 +128,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     stack: {
       runTests: async (opts) => {
         perm.require("shell:test");
-        return deps.stack.runTests({ root: deps.workspace.root, ...(opts?.signal ? { signal: opts.signal } : {}) });
+        return testRuns.run({ source: "gate", ...(opts?.signal ? { signal: opts.signal } : {}), ...(opts?.evidence ? { tag: opts.evidence } : {}) });
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
     },
@@ -119,6 +145,10 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
 
     interactions: {
       request: (req) => deps.interactions.request({ ...req, extensionId: manifest.id }),
+    },
+
+    evidence: {
+      list: async (taskId) => (perm.require("fs:read"), deps.evidence.list(taskId)),
     },
 
     log: {

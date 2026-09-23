@@ -1,5 +1,5 @@
 import { createInteractionService, createRegistry, type TaskAgentRunner, type TaskAgentSpec } from "@agent-studio/core";
-import { fixedClock, MemoryInteractionStore, RecordingCheckpoints, sequentialIds } from "@agent-studio/core/testing";
+import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, RecordingCheckpoints, sequentialIds } from "@agent-studio/core/testing";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agent-studio/extension-api";
 import type { StackAdapter } from "@agent-studio/stack-adapters";
 import { createTaskEngine, MemoryTaskStore } from "@agent-studio/task-engine";
@@ -65,6 +65,9 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
       deliver: (taskId, option, comment) => engine.dispatch(taskId, { type: "HUMAN_DECISION", decision: option, ...(comment ? { comment } : {}) }),
     }),
     chat: { post: (ext, md) => void posted.push(`${ext}: ${md}`) },
+    evidence: new MemoryEvidenceStore(),
+    clock: fixedClock(),
+    ids: sequentialIds("ev-"),
   };
   return { deps, runs, posted };
 }
@@ -174,7 +177,7 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, posted } = await activateWith(() => {});
     ctx.chat.post("Bonjour");
     expect(posted).toEqual(["diabeo.demo: Bonjour"]);
-    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "extensionId", "git", "interactions", "log", "stack", "tasks", "workspace"]);
+    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "interactions", "log", "stack", "tasks", "workspace"]);
   });
 
   it("désactivation : capacités retirées du registre", async () => {

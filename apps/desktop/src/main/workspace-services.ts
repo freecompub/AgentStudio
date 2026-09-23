@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import {
   createInteractionService,
+  createJsonEvidenceStore,
   createLazyRuntime,
   createRegistry,
   createTaskAgentRunner,
   MemoryInteractionStore,
   routeIntent,
   type Clock,
+  type EvidenceStore,
   type IdGenerator,
   type Logger,
 } from "@agent-studio/core";
@@ -27,8 +29,9 @@ export interface WorkspaceServicesConfig {
   clock: Clock;
   ids: IdGenerator;
   logger?: Logger;
-  /** Pour les tests : stockage des tâches imposé. */
+  /** Pour les tests : stockages imposés. */
   taskStore?: TaskStore;
+  evidenceStore?: EvidenceStore;
   agentIdleMs?: number;
 }
 
@@ -85,6 +88,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       if (record.status === "finished") void interactions.cancelForTask(record.id);
     });
 
+    const evidence = cfg.evidenceStore ?? createJsonEvidenceStore(join(cfg.tasksDir, projectKey, "evidence"));
     const registry = createRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of cfg.extensions) {
@@ -101,6 +105,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           workspace,
           stack: cfg.stack,
           interactions,
+          evidence,
+          clock: cfg.clock,
+          ids: cfg.ids,
           chat: { post: onPost },
           ...(cfg.logger ? { logger: cfg.logger } : {}),
         }),

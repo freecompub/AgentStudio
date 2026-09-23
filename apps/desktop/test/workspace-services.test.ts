@@ -1,4 +1,4 @@
-import { fixedClock, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
+import { fixedClock, MemoryEvidenceStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
@@ -34,6 +34,7 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     stack: { id: "typescript", detect: async () => true, isTestFile: (p) => p.startsWith("tests/"), runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) },
     tasksDir: "/inutile",
     taskStore: store,
+    evidenceStore: new MemoryEvidenceStore(),
     clock: fixedClock(),
     ids: sequentialIds("id-"),
   })({

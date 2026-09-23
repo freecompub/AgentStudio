@@ -1,3 +1,4 @@
+import type { Evidence, EvidenceStore } from "../protocols/evidence.js";
 import type { InteractionRequest, InteractionStore } from "../protocols/interactions.js";
 import type {
   Clock,
@@ -54,5 +55,17 @@ export class MemoryInteractionStore implements InteractionStore {
 
   async list(): Promise<InteractionRequest[]> {
     return [...this.records.values()].map((r) => structuredClone(r));
+  }
+}
+
+export class MemoryEvidenceStore implements EvidenceStore {
+  readonly items: Evidence[] = [];
+
+  async append(e: Evidence): Promise<void> {
+    this.items.push(structuredClone(e));
+  }
+
+  async list(taskId: string): Promise<Evidence[]> {
+    return this.items.filter((e) => e.taskId === taskId).map((e) => structuredClone(e));
   }
 }

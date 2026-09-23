@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { createInteractionService, createRegistry, createTaskAgentRunner } from "@agent-studio/core";
+import { createInteractionService, createJsonEvidenceStore, createRegistry, createTaskAgentRunner } from "@agent-studio/core";
 import { fixedClock, MemoryInteractionStore, ScriptedRuntime, sequentialIds, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { activateInProcess } from "@agent-studio/extension-host";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
@@ -113,6 +113,9 @@ async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string
       stack: createTypeScriptAdapter(),
       interactions,
       chat: { post: (_ext, md) => void posted.push(md) },
+      evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
+      clock: { now: () => new Date() },
+      ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
     },
   );
   return { engine, interactions, registry, posted, workspace };
