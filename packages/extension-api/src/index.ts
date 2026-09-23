@@ -156,8 +156,17 @@ export interface TasksApi {
 }
 
 export interface InteractionsApi {
-  /** Demande persistée ; la réponse arrive dans la tâche comme `HUMAN_DECISION`. */
-  request(req: { taskId: string; title: string; detail?: string; options: { id: string; label: string }[] }): Promise<string>;
+  /**
+   * Demande persistée ; la réponse arrive dans la tâche comme `HUMAN_DECISION`.
+   * `requiredRoles` réserve la réponse à certains profils (ex. un architecte ratifie un ADR).
+   */
+  request(req: {
+    taskId: string;
+    title: string;
+    detail?: string;
+    options: { id: string; label: string }[];
+    requiredRoles?: ("testeur" | "po" | "developpeur" | "architecte" | "administrateur")[];
+  }): Promise<string>;
 }
 
 export interface ExtensionLog {

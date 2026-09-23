@@ -1,5 +1,6 @@
 import type { Clock, IdGenerator } from "../protocols/conversation.js";
 import type { InteractionOption, InteractionRequest, InteractionStore } from "../protocols/interactions.js";
+import { ROLE_LABELS, type Role } from "../protocols/profile.js";
 
 export interface InteractionServiceDeps {
   store: InteractionStore;
@@ -15,11 +16,13 @@ export interface NewInteraction {
   title: string;
   detail?: string;
   options: InteractionOption[];
+  requiredRoles?: Role[];
 }
 
 export interface InteractionService {
   request(req: NewInteraction): Promise<string>;
-  respond(id: string, option: string, comment?: string): Promise<void>;
+  /** `by` : profil de l'utilisateur qui répond, vérifié contre `requiredRoles`. */
+  respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
   pending(): Promise<InteractionRequest[]>;
   cancelForTask(taskId: string): Promise<void>;
   onChange(cb: (pending: InteractionRequest[]) => void): () => void;
@@ -52,17 +55,20 @@ export function createInteractionService(deps: InteractionServiceDeps): Interact
         title: req.title,
         options: req.options,
         ...(req.detail ? { detail: req.detail } : {}),
+        ...(req.requiredRoles?.length ? { requiredRoles: req.requiredRoles } : {}),
       };
       await deps.store.save(record);
       await notify();
       return record.id;
     },
 
-    async respond(id, option, comment) {
+    async respond(id, option, comment, by) {
       const req = (await deps.store.list()).find((r) => r.id === id);
       if (!req) throw new Error(`Demande introuvable : ${id}`);
       if (req.status !== "pending") throw new Error("Cette demande a déjà été traitée");
       if (!req.options.some((o) => o.id === option)) throw new Error(`Option non autorisée : ${option}`);
+      if (req.requiredRoles?.length && (!by || !req.requiredRoles.includes(by.role)))
+        throw new Error(`Seul le profil ${req.requiredRoles.map((r) => ROLE_LABELS[r]).join(" ou ")} peut répondre à cette demande.`);
       await deps.deliver(req.taskId, option, comment);
       await deps.store.save({
         ...req,

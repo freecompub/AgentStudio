@@ -14,6 +14,7 @@ const schema = z.object({
   title: z.string(),
   detail: z.string().optional(),
   options: z.array(z.object({ id: z.string(), label: z.string() })),
+  requiredRoles: z.array(z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"])).optional(),
   createdAt: z.string(),
   status: z.enum(["pending", "answered", "cancelled"]),
   answer: z.object({ option: z.string(), comment: z.string().optional(), answeredAt: z.string() }).optional(),
