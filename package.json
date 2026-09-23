@@ -11,10 +11,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "pnpm --filter @agent-studio/desktop dev",
-    "build": "pnpm --filter @agent-studio/desktop build"
+    "build": "pnpm --filter @agent-studio/desktop build",
+    "smoke:copilot": "tsx scripts/smoke-copilot.ts"
   },
   "devDependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/github-auth": "workspace:*",
+    "@agent-studio/runtime-copilot": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
     "@types/node": "^22.19.0",
+    "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
   }

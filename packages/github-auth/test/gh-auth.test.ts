@@ -1,0 +1,114 @@
+import { describe, expect, it } from "vitest";
+import { createGhAuth } from "../src/gh-auth.js";
+import type { CommandResult, CommandRunner, InteractiveProcess, ProcessSpawner } from "../src/protocols.js";
+
+function runner(table: Record<string, CommandResult>): CommandRunner & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    async run(cmd, args) {
+      const key = [cmd, ...args].join(" ");
+      calls.push(key);
+      const r = table[key];
+      if (!r) throw new Error(`commande inattendue : ${key}`);
+      return r;
+    },
+  };
+}
+
+const ok = (stdout: string): CommandResult => ({ code: 0, stdout, stderr: "" });
+const ko = (stderr: string): CommandResult => ({ code: 1, stdout: "", stderr });
+
+const LOGGED_IN = {
+  "gh auth status --hostname github.com": ok(""),
+  "gh api --hostname github.com user --jq .login": ok("octo\n"),
+  "gh auth token --hostname github.com": ok("gho_abc\n"),
+};
+
+describe("GhAuth", () => {
+  it("statut connecté avec le nom d'utilisateur", async () => {
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: null as never });
+    expect(await auth.status()).toEqual({ loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true });
+  });
+
+  it.each([
+    ["ghp_x", "classic-pat", false],
+    ["github_pat_x", "fine-grained-pat", true],
+    ["gho_x", "oauth", true],
+    ["autre", "unknown", true],
+  ] as const)("jeton %s : nature %s, compatible Copilot = %s", async (token, tokenKind, copilotCompatible) => {
+    const auth = createGhAuth({
+      runner: runner({ ...LOGGED_IN, "gh auth token --hostname github.com": ok(`${token}\n`) }),
+      spawner: null as never,
+    });
+    expect(await auth.status()).toMatchObject({ tokenKind, copilotCompatible });
+  });
+
+  it("statut déconnecté", async () => {
+    const auth = createGhAuth({
+      runner: runner({ "gh auth status --hostname github.com": ko("You are not logged into any GitHub hosts") }),
+      spawner: null as never,
+    });
+    expect(await auth.status()).toEqual({ loggedIn: false });
+  });
+
+  it("gh absent : message explicite", async () => {
+    const auth = createGhAuth({
+      runner: { run: async () => Promise.reject(Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" })) },
+      spawner: null as never,
+    });
+    await expect(auth.status()).rejects.toThrow(/GitHub CLI.*introuvable/);
+  });
+
+  it("jeton : sortie de gh auth token, espaces retirés", async () => {
+    const auth = createGhAuth({
+      runner: runner({ "gh auth token --hostname github.com": ok("gho_abc\n") }),
+      spawner: null as never,
+    });
+    expect(await auth.token()).toBe("gho_abc");
+  });
+
+  it("jeton : échec explicite si non connecté", async () => {
+    const auth = createGhAuth({
+      runner: runner({ "gh auth token --hostname github.com": ko("no oauth token") }),
+      spawner: null as never,
+    });
+    await expect(auth.token()).rejects.toThrow(/connecté/);
+  });
+
+  it("connexion : transmet le code d'appareil, valide l'invite, puis renvoie le statut", async () => {
+    const written: string[] = [];
+    let emit: (s: string) => void = () => {};
+    let exit: (c: number) => void = () => {};
+    const proc: InteractiveProcess = {
+      onOutput: (cb) => (emit = cb),
+      write: (d) => written.push(d),
+      exited: new Promise((r) => (exit = r)),
+    };
+    const spawned: string[] = [];
+    const spawner: ProcessSpawner = {
+      spawn: (cmd, args) => {
+        spawned.push([cmd, ...args].join(" "));
+        return proc;
+      },
+    };
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner });
+    const codes: unknown[] = [];
+    const done = auth.login((c) => codes.push(c));
+
+    emit("! First copy your one-time code: ");
+    emit("AB12-CD34\nPress Enter to open github.com in your browser...");
+    exit(0);
+
+    expect(await done).toMatchObject({ loggedIn: true, user: "octo" });
+    expect(spawned[0]).toBe("gh auth login --hostname github.com --git-protocol https --web");
+    expect(codes).toEqual([{ code: "AB12-CD34", verificationUrl: "https://github.com/login/device" }]);
+    expect(written).toEqual(["\n"]);
+  });
+
+  it("connexion : échec si gh se termine en erreur", async () => {
+    const proc: InteractiveProcess = { onOutput: () => {}, write: () => {}, exited: Promise.resolve(1) };
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: { spawn: () => proc } });
+    await expect(auth.login(() => {})).rejects.toThrow(/connexion GitHub a échoué/);
+  });
+});
