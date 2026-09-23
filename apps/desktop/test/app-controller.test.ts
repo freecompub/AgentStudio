@@ -256,7 +256,7 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
 
   it("les cartes de tâche et les demandes sont relayées à la fenêtre", async () => {
     const { controller, emitted, getServicesArgs } = await started();
-    const card = { id: "t1", title: "Cycle TDD", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, updatedAt: "" };
+    const card = { id: "t1", title: "Cycle TDD", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, milestone: false, updatedAt: "" };
     getServicesArgs()!.onTask(card);
     getServicesArgs()!.onInteractions([]);
     expect(emitted).toContainEqual({ channel: "task:update", payload: card });

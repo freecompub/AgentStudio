@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from "electron";
 import { createJsonConversationStore, createJsonLogger } from "@agent-studio/core";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
@@ -124,6 +124,13 @@ function createController(): AppController {
       },
     },
     external: { open: (url) => shell.openExternal(url) },
+    notifier: {
+      // Jalons et alertes seulement si l'application est en arrière-plan (§7.2).
+      notify(title, body) {
+        if (window?.isFocused() || !Notification.isSupported()) return;
+        new Notification({ title, body }).show();
+      },
+    },
     sink: { emit },
     clock: { now: () => new Date() },
     ids: { next: () => randomUUID() },

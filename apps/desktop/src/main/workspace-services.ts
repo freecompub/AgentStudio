@@ -3,13 +3,15 @@ import { join } from "node:path";
 import {
   createInteractionService,
   createJsonEvidenceStore,
+  createJsonInteractionStore,
+  createProgressReporter,
   createLazyRuntime,
   createRegistry,
   createTaskAgentRunner,
-  MemoryInteractionStore,
   routeIntent,
   type Clock,
   type EvidenceStore,
+  type InteractionStore,
   type IdGenerator,
   type Logger,
 } from "@agent-studio/core";
@@ -32,6 +34,7 @@ export interface WorkspaceServicesConfig {
   /** Pour les tests : stockages imposés. */
   taskStore?: TaskStore;
   evidenceStore?: EvidenceStore;
+  interactionStore?: InteractionStore;
   agentIdleMs?: number;
 }
 
@@ -49,6 +52,7 @@ export function toTaskCard(record: TaskRecord, manifests: ExtensionManifest[]): 
     phaseLabel: decl?.states[phase] ?? phase,
     status: record.status,
     alert: decl?.alerts?.includes(phase) ?? false,
+    milestone: decl?.milestones?.includes(phase) ?? false,
     ...(step && s.steps ? { step: { index: (s.current ?? 0) + 1, total: s.steps.length, behavior: step.behavior } } : {}),
     ...(s.feedback ? { feedback: s.feedback } : {}),
     updatedAt: record.updatedAt,
@@ -57,7 +61,7 @@ export function toTaskCard(record: TaskRecord, manifests: ExtensionManifest[]): 
 
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost }) => {
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify }) => {
     const manifests = cfg.extensions.map((e) => e.manifest);
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const engine = createTaskEngine({
@@ -68,7 +72,8 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       ...(cfg.logger ? { logger: cfg.logger.child({ component: "tasks" }) } : {}),
     });
     const interactions = createInteractionService({
-      store: new MemoryInteractionStore(), // J3 : demandes persistées
+      // Demandes persistées : une escalade survit au redémarrage (J3, D31).
+      store: cfg.interactionStore ?? createJsonInteractionStore(join(cfg.tasksDir, projectKey, "interactions")),
       clock: cfg.clock,
       ids: cfg.ids,
       deliver: (taskId, option, comment) => engine.dispatch(taskId, { type: "HUMAN_DECISION", decision: option, ...(comment ? { comment } : {}) }),
@@ -83,8 +88,35 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       ...(r.detail ? { detail: r.detail } : {}),
     });
     const offInteractions = interactions.onChange((pending) => onInteractions(pending.map(toDto)));
+    const latestCards = new Map<string, TaskCardDto>();
+    const reporter = createProgressReporter({
+      onCard: (s) => {
+        const card = latestCards.get(s.taskId);
+        if (card) onTask(card);
+      },
+      onMilestone: (s, text) => {
+        onPost(s.extensionId, text);
+        notify?.("Jalon atteint", text);
+      },
+      onAlert: (s, text) => {
+        onPost(s.extensionId, text);
+        notify?.("Tâche à surveiller", text);
+      },
+    });
     const offTasks = engine.onUpdate((record) => {
-      onTask(toTaskCard(record, manifests));
+      const card = toTaskCard(record, manifests);
+      latestCards.set(card.id, card);
+      reporter.update({
+        taskId: card.id,
+        extensionId: record.name.split("/")[0] ?? "",
+        title: card.title,
+        phase: card.phase,
+        phaseLabel: card.phaseLabel,
+        milestone: card.milestone,
+        alert: card.alert,
+        ...(card.step ? { step: card.step } : {}),
+        ...(card.feedback ? { detail: card.feedback } : {}),
+      });
       if (record.status === "finished") void interactions.cancelForTask(record.id);
     });
 
@@ -130,6 +162,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       respond: (id, option, comment) => interactions.respond(id, option, comment),
       async dispose() {
         offTasks();
+        reporter.dispose();
         offInteractions();
         for (const h of handles) await h.deactivate();
       },

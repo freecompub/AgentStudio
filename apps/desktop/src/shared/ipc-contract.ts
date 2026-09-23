@@ -44,6 +44,7 @@ export const taskCardSchema = z.object({
   phaseLabel: z.string(),
   status: z.enum(["running", "waiting", "finished"]),
   alert: z.boolean(),
+  milestone: z.boolean(),
   step: z.object({ index: z.number(), total: z.number(), behavior: z.string() }).optional(),
   feedback: z.string().optional(),
   updatedAt: z.string(),

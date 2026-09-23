@@ -1,4 +1,4 @@
-import { fixedClock, MemoryEvidenceStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
+import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
@@ -21,7 +21,7 @@ function fakeWorkspace(): Workspace {
   };
 }
 
-async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntime()) {
+async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntime(), interactionStore = new MemoryInteractionStore()) {
   runtime.behave("diabeo.tdd/tdd-planner", async (t) => {
     await t.callTool("submit_plan", { steps: [{ id: "s1", behavior: "plafonne la dose" }] });
   });
@@ -29,12 +29,14 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
   const cards: TaskCardDto[] = [];
   const pending: InteractionDto[][] = [];
   const posts: string[] = [];
+  const notifications: string[] = [];
   const services = await workspaceServicesFactory({
     extensions: [{ manifest: tddManifest, module: tddExtension }],
     stack: { id: "typescript", detect: async () => true, isTestFile: (p) => p.startsWith("tests/"), runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) },
     tasksDir: "/inutile",
     taskStore: store,
     evidenceStore: new MemoryEvidenceStore(),
+    interactionStore,
     clock: fixedClock(),
     ids: sequentialIds("id-"),
   })({
@@ -43,8 +45,9 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     onTask: (c) => cards.push(c),
     onInteractions: (p) => pending.push(p),
     onPost: (ext, md) => posts.push(`${ext}: ${md}`),
+    notify: (title, body) => notifications.push(`${title} | ${body}`),
   });
-  return { services, cards, pending, posts, getLoads: () => runtimeLoads, store };
+  return { services, cards, pending, posts, notifications, getLoads: () => runtimeLoads, store };
 }
 
 const until = async (check: () => boolean) => {
@@ -71,6 +74,7 @@ describe("Services d'un projet (J2)", () => {
     expect(review).toMatchObject({ extensionId: "diabeo.tdd", title: "Valider le plan TDD : Plafonner la dose", detail: "1. plafonne la dose" });
     expect(review?.options.map((o) => o.id)).toEqual(["approve", "reject"]);
 
+    await until(() => cards.at(-1)?.status === "waiting"); // carte limitée à deux rafraîchissements par seconde
     const card = cards.at(-1)!;
     expect(card).toMatchObject({ title: "Cycle TDD : Plafonner la dose", phase: "PLAN_REVIEW", phaseLabel: "Plan à valider", status: "waiting", alert: false });
     expect(card.step).toEqual({ index: 1, total: 1, behavior: "plafonne la dose" });
@@ -92,16 +96,30 @@ describe("Services d'un projet (J2)", () => {
     await until(() => pending.at(-1)?.length === 0);
   });
 
-  it("reprend les tâches persistées à la création des services (redémarrage)", async () => {
+  it("redémarrage : la tâche en attente et sa demande de décision sont toujours là (J3)", async () => {
     const store = new MemoryTaskStore();
-    const first = await setup(store);
+    const interactionStore = new MemoryInteractionStore();
+    const first = await setup(store, new ScriptedRuntime(), interactionStore);
     await first.services.route("/tdd Plafonner la dose");
     await until(() => first.pending.some((p) => p.length === 1));
     await first.services.dispose();
 
-    const second = await setup(store);
+    const second = await setup(store, new ScriptedRuntime(), interactionStore);
     const tasks = await second.services.tasks();
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toMatchObject({ phase: "PLAN_REVIEW", status: "waiting" });
+    const [review] = await second.services.pendingInteractions();
+    expect(review?.taskId).toBe(tasks[0]?.id);
+  });
+
+  it("jalons et alertes : consignés dans la conversation et notifiés", async () => {
+    const { services, pending, posts, notifications } = await setup();
+    await services.route("/tdd Plafonner la dose");
+    await until(() => pending.some((p) => p.length === 1));
+    const [review] = await services.pendingInteractions();
+    await services.cancelTask(review!.taskId);
+    await until(() => posts.some((p) => p.includes("Annulé")));
+    expect(posts.at(-1)).toBe("diabeo.tdd: Cycle TDD : Plafonner la dose : Annulé (étape 1 sur 1 : plafonne la dose)");
+    expect(notifications.at(-1)).toMatch(/^Tâche à surveiller \| Cycle TDD/);
   });
 });

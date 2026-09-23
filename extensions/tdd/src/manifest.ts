@@ -39,7 +39,7 @@ export const manifest: ExtensionManifest = {
         name: "tdd-cycle",
         title: "Cycle TDD",
         states: PHASE_LABELS,
-        milestones: ["DONE"],
+        milestones: ["STEP_START", "DONE"],
         alerts: ["ESCALATED", "ABORTED"],
       },
     ],

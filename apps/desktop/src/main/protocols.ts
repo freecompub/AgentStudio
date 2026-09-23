@@ -29,6 +29,10 @@ export interface FolderPicker {
   pick(): Promise<string | null>;
 }
 
+export interface SystemNotifier {
+  notify(title: string, body: string): void;
+}
+
 export interface ExternalOpener {
   open(url: string): Promise<void>;
 }
@@ -56,6 +60,8 @@ export interface WorkspaceServicesArgs {
   onInteractions(pending: InteractionDto[]): void;
   /** Message d'une extension à consigner dans la conversation. */
   onPost(extensionId: string, markdown: string): void;
+  /** Notification système (jalons et alertes), si l'application est en arrière-plan (§7.2). */
+  notify?(title: string, body: string): void;
 }
 
 export type WorkspaceServicesFactory = (args: WorkspaceServicesArgs) => Promise<WorkspaceServices>;

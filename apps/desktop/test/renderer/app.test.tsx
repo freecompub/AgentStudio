@@ -142,7 +142,7 @@ describe("Renderer — tâches et décisions (J2)", () => {
     chatReady();
     render(<App />);
     await screen.findByLabelText("Votre message");
-    const card = { id: "t1", title: "Cycle TDD : Plafonner", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, step: { index: 1, total: 2, behavior: "plafonne" }, updatedAt: new Date().toISOString() };
+    const card = { id: "t1", title: "Cycle TDD : Plafonner", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, milestone: false, step: { index: 1, total: 2, behavior: "plafonne" }, updatedAt: new Date().toISOString() };
     act(() => api.emit("task:update", card));
     expect(await screen.findByText("Cycle TDD : Plafonner")).toBeTruthy();
     expect(screen.getByText(/Écriture du test/)).toBeTruthy();

@@ -19,6 +19,7 @@ import type {
   FolderPicker,
   RuntimeFactory,
   SettingsStore,
+  SystemNotifier,
   WorkspaceProvider,
   WorkspaceServices,
   WorkspaceServicesFactory,
@@ -38,6 +39,8 @@ export interface AppControllerDeps {
   clock: Clock;
   ids: IdGenerator;
   systemPrompt: string;
+  /** Notifications système pour jalons et alertes (application en arrière-plan). */
+  notifier?: SystemNotifier;
   logger?: Logger;
   idleMs?: number;
 }
@@ -89,6 +92,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       runtime: ensureRuntime,
       onTask: (card) => deps.sink.emit("task:update", card),
       onInteractions: (pending) => deps.sink.emit("interactions:changed", { pending }),
+      ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
         if (session) void session.record("notice", markdown, extensionId);
         else deps.logger?.info("message d'extension hors conversation", { extensionId });
