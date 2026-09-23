@@ -1,0 +1,52 @@
+{
+  "/home/diabeo/Projets/AgentStudio/docs/copilot-agents.ts": {
+    "mtime": 1790189069.7497272,
+    "ast_hash": "3c8675cc56f2958aedd34616575a3007",
+    "semantic_hash": "3c8675cc56f2958aedd34616575a3007"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/tdd-orchestrator.ts": {
+    "mtime": 1790189069.7497272,
+    "ast_hash": "f498e2d54d3443460cdd83c61b9b7e69",
+    "semantic_hash": "f498e2d54d3443460cdd83c61b9b7e69"
+  },
+  "/home/diabeo/Projets/AgentStudio/CLAUDE.md": {
+    "mtime": 1790189143.436481,
+    "ast_hash": "9c380abce05d80cac1562bf9a6bcc603",
+    "semantic_hash": "9c380abce05d80cac1562bf9a6bcc603"
+  },
+  "/home/diabeo/Projets/AgentStudio/README.md": {
+    "mtime": 1790189069.7483559,
+    "ast_hash": "72fe8e73efa14f1b6aef5d0bc10aa1d6",
+    "semantic_hash": "72fe8e73efa14f1b6aef5d0bc10aa1d6"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/01-architecture-technique.md": {
+    "mtime": 1790189069.7483559,
+    "ast_hash": "d5c86ae436ca7d801b8be95b6853350b",
+    "semantic_hash": "d5c86ae436ca7d801b8be95b6853350b"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/02-analyse-technique-skraft-plugin.md": {
+    "mtime": 1790189069.749216,
+    "ast_hash": "496530c43eb44d7717ab38a43d80ce41",
+    "semantic_hash": "496530c43eb44d7717ab38a43d80ce41"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/03-skraft-diagrammes-etat-compares.md": {
+    "mtime": 1790189069.749216,
+    "ast_hash": "5122863f81d8b06e50c5909b86962aea",
+    "semantic_hash": "5122863f81d8b06e50c5909b86962aea"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/04-skraft-pas-a-pas-fragilites-ameliorations.md": {
+    "mtime": 1790189069.749216,
+    "ast_hash": "09094624372acda20ce6ac4df7d4305b",
+    "semantic_hash": "09094624372acda20ce6ac4df7d4305b"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/SPEC-skraft.md": {
+    "mtime": 1790189069.749216,
+    "ast_hash": "d05d873b10e280c7a6fe2d4f79ab4607",
+    "semantic_hash": "d05d873b10e280c7a6fe2d4f79ab4607"
+  },
+  "/home/diabeo/Projets/AgentStudio/docs/SPEC.md": {
+    "mtime": 1790189069.7497272,
+    "ast_hash": "598ced8fbd83c6758afee6e3d302dcab",
+    "semantic_hash": "598ced8fbd83c6758afee6e3d302dcab"
+  }
+}
