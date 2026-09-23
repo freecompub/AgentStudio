@@ -29,7 +29,7 @@ import {
   type LoadedExtension,
   type ProcessLauncher,
 } from "@agent-studio/extension-host";
-import type { StackAdapter } from "@agent-studio/stack-adapters";
+import { selectStackAdapter, type StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
@@ -39,9 +39,10 @@ export type ExtensionSource = ({ kind: "in-process" } & LoadedExtension) | ({ ki
 
 export interface WorkspaceServicesConfig {
   extensions: ExtensionSource[];
+  /** Adaptateurs de stack, par ordre de préférence : le premier qui reconnaît le projet est retenu. */
+  stacks: StackAdapter[];
   /** Obligatoire dès qu'une extension est isolée. */
   isolation?: { launcher: ProcessLauncher; runtimeEntry: string };
-  stack: StackAdapter;
   /** Dossier des tâches ; un sous-dossier par projet. */
   tasksDir: string;
   clock: Clock;
@@ -113,6 +114,11 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify }) => {
     const manifests = cfg.extensions.map((e) => e.manifest);
+    const detected = await selectStackAdapter(workspace.root, cfg.stacks);
+    const stack = detected ?? cfg.stacks[0];
+    if (!stack) throw new Error("Aucun adaptateur de stack configuré");
+    if (!detected) cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
+    else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const usage = cfg.usageRecorder ?? createUsageRecorder(join(cfg.tasksDir, projectKey, "usage"));
     const usageRows = new Map<string, UsageRow[]>();
@@ -202,7 +208,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
         workspace,
-        stack: cfg.stack,
+        stack,
         interactions,
         evidence,
         hooks,

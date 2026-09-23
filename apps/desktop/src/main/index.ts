@@ -7,7 +7,7 @@ import { createJsonConversationStore, createJsonLogger, createJsonPermissionRule
 import { API_VERSION } from "@agent-studio/extension-api";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
-import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
+import { createSwiftAdapter, createTypeScriptAdapter, findLocalSwiftToolchain } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studio/workspace";
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
 import { createAppController, type AppController } from "./app-controller.js";
@@ -116,7 +116,8 @@ async function createController(): Promise<AppController> {
         launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'une extension", { output: c.slice(0, 2_000) }) }),
         runtimeEntry: EXTENSION_RUNTIME,
       },
-      stack: createTypeScriptAdapter(),
+      // Swift (SwiftPM) puis TypeScript (Vitest) ; chaîne Swift du système ou installée hors système.
+      stacks: [createSwiftAdapter({ toolchain: findLocalSwiftToolchain() ?? {} }), createTypeScriptAdapter()],
       tasksDir: join(userData, "tasks"),
       clock: { now: () => new Date() },
       ids: { next: () => randomUUID() },
