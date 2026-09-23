@@ -39,8 +39,16 @@ export interface ManifestAgent {
   output: TerminalToolName;
   /** Périmètre d'écriture (globs) ; absent = lecture seule. */
   write?: string[];
-  /** Outils standard fournis par le cœur (§6.5). `run_tests` exige `shell:test`. */
-  tools?: ("run_tests" | "report_blocker")[];
+  /**
+   * Outils mis à disposition de l'agent : outils standard du cœur (§6.5, `run_tests` exige
+   * `shell:test`) ou outils de l'extension déclarés dans `contributes.tools`.
+   */
+  tools?: string[];
+}
+
+export interface ManifestTool {
+  name: string;
+  description: string;
 }
 
 export interface ManifestTask {
@@ -63,6 +71,7 @@ export interface ExtensionManifest {
   contributes: {
     commands?: ManifestCommand[];
     agents?: ManifestAgent[];
+    tools?: ManifestTool[];
     tasks?: ManifestTask[];
   };
 }
@@ -164,6 +173,21 @@ export interface TasksApi {
   cancel(taskId: string): Promise<void>;
 }
 
+/** Outil d'extension : exécuté par le code de l'extension quand un agent l'appelle (§5.4). */
+export interface ExtensionTool {
+  name: string;
+  description: string;
+  /** JSON Schema des arguments. */
+  parameters: Record<string, unknown>;
+  /** Renvoie le texte transmis à l'agent ; une exception refuse l'appel (l'agent peut corriger). */
+  handler(args: unknown): Promise<string>;
+}
+
+export interface ToolsApi {
+  /** L'outil doit être déclaré dans `contributes.tools`. */
+  register(tool: ExtensionTool): Disposable;
+}
+
 export interface InteractionsApi {
   /**
    * Demande persistée ; la réponse arrive dans la tâche comme `HUMAN_DECISION`.
@@ -196,6 +220,7 @@ export interface ExtensionContext {
   readonly interactions: InteractionsApi;
   readonly evidence: EvidenceApi;
   readonly hooks: HooksApi;
+  readonly tools: ToolsApi;
   readonly log: ExtensionLog;
 }
 

@@ -22,6 +22,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
   const commands = new Map<string, (args: string) => Promise<void>>();
   const tasks = new Map<string, AnyTask>();
   const hooks = new Map<number, Parameters<ExtensionContext["hooks"]["onPreToolUse"]>[0]>();
+  const tools = new Map<string, Parameters<ExtensionContext["tools"]["register"]>[0]>();
   const registrations: Promise<unknown>[] = [];
   let hookSeq = 0;
 
@@ -66,6 +67,11 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
     "task.runEffect": async ([name, effect, ec], { signal }) => {
       const e = ec as { taskId: string; state: unknown };
       return (await task(name).runEffect(effect, ctx!, { taskId: e.taskId, state: e.state, signal })) ?? null;
+    },
+    "tool.invoke": async ([name, args]) => {
+      const t = tools.get(String(name));
+      if (!t) throw new Error(`Outil inconnu dans l'hôte : ${String(name)}`);
+      return t.handler(args);
     },
     "hook.preToolUse": async ([id, call]) => {
       const h = hooks.get(Number(id));
@@ -131,6 +137,13 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       },
       interactions: { request: (req) => call("interactions.request", [req]) },
       evidence: { list: (taskId) => call("evidence.list", [taskId]) },
+      tools: {
+        register(tool) {
+          tools.set(tool.name, tool);
+          register(call("tools.register", [{ name: tool.name, description: tool.description, parameters: tool.parameters }]));
+          return { dispose: () => void tools.delete(tool.name) };
+        },
+      },
       hooks: {
         onPreToolUse(handler) {
           const id = ++hookSeq;

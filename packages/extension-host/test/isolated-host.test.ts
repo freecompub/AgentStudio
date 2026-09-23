@@ -139,6 +139,23 @@ describe("Hôte d'extension isolé (processus Node réel)", () => {
     expect(await chain.check({ kind: "shell", toolName: "bash", command: "lent" })).toMatchObject({ decision: "deny" });
   }, 30_000);
 
+  it("outil de l'extension appelé par un agent : exécuté dans le processus de l'extension", async () => {
+    const env = deps();
+    const { ScriptedRuntime } = await import("@agent-studio/core/testing");
+    const { createTaskAgentRunner } = await import("@agent-studio/core");
+    const runtime = new ScriptedRuntime();
+    let reply: unknown;
+    runtime.behave("diabeo.demo/echoer", async (t) => {
+      reply = await t.callTool("shout", { text: "plafond" });
+      await t.callTool("report_phase", { summary: "ok", files: [] });
+    });
+    env.d.agents = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 60_000 });
+    const handle = await activateIsolated({ manifest: DEMO_MANIFEST, directory: extDir, entry: join(extDir, "index.mjs") }, env.d, { launcher: createNodeLauncher(), runtimeEntry });
+    launched.push(handle);
+    await handle.ctx.agents.run("echoer", "x");
+    expect(reply).toBe(`PLAFOND (pid ${handle.pid})`);
+  }, 30_000);
+
   it("plantage : redémarrage automatique, puis désactivation au-delà de trois par heure", async () => {
     const { d, posted, handle } = await activate();
     for (let i = 1; i <= 3; i++) {

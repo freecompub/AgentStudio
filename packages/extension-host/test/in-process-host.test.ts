@@ -179,7 +179,7 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, posted } = await activateWith(() => {});
     ctx.chat.post("Bonjour");
     expect(posted).toEqual(["diabeo.demo: Bonjour"]);
-    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "workspace"]);
+    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "tools", "workspace"]);
   });
 
   it("hooks : un refus d'extension s'applique aux sessions d'agent, préfixé par l'extension", async () => {

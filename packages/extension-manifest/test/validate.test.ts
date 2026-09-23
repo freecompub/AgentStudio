@@ -50,6 +50,14 @@ describe("Validation du manifeste (§5.1, D11, D13)", () => {
     expect(errorsOf(dup)).toEqual(["commands : nom en double : tdd"]);
   });
 
+  it("outils d'agent : standard ou déclarés par l'extension", () => {
+    const m = base();
+    m.contributes.agents[0].tools = ["render_adr"];
+    expect(errorsOf(m)).toEqual([expect.stringMatching(/outil inconnu render_adr/)]);
+    m.contributes.tools = [{ name: "render_adr", description: "Rédige un ADR" }];
+    expect(errorsOf(m)).toEqual([]);
+  });
+
   it("entrée compilée : chemin relatif sans remontée", () => {
     expect(errorsOf({ ...base(), main: "../../etc/x.js" })).toEqual([expect.stringMatching(/^main/)]);
     expect(errorsOf({ ...base(), main: "/abs/x.js" })).toEqual([expect.stringMatching(/^main/)]);

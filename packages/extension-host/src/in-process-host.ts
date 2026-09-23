@@ -74,7 +74,15 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: a.role, writable: a.write ?? [], output: a.output });
 
   const taskName = (name: string) => `${manifest.id}/${name}`;
+  const declaredTools = new Map((manifest.contributes.tools ?? []).map((t) => [t.name, t]));
+  const extensionTools = new Map<string, import("@agent-studio/extension-api").ExtensionTool>();
   const testRuns = createTestRunService(deps);
+  /** Outils de l'extension déclarés par l'agent : exécutés par le code de l'extension (§5.4). */
+  const ownTools = (names: string[]): import("@agent-studio/core").ToolSpec[] =>
+    names
+      .map((n) => extensionTools.get(n))
+      .filter((t): t is NonNullable<typeof t> => !!t)
+      .map((t) => ({ name: t.name, description: t.description, parameters: t.parameters, handler: (args: unknown) => t.handler(args) }));
   for (const a of declared.agents.values())
     if (a.tools?.includes("run_tests") && !perm.has("shell:test"))
       throw new Error(`L'agent ${a.name} utilise run_tests sans la permission shell:test`);
@@ -109,6 +117,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             ...(a.tools?.includes("run_tests")
               ? {
                   tools: (beat: () => void) => [
+                    ...ownTools(a.tools ?? []),
                     runTestsTool(testRuns, {
                       beat,
                       ...(opts?.signal ? { signal: opts.signal } : {}),
@@ -119,7 +128,9 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                     }),
                   ],
                 }
-              : {}),
+              : (a.tools ?? []).some((t) => extensionTools.has(t))
+                ? { tools: () => ownTools(a.tools ?? []) }
+                : {}),
             guards: [
               ...(opts?.freezeTestsAfterRed ? [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] : []),
               ...deps.hooks.guards(),
@@ -177,6 +188,14 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
 
     evidence: {
       list: async (taskId) => (perm.require("fs:read"), deps.evidence.list(taskId)),
+    },
+
+    tools: {
+      register(tool) {
+        if (!declaredTools.has(tool.name)) throw new Error(`Outil non déclaré dans le manifeste : ${tool.name}`);
+        extensionTools.set(tool.name, tool);
+        return { dispose: () => void extensionTools.delete(tool.name) };
+      },
     },
 
     hooks: {

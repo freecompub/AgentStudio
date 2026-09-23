@@ -26,10 +26,11 @@ const schema = z.object({
           role: text(20_000),
           output: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"]),
           write: z.array(z.string().min(1)).optional(),
-          tools: z.array(z.enum(["run_tests", "report_blocker"])).optional(),
+          tools: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)).optional(),
         }),
       )
       .optional(),
+    tools: z.array(z.object({ name: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), description: text(500) })).optional(),
     tasks: z
       .array(
         z.object({
@@ -64,6 +65,9 @@ export function validateManifest(raw: unknown, app: { appApi: string }): Manifes
   for (const a of m.contributes.agents ?? []) {
     for (const g of a.write ?? []) if (!writeGlobs.has(g)) errors.push(`agents.${a.name} : écrit dans ${g} sans la permission fs:write:${g}`);
     if (a.tools?.includes("run_tests") && !m.permissions.includes("shell:test")) errors.push(`agents.${a.name} : run_tests exige la permission shell:test`);
+    const own = new Set((m.contributes.tools ?? []).map((t) => t.name));
+    for (const t of a.tools ?? [])
+      if (t !== "run_tests" && t !== "report_blocker" && !own.has(t)) errors.push(`agents.${a.name} : outil inconnu ${t} (ni standard, ni déclaré dans contributes.tools)`);
   }
   if ((m.contributes.agents ?? []).length && !m.permissions.includes("copilot:sessions"))
     errors.push("permissions : des agents sont déclarés sans la permission copilot:sessions");
@@ -72,6 +76,7 @@ export function validateManifest(raw: unknown, app: { appApi: string }): Manifes
     ["commands", m.contributes.commands ?? []],
     ["agents", m.contributes.agents ?? []],
     ["tasks", m.contributes.tasks ?? []],
+    ["tools", m.contributes.tools ?? []],
   ] as const) {
     const seen = new Set<string>();
     for (const c of list) {

@@ -35,6 +35,13 @@ const demo: ExtensionModule = {
       setTimeout(() => process.exit(1), 10);
     });
 
+    ctx.tools.register({
+      name: "shout",
+      description: "Met un texte en majuscules",
+      parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+      handler: async (args) => `${String((args as { text: string }).text).toUpperCase()} (pid ${process.pid})`,
+    });
+
     ctx.chat.registerCommand("files", async () => ctx.chat.post(`fichiers : ${(await ctx.workspace.listFiles()).join(", ")}`));
 
     ctx.hooks.onPreToolUse((call) => {

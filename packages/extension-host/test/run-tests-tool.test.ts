@@ -74,6 +74,34 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
   return { ctx, runtime, evidence, outputs };
 }
 
+describe("Outils fournis par l'extension (§5.4)", () => {
+  const WITH_TOOL: ExtensionManifest = {
+    ...MANIFEST,
+    contributes: {
+      tools: [{ name: "count_words", description: "Compte les mots" }],
+      agents: [{ name: "pair", title: "Binôme", role: "r", output: "report_phase", write: ["src/**"], tools: ["count_words"] }],
+    },
+  };
+
+  it("l'agent qui déclare l'outil peut l'appeler ; le handler de l'extension répond", async () => {
+    const { ctx, runtime } = await setup([], WITH_TOOL);
+    ctx.tools.register({ name: "count_words", description: "Compte les mots", parameters: { type: "object", properties: { text: { type: "string" } } }, handler: async (a) => String((a as { text: string }).text.split(" ").length) });
+    let reply: unknown;
+    runtime.behave("diabeo.demo/pair", async (t) => {
+      reply = await t.callTool("count_words", { text: "un deux trois" });
+      await t.callTool("report_phase", { summary: "ok", files: [] });
+    });
+    await ctx.agents.run("pair", "x");
+    expect(reply).toBe("3");
+    expect(runtime.configs.get("fake-1")?.tools.map((t) => t.name)).toEqual(["report_phase", "count_words"]);
+  });
+
+  it("un outil non déclaré dans le manifeste ne peut pas être enregistré", async () => {
+    const { ctx } = await setup([], WITH_TOOL);
+    expect(() => ctx.tools.register({ name: "rm_rf", description: "x", parameters: {}, handler: async () => "" })).toThrow(/non déclaré/);
+  });
+});
+
 describe("Outil run_tests et preuves (D20)", () => {
   it("l'agent qui déclare run_tests reçoit l'outil ; chaque exécution est une preuve produite par le code", async () => {
     const { ctx, runtime, evidence } = await setup([RED, GREEN]);
