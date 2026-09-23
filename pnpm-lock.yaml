@@ -121,6 +121,18 @@ importers:
         specifier: ^7.3.6
         version: 7.3.6(@types/node@24.13.6)(lightningcss@1.33.0)(tsx@4.23.15)
 
+  extensions/skraft:
+    dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../../packages/extension-api
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../../packages/task-engine
+
   extensions/tdd:
     dependencies:
       '@agent-studio/core':
