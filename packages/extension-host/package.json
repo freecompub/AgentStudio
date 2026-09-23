@@ -1,0 +1,16 @@
+{
+  "name": "@agent-studio/extension-host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*",
+    "@agent-studio/workspace": "workspace:*"
+  }
+}

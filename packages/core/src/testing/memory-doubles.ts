@@ -1,3 +1,4 @@
+import type { InteractionRequest, InteractionStore } from "../protocols/interactions.js";
 import type {
   Clock,
   ConversationRecord,
@@ -42,4 +43,16 @@ export function fixedClock(iso = "2026-09-23T10:00:00.000Z"): Clock {
 export function sequentialIds(prefix = "m"): IdGenerator {
   let n = 0;
   return { next: () => `${prefix}${++n}` };
+}
+
+export class MemoryInteractionStore implements InteractionStore {
+  readonly records = new Map<string, InteractionRequest>();
+
+  async save(req: InteractionRequest): Promise<void> {
+    this.records.set(req.id, structuredClone(req));
+  }
+
+  async list(): Promise<InteractionRequest[]> {
+    return [...this.records.values()].map((r) => structuredClone(r));
+  }
 }

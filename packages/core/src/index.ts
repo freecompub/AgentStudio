@@ -25,3 +25,10 @@ export {
   type Registry,
 } from "./registry/registry.js";
 export { routeIntent, type Intent } from "./registry/intent-router.js";
+export type * from "./protocols/interactions.js";
+export {
+  createInteractionService,
+  type InteractionService,
+  type InteractionServiceDeps,
+  type NewInteraction,
+} from "./interactions/interaction-service.js";

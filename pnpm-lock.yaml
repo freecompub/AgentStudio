@@ -103,6 +103,36 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/extension-api:
+    dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../task-engine
+
+  packages/extension-host:
+    dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../task-engine
+      '@agent-studio/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+
   packages/github-auth: {}
 
   packages/runtime-copilot:
