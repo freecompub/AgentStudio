@@ -11,7 +11,7 @@ import type { Evidence } from "@agent-studio/core";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TddState } from "../src/index.js";
-import { assemble, CAP_SRC, CAP_TEST, createProject, devAgent, git, phaseOf, planner, put, ROLE, testAgent, until } from "./support/harness.js";
+import { assemble, CAP_SRC, CAP_TEST, createProject, devAgent, git, phaseOf, planner, put, ROLE, testAgent, until, HOST_MODES, shutdownHosts } from "./support/harness.js";
 
 const STEPS = {
   s1: { behavior: "plafonne la dose", testFile: "tests/cap.test.ts", test: CAP_TEST, srcFile: "src/cap.ts", src: CAP_SRC },
@@ -49,7 +49,7 @@ function redThenGreen(evidence: Evidence[], stepId: string): boolean {
   return red >= 0 && own.slice(red + 1).some((e) => e.counts.failed === 0 && e.counts.passed > 0 && !e.timedOut);
 }
 
-describe("Extension tdd — critères de sortie de J3", () => {
+describe.each(HOST_MODES)("Extension tdd — critères de sortie de J3 (extension %s)", (mode) => {
   let root: string;
   let tasksDir: string;
 
@@ -58,6 +58,7 @@ describe("Extension tdd — critères de sortie de J3", () => {
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-tasks-"));
   });
   afterEach(async () => {
+    await shutdownHosts();
     await rm(root, { recursive: true, force: true });
     await rm(tasksDir, { recursive: true, force: true });
   });
@@ -76,7 +77,7 @@ describe("Extension tdd — critères de sortie de J3", () => {
     const runtime = new ScriptedRuntime()
       .behave(ROLE("tdd-planner"), planner([{ id: "s1", behavior: STEPS.s1.behavior }, { id: "s2", behavior: STEPS.s2.behavior }]))
       .behave(ROLE("tdd-pair"), pairAgent(root, { probeFreeze: probes }));
-    const app = await assemble(root, runtime, tasksDir);
+    const app = await assemble(root, runtime, tasksDir, mode);
     const id = await launch(app, "Plafonner la dose proposée");
     await app.engine.idle(id);
 
@@ -108,7 +109,7 @@ describe("Extension tdd — critères de sortie de J3", () => {
       .behave(ROLE("tdd-pair"), pairAgent(root, { skipRed: true }))
       .behave(ROLE("tdd-test"), testAgent(root))
       .behave(ROLE("tdd-dev"), devAgent(root));
-    const app = await assemble(root, runtime, tasksDir);
+    const app = await assemble(root, runtime, tasksDir, mode);
     const id = await launch(app, "Plafonner la dose proposée");
     await app.engine.idle(id);
 
@@ -128,7 +129,7 @@ describe("Extension tdd — critères de sortie de J3", () => {
     const first = new ScriptedRuntime()
       .behave(ROLE("tdd-planner"), planner([{ id: "s1", behavior: STEPS.s1.behavior }]))
       .behave(ROLE("tdd-test"), lazyTest);
-    const app1 = await assemble(root, first, tasksDir);
+    const app1 = await assemble(root, first, tasksDir, mode);
     const id = await launch(app1, "--strict Plafonner la dose proposée");
     await app1.engine.idle(id);
     expect(phaseOf(await app1.engine.status(id))).toBe("ESCALATED");
@@ -138,7 +139,7 @@ describe("Extension tdd — critères de sortie de J3", () => {
 
     // Redémarrage : nouveaux services, mêmes stockages. La demande est toujours là.
     const second = new ScriptedRuntime().behave(ROLE("tdd-test"), testAgent(root)).behave(ROLE("tdd-dev"), devAgent(root));
-    const app2 = await assemble(root, second, tasksDir);
+    const app2 = await assemble(root, second, tasksDir, mode);
     await app2.engine.resumeAll();
     expect((await app2.engine.status(id))?.status).toBe("waiting");
     const [persisted] = await app2.interactions.pending();

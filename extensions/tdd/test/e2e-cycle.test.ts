@@ -11,9 +11,9 @@ import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TddState } from "../src/index.js";
-import { assemble, CAP_SRC, CAP_TEST, createProject, devAgent, git, phaseOf, planner, ROLE, testAgent, until } from "./support/harness.js";
+import { assemble, CAP_SRC, CAP_TEST, createProject, devAgent, git, phaseOf, planner, ROLE, testAgent, until, HOST_MODES, shutdownHosts } from "./support/harness.js";
 
-describe("Extension tdd — critères de sortie de J2", () => {
+describe.each(HOST_MODES)("Extension tdd — critères de sortie de J2 (extension %s)", (mode) => {
   let root: string;
   let tasksDir: string;
 
@@ -22,6 +22,7 @@ describe("Extension tdd — critères de sortie de J2", () => {
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-tasks-"));
   });
   afterEach(async () => {
+    await shutdownHosts();
     await rm(root, { recursive: true, force: true });
     await rm(tasksDir, { recursive: true, force: true });
   });
@@ -41,7 +42,7 @@ describe("Extension tdd — critères de sortie de J2", () => {
       .behave(ROLE("tdd-planner"), planner([{ id: "s1", behavior: "plafonne une dose au-dessus du plafond" }]))
       .behave(ROLE("tdd-test"), testAgent(root))
       .behave(ROLE("tdd-dev"), devAgent(root));
-    const app = await assemble(root, runtime, tasksDir);
+    const app = await assemble(root, runtime, tasksDir, mode);
 
     const id = await startTdd(app);
     await app.engine.idle(id);
@@ -66,7 +67,7 @@ describe("Extension tdd — critères de sortie de J2", () => {
       .behave(ROLE("tdd-planner"), planner([{ id: "s1", behavior: "plafonne la dose" }]))
       .behave(ROLE("tdd-test"), testAgent(root))
       .behave(ROLE("tdd-dev"), dev);
-    const app = await assemble(root, runtime, tasksDir);
+    const app = await assemble(root, runtime, tasksDir, mode);
 
     const id = await startTdd(app);
     await app.engine.idle(id);
@@ -88,7 +89,7 @@ describe("Extension tdd — critères de sortie de J2", () => {
       .behave(ROLE("tdd-planner"), planner([{ id: "s1", behavior: "plafonne la dose" }]))
       .behave(ROLE("tdd-test"), testAgent(root))
       .behave(ROLE("tdd-dev"), devAgent(root, { hang: true }));
-    const app1 = await assemble(root, first, tasksDir);
+    const app1 = await assemble(root, first, tasksDir, mode);
     const id = await startTdd(app1);
     await until(async () => existsSync(join(root, "src/brouillon.ts")));
     const crashed = await app1.engine.status(id);
@@ -97,7 +98,7 @@ describe("Extension tdd — critères de sortie de J2", () => {
 
     // Redémarrage : nouveaux services sur le même dépôt et le même stockage des tâches.
     const second = new ScriptedRuntime().behave(ROLE("tdd-dev"), devAgent(root));
-    const app2 = await assemble(root, second, tasksDir);
+    const app2 = await assemble(root, second, tasksDir, mode);
     await app2.engine.resumeAll();
     await app2.engine.idle(id);
 

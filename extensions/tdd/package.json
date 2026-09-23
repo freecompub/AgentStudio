@@ -14,6 +14,10 @@
   "devDependencies": {
     "@agent-studio/extension-host": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
-    "@agent-studio/workspace": "workspace:*"
+    "@agent-studio/workspace": "workspace:*",
+    "esbuild": "^0.28.2"
+  },
+  "scripts": {
+    "build": "node build.mjs"
   }
 }

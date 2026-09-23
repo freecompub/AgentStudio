@@ -10,6 +10,7 @@ export const manifest: ExtensionManifest = {
   version: "0.1.0",
   publisher: "diabeo",
   engines: { appApi: "^0.1" },
+  main: "dist/index.mjs",
   permissions: [
     "fs:read",
     ...TEST_GLOBS.map((g) => `fs:write:${g}` as const),

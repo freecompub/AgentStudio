@@ -17,7 +17,7 @@ import {
   type Evidence,
 } from "@agent-studio/core";
 import { ScriptedRuntime, sequentialIds, type ScriptedBehavior } from "@agent-studio/core/testing";
-import { activateInProcess } from "@agent-studio/extension-host";
+import { activateInProcess, activateIsolated, bundle, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord } from "@agent-studio/task-engine";
 import { openWorkspace } from "@agent-studio/workspace";
@@ -92,7 +92,33 @@ export function devAgent(root: string, opts: { tamperFirst?: boolean; hang?: boo
 
 // ---------- Assemblage de l'application (sans Electron) ------------------------------
 
-export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string) {
+/** Mode d'hébergement de l'extension : dans le principal (J2) ou dans son propre processus (J4). */
+export type HostMode = "in-process" | "isolated";
+export const HOST_MODES: HostMode[] = ["in-process", "isolated"];
+
+let artifacts: Promise<{ runtimeEntry: string; extDir: string }> | undefined;
+
+/** Bundles du runtime enfant et de l'extension, construits une fois par fichier de test. */
+function isolatedArtifacts(): Promise<{ runtimeEntry: string; extDir: string }> {
+  artifacts ??= (async () => {
+    const dir = await mkdtemp(join(tmpdir(), "agent-studio-bundles-"));
+    const runtimeEntry = join(dir, "runtime", "extension-child.mjs");
+    const extDir = join(dir, "tdd");
+    await bundle(resolve(import.meta.dirname, "../../../../packages/extension-host/src/child/entry.ts"), runtimeEntry);
+    await bundle(resolve(import.meta.dirname, "../../src/entry.ts"), join(extDir, "dist/index.mjs"));
+    return { runtimeEntry, extDir };
+  })();
+  return artifacts;
+}
+
+const handles: ExtensionHandle[] = [];
+
+/** Arrête les hôtes d'extension lancés (processus isolés). */
+export async function shutdownHosts(): Promise<void> {
+  for (const h of handles.splice(0)) await h.deactivate().catch(() => undefined);
+}
+
+export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, mode: HostMode = "in-process") {
   const workspace = await openWorkspace(root);
   const engine = createTaskEngine({
     store: createJsonTaskStore(tasksDir),
@@ -108,22 +134,30 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
   });
   const registry = createRegistry();
   const posted: string[] = [];
-  await activateInProcess(
-    { manifest, module: tddExtension },
-    {
-      registry,
-      engine,
-      agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
-      workspace,
-      stack: createTypeScriptAdapter(),
-      interactions,
-      chat: { post: (_ext, md) => void posted.push(md) },
-      evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
-      hooks: createHookRegistry(),
-      clock: { now: () => new Date() },
-      ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
-    },
-  );
+  const hostDeps: HostDeps = {
+    registry,
+    engine,
+    agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
+    workspace,
+    stack: createTypeScriptAdapter(),
+    interactions,
+    chat: { post: (_ext, md) => void posted.push(md) },
+    evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
+    hooks: createHookRegistry(),
+    clock: { now: () => new Date() },
+    ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
+  };
+  if (mode === "in-process") handles.push(await activateInProcess({ manifest, module: tddExtension }, hostDeps));
+  else {
+    const { runtimeEntry, extDir } = await isolatedArtifacts();
+    handles.push(
+      await activateIsolated(
+        { manifest, directory: extDir, entry: join(extDir, manifest.main!) },
+        hostDeps,
+        { launcher: createNodeLauncher({ onStderr: (c) => process.stderr.write(c) }), runtimeEntry },
+      ),
+    );
+  }
   const evidence = createJsonEvidenceStore(join(tasksDir, "evidence"));
   return { engine, interactions, registry, posted, workspace, evidence };
 }
