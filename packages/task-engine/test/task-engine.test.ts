@@ -235,6 +235,22 @@ describe("Moteur de tâches", () => {
     await expect(engine.start("absente", {})).rejects.toThrow(/Tâche non enregistrée/);
   });
 
+  it("les effets émis avec l'état terminal (bilan) s'exécutent avant que la tâche soit terminée", async () => {
+    const def = counterTask(async () => ({ type: "WORKED" }));
+    const withReport: typeof def = {
+      ...def,
+      transition: (s, e) => {
+        const r = def.transition(s, e) as { state: S; effects: F[] };
+        return r.state.phase === "DONE" && s.phase !== "DONE" ? { ...r, effects: [{ kind: "notify", text: "bilan" }] } : r;
+      },
+    };
+    const { engine, store, deps } = start(withReport);
+    const id = await engine.start("compteur", { target: 1 });
+    await engine.idle(id);
+    expect(deps.calls.at(-1)).toEqual({ kind: "notify", text: "bilan" });
+    expect((await store.load(id))?.status).toBe("finished");
+  });
+
   it("notifie chaque mise à jour", async () => {
     const def = counterTask(async () => ({ type: "WORKED" }));
     const { engine, updates } = start(def);

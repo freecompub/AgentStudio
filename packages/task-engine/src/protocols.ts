@@ -59,6 +59,8 @@ export interface TaskRecord<S = unknown, F = unknown> {
   /** Effet commencé et non terminé : rejoué depuis son checkpoint au redémarrage (§6.3). */
   inflight: InflightEffect<F> | null;
   status: TaskStatus;
+  /** Nom de l'état courant (`phaseOf`), pour l'affichage et l'usage. */
+  phase?: string;
   createdAt: string;
   updatedAt: string;
 }

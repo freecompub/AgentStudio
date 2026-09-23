@@ -55,7 +55,9 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
   async function persist(t: Live): Promise<void> {
     const r = t.record;
-    r.status = (await t.def.isTerminal(r.state)) ? "finished" : r.pending.length || r.inflight ? "running" : "waiting";
+    // Les effets émis par la transition vers l'état terminal (bilan…) s'exécutent avant « terminée ».
+    r.status = r.pending.length || r.inflight ? "running" : (await t.def.isTerminal(r.state)) ? "finished" : "waiting";
+    r.phase = await phaseOfState(t);
     r.updatedAt = now();
     await deps.store.save(r);
     const snapshot = structuredClone(r);
@@ -88,7 +90,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
   /** Exécute les effets en attente jusqu'à épuisement (ou attente d'un événement externe). */
   async function drain(t: Live): Promise<void> {
-    while (t.record.pending.length && !(await t.def.isTerminal(t.record.state))) {
+    while (t.record.pending.length) {
       if (t.abort.signal.aborted) return; // annulée : plus aucun effet ne démarre
       const effect = t.record.pending[0];
       const wantsCheckpoint = (await t.def.checkpointBefore?.(effect)) ?? true;

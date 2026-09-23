@@ -13,6 +13,7 @@ const recordSchema = z.object({
   pending: z.array(z.unknown()),
   inflight: z.object({ effect: z.unknown(), checkpointId: z.string().nullable(), startedAt: z.string() }).nullable(),
   status: z.enum(["running", "waiting", "finished"]),
+  phase: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
