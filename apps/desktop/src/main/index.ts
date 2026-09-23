@@ -5,13 +5,16 @@ import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import { createJsonConversationStore, createJsonLogger } from "@agent-studio/core";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
+import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
+import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studio/workspace";
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
 import { createAppController, type AppController } from "./app-controller.js";
 import { createIpcRouter } from "./ipc-router.js";
 import { createJsonSettingsStore } from "./settings-store.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
+import { workspaceServicesFactory } from "./workspace-services.js";
 
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
 const RENDERER_FILE = join(import.meta.dirname, "../renderer/index.html");
@@ -98,6 +101,15 @@ function createController(): AppController {
       open: (path) => openWorkspace(path, { git }),
       clone: (url, dest) => cloneWorkspace(url, dest, { git }),
     },
+    workspaceServices: workspaceServicesFactory({
+      // J2 : extensions internes chargées en processus ; isolation en utilityProcess au J4.
+      extensions: [{ manifest: tddManifest, module: tddExtension }],
+      stack: createTypeScriptAdapter(),
+      tasksDir: join(userData, "tasks"),
+      clock: { now: () => new Date() },
+      ids: { next: () => randomUUID() },
+      logger,
+    }),
     runtimeFactory: (token) =>
       createCopilotRuntime({
         client: createCopilotClient({ gitHubToken: token, baseDirectory: join(userData, "copilot") }),

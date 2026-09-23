@@ -12,8 +12,13 @@
   },
   "dependencies": {
     "@agent-studio/core": "workspace:*",
+    "@agent-studio/ext-tdd": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/extension-host": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "@github/copilot-sdk": "1.0.14",
     "react": "^19.3.0",

@@ -38,12 +38,27 @@ importers:
       '@agent-studio/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@agent-studio/ext-tdd':
+        specifier: workspace:*
+        version: link:../../extensions/tdd
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../../packages/extension-api
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../../packages/extension-host
       '@agent-studio/github-auth':
         specifier: workspace:*
         version: link:../../packages/github-auth
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:../../packages/runtime-copilot
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../../packages/stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../../packages/task-engine
       '@agent-studio/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace

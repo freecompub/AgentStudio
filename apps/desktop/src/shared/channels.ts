@@ -17,6 +17,19 @@ export const REQUEST_CHANNELS = [
   "chat:turn-changes",
   "confirm:respond",
   "shell:open-device-page",
+  "commands:list",
+  "tasks:list",
+  "task:cancel",
+  "interactions:list",
+  "interaction:respond",
 ] as const;
 
-export const EVENT_CHANNELS = ["chat:messages", "chat:agent", "chat:busy", "confirm:request", "auth:device-code"] as const;
+export const EVENT_CHANNELS = [
+  "chat:messages",
+  "chat:agent",
+  "chat:busy",
+  "confirm:request",
+  "auth:device-code",
+  "task:update",
+  "interactions:changed",
+] as const;

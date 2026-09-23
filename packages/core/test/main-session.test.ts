@@ -221,3 +221,19 @@ describe("Session principale — annulation en un geste", () => {
     expect(store.records.get(ROOT)?.messages.find((m) => m.id === tour1.id)?.undone).toBe(true);
   });
 });
+
+describe("Session principale — messages hors tour d'agent", () => {
+  it("consigne une commande et un message d'extension sans lancer de tour ni de checkpoint", async () => {
+    const { runtime, checkpoints, store, session } = setup();
+    await session.start();
+    await session.record("user", "/tdd plafonner");
+    await session.record("notice", "Cycle TDD lancé", "diabeo.tdd");
+    expect(session.messages().map((m) => [m.role, m.text, m.origin])).toEqual([
+      ["user", "/tdd plafonner", undefined],
+      ["notice", "Cycle TDD lancé", "diabeo.tdd"],
+    ]);
+    expect(runtime.last.sent).toEqual([]);
+    expect(checkpoints.created).toEqual([]);
+    expect(store.records.get(ROOT)?.messages).toHaveLength(2);
+  });
+});

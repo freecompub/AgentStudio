@@ -32,3 +32,5 @@ export {
   type InteractionServiceDeps,
   type NewInteraction,
 } from "./interactions/interaction-service.js";
+export { createLazyRuntime } from "./agents/lazy-runtime.js";
+export { MemoryInteractionStore } from "./testing/memory-doubles.js";

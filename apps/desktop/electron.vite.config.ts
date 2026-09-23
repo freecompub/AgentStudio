@@ -3,7 +3,17 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 
 /** Paquets internes du monorepo : exportent du TypeScript, donc intégrés au bundle. */
-const INTERNAL = ["@agent-studio/core", "@agent-studio/workspace", "@agent-studio/runtime-copilot", "@agent-studio/github-auth"];
+const INTERNAL = [
+  "@agent-studio/core",
+  "@agent-studio/workspace",
+  "@agent-studio/runtime-copilot",
+  "@agent-studio/github-auth",
+  "@agent-studio/task-engine",
+  "@agent-studio/stack-adapters",
+  "@agent-studio/extension-api",
+  "@agent-studio/extension-host",
+  "@agent-studio/ext-tdd",
+];
 
 export default defineConfig({
   main: {

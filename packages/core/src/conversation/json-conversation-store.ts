@@ -11,6 +11,7 @@ const chatMessageSchema = z.object({
   createdAt: z.string(),
   checkpointId: z.string().optional(),
   undone: z.boolean().optional(),
+  origin: z.string().optional(),
 });
 
 const recordSchema = z.object({

@@ -3,7 +3,7 @@ import type { Workspace } from "@agent-studio/workspace";
 import { MemoryConversationStore, reply, ScriptedRuntime, sequentialIds, fixedClock } from "@agent-studio/core/testing";
 import { describe, expect, it } from "vitest";
 import { createAppController } from "../src/main/app-controller.js";
-import type { AppSettings, EventSink, WorkspaceProvider } from "../src/main/protocols.js";
+import type { AppSettings, EventSink, WorkspaceProvider, WorkspaceServices, WorkspaceServicesArgs } from "../src/main/protocols.js";
 import type { EventChannel } from "../src/shared/ipc-contract.js";
 
 const OAUTH: AuthStatus = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true };
@@ -61,9 +61,33 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
     },
   };
   const opened: string[] = [];
+  const serviceLog: string[] = [];
+  let servicesArgs: WorkspaceServicesArgs | undefined;
   const controller = createAppController({
     auth,
     workspaces: provider,
+    workspaceServices: async (args) => {
+      servicesArgs = args;
+      serviceLog.push(`créés:${args.workspace.root}`);
+      const services: WorkspaceServices = {
+        route: async (text) => {
+          serviceLog.push(`route:${text}`);
+          if (text.startsWith("/tdd")) {
+            args.onPost("diabeo.tdd", "Cycle TDD lancé");
+            return { kind: "handled" };
+          }
+          if (text.startsWith("/")) return { kind: "unknown-command", name: text.slice(1).split(" ")[0]! };
+          return { kind: "chat" };
+        },
+        commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
+        tasks: async () => [],
+        cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
+        pendingInteractions: async () => [],
+        respond: async (id, option) => void serviceLog.push(`réponse:${id}:${option}`),
+        dispose: async () => void serviceLog.push(`libérés:${args.workspace.root}`),
+      };
+      return services;
+    },
     runtimeFactory: (token) => {
       tokens.push(token);
       return runtime;
@@ -77,7 +101,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
     ids: sequentialIds(),
     systemPrompt: "Rôle.",
   });
-  return { controller, runtime, tokens, emitted, workspaces, opened, getSettings: () => settings };
+  return { controller, runtime, tokens, emitted, workspaces, opened, serviceLog, getServicesArgs: () => servicesArgs, getSettings: () => settings };
 }
 
 describe("AppController — authentification", () => {
@@ -194,5 +218,63 @@ describe("AppController — conversation", () => {
     expect(req.detail).toContain("npm test");
     await controller["confirm:respond"]({ id: req.id, allowed: true });
     expect(await decision).toEqual({ decision: "allow" });
+  });
+});
+
+describe("AppController — commandes, tâches et interactions (J2)", () => {
+  async function started() {
+    const ctx = setup();
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    await ctx.controller["chat:start"]({});
+    return ctx;
+  }
+
+  it("un /commande passe par l'extension, est consigné, et n'est jamais envoyé à l'agent", async () => {
+    const { controller, runtime } = await started();
+    await controller["chat:send"]({ text: "/tdd Plafonner" });
+    const msgs = await controller["chat:start"]({});
+    expect(msgs.map((m) => [m.role, m.text, m.origin])).toEqual([
+      ["user", "/tdd Plafonner", undefined],
+      ["notice", "Cycle TDD lancé", "diabeo.tdd"],
+    ]);
+    expect(runtime.last.sent).toEqual([]);
+  });
+
+  it("commande inconnue : avis listant les commandes disponibles", async () => {
+    const { controller } = await started();
+    await controller["chat:send"]({ text: "/pirate x" });
+    const msgs = await controller["chat:start"]({});
+    expect(msgs.at(-1)?.text).toBe("Commande inconnue : /pirate. Commandes disponibles : /tdd.");
+  });
+
+  it("le texte libre part toujours vers la session principale", async () => {
+    const { controller, runtime } = await started();
+    runtime.last.onNextSend(reply("ok"));
+    await controller["chat:send"]({ text: "Bonjour" });
+    expect(runtime.last.sent).toEqual(["Bonjour"]);
+  });
+
+  it("les cartes de tâche et les demandes sont relayées à la fenêtre", async () => {
+    const { controller, emitted, getServicesArgs } = await started();
+    const card = { id: "t1", title: "Cycle TDD", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, updatedAt: "" };
+    getServicesArgs()!.onTask(card);
+    getServicesArgs()!.onInteractions([]);
+    expect(emitted).toContainEqual({ channel: "task:update", payload: card });
+    expect(emitted).toContainEqual({ channel: "interactions:changed", payload: { pending: [] } });
+    expect(await controller["commands:list"]({})).toEqual([{ invocation: "tdd", title: "TDD", description: "d" }]);
+  });
+
+  it("réponses et annulations délèguent aux services ; changer de projet les libère", async () => {
+    const { controller, serviceLog } = await started();
+    await controller["interaction:respond"]({ id: "int-1", option: "approve" });
+    await controller["task:cancel"]({ taskId: "t1" });
+    await controller["workspace:open"]({ path: "/projets/autre" });
+    expect(serviceLog).toEqual([
+      "créés:/projets/demo",
+      "réponse:int-1:approve",
+      "annule:t1",
+      "libérés:/projets/demo",
+      "créés:/projets/autre",
+    ]);
   });
 });

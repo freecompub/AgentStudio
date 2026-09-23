@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessageDto, WorkspaceInfoDto } from "../../shared/ipc-contract";
+import type { ChatMessageDto, CommandListingDto, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
+import { TaskPanel } from "../components/TaskPanel";
 import { TurnChanges } from "../components/TurnChanges";
 
 interface ToolActivity {
@@ -20,6 +21,7 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [armedUndo, setArmedUndo] = useState<string | null>(null);
   const [openChanges, setOpenChanges] = useState<string | null>(null);
+  const [commands, setCommands] = useState<CommandListingDto[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
       }),
     ];
     api.call("chat:start", {}).then(setMessages, (err: Error) => setError(err.message));
+    api.call("commands:list", {}).then(setCommands, () => undefined);
     return () => offs.forEach((off) => off());
   }, [props.workspace.root]);
 
@@ -112,6 +115,8 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
         <span className="user">{props.user}</span>
       </header>
 
+      <TaskPanel />
+
       <main className="thread" aria-live="polite">
         {messages.length === 0 && !busy && (
           <div className="empty">
@@ -126,7 +131,8 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
         <ol className="rail">
           {messages.map((m) => (
             <li key={m.id} className={`msg ${m.role}${m.undone ? " undone" : ""}`}>
-              {m.role === "user" && <span className="notch" aria-hidden="true" />}
+              {m.role === "user" && m.checkpointId && <span className="notch" aria-hidden="true" />}
+              {m.origin && <span className="origin">{m.origin}</span>}
               <div className="body">{m.text}</div>
               {m.role === "user" && m.checkpointId && (
                 <div className="turn-actions">
@@ -170,10 +176,26 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
 
       <form className="composer" onSubmit={(e) => void send(e)}>
         {error && <p className="error">{error}</p>}
+        {draft.startsWith("/") && !draft.includes(" ") && (
+          <ul className="command-hints" aria-label="Commandes disponibles">
+            {commands
+              .filter((c) => `/${c.invocation}`.startsWith(draft))
+              .map((c) => (
+                <li key={c.invocation}>
+                  <button type="button" className="link" onClick={() => setDraft(`/${c.invocation} `)}>
+                    /{c.invocation}
+                  </button>{" "}
+                  <span className="hint">
+                    {c.title} : {c.description}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        )}
         <textarea
           aria-label="Votre message"
           rows={3}
-          placeholder="Par exemple : ajoute une section « Installation » au README"
+          placeholder="Par exemple : ajoute une section « Installation » au README, ou /tdd pour une fonctionnalité en TDD"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKey}

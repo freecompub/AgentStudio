@@ -13,11 +13,22 @@ import type { GitHubAuth } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
 import type { RequestChannel, RequestInput, RequestOutput, WorkspaceInfoDto } from "../shared/ipc-contract.js";
 import { createIpcConfirmer } from "./ipc-confirmer.js";
-import type { EventSink, ExternalOpener, FolderPicker, RuntimeFactory, SettingsStore, WorkspaceProvider } from "./protocols.js";
+import type {
+  EventSink,
+  ExternalOpener,
+  FolderPicker,
+  RuntimeFactory,
+  SettingsStore,
+  WorkspaceProvider,
+  WorkspaceServices,
+  WorkspaceServicesFactory,
+} from "./protocols.js";
 
 export interface AppControllerDeps {
   auth: GitHubAuth;
   workspaces: WorkspaceProvider;
+  /** Registre, extensions, tâches et interactions du projet ouvert (J2). */
+  workspaceServices: WorkspaceServicesFactory;
   runtimeFactory: RuntimeFactory;
   conversations: ConversationStore;
   settings: SettingsStore;
@@ -41,6 +52,7 @@ const DEVICE_PAGE = "https://github.com/login/device";
 export function createAppController(deps: AppControllerDeps): AppController {
   const confirmer = createIpcConfirmer(deps.sink);
   let workspace: Workspace | null = null;
+  let services: WorkspaceServices | null = null;
   let runtime: AgentRuntime | null = null;
   let session: MainSession | null = null;
   let offSession: (() => void) | null = null;
@@ -64,9 +76,29 @@ export function createAppController(deps: AppControllerDeps): AppController {
     session = null;
   }
 
+  function requireServices(): WorkspaceServices {
+    if (!services) throw new Error("Aucun projet ouvert.");
+    return services;
+  }
+
+  async function attach(ws: Workspace): Promise<void> {
+    await services?.dispose();
+    workspace = ws;
+    services = await deps.workspaceServices({
+      workspace: ws,
+      runtime: ensureRuntime,
+      onTask: (card) => deps.sink.emit("task:update", card),
+      onInteractions: (pending) => deps.sink.emit("interactions:changed", { pending }),
+      onPost: (extensionId, markdown) => {
+        if (session) void session.record("notice", markdown, extensionId);
+        else deps.logger?.info("message d'extension hors conversation", { extensionId });
+      },
+    });
+  }
+
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {
     await closeSession();
-    workspace = ws;
+    await attach(ws);
     await deps.settings.save({ ...(await deps.settings.load()), lastWorkspace: ws.root });
     deps.logger?.info("projet ouvert", { root: ws.root });
     return info(ws);
@@ -106,8 +138,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
       const last = (await deps.settings.load()).lastWorkspace;
       if (!last) return null;
       try {
-        workspace = await deps.workspaces.open(last);
-        return info(workspace);
+        await attach(await deps.workspaces.open(last));
+        return info(workspace!);
       } catch (err) {
         deps.logger?.warn("dernier projet introuvable", { root: last, error: String(err) });
         return null;
@@ -146,7 +178,17 @@ export function createAppController(deps: AppControllerDeps): AppController {
       return s.start();
     },
 
-    "chat:send": ({ text }) => requireSession().send(text),
+    "chat:send": async ({ text }) => {
+      const s = requireSession();
+      // Une commande est consignée avant d'être exécutée, pour que ses messages la suivent.
+      if (!/^\s*\/[a-z0-9]/.test(text)) return s.send(text);
+      await s.record("user", text.trim());
+      const outcome = await requireServices().route(text);
+      if (outcome.kind === "unknown-command") {
+        const known = requireServices().commands().map((c) => `/${c.invocation}`).join(", ") || "aucune";
+        await s.record("notice", `Commande inconnue : /${outcome.name}. Commandes disponibles : ${known}.`);
+      }
+    },
 
     "chat:undo": ({ messageId }) => requireSession().undo(messageId),
 
@@ -162,7 +204,22 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     "confirm:respond": async ({ id, allowed }) => confirmer.respond(id, allowed),
 
+    "commands:list": async () =>
+      requireServices()
+        .commands()
+        .map(({ invocation, title, description }) => ({ invocation, title, description })),
+
+    "tasks:list": () => requireServices().tasks(),
+
+    "task:cancel": ({ taskId }) => requireServices().cancelTask(taskId),
+
+    "interactions:list": () => requireServices().pendingInteractions(),
+
+    "interaction:respond": ({ id, option, comment }) => requireServices().respond(id, option, comment),
+
     async dispose() {
+      await services?.dispose();
+      services = null;
       await closeSession();
       await runtime?.stop();
       runtime = null;

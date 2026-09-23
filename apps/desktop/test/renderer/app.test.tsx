@@ -114,3 +114,59 @@ describe("Renderer", () => {
     await waitFor(() => expect(api.calls).toContainEqual({ channel: "confirm:respond", input: { id: "c1", allowed: true } }));
   });
 });
+
+describe("Renderer — tâches et décisions (J2)", () => {
+  function chatReady() {
+    api
+      .handle("auth:status", () => OAUTH)
+      .handle("workspace:current", () => WS)
+      .handle("chat:start", () => [])
+      .handle("commands:list", () => [{ invocation: "tdd", title: "Implémenter en TDD", description: "Cycle rouge, vert, nettoyage" }])
+      .handle("tasks:list", () => [])
+      .handle("interactions:list", () => [])
+      .handle("interaction:respond", () => undefined)
+      .handle("task:cancel", () => undefined);
+  }
+
+  it("propose les commandes quand on tape /", async () => {
+    chatReady();
+    render(<App />);
+    const box = await screen.findByLabelText("Votre message");
+    await waitFor(() => expect(api.calls.some((c) => c.channel === "commands:list")).toBe(true));
+    fireEvent.change(box, { target: { value: "/t" } });
+    fireEvent.click(await screen.findByRole("button", { name: "/tdd" }));
+    expect((box as HTMLTextAreaElement).value).toBe("/tdd ");
+  });
+
+  it("affiche la carte de tâche mise à jour en place et la décision en attente", async () => {
+    chatReady();
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+    const card = { id: "t1", title: "Cycle TDD : Plafonner", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, step: { index: 1, total: 2, behavior: "plafonne" }, updatedAt: new Date().toISOString() };
+    act(() => api.emit("task:update", card));
+    expect(await screen.findByText("Cycle TDD : Plafonner")).toBeTruthy();
+    expect(screen.getByText(/Écriture du test/)).toBeTruthy();
+    act(() => api.emit("task:update", { ...card, phase: "GREEN", phaseLabel: "Écriture du code" }));
+    expect(screen.getAllByText("Cycle TDD : Plafonner")).toHaveLength(1);
+    expect(screen.getByText(/Écriture du code/)).toBeTruthy();
+
+    act(() =>
+      api.emit("interactions:changed", {
+        pending: [{ id: "int-1", taskId: "t1", extensionId: "diabeo.tdd", title: "Valider le plan TDD", detail: "1. plafonne", options: [{ id: "approve", label: "Valider le plan" }, { id: "reject", label: "Refuser et replanifier" }], createdAt: "" }],
+      }),
+    );
+    expect(screen.getByText("En attente de vous")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Valider le plan" }));
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "interaction:respond", input: { id: "int-1", option: "approve" } }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Annuler la tâche" }));
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "task:cancel", input: { taskId: "t1" } }));
+  });
+
+  it("affiche l'extension d'origine d'un message", async () => {
+    chatReady();
+    api.handle("chat:start", () => [{ id: "n1", role: "notice", text: "Cycle TDD lancé", createdAt: "", origin: "diabeo.tdd" }]);
+    render(<App />);
+    expect(await screen.findByText("diabeo.tdd")).toBeTruthy();
+  });
+});

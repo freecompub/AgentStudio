@@ -14,6 +14,8 @@ export interface ChatMessage {
   checkpointId?: string;
   /** Le tour a été annulé par l'utilisateur (fichiers restaurés). */
   undone?: boolean;
+  /** Extension à l'origine d'un message (affichée, D34). */
+  origin?: string;
 }
 
 export interface ConversationRecord {

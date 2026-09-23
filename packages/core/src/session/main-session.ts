@@ -37,6 +37,8 @@ export interface MainSession {
   /** Annule le tour `messageId` et tous les suivants : restaure le checkpoint pris avant lui. */
   undo(messageId: string): Promise<void>;
   abort(): Promise<void>;
+  /** Consigne un message sans tour d'agent (commande d'extension, message d'extension). */
+  record(role: "user" | "notice", text: string, origin?: string): Promise<void>;
   messages(): ChatMessage[];
   onEvent(cb: (e: MainSessionEvent) => void): () => void;
   close(): Promise<void>;
@@ -184,6 +186,11 @@ export function createMainSession(deps: MainSessionDeps): MainSession {
 
     async abort() {
       await session?.abort();
+    },
+
+    async record(role, text, origin) {
+      append(role, text, origin ? { origin } : {});
+      await persist();
     },
 
     async close() {

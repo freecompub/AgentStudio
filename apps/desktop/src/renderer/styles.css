@@ -223,7 +223,7 @@ label {
 .chat-layout {
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
 }
 
 .topbar {
@@ -393,6 +393,90 @@ label {
 .composer textarea {
   resize: vertical;
   min-height: 4.5rem;
+}
+
+/* ---------- Tâches et décisions en attente ---------- */
+
+.task-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.task-panel > * {
+  width: min(46rem, 100%);
+  margin-inline: auto;
+}
+
+.task-panel h2 {
+  font-size: var(--step-0);
+  margin-bottom: 0.5rem;
+}
+
+.task-panel h3 {
+  font-size: var(--step-0);
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.decision {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pine);
+  border-radius: var(--radius-control);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.decision-detail {
+  white-space: pre-wrap;
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  margin: 0.25rem 0 0.75rem;
+}
+
+.task-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 0.6rem 1rem;
+}
+
+.task-card.alert {
+  border-color: var(--amber);
+}
+
+.task-card.finished {
+  opacity: 0.7;
+}
+
+.task-phase {
+  margin: 0 0 0.35rem;
+}
+
+.task-card progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--pine);
+}
+
+.origin {
+  display: block;
+  font-size: var(--step--1);
+  color: var(--pine);
+  font-weight: 600;
+}
+
+.command-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--paper);
+  border-radius: var(--radius-control);
 }
 
 /* ---------- Demande d'autorisation (canal réservé à l'arbitre) ---------- */
