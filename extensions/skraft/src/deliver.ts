@@ -15,6 +15,8 @@ export interface DeliverScenario {
   acceptanceTestId: string;
   role: "driver" | "regression";
   status: "pending" | "in_progress" | "done";
+  /** Tests unitaires ajoutés pour ce scénario (faits de la revue, §9.1). */
+  unitTests?: string[];
 }
 
 /**

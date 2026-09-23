@@ -3,7 +3,7 @@ import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./c
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { actionableDefects, synthesize } from "./review.js";
-import { deliverTransition, escalateDeliver, resumeDeliver, retryDeliver } from "./deliver-machine.js";
+import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
 type Out = { state: SkraftState; effects: SkraftEffect[] };
@@ -46,6 +46,7 @@ export function initialState(input: SkraftInput): SkraftState {
     acceptanceHash: null,
     regressions: [],
     granularitySetting: input.granularity ?? null,
+    retries: {},
   };
 }
 
@@ -167,6 +168,8 @@ export function transition(s: SkraftState, e: Ev): Out {
           return commit(ns);
         }
         if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
+        // DELIVER : correction ciblée depuis le dernier vert, avec les seuls défauts blocker et major (§9.3).
+        if (p === "DELIVER" && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, actionableDefects(e.lenses));
         return failure(ns, "revue", actionableDefects(e.lenses));
       }
       if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
@@ -269,7 +272,8 @@ function commit(s: SkraftState): Out {
 }
 
 /** Rejet de porte, de revue ou délai : réessai ciblé après rollback, ou escalade à budget épuisé (D24). */
-function failure(s: SkraftState, gate: string, reasons: string[]): Out {
+function failure(s0: SkraftState, gate: string, reasons: string[]): Out {
+  const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
   const rollback: SkraftEffect[] = cp ? [{ kind: "rollback", to: cp }] : [];

@@ -44,6 +44,20 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 - Le plafond s'applique-t-il par prise ou par jour ?
 `;
 
+/** Story difficile : deux questions métier ouvertes (§8.2). */
+export const US15 = `# US-15 — Alerter sur un bolus rapproché
+
+En tant que patient, je veux être alerté si je demande un bolus peu après le précédent.
+
+## Critères d'acceptation
+1. Bolus demandé 30 min après le précédent : alerte « Bolus rapproché ».
+2. Bolus demandé 3 h après le précédent : aucune alerte.
+
+## Questions ouvertes
+- Le délai minimal dépend-il de l'insuline utilisée ?
+- L'alerte bloque-t-elle la validation ?
+`;
+
 export const SIMPLE = `# US-7 — Afficher l'unité
 
 En tant que patient, je veux voir l'unité de la dose.
@@ -60,6 +74,7 @@ export async function createProject(): Promise<string> {
   await put(root, "Sources/Settings/MaxBolusSetting.swift", "public struct MaxBolusSetting {}\n");
   await put(root, "stories/us-12.md", US12);
   await put(root, "stories/us-7.md", SIMPLE);
+  await put(root, "stories/us-15.md", US15);
   git(root, "init", "-q", "-b", "main");
   git(root, "add", "-A");
   git(root, "commit", "-qm", "init");
@@ -114,7 +129,12 @@ export function unitTestWriter(root: string): ScriptedBehavior {
 }
 
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
-export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Partial<Record<string, ScriptedBehavior>> = {}): ScriptedRuntime {
+export function simulatedAgents(
+  runtime: ScriptedRuntime,
+  root: string,
+  over: Partial<Record<string, ScriptedBehavior>> = {},
+  opts: { usage?: boolean } = {},
+): ScriptedRuntime {
   const writer = (rel: string, content: string): ScriptedBehavior => async (t) => {
     await put(root, rel, content);
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
@@ -124,7 +144,10 @@ export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Pa
       const proposed = /Niveau proposé par la grille : (\S+)/.exec(t.prompt)?.[1] ?? "medium";
       await t.callTool("submit_difficulty", { level: proposed, justification: "conforme à la grille" });
     },
-    "skraft-researcher": writer(".skraft/us-12/research/research.md", researchDoc()),
+    "skraft-researcher": async (t) => {
+      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+      await writer(`.skraft/${slug}/research/research.md`, researchDoc())(t);
+    },
     "skraft-architect-model": async (t) => {
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
       await writer(`.skraft/${slug}/design/event-model.md`, "`BolusCapped`\n")(t);
@@ -152,7 +175,17 @@ export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Pa
       ]),
     ),
   };
-  for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) if (behavior) runtime.behave(ROLE(name), behavior);
+  for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) {
+    if (!behavior) continue;
+    // Usage simulé (D37) : une requête par tour, tokens proportionnels au dossier de passation.
+    const measured: ScriptedBehavior = opts.usage
+      ? async (t) => {
+          t.session.emit({ type: "usage", model: "gpt-5", inputTokens: t.prompt.length, outputTokens: 100, multiplier: 1 });
+          await behavior(t);
+        }
+      : behavior;
+    runtime.behave(ROLE(name), measured);
+  }
   return runtime;
 }
 

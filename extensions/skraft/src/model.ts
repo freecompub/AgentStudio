@@ -57,7 +57,7 @@ export interface AdrRecord {
 }
 
 /** Pas de la sous-machine DELIVER : test unitaire, puis code (un tour) ou vert et nettoyage (sessions séparées). */
-export type DeliverStep = "test" | "dev" | "green" | "refactor" | "scenario-gate";
+export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix" | "scenario-gate";
 
 /** Sous-machine DELIVER (§7.4). Les champs après `scenarioCheckpoint` sont internes au réducteur. */
 export interface DeliverState {
@@ -87,6 +87,10 @@ export interface DeliverState {
   feedback: string[];
   /** Informations pour les lentilles (mutation non mesurée, etc.). */
   notes: string[];
+  /** Faits établis par les portes de fin de scénario (mutation, dépendances…), pour la revue (§9.1). */
+  facts: string[];
+  /** Correction des défauts de revue en cours (§9.3). */
+  fixing: boolean;
 }
 
 export interface SkraftInput {
@@ -144,6 +148,8 @@ export interface SkraftState {
   regressions: string[];
   /** Granularité imposée par réglage, sinon choisie selon la difficulté. */
   granularitySetting: Granularity | null;
+  /** Réessais par phase (mesures d'usage, §12). */
+  retries: Record<string, number>;
 }
 
 export type SkraftEvent =
@@ -168,7 +174,7 @@ export type SkraftEvent =
   | { type: "SCENARIO_STARTED"; checkpointId: string }
   | { type: "STEP_OK"; checkpointId: string; all: string[]; passed: string[]; newTest?: string; unitTestsHash?: string; acceptanceGreen?: boolean }
   | { type: "STEP_FAIL"; reason: string }
-  | { type: "SCENARIO_OK"; notes: string[] }
+  | { type: "SCENARIO_OK"; notes: string[]; facts?: string[] }
   | { type: "SCENARIO_FAIL"; reasons: string[] };
 
 export type SkraftEffect =
@@ -189,11 +195,11 @@ export type SkraftEffect =
   | { kind: "finalReport" }
   | { kind: "planDeliver" }
   | { kind: "startScenario"; scenarioId: string }
-  | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor"; scenarioId: string; attempt: number; feedback: string[] }
+  | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
   | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[] }
   | {
       kind: "verifyUnitGreen";
-      mode: "dev" | "green" | "refactor";
+      mode: "dev" | "green" | "refactor" | "fix";
       scenarioId: string;
       since: string;
       newTest: string | null;
@@ -248,6 +254,7 @@ const stateSchema = z.object({
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
+  retries: z.record(z.string(), z.number().int().min(0)),
   deliver: z
     .object({
       scenarios: z.array(z.object({ id: z.string(), ac: z.number(), acceptanceTestId: z.string(), role: z.enum(["driver", "regression"]), status: z.enum(["pending", "in_progress", "done"]) })),

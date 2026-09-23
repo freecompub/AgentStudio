@@ -60,6 +60,8 @@ const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | n
     `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifie avec run_tests, puis nettoie le code sans changer son comportement. Ne modifie aucun test.`,
   green: ({ newTest, sources }) => `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifié avec run_tests. Ne modifie aucun test.`,
   refactor: () => "Pas en cours : nettoie le code de production sans changer son comportement ; la suite doit rester verte. Ne modifie aucun test.",
+  fix: ({ sources }) =>
+    `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test.`,
 };
 
 /** Agent test ou dev d'un pas : dossier de passation construit par le code, tests gelés hors de son périmètre. */
@@ -134,8 +136,9 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
     if (own.some((r) => r.status !== "passed")) return fail(`Le test du pas ne passe pas : ${e.newTest}.`);
   }
 
-  await ctx.git.commit(`${e.mode === "refactor" ? "refactor" : "feat"}(${state.slug}): ${e.scenarioId}`);
-  const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : ${e.mode === "refactor" ? "nettoyé" : "vert"} ${e.scenarioId}`);
+  const kind = { dev: "feat", green: "feat", refactor: "refactor", fix: "fix" }[e.mode];
+  await ctx.git.commit(`${kind}(${state.slug}): ${e.mode === "fix" ? "correction de revue" : e.scenarioId}`);
+  const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : ${e.mode} ${e.scenarioId}`);
   const acceptanceTestId = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!.acceptanceTestId;
   return {
     type: "STEP_OK",
@@ -164,6 +167,7 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   const bar = quality.bar;
   const reasons: string[] = [];
   const notes: string[] = [];
+  const facts: string[] = [];
   if (!(await acceptanceFrozen(ctx, state))) reasons.push("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL.");
 
   const k = kinds(ctx);
@@ -181,14 +185,25 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   const sources = changed.map((f) => f.path).filter((p) => matchesAny(ctx.stack.layout.sources, p));
   if (sources.length) {
     const mutation = await ctx.stack.mutation({ signal });
-    if (mutation) reasons.push(...checkMutation(mutation, sources, bar));
-    else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
+    if (mutation) {
+      reasons.push(...checkMutation(mutation, sources, bar));
+      for (const f of mutation.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
+        facts.push(`Mutation (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
+    } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
+    const before = reasons.length;
     for (const p of sources) reasons.push(...checkCalisthenics(p, await ctx.workspace.readFile(p), bar));
+    if (reasons.length === before) {
+      const c = bar.calisthenics;
+      facts.push(`Object Calisthenics (${e.scenarioId}) : méthodes de ${c.maxMethodLines} lignes au plus, ${c.maxIndentation} niveaux d'indentation au plus, ${c.maxAttributes} attributs par type au plus, dans ${sources.join(", ")}.`);
+    }
   }
   const architecture = await ctx.stack.architecture(bar.dependencyRules);
-  if (architecture) reasons.push(...checkDependencies(architecture));
-  else notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
+  if (architecture) {
+    const found = checkDependencies(architecture);
+    reasons.push(...found);
+    if (!found.length) facts.push(`Règle de dépendance respectée : ${bar.dependencyRules.map((r) => `${r.module} n'importe ni ${r.forbidden.join(", ni ")}`).join(" ; ")}.`);
+  } else notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
 
   if (reasons.length) return { type: "SCENARIO_FAIL", reasons };
-  return { type: "SCENARIO_OK", notes };
+  return { type: "SCENARIO_OK", notes, facts };
 }

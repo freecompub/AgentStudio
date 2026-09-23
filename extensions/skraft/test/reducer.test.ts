@@ -430,6 +430,28 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     expect(r.state.answers).toEqual([{ question: "Plafond par prise ?", answer: "oui" }]);
   });
 
+  it("revue de DELIVER avec défaut major : retour au dernier vert, correction ciblée, porte de fin de scénario, nouvelle revue", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const delivered = [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [], facts: ["Mutation (ac-1) : 100 %"] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
+    ];
+    const major: LensVerdict = { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 2 }, { severity: "minor", description: "nom" }] };
+    const fix = play([...delivered, LENSES(major)]);
+    const defect = "[cold-reader, major] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
+    expect(fix.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect] }]);
+    expect(fix.state).toMatchObject({ stage: "SPECIALIST", attempts: 1, retries: { DELIVER: 1 } });
+    expect(fix.state.deliver!.scenarios[0]!.unitTests).toEqual(["U > t1"]);
+    const verify = transition(fix.state, REP_DEV);
+    expect(verify.effects).toEqual([{ kind: "verifyUnitGreen", mode: "fix", scenarioId: "ac-2", since: "cp-s2", newTest: null, unitTestsHash: "h1", pending: [] }]);
+    const gate = transition(verify.state, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true });
+    expect(gate.effects).toEqual([{ kind: "scenarioGate", scenarioId: "ac-2", since: "cp-s2", unitTests: [], pending: [] }]);
+    const back = transition(gate.state, { type: "SCENARIO_OK", notes: [] });
+    expect(back.effects).toEqual([{ kind: "runGate", phase: "DELIVER", attempt: 2 }]);
+    expect(back.state.deliver!.fixing).toBe(false);
+    expect(back.state.deliver!.facts).toEqual(["Mutation (ac-1) : 100 %"]);
+  });
+
   it("panne d'environnement pendant un scénario : retour au début du scénario et escalade, sans perdre les scénarios livrés", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: [] } as Ev, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev];
     const r = play([...base, REP_TEST, { type: "ENV_FAILURE", reason: "swift introuvable" }]);

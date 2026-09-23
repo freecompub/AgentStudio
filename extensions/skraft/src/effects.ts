@@ -12,6 +12,9 @@ import { checkDesign } from "./design.js";
 import { checkAcceptanceRed, checkValues } from "./distill.js";
 import { matchesAny } from "@agent-studio/core";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
+import { lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
+import { reviewReport } from "./review.js";
+import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
 import { planDeliver, runDeliverAgent, scenarioGate, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 
@@ -114,17 +117,18 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       return runGate(ctx, state, effect.phase, effect.attempt, signal, taskId);
 
     case "runReview": {
+      // Faits établis par le code et fichiers de la phase (§9.1, §9.2) ; une session neuve par lentille, en parallèle.
+      const facts = reviewFacts(state, effect.phase, await ctx.evidence.list(taskId));
+      const files = await phaseFiles(ctx, state, effect.phase);
       const verdicts = await Promise.all(
-        effect.lenses.map(async (lens) =>
+        effect.lenses.map(async (lens: LensName) =>
           expectOutput(
-            await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, buildBrief(state, effect.phase, []), { signal, evidence: tag("REVIEW") }),
+            await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, lensBrief(lens, state, effect.phase, files, facts), { signal, evidence: tag("REVIEW") }),
           ),
         ),
       );
-      const base = `.skraft/${state.slug}/reviews/${effect.phase.toLowerCase()}-review-${effect.attempt}`;
-      await ctx.workspace.writeFile(`${base}.json`, JSON.stringify(verdicts, null, 2));
-      await ctx.workspace.writeFile(`${base}.md`, reviewReport(effect.phase, effect.attempt, verdicts));
-      return { type: "LENSES_DONE", lenses: verdicts, reportPath: `${base}.md` };
+      const reportPath = await writeReview(ctx, state.slug, effect.phase, effect.attempt, verdicts);
+      return { type: "LENSES_DONE", lenses: verdicts, reportPath };
     }
 
     case "askRatification":
@@ -184,6 +188,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       return;
 
     case "commitPhase":
+      // Rapports de revue réécrits depuis l'état (un rollback de réessai a pu les effacer) : reproductibles.
+      for (const r of state.reviews[effect.phase]) await writeReview(ctx, state.slug, effect.phase, r.attempt, r.lenses);
       return { type: "COMMITTED", sha: await ctx.git.commit(effect.message) };
 
     case "finalReport":
@@ -316,15 +322,21 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
 }
 
-function reviewReport(phase: Phase, attempt: number, verdicts: TerminalOutput<"submit_lens_verdict">[]): string {
-  const lines = [`# Revue ${phase}, essai ${attempt}`, ""];
-  for (const v of verdicts) {
-    lines.push(`## Lentille ${v.lens} : ${v.verdict}`, "");
-    if (!v.defects.length) lines.push("Aucun défaut.", "");
-    for (const d of v.defects) lines.push(`- **${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
-    lines.push("");
-  }
-  return lines.join("\n");
+async function writeReview(ctx: ExtensionContext, slug: string, phase: Phase, attempt: number, lenses: TerminalOutput<"submit_lens_verdict">[]): Promise<string> {
+  const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${attempt}`;
+  await ctx.workspace.writeFile(`${base}.json`, JSON.stringify(lenses, null, 2));
+  await ctx.workspace.writeFile(`${base}.md`, reviewReport(phase, attempt, lenses));
+  return `${base}.md`;
+}
+
+/** Fichiers de la phase, depuis son checkpoint : livrables, code, tests (rapports de revue exclus). */
+async function phaseFiles(ctx: ExtensionContext, state: SkraftState, phase: Phase): Promise<LensFiles> {
+  const cp = state.checkpoints[phase];
+  const changed = cp ? (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted" && !f.path.includes("/reviews/")).map((f) => f.path) : [];
+  const tests = changed.filter((p) => ctx.stack.isTestFile(p));
+  const code = changed.filter((p) => !tests.includes(p) && matchesAny(ctx.stack.layout.sources, p));
+  const artifacts = [...new Set([...state.artifacts[phase].map((a) => a.path), ...changed.filter((p) => !tests.includes(p) && !code.includes(p))])];
+  return { artifacts, code, tests };
 }
 
 function finalReport(s: SkraftState): string {
@@ -337,6 +349,7 @@ function finalReport(s: SkraftState): string {
     `Difficulté : ${s.difficulty?.level ?? "?"} (${s.difficulty?.confirmedBy === "user" ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
+    `Réessais par phase : ${Object.entries(s.retries).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
     `Identifiant de suivi : ${randomUUID().slice(0, 8)}.`,
   ].join("\n");
 }

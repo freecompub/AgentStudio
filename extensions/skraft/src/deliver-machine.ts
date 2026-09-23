@@ -3,7 +3,12 @@ import type { DeliverState, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 
 type Out = { state: SkraftState; effects: SkraftEffect[] };
-type AgentStep = "test" | "dev" | "green" | "refactor";
+type AgentStep = "test" | "dev" | "green" | "refactor" | "fix";
+
+/** Réessais par phase, pour les mesures d'usage (§12). */
+export function bumpRetries(s: SkraftState, key: string): SkraftState {
+  return { ...s, retries: { ...s.retries, [key]: (s.retries[key] ?? 0) + 1 } };
+}
 
 /**
  * Sous-machine DELIVER (SPEC-skraft §7.4). PURE. Pour chaque scénario : test unitaire rouge, puis
@@ -33,6 +38,8 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
       scenarioFailures: 0,
       feedback: s.lastRejection?.reasons ?? [],
       notes: [],
+      facts: [],
+      fixing: false,
     });
   }
   const d = s.deliver;
@@ -51,6 +58,8 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
       if (d.step === "test")
         return { state: s, effects: [{ kind: "verifyUnitRed", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline, pending: pending(d, true) }] };
+      if (d.step === "fix")
+        return { state: s, effects: [{ kind: "verifyUnitGreen", mode: "fix", scenarioId: scenario.id, since: d.stepCheckpoint, newTest: null, unitTestsHash: d.unitTestsHash, pending: [] }] };
       return {
         state: s,
         effects: [
@@ -74,6 +83,8 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
       }
       if (d.step === "green") return agent(s, { ...base, newTest: null, acceptanceGreen: e.acceptanceGreen ?? false, step: "refactor" }, []);
       if (d.step === "dev" || d.step === "refactor") return afterCode(s, { ...base, newTest: null }, e.acceptanceGreen ?? d.acceptanceGreen);
+      // Correction de revue validée : la porte de fin de scénario revérifie le code corrigé.
+      if (d.step === "fix") return scenarioGate(s, { ...base, newTest: null, unitTests: [] });
       return null;
     }
 
@@ -90,8 +101,9 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
     }
 
     case "SCENARIO_OK": {
-      const scenarios = d.scenarios.map((x, i) => (i === d.current ? { ...x, status: "done" as const } : x));
-      return nextScenario(s, { ...d, scenarios, notes: [...new Set([...d.notes, ...e.notes])], feedback: [] });
+      const scenarios = d.scenarios.map((x, i) => (i === d.current ? { ...x, status: "done" as const, unitTests: d.fixing ? (x.unitTests ?? []) : d.unitTests } : x));
+      const facts = [...new Set([...d.facts, ...(e.facts ?? [])])];
+      return nextScenario(s, { ...d, scenarios, notes: [...new Set([...d.notes, ...e.notes])], facts, feedback: [], fixing: false });
     }
 
     case "SCENARIO_FAIL":
@@ -153,7 +165,8 @@ function nextScenario(s: SkraftState, d: DeliverState): Out {
   return { state: { ...s, stage: "SPECIALIST", deliver: nd }, effects: [{ kind: "startScenario", scenarioId: scenarios[i]!.id }] };
 }
 
-function stepFailure(s: SkraftState, d: DeliverState, reasons: string[]): Out {
+function stepFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
+  const s = bumpRetries(s0, "DELIVER");
   const attempts = d.attempts + 1;
   if (attempts >= s.budget.maxAttemptsPerPhase) return scenarioFailure(s, d, reasons);
   const r = agent({ ...s, lastRejection: { gate: "DELIVER", reasons } }, { ...d, attempts }, reasons);
@@ -161,7 +174,8 @@ function stepFailure(s: SkraftState, d: DeliverState, reasons: string[]): Out {
 }
 
 /** Scénario repris depuis son début : en sessions séparées après un premier échec, puis selon le budget. */
-function scenarioFailure(s: SkraftState, d: DeliverState, reasons: string[]): Out {
+function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
+  const s = d.step === "scenario-gate" ? bumpRetries(s0, "DELIVER") : s0;
   const sc = d.scenarios[d.current]!;
   const failures = d.scenarioFailures + 1;
   const restart: DeliverState = {
@@ -178,7 +192,12 @@ function scenarioFailure(s: SkraftState, d: DeliverState, reasons: string[]): Ou
   };
   const rollback: SkraftEffect[] = d.scenarioCheckpoint ? [{ kind: "rollback", to: d.scenarioCheckpoint }] : [];
   const lastRejection = { gate: `scénario ${sc.id}`, reasons };
-  if (d.granularity === "turn-per-scenario") {
+  // Correction de revue : relancée depuis son point de départ, dans la limite du budget.
+  if (d.fixing && failures < s.budget.maxAttemptsPerPhase) {
+    const r = agent({ ...s, lastRejection }, { ...restart, step: "fix", unitTests: [] }, reasons);
+    return { state: r.state, effects: [...rollback, ...r.effects] };
+  }
+  if (d.granularity === "turn-per-scenario" && !d.fixing) {
     const nd: DeliverState = { ...restart, granularity: "session-per-step", notes: [...d.notes, `Scénario ${sc.id} : repris en sessions séparées après un échec.`] };
     const r = agent({ ...s, lastRejection }, nd, reasons);
     return { state: r.state, effects: [...rollback, ...r.effects] };
@@ -209,4 +228,17 @@ export function retryDeliver(s: SkraftState): Out {
   const d = s.deliver!;
   if (!d.scenarioCheckpoint) return { state: { ...s, stage: "SPECIALIST", escalation: null }, effects: [{ kind: "startScenario", scenarioId: d.scenarios[d.current]!.id }] };
   return agent({ ...s, escalation: null }, { ...d, step: "test", attempts: 0, scenarioFailures: 0 }, s.lastRejection?.reasons ?? []);
+}
+
+/**
+ * Revue de DELIVER « changements demandés » (§9.3) : retour au dernier vert, relance de `skraft-dev`
+ * avec les seuls défauts blocker et major ; la porte de fin de scénario revérifie le code corrigé.
+ */
+export function startReviewFix(s0: SkraftState, defects: string[]): Out {
+  const s = bumpRetries({ ...s0, attempts: s0.attempts + 1, lastRejection: { gate: "revue", reasons: defects } }, "DELIVER");
+  const d = s.deliver!;
+  const cp = d.stepCheckpoint!;
+  const nd: DeliverState = { ...d, step: "fix", fixing: true, attempts: 0, scenarioFailures: 0, scenarioCheckpoint: cp, unitTests: [], newTest: null, feedback: defects };
+  const r = agent(s, nd, defects);
+  return { state: r.state, effects: [{ kind: "rollback", to: cp }, ...r.effects] };
 }

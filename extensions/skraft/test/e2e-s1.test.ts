@@ -135,7 +135,9 @@ describe("skraft — critères de sortie de S1", () => {
       const r = await app1.engine.status(id);
       const s = stateOf(r);
       const settled = c.waitDifficulty ? r?.status === "waiting" : !!r?.inflight;
-      return s?.stage === c.stage && (c.phase ? s.phase === c.phase : true) && settled;
+      // Agent muet : le processus n'est « planté » qu'une fois la session de ce rôle ouverte.
+      const hung = c.hungRole ? first.history.some((h) => first.configs.get(h.id)?.role === ROLE(c.hungRole!)) : true;
+      return s?.stage === c.stage && (c.phase ? s.phase === c.phase : true) && settled && hung;
     });
 
     // Redémarrage : nouveaux services sur le même dépôt et les mêmes stockages, agents sains.

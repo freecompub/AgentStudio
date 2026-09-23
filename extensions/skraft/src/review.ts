@@ -1,4 +1,5 @@
 /** Revue (SPEC-skraft §9) : verdicts des lentilles à schéma, synthèse appliquée par le code. */
+import { z } from "zod";
 export type Verdict = "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 
 export interface LensDefect {
@@ -33,4 +34,30 @@ export function actionableDefects(lenses: LensVerdict[]): string[] {
       .filter((d) => d.severity !== "minor")
       .map((d) => `[${l.lens}, ${d.severity}] ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`),
   );
+}
+
+/** Rapport lisible généré par le code depuis les verdicts des lentilles (§9.3). Pur, déterministe. */
+export function reviewReport(phase: string, attempt: number, lenses: LensVerdict[]): string {
+  const lines = [`# Revue ${phase}, essai ${attempt}`, "", `Verdict (synthèse du code) : ${synthesize(lenses)}`, ""];
+  for (const v of lenses) {
+    lines.push(`## Lentille ${v.lens} : ${v.verdict}`, "");
+    if (!v.defects.length) lines.push("Aucun défaut.", "");
+    for (const d of v.defects) lines.push(`- **${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+const lensesSchema = z.array(
+  z.object({
+    lens: z.string(),
+    verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
+    defects: z.array(z.object({ severity: z.enum(["blocker", "major", "minor"]), description: z.string(), file: z.string().optional(), line: z.number().optional() })),
+  }),
+);
+
+/** Rejoue une revue depuis son JSON : même verdict, même rapport (critère de sortie de S6). */
+export function replayReview(phase: string, attempt: number, json: string): { verdict: Verdict; markdown: string } {
+  const lenses: LensVerdict[] = lensesSchema.parse(JSON.parse(json));
+  return { verdict: synthesize(lenses), markdown: reviewReport(phase, attempt, lenses) };
 }
