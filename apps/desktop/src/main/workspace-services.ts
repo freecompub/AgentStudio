@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import {
+  createHookRegistry,
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
@@ -122,6 +123,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
 
     const evidence = cfg.evidenceStore ?? createJsonEvidenceStore(join(cfg.tasksDir, projectKey, "evidence"));
     const registry = createRegistry();
+    const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of cfg.extensions) {
       handles.push(
@@ -138,6 +140,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           stack: cfg.stack,
           interactions,
           evidence,
+          hooks,
           clock: cfg.clock,
           ids: cfg.ids,
           chat: { post: onPost },

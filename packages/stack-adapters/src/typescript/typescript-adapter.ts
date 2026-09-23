@@ -65,5 +65,6 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
     },
 
     isTestFile: (path) => TEST_FILE.test(path.replaceAll("\\", "/")),
+    testFilePattern: TEST_FILE.source,
   };
 }

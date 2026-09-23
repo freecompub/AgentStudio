@@ -37,6 +37,8 @@ export interface StackAdapter {
   detect(root: string): Promise<boolean>;
   runTests(opts: RunTestsOptions): Promise<TestRun>;
   isTestFile(path: string): boolean;
+  /** Motif (source d'expression régulière) équivalent à `isTestFile`, transmissible à un autre processus. */
+  readonly testFilePattern: string;
 }
 
 // ---------- Exécution de processus ------------------------------------------------

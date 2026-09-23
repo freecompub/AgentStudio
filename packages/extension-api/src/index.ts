@@ -107,8 +107,8 @@ export interface WorkspaceApi {
   rollback(checkpointId: string): Promise<void>;
   /** Fichiers modifiés depuis un checkpoint. */
   changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
-  /** Empreinte des fichiers retenus par le filtre (gel des tests, D21). */
-  fingerprint(include: (path: string) => boolean): Promise<string>;
+  /** Empreinte des fichiers de test du projet, au sens de l'adaptateur de stack (gel des tests, D21). */
+  fingerprintTests(): Promise<string>;
 }
 
 export interface GitApi {
@@ -121,6 +121,26 @@ export interface StackApi {
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;
+}
+
+/** Appel d'outil soumis aux hooks (forme normalisée, indépendante du runtime). */
+export interface HookToolCall {
+  kind: "read" | "write" | "shell" | "url" | "mcp" | "custom-tool" | "other";
+  toolName: string;
+  path?: string;
+  command?: string;
+  url?: string;
+}
+
+/** Un hook ne peut que refuser (ou laisser passer) : jamais élargir une permission (§5.5). */
+export type HookDecision = { decision: "allow" } | { decision: "deny"; reason: string };
+
+export interface HooksApi {
+  /**
+   * Garde exécutée avant chaque appel d'outil des agents, après celles du cœur. Si elle plante ou
+   * dépasse son délai, l'appel est refusé (D28).
+   */
+  onPreToolUse(handler: (call: HookToolCall) => HookDecision | void | Promise<HookDecision | void>): Disposable;
 }
 
 export interface EvidenceApi {
@@ -155,6 +175,7 @@ export interface ExtensionContext {
   readonly tasks: TasksApi;
   readonly interactions: InteractionsApi;
   readonly evidence: EvidenceApi;
+  readonly hooks: HooksApi;
   readonly log: ExtensionLog;
 }
 

@@ -8,6 +8,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
+  createHookRegistry,
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
@@ -118,6 +119,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
       interactions,
       chat: { post: (_ext, md) => void posted.push(md) },
       evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
+      hooks: createHookRegistry(),
       clock: { now: () => new Date() },
       ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
     },

@@ -124,7 +124,7 @@ async function verifyRed(ctx: ExtensionContext, e: Extract<TddEffect, { kind: "v
   const regressions = run.results.filter((r) => baseline.has(r.id) && r.status === "failed");
   if (regressions.length) return fail(`Des tests existants ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
 
-  const testsHash = await ctx.workspace.fingerprint((p) => ctx.stack.isTestFile(p));
+  const testsHash = await ctx.workspace.fingerprintTests();
   await ctx.git.commit(`test: ${e.step.behavior}`);
   const cp = await ctx.workspace.checkpoint(`Rouge : ${e.step.id}`);
   return { type: "VERIFY_OK", checkpointId: cp.id, newTestIds: [t.id], testsHash };
@@ -137,7 +137,7 @@ async function verifyGreen(
   signal: AbortSignal,
   tag: Tag,
 ): Promise<Ev> {
-  if ((await ctx.workspace.fingerprint((p) => ctx.stack.isTestFile(p))) !== e.testsHash)
+  if ((await ctx.workspace.fingerprintTests()) !== e.testsHash)
     return fail("Les fichiers de test ont été modifiés : c'est interdit à l'agent dev. Les tests sont gelés ; modifie uniquement le code de production.");
 
   const changed = await ctx.workspace.changedFiles(e.since);
@@ -179,7 +179,7 @@ async function verifyCycle(ctx: ExtensionContext, e: Extract<TddEffect, { kind: 
   const greenAfter = evidence.slice(redIndex + 1).some((x) => !x.timedOut && x.counts.failed === 0 && x.counts.passed > 0);
   if (!greenAfter) return fail("Aucune exécution verte après le rouge dans les preuves : fais passer la suite via run_tests.");
 
-  const testsHash = await ctx.workspace.fingerprint((p) => ctx.stack.isTestFile(p));
+  const testsHash = await ctx.workspace.fingerprintTests();
   if (testsHash !== red.testsHash) return fail("Les tests ont été modifiés après l'exécution rouge : ils devaient rester gelés.");
 
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, stepId: e.step.id, phase: "CYCLE_VERIFY" } });

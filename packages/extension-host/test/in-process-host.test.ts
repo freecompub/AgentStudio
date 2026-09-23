@@ -1,4 +1,4 @@
-import { createInteractionService, createRegistry, type TaskAgentRunner, type TaskAgentSpec } from "@agent-studio/core";
+import { createHookRegistry, createInteractionService, createRegistry, type TaskAgentRunner, type TaskAgentSpec } from "@agent-studio/core";
 import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, RecordingCheckpoints, sequentialIds } from "@agent-studio/core/testing";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agent-studio/extension-api";
 import type { StackAdapter } from "@agent-studio/stack-adapters";
@@ -51,6 +51,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
     detect: async () => true,
     runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1 }),
     isTestFile: (p) => p.startsWith("tests/"),
+    testFilePattern: "^tests/",
   };
   const deps: HostDeps = {
     registry: createRegistry(),
@@ -66,6 +67,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
     }),
     chat: { post: (ext, md) => void posted.push(`${ext}: ${md}`) },
     evidence: new MemoryEvidenceStore(),
+    hooks: createHookRegistry(),
     clock: fixedClock(),
     ids: sequentialIds("ev-"),
   };
@@ -177,12 +179,34 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, posted } = await activateWith(() => {});
     ctx.chat.post("Bonjour");
     expect(posted).toEqual(["diabeo.demo: Bonjour"]);
-    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "interactions", "log", "stack", "tasks", "workspace"]);
+    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "workspace"]);
+  });
+
+  it("hooks : un refus d'extension s'applique aux sessions d'agent, préfixé par l'extension", async () => {
+    const { ctx, deps, runs } = await activateWith((c) =>
+      void c.hooks.onPreToolUse((call) => (call.kind === "shell" ? { decision: "deny", reason: "pas de shell ici" } : undefined)),
+    );
+    const [guard] = deps.hooks.guards();
+    expect(await guard!.check({ kind: "shell", toolName: "bash", command: "ls" })).toEqual({ decision: "deny", reason: "[diabeo.demo] pas de shell ici" });
+    expect(await guard!.check({ kind: "read", toolName: "view", path: "a" })).toEqual({ decision: "allow" });
+    void ctx;
+    void runs;
+  });
+
+  it("hooks : les gardes des extensions sont transmises à chaque agent lancé", async () => {
+    let seen: unknown[] = [];
+    const env = setup();
+    env.deps.agents = { run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    let ctx!: ExtensionContext;
+    await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void ((ctx = c), c.hooks.onPreToolUse(() => undefined)) } }, env.deps);
+    await ctx.agents.run("writer", "x");
+    expect(seen).toHaveLength(1);
   });
 
   it("désactivation : capacités retirées du registre", async () => {
     const { deps, handle } = await activateWith((ctx) => void ctx.chat.registerCommand("demo", async () => {}));
     await handle.deactivate();
     expect(deps.registry.command("demo")).toBeUndefined();
+    expect(deps.hooks.guards()).toEqual([]);
   });
 });

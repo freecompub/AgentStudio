@@ -39,3 +39,4 @@ export type * from "./protocols/evidence.js";
 export { createJsonEvidenceStore } from "./evidence/json-evidence-store.js";
 export { composeGuards } from "./guards/compose-guards.js";
 export { createProgressReporter, type ProgressReporter, type ProgressReporterDeps, type ProgressSnapshot } from "./progress/progress-reporter.js";
+export { createHookRegistry, type HookRegistry } from "./guards/hook-registry.js";

@@ -1,4 +1,4 @@
-import type { Clock, EvidenceStore, IdGenerator, InteractionService, Logger, Registry, TaskAgentRunner } from "@agent-studio/core";
+import type { Clock, EvidenceStore, HookRegistry, IdGenerator, InteractionService, Logger, Registry, TaskAgentRunner, ToolCallGuard } from "@agent-studio/core";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agent-studio/extension-api";
 import { fingerprintFiles, type StackAdapter } from "@agent-studio/stack-adapters";
 import type { TaskEngine } from "@agent-studio/task-engine";
@@ -19,6 +19,8 @@ export interface HostDeps {
   stack: StackAdapter;
   interactions: InteractionService;
   evidence: EvidenceStore;
+  /** Hooks `onPreToolUse` des extensions actives, composés après les gardes du cœur (§5.5). */
+  hooks: HookRegistry;
   chat: ExtensionChatSink;
   clock: Clock;
   ids: IdGenerator;
@@ -101,7 +103,10 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                   ],
                 }
               : {}),
-            ...(opts?.freezeTestsAfterRed ? { guards: [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] } : {}),
+            guards: [
+              ...(opts?.freezeTestsAfterRed ? [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] : []),
+              ...deps.hooks.guards(),
+            ],
           },
         );
         return { output: structuredClone(r.output) } as never;
@@ -114,9 +119,9 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       checkpoint: async (label) => ({ id: (await deps.workspace.checkpoints.create(label)).id }),
       rollback: async (id) => (perm.require("git:revert"), deps.workspace.checkpoints.rollback(id)),
       changedFiles: async (id) => (perm.require("fs:read"), (await deps.workspace.checkpoints.diff(id)).files),
-      async fingerprint(include) {
+      async fingerprintTests() {
         perm.require("fs:read");
-        return fingerprintFiles(deps.workspace.files, include);
+        return fingerprintFiles(deps.workspace.files, (p) => deps.stack.isTestFile(p));
       },
     },
 
@@ -151,6 +156,20 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       list: async (taskId) => (perm.require("fs:read"), deps.evidence.list(taskId)),
     },
 
+    hooks: {
+      onPreToolUse(handler) {
+        const guard: ToolCallGuard = {
+          async check(req) {
+            const call = { kind: req.kind, toolName: req.toolName, ...(req.path ? { path: req.path } : {}), ...(req.command ? { command: req.command } : {}), ...(req.url ? { url: req.url } : {}) };
+            const d = await handler(call);
+            return d?.decision === "deny" ? { decision: "deny", reason: `[${manifest.id}] ${d.reason}` } : { decision: "allow" };
+          },
+        };
+        const remove = deps.hooks.add(manifest.id, guard);
+        return { dispose: remove };
+      },
+    },
+
     log: {
       info: (msg, fields) => log?.info(msg, fields),
       warn: (msg, fields) => log?.warn(msg, fields),
@@ -161,6 +180,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     await ext.module.activate(ctx);
   } catch (err) {
     deps.registry.removeExtension(manifest.id);
+    deps.hooks.removeExtension(manifest.id);
     throw err;
   }
   log?.info("extension activée (en processus)");
@@ -170,6 +190,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     async deactivate() {
       await ext.module.deactivate?.();
       deps.registry.removeExtension(manifest.id);
+      deps.hooks.removeExtension(manifest.id);
     },
   };
 }

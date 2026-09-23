@@ -1,4 +1,4 @@
-import { createInteractionService, createRegistry, createTaskAgentRunner } from "@agent-studio/core";
+import { createHookRegistry, createInteractionService, createRegistry, createTaskAgentRunner } from "@agent-studio/core";
 import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, RecordingCheckpoints, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import type { ExtensionContext, ExtensionManifest } from "@agent-studio/extension-api";
 import type { StackAdapter, TestRun } from "@agent-studio/stack-adapters";
@@ -40,6 +40,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
     id: "typescript",
     detect: async () => true,
     isTestFile: (p) => p.startsWith("tests/"),
+    testFilePattern: "^tests/",
     runTests: async (opts) => {
       opts.onOutput?.("ligne\n");
       outputs.push("run");
@@ -64,6 +65,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
       stack,
       interactions: createInteractionService({ store: new MemoryInteractionStore(), clock: fixedClock(), ids: sequentialIds("i"), deliver: async () => {} }),
       evidence,
+      hooks: createHookRegistry(),
       chat: { post: () => {} },
       clock: fixedClock(),
       ids: sequentialIds("ev-"),
