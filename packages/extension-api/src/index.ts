@@ -175,6 +175,8 @@ export interface InteractionsApi {
     detail?: string;
     options: { id: string; label: string }[];
     requiredRoles?: ("testeur" | "po" | "developpeur" | "architecte" | "administrateur")[];
+    /** Une réponse en texte libre est attendue (question ouverte, précision d'un amendement). */
+    freeText?: boolean;
   }): Promise<string>;
 }
 

@@ -17,6 +17,7 @@ export interface NewInteraction {
   detail?: string;
   options: InteractionOption[];
   requiredRoles?: Role[];
+  freeText?: boolean;
 }
 
 export interface InteractionService {
@@ -56,6 +57,7 @@ export function createInteractionService(deps: InteractionServiceDeps): Interact
         options: req.options,
         ...(req.detail ? { detail: req.detail } : {}),
         ...(req.requiredRoles?.length ? { requiredRoles: req.requiredRoles } : {}),
+        ...(req.freeText ? { freeText: true } : {}),
       };
       await deps.store.save(record);
       await notify();
