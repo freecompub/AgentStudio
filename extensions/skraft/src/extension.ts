@@ -1,5 +1,6 @@
 import type { ExtensionContext, ExtensionModule, TaskDefinition } from "@agent-studio/extension-api";
 import { runSkraftEffect } from "./effects.js";
+import { renderAdrTool } from "./render-adr-tool.js";
 import type { SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { initialEffects, initialState, isTerminal, phaseOf, transition } from "./reducer.js";
 
@@ -11,7 +12,7 @@ export const skraftTask: TaskDefinition<SkraftState, SkraftEvent, SkraftEffect, 
   transition,
   runEffect: runSkraftEffect,
   // Checkpoint avant tout effet qui écrit ou lance un agent (D23).
-  checkpointBefore: (e) => ["init", "runSpecialist", "runReview", "commitPhase"].includes(e.kind),
+  checkpointBefore: (e) => ["init", "runSpecialist", "runReview", "commitPhase", "applyAdrStatuses"].includes(e.kind),
   isTerminal,
   phaseOf,
 };
@@ -31,6 +32,7 @@ export function parseSkraftArgs(args: string): SkraftInput | null {
 export const skraftExtension: ExtensionModule = {
   activate(ctx) {
     ctx.tasks.register(skraftTask);
+    ctx.tools.register(renderAdrTool(ctx));
     ctx.chat.registerCommand("skraft", async (args) => {
       const input = parseSkraftArgs(args);
       if (!input) return ctx.chat.post(USAGE);

@@ -132,6 +132,7 @@ export type SkraftEffect =
   | { kind: "runGate"; phase: Phase; attempt: number }
   | { kind: "runReview"; phase: Phase; lenses: LensName[]; attempt: number }
   | { kind: "askRatification"; adr: AdrRecord }
+  | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
   | { kind: "askBlocker"; question: string; choices: string[] }
   | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }

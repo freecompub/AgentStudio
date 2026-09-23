@@ -139,6 +139,11 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(kinds(play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED]).effects)).toEqual(["runGate"]);
   });
 
+  it("réessai de DESIGN : la session de décisions reçoit aussi le motif du rejet", () => {
+    const { effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_FAIL, REPORTED]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 2, feedback: ["fichier de 55 lignes"] }]);
+  });
+
   it("GATE_OK sans reviewer (RESEARCH) → COMMIT ; artefacts ajoutés", () => {
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_OK]);
     expect(state.stage).toBe("COMMIT");
@@ -286,7 +291,10 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     const { state, effects } = play([...toRatification, DECIDE("accept:ADR-008")]);
     expect(state.adrs).toEqual([{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Accepted", decisionBy: "user" }]);
     expect(state.stage).toBe("COMMIT");
-    expect(kinds(effects)).toEqual(["commitPhase"]);
+    expect(effects).toEqual([
+      { kind: "applyAdrStatuses", adrs: [{ path: "docs/adr/adr-008-plafond.md", status: "Accepted" }] },
+      expect.objectContaining({ kind: "commitPhase", phase: "DESIGN" }),
+    ]);
   });
 
   it("amend → relance de skraft-architect-decide avec la demande", () => {

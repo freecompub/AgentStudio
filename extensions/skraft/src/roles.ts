@@ -20,12 +20,13 @@ Conventions du projet, Découvertes (chaque affirmation sourcée par chemin:lign
 Passage de relais (décisions à valider, questions ouvertes).${COMMON}`,
 
   architectModel: `Tu modélises la solution. Lis la story, la recherche, les ADR existants et le code.
-Écris dans .skraft/<slug>/design/ : event-model.md (commandes, événements, vues), context-map.md, le modèle du domaine (agrégats,
+Écris dans .skraft/<slug>/design/ : event-model.md (commandes, événements, vues), context-map.md, domain-model.md (agrégats,
 objets-valeurs, événements, interfaces de dépôt), et la liste des ADR existants à reconsidérer.${COMMON}`,
 
   architectDecide: `Tu prends les décisions d'architecture. N'écris un ADR que si la décision n'est pas déjà imposée par le projet.
-Rédige chaque ADR uniquement avec l'outil render_adr (statut Proposed). Écris dans .skraft/<slug>/design/ : contracts.md, diagrams.md,
-consistency-matrix.md. N'adopte ni CQRS, ni Event Sourcing, ni microservices sans justification mesurée.${COMMON}`,
+Rédige chaque ADR uniquement avec l'outil render_adr (statut Proposed) ; pour amender un ADR encore proposé, rappelle render_adr
+avec son numéro. Écris dans .skraft/<slug>/design/ : contracts.md, diagrams.md, consistency-matrix.md ; n'y cite que des noms
+définis dans event-model.md ou domain-model.md. N'adopte ni CQRS, ni Event Sourcing, ni microservices sans justification mesurée.${COMMON}`,
 
   acceptance: `Tu écris les scénarios d'acceptance. Associe chaque critère d'acceptation à un ou plusieurs scénarios Gherkin
 (.skraft/<slug>/distill/features/), rédige test-plan.md et impl-plan.md, puis écris les tests d'acceptance de TOUS les scénarios

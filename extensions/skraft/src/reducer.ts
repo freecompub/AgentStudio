@@ -103,8 +103,9 @@ export function transition(s: SkraftState, e: Ev): Out {
       }
       if (e.type === "AGENT_REPORTED") {
         if (p === "DESIGN" && s.designStep === "model") {
+          // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
           const ns: SkraftState = { ...s, designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, [])] };
+          return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };
         }
         return { state: { ...s, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s.attempts + 1 }] };
       }
@@ -174,8 +175,13 @@ export function transition(s: SkraftState, e: Ev): Out {
         const adrs = s.adrs.map((a): AdrRecord => (a.id === adr.id ? { ...a, status, decisionBy: "user" } : a));
         const ns: SkraftState = { ...s, adrs };
         if (adrs.some((a) => a.status === "Proposed")) return { state: ns, effects: [] };
-        // Ratification juste après la revue de DESIGN : on enregistre la phase ; sinon on reprend la route.
-        return ns.phase && !ns.phasesCompleted.includes(ns.phase) ? commit(ns) : route(ns);
+        // Statuts basculés dans les fichiers par le code, puis enregistrement de la phase (ou reprise de la route).
+        const apply: SkraftEffect = {
+          kind: "applyAdrStatuses",
+          adrs: adrs.filter((a) => a.status !== "Proposed").map((a) => ({ path: a.path, status: a.status as "Accepted" | "Rejected" })),
+        };
+        const next = ns.phase && !ns.phasesCompleted.includes(ns.phase) ? commit(ns) : route(ns);
+        return { state: next.state, effects: [apply, ...next.effects] };
       }
       break;
 

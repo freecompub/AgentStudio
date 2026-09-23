@@ -35,7 +35,8 @@ export const manifest: ExtensionManifest = {
       { name: "skraft-classifier", title: "Évaluation de la difficulté", role: ROLES.classifier, output: "submit_difficulty" },
       { name: "skraft-researcher", title: "Chercheur", role: ROLES.researcher, output: "report_phase", write: [SKRAFT_DIR], tools: ["report_blocker"] },
       { name: "skraft-architect-model", title: "Architecte (modélisation)", role: ROLES.architectModel, output: "report_phase", write: [SKRAFT_DIR], tools: ["report_blocker"] },
-      { name: "skraft-architect-decide", title: "Architecte (décisions)", role: ROLES.architectDecide, output: "report_phase", write: [SKRAFT_DIR, "docs/adr/**"], tools: ["report_blocker"] },
+      // Aucun droit d'écriture direct dans docs/adr : seul render_adr y écrit (§6.3).
+      { name: "skraft-architect-decide", title: "Architecte (décisions)", role: ROLES.architectDecide, output: "report_phase", write: [SKRAFT_DIR], tools: ["render_adr", "report_blocker"] },
       { name: "skraft-acceptance", title: "Scénarios d'acceptance", role: ROLES.acceptance, output: "report_phase", write: [SKRAFT_DIR, ...TESTS], tools: ["run_tests", "report_blocker"] },
       { name: "skraft-test", title: "Tests unitaires", role: ROLES.dev, output: "report_phase", write: TESTS, tools: ["run_tests", "report_blocker"] },
       { name: "skraft-dev", title: "Développement", role: ROLES.dev, output: "report_phase", write: SOURCES, tools: ["run_tests", "report_blocker"] },
@@ -46,6 +47,7 @@ export const manifest: ExtensionManifest = {
         output: "submit_lens_verdict" as const,
       })),
     ],
+    tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],
     tasks: [
       {
         name: "skraft-pipeline",

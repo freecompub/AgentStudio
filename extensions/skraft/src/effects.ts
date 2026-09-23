@@ -7,6 +7,9 @@ import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.j
 import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
+import { parseAdr, setAdrStatus } from "./adr.js";
+import { checkDesign } from "./design.js";
+import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { parseStory, slugOf } from "./story.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
@@ -134,6 +137,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       });
       return;
 
+    case "applyAdrStatuses":
+      for (const a of effect.adrs) await ctx.workspace.writeFile(a.path, setAdrStatus(await ctx.workspace.readFile(a.path), a.status));
+      return;
+
     case "askBlocker":
       await ctx.interactions.request({
         taskId,
@@ -184,11 +191,12 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 /** Porte minimale S1 : au moins un livrable produit dans la phase, empreintes enregistrées. */
 async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, attempt: number): Promise<Ev> {
   if (phase === "RESEARCH") return researchGate(ctx, state, attempt);
+  if (phase === "DESIGN") return designGate(ctx, state, attempt);
   const cp = state.checkpoints[phase];
   if (!cp) throw new EnvFailureError(`Point de retour de la phase ${phase} introuvable`);
   const changed = (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted");
   if (changed.length === 0) return { type: "GATE_FAIL", gate: "livrables", reasons: [`Aucun livrable produit pendant la phase ${phase}.`] };
-  const producedBy = phase === "DESIGN" ? "skraft-architect" : phase;
+  const producedBy = phase;
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   return { type: "GATE_OK", artifacts };
@@ -215,6 +223,45 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
     type: "GATE_OK",
     artifacts: [{ path, sha256: createHash("sha256").update(md).digest("hex"), producedBy: "skraft-researcher", attempt }],
     openQuestions: openQuestions.filter((q) => !known.has(q)),
+  };
+}
+
+const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
+
+/** Porte cohérence (§7.2) : documents de conception et ADR de la phase, vérifiés par le code. */
+async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: number): Promise<Ev> {
+  const cp = state.checkpoints.DESIGN;
+  if (!cp) throw new EnvFailureError("Point de retour de la phase DESIGN introuvable");
+  const dir = `.skraft/${state.slug}/design`;
+  const docs: Record<string, string> = {};
+  for (const d of DESIGN_DOCS) {
+    try {
+      docs[d] = await ctx.workspace.readFile(`${dir}/${d}`);
+    } catch {
+      // document absent : la porte le signale s'il est requis
+    }
+  }
+  const changed = await ctx.workspace.changedFiles(cp);
+  const added = new Set(changed.filter((f) => f.status === "added").map((f) => f.path));
+  const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && ADR_FILE.test(f.path)).map((f) => f.path);
+  const adrPaths = (await ctx.workspace.listFiles()).filter((p) => ADR_FILE.test(p));
+  const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) })));
+  let supersessions = "";
+  try {
+    supersessions = await ctx.workspace.readFile(SUPERSESSIONS);
+  } catch {
+    supersessions = "";
+  }
+  const reasons = checkDesign({ docs, adrs, supersessions, modifiedExistingAdrs });
+  if (reasons.length) return { type: "GATE_FAIL", gate: "cohérence", reasons };
+  const artifacts: ArtifactRecord[] = [];
+  for (const f of changed.filter((c) => c.status !== "deleted"))
+    artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: ADR_FILE.test(f.path) ? "render_adr" : "skraft-architect", attempt });
+  return {
+    type: "GATE_OK",
+    artifacts,
+    adrs: adrs.filter((a) => a.isNew).map((a) => ({ id: parseAdr(a.md).id, path: a.path, status: "Proposed" as const })),
   };
 }
 
