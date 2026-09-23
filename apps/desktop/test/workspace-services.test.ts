@@ -2,6 +2,10 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, ScriptedRuntim
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createUsageRecorder } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
 import type { InteractionDto, TaskCardDto } from "../src/shared/ipc-contract.js";
 import { workspaceServicesFactory } from "../src/main/workspace-services.js";
@@ -22,7 +26,9 @@ function fakeWorkspace(): Workspace {
 }
 
 async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntime(), interactionStore = new MemoryInteractionStore()) {
+  const usageRecorder = createUsageRecorder(await mkdtemp(join(tmpdir(), "agent-studio-usage-")));
   runtime.behave("diabeo.tdd/tdd-planner", async (t) => {
+    t.session.emit({ type: "usage", model: "gpt-5", inputTokens: 1200, outputTokens: 80, multiplier: 1 });
     await t.callTool("submit_plan", { steps: [{ id: "s1", behavior: "plafonne la dose" }] });
   });
   let runtimeLoads = 0;
@@ -37,6 +43,7 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     taskStore: store,
     evidenceStore: new MemoryEvidenceStore(),
     interactionStore,
+    usageRecorder,
     clock: fixedClock(),
     ids: sequentialIds("id-"),
   })({
@@ -79,6 +86,17 @@ describe("Services d'un projet (J2)", () => {
     expect(card).toMatchObject({ title: "Cycle TDD : Plafonner la dose", phase: "PLAN_REVIEW", phaseLabel: "Plan à valider", status: "waiting", alert: false });
     expect(card.step).toEqual({ index: 1, total: 1, behavior: "plafonne la dose" });
     expect(await services.tasks()).toHaveLength(1);
+  });
+
+  it("usage par état sur la carte : requêtes et tokens du planificateur, libellé du manifeste (D37)", async () => {
+    const { services, cards, pending } = await setup();
+    await services.route("/tdd Plafonner la dose");
+    await until(() => pending.some((p) => p.length === 1));
+    await until(() => cards.at(-1)?.usage?.rows.some((r) => r.phase === "PLANNING" && r.requests === 1) ?? false);
+    const usage = cards.at(-1)!.usage!;
+    expect(usage.unit).toBe("requests");
+    expect(usage.rows.find((r) => r.phase === "PLANNING")).toMatchObject({ label: "Découpage en comportements", requests: 1, inputTokens: 1200, outputTokens: 80 });
+    expect(usage.total.requests).toBe(1);
   });
 
   it("la réponse relance la tâche ; l'annulation clôt la tâche et ses demandes", async () => {

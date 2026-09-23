@@ -93,6 +93,8 @@ export type AgentEvent =
   | { type: "tool-progress"; toolCallId: string; message: string }
   | { type: "tool-end"; toolCallId: string; success: boolean }
   | { type: "tool-denied"; toolName: string; reason: string }
+  /** Consommation d'un appel au modèle (§13) ; `multiplier` = coût relatif du modèle (Copilot). */
+  | { type: "usage"; model?: string; inputTokens?: number; outputTokens?: number; multiplier?: number }
   | { type: "idle" }
   | { type: "error"; message: string }
   /** Tout autre signe de vie : sert uniquement à réarmer le watchdog. */

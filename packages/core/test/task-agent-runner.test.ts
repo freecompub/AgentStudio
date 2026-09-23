@@ -126,4 +126,20 @@ describe("Exécuteur d'agent de tâche", () => {
     expect(await guard.check({ kind: "write", toolName: "edit", path: "tests/a.ts" })).toEqual({ decision: "deny", reason: "tests gelés" });
     expect(await guard.check({ kind: "write", toolName: "edit", path: "src/a.ts" })).toMatchObject({ decision: "deny", reason: expect.stringMatching(/périmètre/) });
   });
+
+  it("usage : une requête par tour (× multiplicateur), tokens cumulés, relance comprise", async () => {
+    const { runtime, runner } = setup();
+    let turn = 0;
+    runtime.behave("tdd-planner", async (t) => {
+      t.session.emit({ type: "usage", model: "m", inputTokens: 100, outputTokens: 10, multiplier: 2 });
+      t.session.emit({ type: "usage", model: "m", inputTokens: 50, outputTokens: 5, multiplier: 2 });
+      if (++turn === 2) await t.callTool("submit_plan", { steps: [] });
+    });
+    const usage: unknown[] = [];
+    await runner.run(PLANNER, "F", { onUsage: (u) => usage.push(u) });
+    expect(usage).toEqual([
+      { requests: 2, inputTokens: 150, outputTokens: 15 },
+      { requests: 2, inputTokens: 150, outputTokens: 15 },
+    ]);
+  });
 });

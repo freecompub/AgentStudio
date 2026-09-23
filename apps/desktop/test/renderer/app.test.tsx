@@ -163,6 +163,22 @@ describe("Renderer — tâches et décisions (J2)", () => {
     await waitFor(() => expect(api.calls).toContainEqual({ channel: "task:cancel", input: { taskId: "t1" } }));
   });
 
+  it("affiche l'usage par état de la tâche, dans l'unité du fournisseur", async () => {
+    chatReady();
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+    const row = (phase: string, label: string, requests: number, retries = 0) => ({ phase, label, requests, inputTokens: 1000, outputTokens: 100, retries, durationMs: 65_000 });
+    act(() =>
+      api.emit("task:update", {
+        id: "t1", title: "Cycle TDD : X", phase: "CYCLE", phaseLabel: "Test puis code (un tour)", status: "running", alert: false, milestone: false, updatedAt: new Date().toISOString(),
+        usage: { unit: "requests", rows: [row("PLANNING", "Découpage en comportements", 1), row("CYCLE", "Test puis code (un tour)", 2, 1)], total: row("total", "Total", 3, 1) },
+      }),
+    );
+    expect(await screen.findByText("Usage : 3 requêtes, 1 réessai", {}, { timeout: 5_000 })).toBeTruthy();
+    expect(screen.getByRole("rowheader", { name: "Découpage en comportements" })).toBeTruthy();
+    expect(screen.getAllByText("1 min 5 s")).toHaveLength(2);
+  });
+
   it("affiche l'extension d'origine d'un message", async () => {
     chatReady();
     api.handle("chat:start", () => [{ id: "n1", role: "notice", text: "Cycle TDD lancé", createdAt: "", origin: "diabeo.tdd" }]);

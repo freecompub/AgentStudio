@@ -1,4 +1,4 @@
-import { EnvFailureError, WorkDefectError, type Clock, type IdGenerator, type Logger } from "@agent-studio/core";
+import { EnvFailureError, WorkDefectError, type Clock, type IdGenerator, type Logger, type UsageRecorder } from "@agent-studio/core";
 import type { SystemEvent, TaskCheckpoints, TaskDefinition, TaskEvent, TaskRecord, TaskStore } from "./protocols.js";
 
 export interface TaskEngineDeps {
@@ -7,6 +7,8 @@ export interface TaskEngineDeps {
   clock: Clock;
   ids: IdGenerator;
   logger?: Logger;
+  /** Durée et nombre d'effets par état (D37). */
+  usage?: UsageRecorder;
 }
 
 export interface TaskEngine {
@@ -23,6 +25,8 @@ export interface TaskEngine {
   /** Résout quand la tâche n'a plus d'effet en cours de traitement. */
   idle(taskId: string): Promise<void>;
   status(taskId: string): Promise<TaskRecord | null>;
+  /** État courant d'une tâche active, pour attribuer l'usage (D37). */
+  phaseOf(taskId: string): Promise<string | null>;
   list(): Promise<TaskRecord[]>;
   onUpdate(cb: (record: TaskRecord) => void): () => void;
 }
@@ -100,6 +104,8 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
       }
 
       let next: TaskEvent<{ type: string }> | void;
+      const phase = await phaseOfState(t);
+      const effectStart = Date.now();
       try {
         next = await t.def.runEffect(effect, t.deps, {
           taskId: t.record.id,
@@ -111,6 +117,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
         deps.logger?.warn("effet en échec", { taskId: t.record.id, event: next.type, reason: "reason" in next ? next.reason : "" });
       }
       t.record.inflight = null;
+      void deps.usage?.add(t.record.id, phase, { durationMs: Date.now() - effectStart, effects: 1 }).catch(() => undefined);
       if (t.abort.signal.aborted) {
         t.record.pending = [];
         await persist(t);
@@ -119,6 +126,12 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
       if (next) await apply(t, next);
       else await persist(t);
     }
+  }
+
+  async function phaseOfState(t: Live): Promise<string> {
+    if (t.def.phaseOf) return t.def.phaseOf(t.record.state);
+    const p = (t.record.state as { phase?: unknown } | null)?.phase;
+    return typeof p === "string" ? p : "?";
   }
 
   function getLive(taskId: string): Live {
@@ -196,6 +209,11 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
     idle: (taskId) => getLive(taskId).chain,
 
     status: (taskId) => deps.store.load(taskId),
+
+    async phaseOf(taskId) {
+      const t = live.get(taskId);
+      return t ? phaseOfState(t) : null;
+    },
 
     list: () => deps.store.list(),
 

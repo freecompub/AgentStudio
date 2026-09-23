@@ -21,6 +21,15 @@ export function mapSessionEvent(event: SessionEvent): AgentEvent {
       return { type: "tool-progress", toolCallId: event.data.toolCallId, message: event.data.progressMessage };
     case "tool.execution_complete":
       return { type: "tool-end", toolCallId: event.data.toolCallId, success: event.data.success };
+    case "assistant.usage":
+      return {
+        type: "usage",
+        model: event.data.model,
+        ...(event.data.inputTokens !== undefined ? { inputTokens: event.data.inputTokens } : {}),
+        ...(event.data.outputTokens !== undefined ? { outputTokens: event.data.outputTokens } : {}),
+        // `cost` : multiplicateur de facturation du modèle (expérimental dans le SDK, à vérifier).
+        ...(event.data.cost !== undefined ? { multiplier: event.data.cost } : {}),
+      };
     case "session.idle":
       return event.agentId ? ACTIVITY : { type: "idle" };
     case "session.error":

@@ -1,4 +1,15 @@
-import type { Clock, EvidenceStore, HookRegistry, IdGenerator, InteractionService, Logger, Registry, TaskAgentRunner, ToolCallGuard } from "@agent-studio/core";
+import type {
+  Clock,
+  EvidenceStore,
+  HookRegistry,
+  IdGenerator,
+  InteractionService,
+  Logger,
+  Registry,
+  TaskAgentRunner,
+  ToolCallGuard,
+  UsageRecorder,
+} from "@agent-studio/core";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule } from "@agent-studio/extension-api";
 import { fingerprintFiles, type StackAdapter } from "@agent-studio/stack-adapters";
 import type { TaskEngine } from "@agent-studio/task-engine";
@@ -21,6 +32,8 @@ export interface HostDeps {
   evidence: EvidenceStore;
   /** Hooks `onPreToolUse` des extensions actives, composés après les gardes du cœur (§5.5). */
   hooks: HookRegistry;
+  /** Usage des agents, attribué à la tâche et à son état courant (D37). */
+  usage?: UsageRecorder;
   chat: ExtensionChatSink;
   clock: Clock;
   ids: IdGenerator;
@@ -84,11 +97,14 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const a = declared.agents.get(name);
         if (!a) throw new Error(`Agent non déclaré dans le manifeste : ${name}`);
         let frozen = false;
+        const taskId = opts?.evidence?.taskId;
+        const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
         const r = await deps.agents.run(
           { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: a.write ?? [], output: a.output },
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
+            ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
             ...(a.tools?.includes("run_tests")
               ? {
                   tools: (beat: () => void) => [

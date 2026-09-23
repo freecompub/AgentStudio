@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { InteractionDto, TaskCardDto } from "../../shared/ipc-contract";
+import type { InteractionDto, TaskCardDto, UsageRowDto } from "../../shared/ipc-contract";
 import { api } from "../api";
 
 /**
@@ -73,6 +73,7 @@ export function TaskPanel() {
           </p>
           {t.step && <progress max={t.step.total} value={t.status === "finished" ? t.step.total : t.step.index - 1} />}
           {t.feedback && t.status !== "finished" && <p className="hint">Dernier rejet : {t.feedback}</p>}
+          {t.usage && <UsageSummary usage={t.usage} />}
           {t.status !== "finished" && (
             <button className="link" onClick={() => void api.call("task:cancel", { taskId: t.id })}>
               Annuler la tâche
@@ -81,5 +82,45 @@ export function TaskPanel() {
         </article>
       ))}
     </aside>
+  );
+}
+
+const nf = new Intl.NumberFormat("fr-FR");
+const duration = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`);
+
+/** Usage par état (D37), dans l'unité du fournisseur : requêtes pour Copilot, tokens sinon. */
+function UsageSummary({ usage }: { usage: NonNullable<TaskCardDto["usage"]> }) {
+  const main = (r: UsageRowDto) => (usage.unit === "requests" ? `${nf.format(r.requests)} requête${r.requests > 1 ? "s" : ""}` : `${nf.format(r.inputTokens + r.outputTokens)} tokens`);
+  return (
+    <details className="usage">
+      <summary>
+        Usage : {main(usage.total)}
+        {usage.total.retries > 0 && `, ${usage.total.retries} réessai${usage.total.retries > 1 ? "s" : ""}`}
+      </summary>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">État</th>
+            <th scope="col">Requêtes</th>
+            <th scope="col">Tokens entrée</th>
+            <th scope="col">Tokens sortie</th>
+            <th scope="col">Réessais</th>
+            <th scope="col">Durée</th>
+          </tr>
+        </thead>
+        <tbody>
+          {usage.rows.map((r) => (
+            <tr key={r.phase}>
+              <th scope="row">{r.label}</th>
+              <td>{nf.format(r.requests)}</td>
+              <td>{nf.format(r.inputTokens)}</td>
+              <td>{nf.format(r.outputTokens)}</td>
+              <td>{r.retries}</td>
+              <td>{duration(r.durationMs)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }

@@ -67,6 +67,16 @@ describe("mapSessionEvent", () => {
     });
   });
 
+  it("usage d'un appel au modèle : tokens et multiplicateur", () => {
+    expect(mapSessionEvent(ev("assistant.usage", { model: "gpt-5", inputTokens: 1200, outputTokens: 80, cost: 1 }))).toEqual({
+      type: "usage",
+      model: "gpt-5",
+      inputTokens: 1200,
+      outputTokens: 80,
+      multiplier: 1,
+    });
+  });
+
   it("tout autre événement est un signe de vie", () => {
     expect(mapSessionEvent(ev("session.usage_info", {}))).toEqual({ type: "activity" });
     expect(mapSessionEvent(ev("hook.start", {}))).toEqual({ type: "activity" });

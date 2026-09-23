@@ -24,7 +24,7 @@ export async function runTddEffect(effect: TddEffect, ctx: ExtensionContext, ec:
   switch (effect.kind) {
     case "runPlanner": {
       const prompt = `Fonctionnalité : ${effect.feature}${effect.feedback ? `\n\nTon plan précédent a été refusé : ${effect.feedback}` : ""}`;
-      const { output } = await ctx.agents.run<"submit_plan">("tdd-planner", prompt, { signal });
+      const { output } = await ctx.agents.run<"submit_plan">("tdd-planner", prompt, { signal, evidence: tag("PLANNING") });
       return { type: "PLAN_SUBMITTED", steps: output.steps };
     }
 

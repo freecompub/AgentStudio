@@ -1,5 +1,6 @@
 import type { AgentEvent, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } from "../protocols/agent-runtime.js";
 import type { Logger } from "../protocols/logger.js";
+import type { UsageDelta } from "../protocols/usage.js";
 import { createTaskAgentGuard } from "../guards/task-agent-guard.js";
 import { composeGuards } from "../guards/compose-guards.js";
 import { createHeartbeat, EnvFailureError, runTurn, WorkDefectError } from "../turns/run-turn.js";
@@ -22,6 +23,8 @@ export interface TaskAgentRunOptions {
   tools?: (beat: () => void) => ToolSpec[];
   /** Gardes supplémentaires, appliquées après la garde du rôle (D28). */
   guards?: ToolCallGuard[];
+  /** Usage de chaque tour : une requête par prompt envoyé (× multiplicateur du modèle), tokens (D37). */
+  onUsage?: (delta: UsageDelta) => void;
 }
 
 export interface TaskAgentRunner {
@@ -46,12 +49,27 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
       let output: TerminalOutput<typeof spec.output> | undefined;
       let session: AgentSession | undefined;
       const heartbeat = createHeartbeat();
-      const turn = (text: string) =>
-        runTurn(session!, text, {
-          heartbeat,
-          ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
-          ...(opts.onEvent ? { onEvent: opts.onEvent } : {}),
-        });
+      const turn = async (text: string) => {
+        let multiplier: number | undefined;
+        let inputTokens = 0;
+        let outputTokens = 0;
+        try {
+          await runTurn(session!, text, {
+            heartbeat,
+            ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
+            onEvent: (e) => {
+              if (e.type === "usage") {
+                multiplier ??= e.multiplier;
+                inputTokens += e.inputTokens ?? 0;
+                outputTokens += e.outputTokens ?? 0;
+              }
+              opts.onEvent?.(e);
+            },
+          });
+        } finally {
+          opts.onUsage?.({ requests: multiplier ?? 1, inputTokens, outputTokens });
+        }
+      };
       const onAbort = () => void session?.abort();
       try {
         if (opts.signal?.aborted) throw new Error("Annulé");

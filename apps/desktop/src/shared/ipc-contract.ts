@@ -37,6 +37,17 @@ export type WorkspaceDiffDto = z.infer<typeof workspaceDiffSchema>;
 export const workspaceInfoSchema = z.object({ root: z.string(), name: z.string() });
 export type WorkspaceInfoDto = z.infer<typeof workspaceInfoSchema>;
 
+const usageRowSchema = z.object({
+  phase: z.string(),
+  label: z.string(),
+  requests: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  retries: z.number(),
+  durationMs: z.number(),
+});
+export type UsageRowDto = z.infer<typeof usageRowSchema>;
+
 export const taskCardSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -47,6 +58,8 @@ export const taskCardSchema = z.object({
   milestone: z.boolean(),
   step: z.object({ index: z.number(), total: z.number(), behavior: z.string() }).optional(),
   feedback: z.string().optional(),
+  /** Usage par état (D37), dans l'unité du fournisseur. */
+  usage: z.object({ unit: z.enum(["requests", "tokens"]), rows: z.array(usageRowSchema), total: usageRowSchema }).optional(),
   updatedAt: z.string(),
 });
 export type TaskCardDto = z.infer<typeof taskCardSchema>;

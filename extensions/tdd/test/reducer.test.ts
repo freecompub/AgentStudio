@@ -179,6 +179,12 @@ describe("Réducteur TDD — rejets, budget et escalade (D24)", () => {
     expect(kinds(effects)).toEqual(["rollback", "runTestAgent"]);
   });
 
+  it("réessais comptés par état (usage, D37)", () => {
+    const { state } = play([...atRedVerify, FAIL("x"), DONE, FAIL("y")]);
+    expect(state.retries).toEqual({ RED: 2 });
+    expect(play([PLAN, CP("c"), DONE, FAIL("z")], { granularity: "turn" }).state.retries).toEqual({ CYCLE: 1 });
+  });
+
   it("budget épuisé : escalade avec rollback et demande à l'humain", () => {
     const f = FAIL("mauvais test");
     const { state, effects } = play([...atRedVerify, f, DONE, f, DONE, f]);

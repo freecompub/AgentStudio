@@ -464,6 +464,31 @@ label {
   accent-color: var(--pine);
 }
 
+.usage {
+  margin-top: 0.35rem;
+  font-size: var(--step--1);
+}
+
+.usage table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage th,
+.usage td {
+  text-align: right;
+  padding: 0.2rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.usage th[scope="row"],
+.usage thead th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
 .origin {
   display: block;
   font-size: var(--step--1);

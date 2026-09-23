@@ -89,7 +89,7 @@ export interface EvidenceTag {
 
 export interface AgentRunOptions {
   signal?: AbortSignal;
-  /** Preuves des `run_tests` de l'agent rattachées à cette étiquette. */
+  /** Rattache l'appel à une tâche : preuves des `run_tests` et usage de l'agent (D20, D37). */
   evidence?: EvidenceTag;
   /** Gel des tests actif dans le tour : après une exécution rouge, plus aucune écriture de test (D22). */
   freezeTestsAfterRed?: boolean;

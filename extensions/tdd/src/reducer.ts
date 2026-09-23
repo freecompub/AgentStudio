@@ -21,8 +21,11 @@ export function initialState(input: TddInput): TddState {
     baselineTests: [],
     newTestIds: [],
     reports: [],
+    retries: {},
   };
 }
+
+const bump = (r: Record<string, number>, phase: string) => ({ ...r, [phase]: (r[phase] ?? 0) + 1 });
 
 export function initialEffects(s: TddState): TddEffect[] {
   return [{ kind: "runPlanner", feature: s.feature }];
@@ -197,7 +200,7 @@ function fallbackToStrict(s: TddState, reason: string): Out {
   const step = s.steps[s.current]!;
   const feedback = `Le tour unique a été rejeté (${reason}) : reprise pas à pas.`;
   return {
-    state: { ...s, phase: "RED", stepStrict: true, attempts: 0, feedback },
+    state: { ...s, phase: "RED", stepStrict: true, attempts: 0, feedback, retries: bump(s.retries, "CYCLE") },
     effects: [
       { kind: "rollback", to: s.checkpoints.step! },
       { kind: "runTestAgent", step, feedback },
@@ -255,7 +258,7 @@ function retryOrEscalate(
   const attempts = s.attempts + 1;
   if (attempts >= s.maxAttempts) return escalate({ ...s, attempts }, reason, phase, rollbackTo);
   const rollback: TddEffect[] = rollbackTo ? [{ kind: "rollback", to: rollbackTo }] : [];
-  return { state: { ...s, phase, attempts, feedback: reason }, effects: [...rollback, rerun] };
+  return { state: { ...s, phase, attempts, feedback: reason, retries: bump(s.retries, phase) }, effects: [...rollback, rerun] };
 }
 
 function escalate(s: TddState, reason: string, from: "PLANNING" | AgentPhase, rollbackTo: string | null): Out {

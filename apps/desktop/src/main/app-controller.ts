@@ -182,7 +182,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       offSession = s.onEvent((e) => {
         if (e.type === "messages") deps.sink.emit("chat:messages", { messages: e.messages });
         else if (e.type === "busy") deps.sink.emit("chat:busy", { busy: e.busy });
-        else if (e.event.type !== "activity") deps.sink.emit("chat:agent", { event: e.event });
+        else if (e.event.type !== "activity" && e.event.type !== "usage") deps.sink.emit("chat:agent", { event: e.event });
       });
       session = s;
       return s.start();

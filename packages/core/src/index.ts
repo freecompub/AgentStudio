@@ -49,3 +49,5 @@ export {
   type PermissionRule,
   type PermissionRules,
 } from "./guards/permission-arbiter.js";
+export type * from "./protocols/usage.js";
+export { createUsageRecorder, sumUsage } from "./usage/usage-recorder.js";

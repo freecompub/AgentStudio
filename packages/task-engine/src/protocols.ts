@@ -37,6 +37,8 @@ export interface TaskDefinition<S, E extends { type: string }, F, D> {
   checkpointBefore?(effect: F): MaybePromise<boolean>;
   /** État terminal : la tâche ne reprendra plus. */
   isTerminal(state: S): MaybePromise<boolean>;
+  /** Nom de l'état courant, pour l'usage par état (D37). Défaut : `state.phase`. */
+  phaseOf?(state: S): MaybePromise<string>;
 }
 
 export type TaskStatus = "running" | "waiting" | "finished";

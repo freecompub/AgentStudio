@@ -57,6 +57,8 @@ export interface TddState {
   /** Dernier motif de rejet, transmis tel quel à l'agent (§8.3). */
   feedback?: string;
   escalation?: { from: "PLANNING" | "RED" | "GREEN"; reason: string };
+  /** Réessais par état (usage par état, D37). */
+  retries: Record<string, number>;
   /** Résumés `report_phase` (dossier de passation, §6.6). */
   reports: { stepId: string; phase: "CYCLE" | "RED" | "GREEN" | "REFACTOR"; summary: string; files: string[] }[];
 }
