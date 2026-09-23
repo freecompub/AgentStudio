@@ -5,16 +5,18 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "start": "electron-vite preview",
-    "typecheck": "tsc -p ../../tsconfig.json && tsc -p tsconfig.web.json"
+    "dev": "node scripts/build-extensions.mjs && electron-vite dev",
+    "build": "node scripts/build-extensions.mjs && electron-vite build",
+    "start": "node scripts/build-extensions.mjs && electron-vite preview",
+    "typecheck": "tsc -p ../../tsconfig.json && tsc -p tsconfig.web.json",
+    "build:extensions": "node scripts/build-extensions.mjs"
   },
   "dependencies": {
     "@agent-studio/core": "workspace:*",
     "@agent-studio/ext-tdd": "workspace:*",
     "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/extension-manifest": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
@@ -34,6 +36,7 @@
     "@vitejs/plugin-react": "~5.1.4",
     "electron": "^44.4.5",
     "electron-vite": "^5.0.0",
+    "esbuild": "^0.28.2",
     "jsdom": "^30.1.1",
     "vite": "^7.3.6"
   }

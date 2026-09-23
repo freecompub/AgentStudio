@@ -31,7 +31,7 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
   const posts: string[] = [];
   const notifications: string[] = [];
   const services = await workspaceServicesFactory({
-    extensions: [{ manifest: tddManifest, module: tddExtension }],
+    extensions: [{ kind: "in-process", manifest: tddManifest, module: tddExtension }],
     stack: { id: "typescript", detect: async () => true, isTestFile: (p) => p.startsWith("tests/"), testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) },
     tasksDir: "/inutile",
     taskStore: store,

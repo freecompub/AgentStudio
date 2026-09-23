@@ -62,6 +62,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
   };
   const opened: string[] = [];
   const serviceLog: string[] = [];
+  const hookGuards: import("@agent-studio/core").ToolCallGuard[] = [];
   let servicesArgs: WorkspaceServicesArgs | undefined;
   const controller = createAppController({
     auth,
@@ -80,6 +81,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
           return { kind: "chat" };
         },
         commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
+        hookGuards: () => hookGuards,
         tasks: async () => [],
         cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
         pendingInteractions: async () => [],
@@ -101,7 +103,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
     ids: sequentialIds(),
     systemPrompt: "Rôle.",
   });
-  return { controller, runtime, tokens, emitted, workspaces, opened, serviceLog, getServicesArgs: () => servicesArgs, getSettings: () => settings };
+  return { controller, runtime, tokens, emitted, workspaces, opened, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
 }
 
 describe("AppController — authentification", () => {
@@ -276,5 +278,26 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
       "libérés:/projets/demo",
       "créés:/projets/autre",
     ]);
+  });
+});
+
+describe("AppController — arbitre de permissions (J4)", () => {
+  it("un hook d'extension qui refuse bloque l'outil sans question à l'utilisateur", async () => {
+    const { controller, runtime, emitted, hookGuards } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    hookGuards.push({ check: async () => ({ decision: "deny", reason: "[diabeo.demo] non" }) });
+    const guard = runtime.configs.get("fake-1")!.guard;
+    expect(await guard.check({ kind: "shell", toolName: "shell", command: "npm test" })).toEqual({ decision: "deny", reason: "[diabeo.demo] non" });
+    expect(emitted.some((e) => e.channel === "confirm:request")).toBe(false);
+  });
+
+  it("un hook d'extension qui plante n'autorise rien", async () => {
+    const { controller, runtime, hookGuards } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    hookGuards.push({ check: async () => Promise.reject(new Error("boum")) });
+    const guard = runtime.configs.get("fake-1")!.guard;
+    expect(await guard.check({ kind: "write", toolName: "edit", path: "src/a.ts" })).toMatchObject({ decision: "deny" });
   });
 });

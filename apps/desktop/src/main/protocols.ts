@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ToolCallGuard } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -45,6 +45,8 @@ export interface WorkspaceServices {
   /** `/commande` → extension ; texte libre → à envoyer à la session principale. */
   route(text: string): Promise<RouteOutcome>;
   commands(): CommandListing[];
+  /** Hooks `onPreToolUse` des extensions actives, pour l'arbitre de la session principale. */
+  hookGuards(): ToolCallGuard[];
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;

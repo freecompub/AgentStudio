@@ -17,15 +17,26 @@ import {
   type Logger,
 } from "@agent-studio/core";
 import type { ExtensionManifest } from "@agent-studio/extension-api";
-import { activateInProcess, type ExtensionHandle, type LoadedExtension } from "@agent-studio/extension-host";
+import {
+  activateInProcess,
+  activateIsolated,
+  type ExtensionHandle,
+  type IsolatedExtension,
+  type LoadedExtension,
+  type ProcessLauncher,
+} from "@agent-studio/extension-host";
 import type { StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
 
+/** Extension à activer : dans le principal (tests, J2) ou dans son propre processus (J4). */
+export type ExtensionSource = ({ kind: "in-process" } & LoadedExtension) | ({ kind: "isolated" } & IsolatedExtension);
+
 export interface WorkspaceServicesConfig {
-  /** Extensions chargées en processus (J2 ; isolation en utilityProcess au J4). */
-  extensions: LoadedExtension[];
+  extensions: ExtensionSource[];
+  /** Obligatoire dès qu'une extension est isolée. */
+  isolation?: { launcher: ProcessLauncher; runtimeEntry: string };
   stack: StackAdapter;
   /** Dossier des tâches ; un sous-dossier par projet. */
   tasksDir: string;
@@ -126,27 +137,35 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of cfg.extensions) {
-      handles.push(
-        await activateInProcess(ext, {
-          registry,
-          engine,
-          agents: createTaskAgentRunner({
-            runtime: createLazyRuntime(runtime),
-            root: workspace.root,
-            ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
-            ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
-          }),
-          workspace,
-          stack: cfg.stack,
-          interactions,
-          evidence,
-          hooks,
-          clock: cfg.clock,
-          ids: cfg.ids,
-          chat: { post: onPost },
-          ...(cfg.logger ? { logger: cfg.logger } : {}),
+      const hostDeps = {
+        registry,
+        engine,
+        agents: createTaskAgentRunner({
+          runtime: createLazyRuntime(runtime),
+          root: workspace.root,
+          ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
+          ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
-      );
+        workspace,
+        stack: cfg.stack,
+        interactions,
+        evidence,
+        hooks,
+        clock: cfg.clock,
+        ids: cfg.ids,
+        chat: { post: onPost },
+        ...(cfg.logger ? { logger: cfg.logger } : {}),
+      };
+      try {
+        if (ext.kind === "in-process") handles.push(await activateInProcess({ manifest: ext.manifest, module: ext.module }, hostDeps));
+        else {
+          if (!cfg.isolation) throw new Error("Aucun lanceur d'hôte d'extension configuré");
+          handles.push(await activateIsolated({ manifest: ext.manifest, directory: ext.directory, entry: ext.entry }, hostDeps, cfg.isolation));
+        }
+      } catch (err) {
+        cfg.logger?.error("activation d'extension impossible", { extensionId: ext.manifest.id, error: String(err) });
+        onPost(ext.manifest.id, `L'extension ${ext.manifest.id} n'a pas pu être activée : ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     await engine.resumeAll();
 
@@ -159,6 +178,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         return { kind: "handled" };
       },
       commands: () => registry.commands(),
+      hookGuards: () => hooks.guards(),
       tasks: async () => (await engine.list()).map((r) => toTaskCard(r, manifests)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       cancelTask: (taskId) => engine.cancel(taskId),
       pendingInteractions: async () => (await interactions.pending()).map(toDto),

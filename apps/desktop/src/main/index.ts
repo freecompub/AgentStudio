@@ -3,16 +3,18 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from "electron";
-import { createJsonConversationStore, createJsonLogger } from "@agent-studio/core";
+import { createJsonConversationStore, createJsonLogger, createJsonPermissionRules } from "@agent-studio/core";
+import { API_VERSION } from "@agent-studio/extension-api";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
-import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studio/workspace";
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
 import { createAppController, type AppController } from "./app-controller.js";
 import { createIpcRouter } from "./ipc-router.js";
+import { loadExtensions } from "./extension-loader.js";
 import { createJsonSettingsStore } from "./settings-store.js";
+import { createUtilityProcessLauncher } from "./utility-launcher.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
 import { workspaceServicesFactory } from "./workspace-services.js";
 
@@ -93,7 +95,13 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-function createController(): AppController {
+/** Extensions internes construites par `scripts/build-extensions.mjs`, et runtime de leurs hôtes. */
+const EXTENSIONS_DIR = join(import.meta.dirname, "../extensions");
+const EXTENSION_RUNTIME = join(import.meta.dirname, "../extension-host/extension-child.mjs");
+
+async function createController(): Promise<AppController> {
+  const { loaded, rejected } = await loadExtensions(EXTENSIONS_DIR, { appApi: API_VERSION });
+  for (const r of rejected) logger.error("extension écartée : manifeste invalide", { directory: r.directory, errors: r.errors.join(" ; ") });
   const git = cliGitRunnerFactory({ config: { "credential.https://github.com.helper": "!gh auth git-credential" } });
   return createAppController({
     auth: createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() }),
@@ -102,8 +110,12 @@ function createController(): AppController {
       clone: (url, dest) => cloneWorkspace(url, dest, { git }),
     },
     workspaceServices: workspaceServicesFactory({
-      // J2 : extensions internes chargées en processus ; isolation en utilityProcess au J4.
-      extensions: [{ manifest: tddManifest, module: tddExtension }],
+      // Une extension = un utilityProcess sous modèle de permissions (D9, J4).
+      extensions: loaded.map((e) => ({ kind: "isolated" as const, ...e })),
+      isolation: {
+        launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'une extension", { output: c.slice(0, 2_000) }) }),
+        runtimeEntry: EXTENSION_RUNTIME,
+      },
       stack: createTypeScriptAdapter(),
       tasksDir: join(userData, "tasks"),
       clock: { now: () => new Date() },
@@ -135,13 +147,14 @@ function createController(): AppController {
     clock: { now: () => new Date() },
     ids: { next: () => randomUUID() },
     systemPrompt: SYSTEM_PROMPT,
+    permissionRules: createJsonPermissionRules(join(userData, "permission-rules.json")),
     logger: logger.child({ component: "controller" }),
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   hardenSession();
-  controller = createController();
+  controller = await createController();
   const router = createIpcRouter(controller, { isTrustedSender, logger: logger.child({ component: "ipc" }) });
   for (const channel of REQUEST_CHANNELS) {
     ipcMain.handle(channel, (event, input: unknown) => router.handle(channel, input, event.senderFrame?.url ?? ""));

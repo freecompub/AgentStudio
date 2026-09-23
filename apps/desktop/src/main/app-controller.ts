@@ -1,7 +1,9 @@
 import { basename } from "node:path";
 import {
   createMainSession,
-  createWorkspaceGuard,
+  createMemoryPermissionRules,
+  createPermissionArbiter,
+  type PermissionRules,
   type AgentRuntime,
   type Clock,
   type ConversationStore,
@@ -39,6 +41,8 @@ export interface AppControllerDeps {
   clock: Clock;
   ids: IdGenerator;
   systemPrompt: string;
+  /** Règles « toujours autoriser » de l'utilisateur (arbitre, D27). */
+  permissionRules?: PermissionRules;
   /** Notifications système pour jalons et alertes (application en arrière-plan). */
   notifier?: SystemNotifier;
   logger?: Logger;
@@ -54,6 +58,7 @@ const DEVICE_PAGE = "https://github.com/login/device";
 
 export function createAppController(deps: AppControllerDeps): AppController {
   const confirmer = createIpcConfirmer(deps.sink);
+  const permissionRules = deps.permissionRules ?? createMemoryPermissionRules();
   let workspace: Workspace | null = null;
   let services: WorkspaceServices | null = null;
   let runtime: AgentRuntime | null = null;
@@ -168,7 +173,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
         checkpoints: ws.checkpoints,
         workspaceRoot: ws.root,
         systemPrompt: deps.systemPrompt,
-        guard: createWorkspaceGuard({ root: ws.root, confirmer }),
+        // Arbitre unique : politique du cœur → hooks des extensions → règles → question (D27).
+        guard: createPermissionArbiter({ root: ws.root, confirmer, rules: permissionRules, extensionGuards: () => services?.hookGuards() ?? [] }),
         clock: deps.clock,
         ids: deps.ids,
         ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
