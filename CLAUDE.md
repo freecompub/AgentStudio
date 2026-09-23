@@ -15,7 +15,8 @@ J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets 
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
 skraft : S0 en attente de décision de licence (ADR 0012, aucune reprise de skraft-plugin, prompts de
 substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
-(`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`).
+(`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`), S3 livré (`feat/s3-skraft-design`,
+`docs/jalons/S3-bilan.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 
 ```bash
