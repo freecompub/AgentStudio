@@ -244,6 +244,26 @@ describe("Moteur de tâches", () => {
   });
 });
 
+describe("Moteur de tâches — définition asynchrone (extension hors processus, J4)", () => {
+  it("toutes les méthodes de la définition peuvent répondre de façon asynchrone", async () => {
+    const sync = counterTask(async () => ({ type: "WORKED" }));
+    const later = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 1));
+    const async: typeof sync = {
+      ...sync,
+      initialState: (i) => later(sync.initialState(i) as S),
+      initialEffects: (s) => later(sync.initialEffects(s) as F[]),
+      transition: (s, e) => later(sync.transition(s, e) as { state: S; effects: F[] }),
+      isTerminal: (s) => later(sync.isTerminal(s) as boolean),
+      checkpointBefore: (f) => later(sync.checkpointBefore!(f) as boolean),
+    };
+    const { engine, store, checkpoints } = start(async);
+    const id = await engine.start("compteur", { target: 2 });
+    await engine.idle(id);
+    expect((await store.load(id))?.status).toBe("finished");
+    expect(checkpoints.created).toHaveLength(2);
+  });
+});
+
 describe("Moteur de tâches — reprise après plantage (D23)", () => {
   it("un effet commencé non terminé est rejoué depuis son checkpoint, après RESUMED", async () => {
     const store = new MemoryTaskStore();

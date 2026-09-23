@@ -51,7 +51,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
   async function persist(t: Live): Promise<void> {
     const r = t.record;
-    r.status = t.def.isTerminal(r.state) ? "finished" : r.pending.length || r.inflight ? "running" : "waiting";
+    r.status = (await t.def.isTerminal(r.state)) ? "finished" : r.pending.length || r.inflight ? "running" : "waiting";
     r.updatedAt = now();
     await deps.store.save(r);
     const snapshot = structuredClone(r);
@@ -67,7 +67,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
   }
 
   async function apply(t: Live, event: TaskEvent<{ type: string }>): Promise<void> {
-    const { state, effects } = t.def.transition(t.record.state, event);
+    const { state, effects } = await t.def.transition(t.record.state, event);
     t.record.state = state;
     if (event.type === "ABORT") t.record.pending = [];
     t.record.pending.push(...effects);
@@ -84,10 +84,10 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
   /** Exécute les effets en attente jusqu'à épuisement (ou attente d'un événement externe). */
   async function drain(t: Live): Promise<void> {
-    while (t.record.pending.length && !t.def.isTerminal(t.record.state)) {
+    while (t.record.pending.length && !(await t.def.isTerminal(t.record.state))) {
       if (t.abort.signal.aborted) return; // annulée : plus aucun effet ne démarre
       const effect = t.record.pending[0];
-      const wantsCheckpoint = t.def.checkpointBefore?.(effect) ?? true;
+      const wantsCheckpoint = (await t.def.checkpointBefore?.(effect)) ?? true;
       const checkpointId = wantsCheckpoint
         ? (await deps.checkpoints.create(`${t.record.name} ${t.record.id}`)).id
         : null;
@@ -143,12 +143,12 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
     async start(name, input) {
       const entry = defs.get(name);
       if (!entry) throw new Error(`Tâche non enregistrée : ${name}`);
-      const state = entry.def.initialState(input);
+      const state = await entry.def.initialState(input);
       const t = attach({
         id: deps.ids.next(),
         name,
         state,
-        pending: entry.def.initialEffects(state),
+        pending: await entry.def.initialEffects(state),
         inflight: null,
         status: "running",
         createdAt: now(),

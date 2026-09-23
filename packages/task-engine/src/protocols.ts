@@ -21,19 +21,22 @@ export interface EffectContext<S = unknown> {
   signal: AbortSignal;
 }
 
+/** Une définition hébergée hors processus répond de façon asynchrone (RPC, J4). */
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface TaskDefinition<S, E extends { type: string }, F, D> {
   name: string;
-  initialState(input: unknown): S;
+  initialState(input: unknown): MaybePromise<S>;
   /** Premiers effets à exécuter au lancement. */
-  initialEffects(state: S): F[];
-  /** PUR : aucune I/O. */
-  transition(state: S, event: TaskEvent<E>): { state: S; effects: F[] };
+  initialEffects(state: S): MaybePromise<F[]>;
+  /** PUR : aucune I/O (hors transport lorsqu'elle est hébergée dans un autre processus). */
+  transition(state: S, event: TaskEvent<E>): MaybePromise<{ state: S; effects: F[] }>;
   /** Exécute un effet ; renvoie l'événement suivant, ou rien (attente d'un événement externe). */
   runEffect(effect: F, deps: D, ctx: EffectContext<S>): Promise<TaskEvent<E> | void>;
   /** Checkpoint Git avant l'effet (D23). Défaut : oui. */
-  checkpointBefore?(effect: F): boolean;
+  checkpointBefore?(effect: F): MaybePromise<boolean>;
   /** État terminal : la tâche ne reprendra plus. */
-  isTerminal(state: S): boolean;
+  isTerminal(state: S): MaybePromise<boolean>;
 }
 
 export type TaskStatus = "running" | "waiting" | "finished";
