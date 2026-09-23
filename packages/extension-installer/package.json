@@ -1,0 +1,15 @@
+{
+  "name": "@agent-studio/extension-installer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/extension-manifest": "workspace:*",
+    "@agent-studio/extension-packaging": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

@@ -180,6 +180,21 @@ importers:
         specifier: ^0.28.2
         version: 0.28.2
 
+  packages/extension-installer:
+    dependencies:
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      '@agent-studio/extension-manifest':
+        specifier: workspace:*
+        version: link:../extension-manifest
+      '@agent-studio/extension-packaging':
+        specifier: workspace:*
+        version: link:../extension-packaging
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
   packages/extension-manifest:
     dependencies:
       '@agent-studio/extension-api':
