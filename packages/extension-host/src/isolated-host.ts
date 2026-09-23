@@ -87,6 +87,7 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
       transition: (state, event) => rpcRef.call("task.transition", [name, state, event], t) as Promise<{ state: unknown; effects: unknown[] }>,
       isTerminal: (state) => rpcRef.call("task.isTerminal", [name, state], t) as Promise<boolean>,
       checkpointBefore: (effect) => rpcRef.call("task.checkpointBefore", [name, effect], t) as Promise<boolean>,
+      phaseOf: (state) => rpcRef.call("task.phaseOf", [name, state], t) as Promise<string>,
       runEffect: (effect, _ctx, ec) =>
         rpcRef.call("task.runEffect", [name, effect, { taskId: ec.taskId, state: ec.state }], { signal: ec.signal }) as Promise<never>,
     };

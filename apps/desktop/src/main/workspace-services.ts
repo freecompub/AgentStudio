@@ -75,7 +75,8 @@ export function toTaskCard(
     feedback?: string;
     retries?: Record<string, number>;
   };
-  const phase = s.phase ?? "";
+  // Nom d'état publié par le moteur (phaseOf de la tâche), sinon convention `state.phase`.
+  const phase = record.phase ?? s.phase ?? "";
   const step = s.steps?.[s.current ?? 0];
   return {
     id: record.id,

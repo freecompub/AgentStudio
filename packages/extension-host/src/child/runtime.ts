@@ -57,6 +57,12 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
     "task.transition": async ([name, state, event]) => task(name).transition(state, event as { type: string }),
     "task.isTerminal": async ([name, state]) => task(name).isTerminal(state),
     "task.checkpointBefore": async ([name, effect]) => (await task(name).checkpointBefore?.(effect)) ?? true,
+    "task.phaseOf": async ([name, state]) => {
+      const t = task(name);
+      if (t.phaseOf) return t.phaseOf(state);
+      const p = (state as { phase?: unknown } | null)?.phase;
+      return typeof p === "string" ? p : "?";
+    },
     "task.runEffect": async ([name, effect, ec], { signal }) => {
       const e = ec as { taskId: string; state: unknown };
       return (await task(name).runEffect(effect, ctx!, { taskId: e.taskId, state: e.state, signal })) ?? null;

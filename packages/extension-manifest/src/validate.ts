@@ -24,7 +24,7 @@ const schema = z.object({
           name: z.string().regex(NAME),
           title: text(80),
           role: text(20_000),
-          output: z.enum(["report_phase", "submit_plan"]),
+          output: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"]),
           write: z.array(z.string().min(1)).optional(),
           tools: z.array(z.enum(["run_tests", "report_blocker"])).optional(),
         }),
