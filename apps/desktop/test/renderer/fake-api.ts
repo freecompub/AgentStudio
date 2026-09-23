@@ -8,6 +8,13 @@ export class FakeApi implements RendererApi {
   private handlers = new Map<RequestChannel, Handler>();
   private listeners = new Map<EventChannel, Set<(p: unknown) => void>>();
 
+  constructor() {
+    // Par défaut : développeur en mode avancé (les tests de profil surchargent).
+    this.handle("profile:get", () => ({ role: "developpeur", roleLabel: "Développeur", defaultMode: "advanced", permissionPolicy: "souple", developerMode: false, adminSource: "défaut" }));
+    this.handle("ui:get-mode", () => "advanced");
+    this.handle("ui:set-mode", () => undefined);
+  }
+
   handle(channel: RequestChannel, h: Handler): this {
     this.handlers.set(channel, h);
     return this;

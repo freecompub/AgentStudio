@@ -11,10 +11,13 @@ import {
   type Logger,
   type MainSession,
 } from "@agent-studio/core";
+import { ROLE_LABELS, type Profile } from "@agent-studio/core";
+import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
 import type { RequestChannel, RequestInput, RequestOutput, WorkspaceInfoDto } from "../shared/ipc-contract.js";
 import { createIpcConfirmer } from "./ipc-confirmer.js";
+import { createIpcConsent } from "./ipc-consent.js";
 import type {
   EventSink,
   ExternalOpener,
@@ -43,6 +46,12 @@ export interface AppControllerDeps {
   systemPrompt: string;
   /** Règles « toujours autoriser » de l'utilisateur (arbitre, D27). */
   permissionRules?: PermissionRules;
+  /** Profil attribué par l'administrateur (D6) ; l'utilisateur ne peut pas le modifier. */
+  profile?: { profile: Profile; developerMode: boolean; source: string };
+  /** Installation d'extensions tierces depuis un fichier (J6). */
+  installer?: ExtensionInstaller;
+  /** Extensions internes livrées avec l'application (affichage). */
+  builtInExtensions?: () => Promise<{ id: string; version: string; publisher: string; commands: string[] }[]>;
   /** Notifications système pour jalons et alertes (application en arrière-plan). */
   notifier?: SystemNotifier;
   logger?: Logger;
@@ -52,13 +61,19 @@ export interface AppControllerDeps {
 /** Un handler par canal de requête : le routeur IPC valide puis délègue. */
 export type AppController = {
   [C in RequestChannel]: (input: RequestInput<C>) => Promise<RequestOutput<C>>;
-} & { dispose(): Promise<void> };
+} & {
+  dispose(): Promise<void>;
+  /** Accord d'installation à fournir à l'installateur (écran d'installation). */
+  askConsent(req: import("@agent-studio/extension-installer").ConsentRequest): Promise<boolean>;
+};
 
 const DEVICE_PAGE = "https://github.com/login/device";
 
 export function createAppController(deps: AppControllerDeps): AppController {
   const confirmer = createIpcConfirmer(deps.sink);
   const permissionRules = deps.permissionRules ?? createMemoryPermissionRules();
+  const consent = createIpcConsent(deps.sink);
+  const profileInfo = deps.profile ?? { profile: { role: "developpeur" as const, defaultMode: "advanced" as const, permissionPolicy: "souple" as const }, developerMode: false, source: "défaut" };
   let workspace: Workspace | null = null;
   let services: WorkspaceServices | null = null;
   let runtime: AgentRuntime | null = null;
@@ -174,7 +189,13 @@ export function createAppController(deps: AppControllerDeps): AppController {
         workspaceRoot: ws.root,
         systemPrompt: deps.systemPrompt,
         // Arbitre unique : politique du cœur → hooks des extensions → règles → question (D27).
-        guard: createPermissionArbiter({ root: ws.root, confirmer, rules: permissionRules, extensionGuards: () => services?.hookGuards() ?? [] }),
+        guard: createPermissionArbiter({
+          root: ws.root,
+          confirmer,
+          rules: permissionRules,
+          extensionGuards: () => services?.hookGuards() ?? [],
+          profilePolicy: profileInfo.profile.permissionPolicy,
+        }),
         clock: deps.clock,
         ids: deps.ids,
         ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
@@ -225,7 +246,62 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     "interactions:list": () => requireServices().pendingInteractions(),
 
-    "interaction:respond": ({ id, option, comment }) => requireServices().respond(id, option, comment),
+    "interaction:respond": ({ id, option, comment }) => requireServices().respond(id, option, comment, { role: profileInfo.profile.role }),
+
+    "profile:get": async () => ({
+      role: profileInfo.profile.role,
+      roleLabel: ROLE_LABELS[profileInfo.profile.role],
+      defaultMode: profileInfo.profile.defaultMode,
+      permissionPolicy: profileInfo.profile.permissionPolicy,
+      developerMode: profileInfo.developerMode,
+      adminSource: profileInfo.source,
+    }),
+
+    "ui:get-mode": async () => (await deps.settings.load()).uiMode ?? profileInfo.profile.defaultMode,
+
+    "ui:set-mode": async ({ mode }) => deps.settings.save({ ...(await deps.settings.load()), uiMode: mode }),
+
+    "extensions:list": async () => {
+      const builtIn = (await deps.builtInExtensions?.()) ?? [];
+      const installed = (await deps.installer?.list()) ?? [];
+      const active = new Map(((await deps.installer?.active()) ?? []).map((a) => [a.manifest.id, a.manifest]));
+      return [
+        ...builtIn.map((b) => ({ ...b, builtIn: true, signed: true, status: "active" as const })),
+        ...installed.map((e) => ({
+          id: e.id,
+          version: e.version,
+          publisher: e.publisher,
+          builtIn: false,
+          signed: e.signed,
+          status: e.disabled ? ("disabled" as const) : ("active" as const),
+          ...(e.disabled ? { reason: e.disabled } : {}),
+          commands: (active.get(e.id)?.contributes.commands ?? []).map((c) => c.title),
+        })),
+      ];
+    },
+
+    "extensions:install": async () => {
+      if (!deps.installer) return { status: "rejected" as const, reason: "Installation d'extensions indisponible." };
+      const file = await deps.folderPicker.pickPackage?.();
+      if (!file) return { status: "cancelled" as const };
+      const r = await deps.installer.installFromFile(file);
+      if (r.status === "installed") {
+        deps.logger?.info("extension installée", { extensionId: r.id, version: r.version });
+        if (workspace) await attach(workspace); // nouvelles commandes disponibles tout de suite
+        deps.sink.emit("extensions:changed", {});
+      }
+      return r;
+    },
+
+    "extensions:uninstall": async ({ id }) => {
+      await deps.installer?.uninstall(id);
+      if (workspace) await attach(workspace);
+      deps.sink.emit("extensions:changed", {});
+    },
+
+    "extension-consent:respond": async ({ id, accept }) => consent.respond(id, accept),
+
+    askConsent: (req) => consent.ask(req),
 
     async dispose() {
       await services?.dispose();

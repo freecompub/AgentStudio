@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing, ToolCallGuard } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, Role, ToolCallGuard } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -18,6 +18,8 @@ export interface EventSink {
 
 export interface AppSettings {
   lastWorkspace?: string;
+  /** Mode d'affichage choisi par l'utilisateur ; absent = mode par défaut du profil. */
+  uiMode?: "simple" | "advanced";
 }
 
 export interface SettingsStore {
@@ -27,6 +29,8 @@ export interface SettingsStore {
 
 export interface FolderPicker {
   pick(): Promise<string | null>;
+  /** Choix d'un paquet d'extension (.asx) à installer. */
+  pickPackage?(): Promise<string | null>;
 }
 
 export interface SystemNotifier {
@@ -50,7 +54,7 @@ export interface WorkspaceServices {
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;
-  respond(id: string, option: string, comment?: string): Promise<void>;
+  respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
   dispose(): Promise<void>;
 }
 

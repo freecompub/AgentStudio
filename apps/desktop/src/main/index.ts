@@ -12,6 +12,9 @@ import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studi
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
 import { createAppController, type AppController } from "./app-controller.js";
 import { createIpcRouter } from "./ipc-router.js";
+import { readFile } from "node:fs/promises";
+import { createExtensionInstaller } from "@agent-studio/extension-installer";
+import { defaultAdminConfigPath, loadAdminConfig } from "./admin-config.js";
 import { loadExtensions } from "./extension-loader.js";
 import { createJsonSettingsStore } from "./settings-store.js";
 import { createUtilityProcessLauncher } from "./utility-launcher.js";
@@ -99,11 +102,49 @@ function createWindow(): BrowserWindow {
 const EXTENSIONS_DIR = join(import.meta.dirname, "../extensions");
 const EXTENSION_RUNTIME = join(import.meta.dirname, "../extension-host/extension-child.mjs");
 
+/** Liste de révocation signée désignée par l'administrateur (fichier ou URL), ou `null`. */
+async function fetchRevocationList(rev: { file?: string; url?: string } | null): Promise<unknown> {
+  if (!rev) return null;
+  try {
+    if (rev.file) return JSON.parse(await readFile(rev.file, "utf8"));
+    if (rev.url) return await (await fetch(rev.url, { signal: AbortSignal.timeout(15_000) })).json();
+  } catch (err) {
+    logger.warn("liste de révocation indisponible", { error: String(err) });
+  }
+  return null;
+}
+
 async function createController(): Promise<AppController> {
+  const admin = await loadAdminConfig(defaultAdminConfigPath(process.platform, process.env));
+  if (admin.error) logger.error("configuration administrateur invalide : profil restreint appliqué", { source: admin.source, error: admin.error });
+  logger.info("profil", { role: admin.profile.role, source: admin.source });
+
   const { loaded, rejected } = await loadExtensions(EXTENSIONS_DIR, { appApi: API_VERSION });
   for (const r of rejected) logger.error("extension écartée : manifeste invalide", { directory: r.directory, errors: r.errors.join(" ; ") });
+
+  let ctl: AppController | null = null;
+  const installer = createExtensionInstaller({
+    installDir: join(userData, "extensions"),
+    appApi: API_VERSION,
+    trusted: () => admin.trustedPublishers,
+    devMode: () => admin.developerMode,
+    consent: (req) => (ctl ? ctl.askConsent(req) : Promise.resolve(false)),
+    revocation: () => fetchRevocationList(admin.revocation),
+    rootPublicKeyPem: admin.revocation?.rootPublicKeyPem ?? "",
+    clock: { now: () => new Date() },
+  });
+  if (admin.revocation) {
+    // Au lancement : les extensions révoquées sont désactivées, avec la raison (§12).
+    try {
+      for (const r of await installer.applyRevocations()) logger.warn("extension révoquée et désactivée", { extensionId: r.id, reason: r.reason });
+    } catch (err) {
+      logger.error("liste de révocation refusée", { error: String(err) });
+    }
+    // Ensuite, interrogation périodique : effet au prochain lancement.
+    setInterval(() => void installer.applyRevocations().catch(() => undefined), 6 * 3_600_000).unref();
+  }
   const git = cliGitRunnerFactory({ config: { "credential.https://github.com.helper": "!gh auth git-credential" } });
-  return createAppController({
+  const controller = createAppController({
     auth: createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() }),
     workspaces: {
       open: (path) => openWorkspace(path, { git }),
@@ -111,7 +152,12 @@ async function createController(): Promise<AppController> {
     },
     workspaceServices: workspaceServicesFactory({
       // Une extension = un utilityProcess sous modèle de permissions (D9, J4).
-      extensions: loaded.map((e) => ({ kind: "isolated" as const, ...e })),
+      extensions: async () => [
+        ...loaded.map((e) => ({ kind: "isolated" as const, ...e })),
+        ...(await installer.active())
+          .filter((a) => a.manifest.main)
+          .map((a) => ({ kind: "isolated" as const, manifest: a.manifest, directory: a.directory, entry: join(a.directory, a.manifest.main!) })),
+      ],
       isolation: {
         launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'une extension", { output: c.slice(0, 2_000) }) }),
         runtimeEntry: EXTENSION_RUNTIME,
@@ -135,7 +181,15 @@ async function createController(): Promise<AppController> {
         const r = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
         return r.canceled ? null : (r.filePaths[0] ?? null);
       },
+      async pickPackage() {
+        const r = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Extension agent-studio", extensions: ["asx", "zip"] }] });
+        return r.canceled ? null : (r.filePaths[0] ?? null);
+      },
     },
+    profile: { profile: admin.profile, developerMode: admin.developerMode, source: admin.source },
+    installer,
+    builtInExtensions: async () =>
+      loaded.map((e) => ({ id: e.manifest.id, version: e.manifest.version, publisher: e.manifest.publisher, commands: (e.manifest.contributes.commands ?? []).map((c) => c.title) })),
     external: { open: (url) => shell.openExternal(url) },
     notifier: {
       // Jalons et alertes seulement si l'application est en arrière-plan (§7.2).
@@ -151,6 +205,8 @@ async function createController(): Promise<AppController> {
     permissionRules: createJsonPermissionRules(join(userData, "permission-rules.json")),
     logger: logger.child({ component: "controller" }),
   });
+  ctl = controller;
+  return controller;
 }
 
 app.whenReady().then(async () => {

@@ -22,6 +22,13 @@ export const REQUEST_CHANNELS = [
   "task:cancel",
   "interactions:list",
   "interaction:respond",
+  "profile:get",
+  "ui:get-mode",
+  "ui:set-mode",
+  "extensions:list",
+  "extensions:install",
+  "extensions:uninstall",
+  "extension-consent:respond",
 ] as const;
 
 export const EVENT_CHANNELS = [
@@ -32,4 +39,6 @@ export const EVENT_CHANNELS = [
   "auth:device-code",
   "task:update",
   "interactions:changed",
+  "extension-consent:request",
+  "extensions:changed",
 ] as const;

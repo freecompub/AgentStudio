@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { WorkspaceDiffDto } from "../../shared/ipc-contract";
 import { api } from "../api";
+import { useAdvanced } from "../ui-mode";
 
 const LABEL = { added: "ajouté", modified: "modifié", deleted: "supprimé" } as const;
 
@@ -8,6 +9,7 @@ const LABEL = { added: "ajouté", modified: "modifié", deleted: "supprimé" } a
 export function TurnChanges({ messageId }: { messageId: string }) {
   const [diff, setDiff] = useState<WorkspaceDiffDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const advanced = useAdvanced();
 
   useEffect(() => {
     api.call("chat:turn-changes", { messageId }).then(setDiff, (e: Error) => setError(e.message));
@@ -29,10 +31,12 @@ export function TurnChanges({ messageId }: { messageId: string }) {
           </li>
         ))}
       </ul>
-      <details>
-        <summary>Détail ligne à ligne</summary>
-        <pre className="patch">{diff.patch}</pre>
-      </details>
+      {advanced && (
+        <details>
+          <summary>Détail ligne à ligne</summary>
+          <pre className="patch">{diff.patch}</pre>
+        </details>
+      )}
     </div>
   );
 }

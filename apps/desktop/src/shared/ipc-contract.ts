@@ -8,6 +8,8 @@ import { EVENT_CHANNELS as EVENT_NAMES, REQUEST_CHANNELS as REQUEST_NAMES } from
 
 const text = (max: number) => z.string().max(max);
 
+export const roleSchema = z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"]);
+
 export const chatMessageSchema = z.object({
   id: z.string(),
   role: z.enum(["user", "assistant", "notice"]),
@@ -71,12 +73,54 @@ export const interactionSchema = z.object({
   title: z.string(),
   detail: z.string().optional(),
   options: z.array(z.object({ id: z.string(), label: z.string() })),
+  requiredRoles: z.array(roleSchema).optional(),
   createdAt: z.string(),
 });
 export type InteractionDto = z.infer<typeof interactionSchema>;
 
 export const commandListingSchema = z.object({ invocation: z.string(), title: z.string(), description: z.string() });
 export type CommandListingDto = z.infer<typeof commandListingSchema>;
+
+export const uiModeSchema = z.enum(["simple", "advanced"]);
+export type UiMode = z.infer<typeof uiModeSchema>;
+
+export const profileInfoSchema = z.object({
+  role: roleSchema,
+  roleLabel: z.string(),
+  defaultMode: uiModeSchema,
+  permissionPolicy: z.enum(["prudente", "souple"]),
+  developerMode: z.boolean(),
+  /** Origine de la configuration : fichier de l'administrateur ou valeurs par défaut. */
+  adminSource: z.string(),
+});
+export type ProfileInfoDto = z.infer<typeof profileInfoSchema>;
+
+export const extensionInfoSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  publisher: z.string(),
+  builtIn: z.boolean(),
+  signed: z.boolean(),
+  status: z.enum(["active", "disabled"]),
+  reason: z.string().optional(),
+  commands: z.array(z.string()),
+});
+export type ExtensionInfoDto = z.infer<typeof extensionInfoSchema>;
+
+const permissionTextSchema = z.object({ permission: z.string(), description: z.string() });
+export const consentRequestSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["install", "update"]),
+  extensionId: z.string(),
+  version: z.string(),
+  publisher: z.string(),
+  signed: z.boolean(),
+  commands: z.array(z.string()),
+  permissions: z.array(permissionTextSchema),
+  added: z.array(permissionTextSchema),
+  warnings: z.array(z.string()),
+});
+export type ConsentRequestDto = z.infer<typeof consentRequestSchema>;
 
 const empty = z.object({}).strict();
 
@@ -106,6 +150,16 @@ export const requests = {
   "tasks:list": { input: empty, output: z.array(taskCardSchema) },
   "task:cancel": { input: z.object({ taskId: text(200).min(1) }).strict(), output: z.void() },
   "interactions:list": { input: empty, output: z.array(interactionSchema) },
+  "profile:get": { input: empty, output: profileInfoSchema },
+  "ui:get-mode": { input: empty, output: uiModeSchema },
+  "ui:set-mode": { input: z.object({ mode: uiModeSchema }).strict(), output: z.void() },
+  "extensions:list": { input: empty, output: z.array(extensionInfoSchema) },
+  "extensions:install": {
+    input: empty,
+    output: z.object({ status: z.enum(["installed", "declined", "rejected", "cancelled"]), id: z.string().optional(), version: z.string().optional(), reason: z.string().optional() }),
+  },
+  "extensions:uninstall": { input: z.object({ id: text(200).min(1) }).strict(), output: z.void() },
+  "extension-consent:respond": { input: z.object({ id: text(100).min(1), accept: z.boolean() }).strict(), output: z.void() },
   "interaction:respond": {
     input: z.object({ id: text(200).min(1), option: text(100).min(1), comment: text(4000).optional() }).strict(),
     output: z.void(),
@@ -138,6 +192,8 @@ export const events = {
   "auth:device-code": z.object({ code: z.string(), verificationUrl: z.string() }),
   "task:update": taskCardSchema,
   "interactions:changed": z.object({ pending: z.array(interactionSchema) }),
+  "extension-consent:request": consentRequestSchema,
+  "extensions:changed": z.object({}),
 } as const;
 
 export type EventChannel = keyof typeof events;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { InteractionDto, TaskCardDto, UsageRowDto } from "../../shared/ipc-contract";
 import { api } from "../api";
+import { useAdvanced } from "../ui-mode";
 
 /**
  * « En attente de vous » puis « Tâches » (§7.2, §11) : une carte par tâche, mise à jour en place.
@@ -11,6 +12,7 @@ export function TaskPanel() {
   const [pending, setPending] = useState<InteractionDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const advanced = useAdvanced();
 
   useEffect(() => {
     const offs = [
@@ -47,7 +49,8 @@ export function TaskPanel() {
           {pending.map((p) => (
             <article key={p.id} className="decision">
               <h3>{p.title}</h3>
-              {p.detail && <pre className="decision-detail">{p.detail}</pre>}
+              {p.detail &&
+                (advanced ? <pre className="decision-detail">{p.detail}</pre> : <p className="decision-detail">{summarize(p.detail)}</p>)}
               <div className="row">
                 {p.options.map((o, i) => (
                   <button key={o.id} className={i === 0 ? "primary" : ""} disabled={busy === p.id} onClick={() => void respond(p.id, o.id)}>
@@ -73,7 +76,7 @@ export function TaskPanel() {
           </p>
           {t.step && <progress max={t.step.total} value={t.status === "finished" ? t.step.total : t.step.index - 1} />}
           {t.feedback && t.status !== "finished" && <p className="hint">Dernier rejet : {t.feedback}</p>}
-          {t.usage && <UsageSummary usage={t.usage} />}
+          {t.usage && <UsageSummary usage={t.usage} detailed={advanced} />}
           {t.status !== "finished" && (
             <button className="link" onClick={() => void api.call("task:cancel", { taskId: t.id })}>
               Annuler la tâche
@@ -89,14 +92,24 @@ const nf = new Intl.NumberFormat("fr-FR");
 const duration = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`);
 
 /** Usage par état (D37), dans l'unité du fournisseur : requêtes pour Copilot, tokens sinon. */
-function UsageSummary({ usage }: { usage: NonNullable<TaskCardDto["usage"]> }) {
+/** Mode simple : une phrase (§11, décisions). */
+function summarize(detail: string): string {
+  const lines = detail.split("\n").filter((l) => l.trim());
+  return lines.length <= 1 ? detail : `${lines[0]} (et ${lines.length - 1} autre${lines.length > 2 ? "s" : ""} point${lines.length > 2 ? "s" : ""})`;
+}
+
+function UsageSummary({ usage, detailed }: { usage: NonNullable<TaskCardDto["usage"]>; detailed: boolean }) {
   const main = (r: UsageRowDto) => (usage.unit === "requests" ? `${nf.format(r.requests)} requête${r.requests > 1 ? "s" : ""}` : `${nf.format(r.inputTokens + r.outputTokens)} tokens`);
+  const summary = (
+    <>
+      Usage : {main(usage.total)}
+      {usage.total.retries > 0 && `, ${usage.total.retries} réessai${usage.total.retries > 1 ? "s" : ""}`}
+    </>
+  );
+  if (!detailed) return <p className="usage hint">{summary}</p>;
   return (
     <details className="usage">
-      <summary>
-        Usage : {main(usage.total)}
-        {usage.total.retries > 0 && `, ${usage.total.retries} réessai${usage.total.retries > 1 ? "s" : ""}`}
-      </summary>
+      <summary>{summary}</summary>
       <table>
         <thead>
           <tr>

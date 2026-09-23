@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessageDto, CommandListingDto, WorkspaceInfoDto } from "../../shared/ipc-contract";
+import type { ChatMessageDto, CommandListingDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
+import { ExtensionsPanel } from "../components/ExtensionsPanel";
+import { GuidedActions } from "../components/GuidedActions";
 import { TaskPanel } from "../components/TaskPanel";
 import { TurnChanges } from "../components/TurnChanges";
 
@@ -11,7 +13,17 @@ interface ToolActivity {
   note?: string;
 }
 
-export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; onChangeProject: () => void }) {
+export function ChatScreen(props: {
+  user: string;
+  workspace: WorkspaceInfoDto;
+  profile: ProfileInfoDto | null;
+  mode: UiMode;
+  onModeChange: (m: UiMode) => void;
+  onChangeProject: () => void;
+}) {
+  const advanced = props.mode === "advanced";
+  const [extensionsOpen, setExtensionsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -45,17 +57,20 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
       }),
     ];
     api.call("chat:start", {}).then(setMessages, (err: Error) => setError(err.message));
-    api.call("commands:list", {}).then(setCommands, () => undefined);
+    const loadCommands = () => api.call("commands:list", {}).then(setCommands, () => undefined);
+    void loadCommands();
+    offs.push(api.on("extensions:changed", () => void loadCommands()));
     return () => offs.forEach((off) => off());
   }, [props.workspace.root]);
 
   useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages, streaming, tools]);
 
-  async function send(e?: FormEvent) {
+  async function send(e?: FormEvent, override?: string) {
     e?.preventDefault();
-    const text = draft.trim();
+    const text = (override ?? draft).trim();
     if (!text || busy) return;
-    setDraft("");
+    if (!override) setDraft("");
+    setActionsOpen(false);
     setError(null);
     try {
       await api.call("chat:send", { text });
@@ -112,7 +127,19 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
         <span className="spacer" />
         {syncNote && <span className="hint">{syncNote}</span>}
         <button onClick={() => void sync()}>Synchroniser</button>
-        <span className="user">{props.user}</span>
+        <button onClick={() => setExtensionsOpen(true)}>Extensions</button>
+        <div className="mode-switch" role="group" aria-label="Mode d'affichage">
+          <button aria-pressed={!advanced} onClick={() => props.onModeChange("simple")}>
+            Simple
+          </button>
+          <button aria-pressed={advanced} onClick={() => props.onModeChange("advanced")}>
+            Avancé
+          </button>
+        </div>
+        <span className="user" title={props.profile ? `Profil attribué par l'administrateur (${props.profile.adminSource})` : undefined}>
+          {props.user}
+          {props.profile && <span className="hint"> ({props.profile.roleLabel})</span>}
+        </span>
       </header>
 
       <TaskPanel />
@@ -125,6 +152,7 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
               Décrivez la tâche en langage courant. Avant chaque réponse, l'application garde un point de retour : vous
               pourrez annuler les modifications de l'agent d'un clic.
             </p>
+            <GuidedActions commands={commands} disabled={busy} onRun={(t) => void send(undefined, t)} />
           </div>
         )}
 
@@ -155,7 +183,13 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
           ))}
           {busy && (
             <li className="msg assistant live">
-              {tools.length > 0 && (
+              {!advanced && tools.length > 0 && (
+                <p className="hint">
+                  L'agent travaille ({tools.length} action{tools.length > 1 ? "s" : ""})
+                  {tools.some((t) => t.state === "denied") ? ", une action a été refusée" : ""}.
+                </p>
+              )}
+              {advanced && tools.length > 0 && (
                 <ul className="tools">
                   {tools.map((t) => (
                     <li key={t.id} className={`tool ${t.state}`}>
@@ -176,6 +210,14 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
 
       <form className="composer" onSubmit={(e) => void send(e)}>
         {error && <p className="error">{error}</p>}
+        {messages.length > 0 && commands.length > 0 && (
+          <div className="row">
+            <button type="button" className="link" onClick={() => setActionsOpen((o) => !o)}>
+              {actionsOpen ? "Masquer les actions" : "Lancer une action"}
+            </button>
+          </div>
+        )}
+        {actionsOpen && <GuidedActions commands={commands} disabled={busy} onRun={(t) => void send(undefined, t)} />}
         {draft.startsWith("/") && !draft.includes(" ") && (
           <ul className="command-hints" aria-label="Commandes disponibles">
             {commands
@@ -202,6 +244,7 @@ export function ChatScreen(props: { user: string; workspace: WorkspaceInfoDto; o
         />
         <div className="row end">
           <span className="hint">Entrée pour envoyer, Maj+Entrée pour aller à la ligne</span>
+          <ExtensionsPanel open={extensionsOpen} onClose={() => setExtensionsOpen(false)} developerMode={props.profile?.developerMode ?? false} />
           {busy ? (
             <button type="button" onClick={() => void api.call("chat:abort", {})}>
               Arrêter l'agent

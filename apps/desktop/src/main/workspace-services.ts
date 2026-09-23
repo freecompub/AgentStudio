@@ -38,7 +38,8 @@ import type { WorkspaceServicesFactory } from "./protocols.js";
 export type ExtensionSource = ({ kind: "in-process" } & LoadedExtension) | ({ kind: "isolated" } & IsolatedExtension);
 
 export interface WorkspaceServicesConfig {
-  extensions: ExtensionSource[];
+  /** Extensions à activer, relues à chaque ouverture de projet (installation, révocation). */
+  extensions: ExtensionSource[] | (() => Promise<ExtensionSource[]>);
   /** Adaptateurs de stack, par ordre de préférence : le premier qui reconnaît le projet est retenu. */
   stacks: StackAdapter[];
   /** Obligatoire dès qu'une extension est isolée. */
@@ -113,7 +114,8 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify }) => {
-    const manifests = cfg.extensions.map((e) => e.manifest);
+    const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
+    const manifests = sources.map((e) => e.manifest);
     const detected = await selectStackAdapter(workspace.root, cfg.stacks);
     const stack = detected ?? cfg.stacks[0];
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
@@ -145,6 +147,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       options: r.options,
       createdAt: r.createdAt,
       ...(r.detail ? { detail: r.detail } : {}),
+      ...(r.requiredRoles ? { requiredRoles: r.requiredRoles } : {}),
     });
     const offInteractions = interactions.onChange((pending) => onInteractions(pending.map(toDto)));
     const latestCards = new Map<string, TaskCardDto>();
@@ -197,7 +200,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const registry = createRegistry();
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
-    for (const ext of cfg.extensions) {
+    for (const ext of sources) {
       const hostDeps = {
         registry,
         engine,
@@ -247,7 +250,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       cancelTask: (taskId) => engine.cancel(taskId),
       pendingInteractions: async () => (await interactions.pending()).map(toDto),
-      respond: (id, option, comment) => interactions.respond(id, option, comment),
+      respond: (id, option, comment, by) => interactions.respond(id, option, comment, by),
       async dispose() {
         offTasks();
         offUsage();

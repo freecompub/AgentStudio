@@ -32,7 +32,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
   };
 }
 
-function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
+function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Partial<Parameters<typeof createAppController>[0]> } = {}) {
   const runtime = new ScriptedRuntime();
   const tokens: string[] = [];
   const emitted: { channel: EventChannel; payload: unknown }[] = [];
@@ -85,7 +85,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
         tasks: async () => [],
         cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
         pendingInteractions: async () => [],
-        respond: async (id, option) => void serviceLog.push(`réponse:${id}:${option}`),
+        respond: async (id, option, _c, by) => void serviceLog.push(`réponse:${id}:${option}${by ? `:${by.role}` : ""}`),
         dispose: async () => void serviceLog.push(`libérés:${args.workspace.root}`),
       };
       return services;
@@ -102,6 +102,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings } = {}) {
     clock: fixedClock(),
     ids: sequentialIds(),
     systemPrompt: "Rôle.",
+    ...opts.extra,
   });
   return { controller, runtime, tokens, emitted, workspaces, opened, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
 }
@@ -214,10 +215,10 @@ describe("AppController — conversation", () => {
     await controller["chat:start"]({});
     const guard = runtime.configs.get("fake-1")!.guard;
 
-    const decision = guard.check({ kind: "shell", toolName: "shell", command: "npm test" });
+    const decision = guard.check({ kind: "shell", toolName: "shell", command: "npm install left-pad" });
     await new Promise((r) => setTimeout(r, 0));
     const req = emitted.find((e) => e.channel === "confirm:request")?.payload as { id: string; detail: string };
-    expect(req.detail).toContain("npm test");
+    expect(req.detail).toContain("npm install left-pad");
     await controller["confirm:respond"]({ id: req.id, answer: "allow-once" });
     expect(await decision).toEqual({ decision: "allow" });
   });
@@ -273,7 +274,7 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
     await controller["workspace:open"]({ path: "/projets/autre" });
     expect(serviceLog).toEqual([
       "créés:/projets/demo",
-      "réponse:int-1:approve",
+      "réponse:int-1:approve:developpeur",
       "annule:t1",
       "libérés:/projets/demo",
       "créés:/projets/autre",
@@ -299,5 +300,82 @@ describe("AppController — arbitre de permissions (J4)", () => {
     hookGuards.push({ check: async () => Promise.reject(new Error("boum")) });
     const guard = runtime.configs.get("fake-1")!.guard;
     expect(await guard.check({ kind: "write", toolName: "edit", path: "src/a.ts" })).toMatchObject({ decision: "deny" });
+  });
+});
+
+describe("AppController — profils, modes et extensions (J6)", () => {
+  it("profil en lecture seule ; mode par défaut du profil, modifiable par l'utilisateur", async () => {
+    const { controller, getSettings } = setup({
+      extra: { profile: { profile: { role: "po", defaultMode: "simple", permissionPolicy: "prudente" }, developerMode: false, source: "/etc/agent-studio/admin.json" } },
+    });
+    expect(await controller["profile:get"]({})).toEqual({
+      role: "po",
+      roleLabel: "PO / BA",
+      defaultMode: "simple",
+      permissionPolicy: "prudente",
+      developerMode: false,
+      adminSource: "/etc/agent-studio/admin.json",
+    });
+    expect(await controller["ui:get-mode"]({})).toBe("simple");
+    await controller["ui:set-mode"]({ mode: "advanced" });
+    expect(await controller["ui:get-mode"]({})).toBe("advanced");
+    expect(getSettings().uiMode).toBe("advanced");
+  });
+
+  it("la réponse à une demande porte le rôle du profil", async () => {
+    const { controller, serviceLog } = setup({
+      extra: { profile: { profile: { role: "architecte", defaultMode: "advanced", permissionPolicy: "souple" }, developerMode: false, source: "x" } },
+    });
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["interaction:respond"]({ id: "int-9", option: "accept" });
+    expect(serviceLog).toContain("réponse:int-9:accept:architecte");
+  });
+
+  it("installation depuis un fichier : accord demandé dans la fenêtre, puis services rechargés", async () => {
+    const { mkdtemp, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { generateKeyPair, packExtension } = await import("@agent-studio/extension-packaging");
+    const { createExtensionInstaller } = await import("@agent-studio/extension-installer");
+    const dir = await mkdtemp(join(tmpdir(), "agent-studio-ctl-"));
+    const key = generateKeyPair();
+    const enc = (x: string) => new TextEncoder().encode(x);
+    const manifest = { id: "tiers.lint", version: "1.0.0", publisher: "tiers", engines: { appApi: "^0.1" }, main: "dist/index.mjs", permissions: ["fs:read"], contributes: { commands: [{ name: "lint", title: "Vérifier le style", description: "d" }] } };
+    const file = join(dir, "lint.asx");
+    await writeFile(file, packExtension(new Map([["manifest.json", enc(JSON.stringify(manifest))], ["dist/index.mjs", enc("export default {activate(){}}")]]), { privateKeyPem: key.privateKeyPem, keyId: key.keyId }));
+
+    let ctl!: ReturnType<typeof createAppController>;
+    const installer = createExtensionInstaller({
+      installDir: join(dir, "extensions"),
+      appApi: "0.1.0",
+      trusted: () => [{ publisher: "tiers", keyId: key.keyId, publicKeyPem: key.publicKeyPem, trustedUpdates: false }],
+      devMode: () => false,
+      consent: (req) => ctl.askConsent(req),
+      revocation: async () => null,
+      rootPublicKeyPem: key.publicKeyPem,
+      clock: { now: () => new Date() },
+    });
+    const env = setup({ extra: { installer, folderPicker: { pick: async () => null, pickPackage: async () => file } } });
+    ctl = env.controller;
+    await ctl["workspace:open"]({ path: "/projets/demo" });
+
+    const install = ctl["extensions:install"]({});
+    await new Promise((r) => setTimeout(r, 50));
+    const req = env.emitted.find((e) => e.channel === "extension-consent:request")?.payload as { id: string; permissions: unknown[]; commands: string[] };
+    expect(req.permissions).toEqual([{ permission: "fs:read", description: "Lire les fichiers du projet" }]);
+    expect(req.commands).toEqual(["Vérifier le style : d"]);
+    await ctl["extension-consent:respond"]({ id: req.id, accept: true });
+
+    expect(await install).toEqual({ status: "installed", id: "tiers.lint", version: "1.0.0" });
+    expect(env.serviceLog.filter((l) => l.startsWith("créés"))).toHaveLength(2);
+    expect(env.emitted.some((e) => e.channel === "extensions:changed")).toBe(true);
+    expect(await ctl["extensions:list"]({})).toEqual([
+      { id: "tiers.lint", version: "1.0.0", publisher: "tiers", builtIn: false, signed: true, status: "active", commands: ["Vérifier le style"] },
+    ]);
+  });
+
+  it("installation annulée au choix du fichier", async () => {
+    const { controller } = setup({ extra: { installer: { installFromFile: async () => ({ status: "declined" }), list: async () => [], uninstall: async () => {}, applyRevocations: async () => [], active: async () => [] }, folderPicker: { pick: async () => null, pickPackage: async () => null } } });
+    expect(await controller["extensions:install"]({})).toEqual({ status: "cancelled" });
   });
 });

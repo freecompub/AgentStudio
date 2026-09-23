@@ -50,9 +50,15 @@ importers:
       '@agent-studio/extension-host':
         specifier: workspace:*
         version: link:../../packages/extension-host
+      '@agent-studio/extension-installer':
+        specifier: workspace:*
+        version: link:../../packages/extension-installer
       '@agent-studio/extension-manifest':
         specifier: workspace:*
         version: link:../../packages/extension-manifest
+      '@agent-studio/extension-packaging':
+        specifier: workspace:*
+        version: link:../../packages/extension-packaging
       '@agent-studio/github-auth':
         specifier: workspace:*
         version: link:../../packages/github-auth
