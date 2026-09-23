@@ -84,7 +84,10 @@ export const requests = {
   "chat:undo": { input: z.object({ messageId: text(200).min(1) }).strict(), output: z.void() },
   "chat:abort": { input: empty, output: z.void() },
   "chat:turn-changes": { input: z.object({ messageId: text(200).min(1) }).strict(), output: workspaceDiffSchema },
-  "confirm:respond": { input: z.object({ id: text(100).min(1), allowed: z.boolean() }).strict(), output: z.void() },
+  "confirm:respond": {
+    input: z.object({ id: text(100).min(1), answer: z.enum(["allow-once", "allow-always", "deny"]) }).strict(),
+    output: z.void(),
+  },
   "shell:open-device-page": { input: empty, output: z.void() },
   "commands:list": { input: empty, output: z.array(commandListingSchema) },
   "tasks:list": { input: empty, output: z.array(taskCardSchema) },

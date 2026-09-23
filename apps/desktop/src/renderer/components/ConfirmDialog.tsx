@@ -17,21 +17,22 @@ export function ConfirmDialog() {
     if (!current && d.open) d.close();
   }, [current]);
 
-  function answer(allowed: boolean) {
+  function answer(answer: "allow-once" | "allow-always" | "deny") {
     if (!current) return;
-    void api.call("confirm:respond", { id: current.id, allowed });
+    void api.call("confirm:respond", { id: current.id, answer });
     setQueue((q) => q.slice(1));
   }
 
   return (
-    <dialog ref={ref} className="confirm" onCancel={(e) => (e.preventDefault(), answer(false))}>
+    <dialog ref={ref} className="confirm" onCancel={(e) => (e.preventDefault(), answer("deny"))}>
       {current && (
         <>
           <h2>{current.title}</h2>
           <pre>{current.detail}</pre>
           <div className="row end">
-            <button onClick={() => answer(false)}>Refuser</button>
-            <button className="warn" onClick={() => answer(true)}>
+            <button onClick={() => answer("deny")}>Refuser</button>
+            <button onClick={() => answer("allow-always")}>Toujours autoriser</button>
+            <button className="warn" onClick={() => answer("allow-once")}>
               Autoriser une fois
             </button>
           </div>

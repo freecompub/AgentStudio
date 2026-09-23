@@ -111,7 +111,7 @@ describe("Renderer", () => {
     await screen.findByLabelText("Votre message");
     act(() => api.emit("confirm:request", { id: "c1", title: "Exécuter une commande ?", detail: "npm test" }));
     fireEvent.click(await screen.findByRole("button", { name: "Autoriser une fois" }));
-    await waitFor(() => expect(api.calls).toContainEqual({ channel: "confirm:respond", input: { id: "c1", allowed: true } }));
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "confirm:respond", input: { id: "c1", answer: "allow-once" } }));
   });
 });
 

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { UserConfirmer } from "@agent-studio/core";
+import type { ConfirmAnswer, UserConfirmer } from "@agent-studio/core";
 import type { EventSink } from "./protocols.js";
 
 export interface IpcConfirmer extends UserConfirmer {
-  respond(id: string, allowed: boolean): void;
+  respond(id: string, answer: ConfirmAnswer): void;
 }
 
 /**
@@ -11,23 +11,23 @@ export interface IpcConfirmer extends UserConfirmer {
  * Sans réponse dans le délai, la demande est retirée et vaut refus.
  */
 export function createIpcConfirmer(sink: EventSink, timeoutMs = 5 * 60_000): IpcConfirmer {
-  const pending = new Map<string, (allowed: boolean) => void>();
+  const pending = new Map<string, (answer: ConfirmAnswer) => void>();
   return {
     confirm({ title, detail }) {
       const id = randomUUID();
-      return new Promise<boolean>((resolve) => {
-        const timer = setTimeout(() => settle(false), timeoutMs);
-        function settle(allowed: boolean) {
+      return new Promise<ConfirmAnswer>((resolve) => {
+        const timer = setTimeout(() => settle("deny"), timeoutMs);
+        function settle(answer: ConfirmAnswer) {
           clearTimeout(timer);
           pending.delete(id);
-          resolve(allowed);
+          resolve(answer);
         }
         pending.set(id, settle);
         sink.emit("confirm:request", { id, title, detail });
       });
     },
-    respond(id, allowed) {
-      pending.get(id)?.(allowed);
+    respond(id, answer) {
+      pending.get(id)?.(answer);
     },
   };
 }

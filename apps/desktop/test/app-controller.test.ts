@@ -216,7 +216,7 @@ describe("AppController — conversation", () => {
     await new Promise((r) => setTimeout(r, 0));
     const req = emitted.find((e) => e.channel === "confirm:request")?.payload as { id: string; detail: string };
     expect(req.detail).toContain("npm test");
-    await controller["confirm:respond"]({ id: req.id, allowed: true });
+    await controller["confirm:respond"]({ id: req.id, answer: "allow-once" });
     expect(await decision).toEqual({ decision: "allow" });
   });
 });

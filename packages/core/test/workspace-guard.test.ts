@@ -11,7 +11,7 @@ function guardWith(answer: boolean) {
     confirmer: {
       confirm: async (q) => {
         asked.push(q);
-        return answer;
+        return answer ? "allow-once" : "deny";
       },
     },
   });

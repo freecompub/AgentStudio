@@ -206,7 +206,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       return requireWorkspace().checkpoints.diff(msg.checkpointId);
     },
 
-    "confirm:respond": async ({ id, allowed }) => confirmer.respond(id, allowed),
+    "confirm:respond": async ({ id, answer }) => confirmer.respond(id, answer),
 
     "commands:list": async () =>
       requireServices()
