@@ -11,5 +11,12 @@
     "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/extension-manifest": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "esbuild": "^0.28.2"
   }
 }

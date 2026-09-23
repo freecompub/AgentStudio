@@ -3,8 +3,8 @@ export type Verdict = "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 
 export interface LensDefect {
   severity: "blocker" | "major" | "minor";
-  file?: string;
-  line?: number;
+  file?: string | undefined;
+  line?: number | undefined;
   description: string;
 }
 
