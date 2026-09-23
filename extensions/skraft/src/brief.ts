@@ -26,6 +26,11 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   if (answered.length) lines.push("Réponses de l'utilisateur :", ...answered.map((a) => `  - ${a.question} → ${a.answer}`));
   if (s.regressions.length) lines.push("Tests d'acceptance requalifiés en non-régression :", ...s.regressions.map((r) => `  - ${r}`));
   if (s.acceptanceHash) lines.push("Les tests d'acceptance sont gelés : ne les modifie jamais.");
+  if (s.deliver) {
+    const done = s.deliver.scenarios.filter((x) => x.status === "done").map((x) => `${x.id}${x.role === "regression" ? " (non-régression)" : ""}`);
+    if (done.length) lines.push(`Scénarios livrés : ${done.join(", ")}`);
+    if (s.deliver.notes.length) lines.push("Constats de DELIVER :", ...s.deliver.notes.map((n) => `  - ${n}`));
+  }
   if (feedback.length) lines.push("Rejet précédent :", ...feedback.map((f) => `  - ${f}`));
   return lines.join("\n");
 }

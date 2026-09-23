@@ -39,8 +39,8 @@ export const manifest: ExtensionManifest = {
       { name: "skraft-architect-model", title: "Architecte (modélisation)", role: ROLES.architectModel, output: "report_phase", write: [SKRAFT_DIR], tools: ["report_blocker"] },
       // Aucun droit d'écriture direct dans docs/adr : seul render_adr y écrit (§6.3).
       { name: "skraft-architect-decide", title: "Architecte (décisions)", role: ROLES.architectDecide, output: "report_phase", write: [SKRAFT_DIR], tools: ["render_adr", "report_blocker"] },
-      { name: "skraft-acceptance", title: "Scénarios d'acceptance", role: ROLES.acceptance, output: "report_phase", write: [SKRAFT_DIR, ACCEPTANCE], tools: ["run_tests", "report_blocker"] },
-      { name: "skraft-test", title: "Tests unitaires", role: ROLES.dev, output: "report_phase", write: [UNIT_TESTS], tools: ["run_tests", "report_blocker"] },
+      { name: "skraft-acceptance", title: "Scénarios d'acceptance", role: ROLES.acceptance, output: "report_phase", write: [SKRAFT_DIR, ACCEPTANCE, SOURCES], tools: ["run_tests", "report_blocker"] },
+      { name: "skraft-test", title: "Tests unitaires", role: ROLES.test, output: "report_phase", write: [UNIT_TESTS], tools: ["run_tests", "report_blocker"] },
       { name: "skraft-dev", title: "Développement", role: ROLES.dev, output: "report_phase", write: [SOURCES], tools: ["run_tests", "report_blocker"] },
       ...(Object.entries(LENS_FOCUS) as [keyof typeof LENS_FOCUS, string][]).map(([name, focus]) => ({
         name: `skraft-lens-${name}`,

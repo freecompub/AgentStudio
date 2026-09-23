@@ -63,6 +63,8 @@ describe("skraft — critères de sortie de S1", () => {
     expect(git(root, "branch", "--show-current")).toBe("skraft/us-12");
     expect(git(root, "log", "--format=%s", `${s.baseSha}..HEAD`).split("\n")).toEqual([
       "feat(us-12): livraison de la story",
+      "feat(us-12): ac-1",
+      "test(us-12): ac-1, UnitTests.BolusCapTests/testCap1",
       "docs(skraft): distill de us-12",
       "docs(skraft): design de us-12",
       "docs(skraft): research de us-12",
@@ -70,6 +72,12 @@ describe("skraft — critères de sortie de S1", () => {
     // Rapports de revue générés par le code depuis les JSON des lentilles.
     const report = JSON.parse(await readFile(join(root, ".skraft/us-12/reviews/design-review-1.json"), "utf8"));
     expect(report.map((l: { lens: string }) => l.lens)).toEqual(["cold-reader", "test-integrity", "architecture"]);
+    // DELIVER : un scénario moteur, les deux autres déjà verts ; constats transmis aux lentilles.
+    expect(s.deliver?.scenarios.map((x) => [x.id, x.status])).toEqual([["ac-1", "done"], ["ac-2", "done"], ["ac-3", "done"]]);
+    expect(s.deliver?.notes).toEqual([
+      "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
+      "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+    ]);
     expect(app.posted.at(-1)).toMatch(/Pipeline skraft terminé pour \*\*US-12\*\*/);
     // Usage par état (D37).
     expect((await app.usage.report(id)).map((r) => r.phase)).toEqual(expect.arrayContaining(["CLASSIFY", "RESEARCH", "DESIGN", "REVIEW", "DELIVER"]));
@@ -143,7 +151,7 @@ describe("skraft — critères de sortie de S1", () => {
     // Aucune phase commitée deux fois : l'effet interrompu a été rejoué depuis son checkpoint.
     const log = git(root, "log", "--format=%s", `${s.baseSha}..HEAD`).split("\n");
     expect(new Set(log).size).toBe(log.length);
-    expect(log).toHaveLength(4);
+    expect(log).toHaveLength(6);
   }, 120_000);
 
   it("blocage d'un agent : question persistée, réponse après redémarrage, relance avec la réponse", async () => {

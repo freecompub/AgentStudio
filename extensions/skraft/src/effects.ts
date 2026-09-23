@@ -13,6 +13,7 @@ import { checkAcceptanceRed, checkValues } from "./distill.js";
 import { matchesAny } from "@agent-studio/core";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { parseStory, slugOf } from "./story.js";
+import { planDeliver, runDeliverAgent, scenarioGate, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
   simple: "Simple",
@@ -188,6 +189,21 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     case "finalReport":
       ctx.chat.post(finalReport(state));
       return;
+
+    case "planDeliver":
+      return planDeliver({ ctx, state, taskId, signal });
+    case "startScenario": {
+      const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : scénario ${effect.scenarioId}`);
+      return { type: "SCENARIO_STARTED", checkpointId: cp.id };
+    }
+    case "runDeliverAgent":
+      return runDeliverAgent(effect, { ctx, state, taskId, signal });
+    case "verifyUnitRed":
+      return verifyUnitRed(effect, { ctx, state, taskId, signal });
+    case "verifyUnitGreen":
+      return verifyUnitGreen(effect, { ctx, state, taskId, signal });
+    case "scenarioGate":
+      return scenarioGate(effect, { ctx, state, taskId, signal });
   }
 }
 

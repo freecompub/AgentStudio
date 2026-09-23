@@ -99,6 +99,20 @@ export function answerQuestions(app: { interactions: import("@agent-studio/core"
   return off;
 }
 
+/** Agent test simulé : un test unitaire de plus par tour, rouge (symbole manquant) tant que le code n'existe pas. */
+export function unitTestWriter(root: string): ScriptedBehavior {
+  return async (t) => {
+    const { readFile: read } = await import("node:fs/promises");
+    const rel = "Tests/UnitTests/BolusCapTests.swift";
+    const existing = await read(join(root, rel), "utf8").catch(() => "");
+    const n = [...existing.matchAll(/func test/g)].length + 1;
+    const tests = [...existing.matchAll(/^  func .*$/gm)].map((m) => m[0]);
+    tests.push(`  func testCap${n}() { XCTAssertEqual(BolusCap().max, 10) }`);
+    await put(root, rel, `import XCTest\n@testable import Domain\nfinal class BolusCapTests: XCTestCase {\n${tests.join("\n")}\n}\n`);
+    await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
+  };
+}
+
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
 export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Partial<Record<string, ScriptedBehavior>> = {}): ScriptedRuntime {
   const writer = (rel: string, content: string): ScriptedBehavior => async (t) => {
@@ -129,6 +143,7 @@ export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Pa
       await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
       await writer("Tests/AcceptanceTests/StoryAcceptanceTests.swift", `import XCTest\nfinal class StoryAcceptanceTests: XCTestCase {\n${tests}\n}\n`)(t);
     },
+    "skraft-test": unitTestWriter(root),
     "skraft-dev": writer("Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n"),
     ...Object.fromEntries(
       ["cold-reader", "test-integrity", "architecture"].map((l) => [
@@ -175,11 +190,12 @@ export async function shutdownHosts(): Promise<void> {
 
 /**
  * Fausse exécution Swift : chaque test d'acceptance marqué `ac-<n>` est rouge sur assertion tant que le
- * fichier de production `Sources/Domain/BolusCap.swift` n'existe pas, vert ensuite.
+ * fichier de production `Sources/Domain/BolusCap.swift` n'existe pas, vert ensuite ; chaque test
+ * unitaire de `Tests/UnitTests` est rouge sur symbole manquant tant que ce fichier n'existe pas.
  */
 async function fakeSwiftRun(opts: { root: string }) {
   const { readdir, readFile: read, access } = await import("node:fs/promises");
-  const results: { id: string; file: string; status: "passed" | "failed"; failureKind?: "assertion"; message?: string }[] = [];
+  const results: { id: string; file: string; status: "passed" | "failed"; failureKind?: "assertion" | "missing_symbol"; message?: string }[] = [];
   const dir = join(opts.root, "Tests/AcceptanceTests");
   const delivered = await access(join(opts.root, "Sources/Domain/BolusCap.swift")).then(() => true, () => false);
   for (const f of await readdir(dir).catch(() => [] as string[])) {
@@ -189,7 +205,28 @@ async function fakeSwiftRun(opts: { root: string }) {
         ? { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "passed" }
         : { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "failed", failureKind: "assertion", message: "XCTFail" });
   }
+  const unitDir = join(opts.root, "Tests/UnitTests");
+  for (const f of await readdir(unitDir).catch(() => [] as string[])) {
+    const content = await read(join(unitDir, f), "utf8");
+    for (const m of content.matchAll(/func (test\w+)/g)) {
+      const id = `UnitTests.${f.replace(".swift", "")}/${m[1]}`;
+      const file = `Tests/UnitTests/${f}`;
+      results.push(delivered ? { id, file, status: "passed" } : { id, file, status: "failed", failureKind: "missing_symbol", message: "cannot find 'BolusCap' in scope" });
+    }
+  }
   return { results, exitCode: results.some((r) => r.status === "failed") ? 1 : 0, timedOut: false, output: "", durationMs: 1 };
+}
+
+/** Pile Swift simulée (aucune chaîne réelle) : tests d'acceptance et unitaires lus sur le disque. */
+export function fakeSwiftStack(): StackAdapter {
+  return {
+    id: "swift",
+    layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
+    detect: async () => true,
+    isTestFile: (p) => /(^|\/)Tests\//.test(p),
+    testFilePattern: "(^|\\/)Tests\\/",
+    runTests: fakeSwiftRun,
+  };
 }
 
 export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; isolated?: boolean; stack?: StackAdapter } = {}) {
@@ -215,7 +252,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     engine,
     agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
     workspace,
-    stack: opts.stack ?? { id: "swift", layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },  detect: async () => true, isTestFile: (p) => /(^|\/)Tests\//.test(p), testFilePattern: "(^|\\/)Tests\\/", runTests: fakeSwiftRun },
+    stack: opts.stack ?? fakeSwiftStack(),
     interactions,
     chat: { post: (_e, md) => void posted.push(md) },
     evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),

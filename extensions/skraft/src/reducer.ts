@@ -3,6 +3,7 @@ import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./c
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { actionableDefects, synthesize } from "./review.js";
+import { deliverTransition, escalateDeliver, resumeDeliver, retryDeliver } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
 type Out = { state: SkraftState; effects: SkraftEffect[] };
@@ -44,6 +45,7 @@ export function initialState(input: SkraftInput): SkraftState {
     questionsAsked: [],
     acceptanceHash: null,
     regressions: [],
+    granularitySetting: input.granularity ?? null,
   };
 }
 
@@ -99,6 +101,10 @@ export function transition(s: SkraftState, e: Ev): Out {
     case "SPECIALIST": {
       const p = s.phase;
       if (!p) break;
+      if (p === "DELIVER") {
+        const r = deliverTransition(s, e);
+        if (r) return r;
+      }
       if (e.type === "PHASE_CHECKPOINTED" && e.phase === p) {
         const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId } };
         return { state: ns, effects: [specialist(ns, [])] };
@@ -121,6 +127,7 @@ export function transition(s: SkraftState, e: Ev): Out {
       if (e.type === "HUMAN_DECISION" && s.blocker && s.phase) {
         const answer = e.comment ? `${e.decision} (${e.comment})` : e.decision;
         const ns: SkraftState = { ...s, stage: "SPECIALIST", blocker: null, answers: [...s.answers, { question: s.blocker.question, answer }] };
+        if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, []);
         return { state: ns, effects: [specialist(ns, [])] };
       }
       break;
@@ -221,6 +228,8 @@ function uniq<T>(xs: T[]): T[] {
 
 function specialist(s: SkraftState, feedback: string[]): SkraftEffect {
   const p = s.phase!;
+  // DELIVER : sous-machine par scénario, à partir du plan d'implémentation (§7.4).
+  if (p === "DELIVER") return { kind: "planDeliver" };
   return { kind: "runSpecialist", phase: p, role: specialistRole(p, s.designStep), attempt: s.attempts + 1, feedback };
 }
 
@@ -279,6 +288,7 @@ function failure(s: SkraftState, gate: string, reasons: string[]): Out {
 function escalate(s: SkraftState, reason: string): Out {
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
+  if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
   return {
     state: { ...s, stage: "ESCALATED", escalation: { from: "PHASE", reason } },
@@ -298,6 +308,7 @@ function decide(s: SkraftState, decision: string): Out {
     if (from === "CLASSIFY" && s.indicators)
       return { state: { ...s, stage: "CLASSIFY", escalation: null }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
     if (!s.phase) return { state: s, effects: [] };
+    if (s.phase === "DELIVER" && s.deliver && !s.phasesCompleted.includes("DELIVER") && s.deliver.scenarios.some((x) => x.status !== "done")) return retryDeliver(s);
     const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts: 0, escalation: null, designStep: "model" };
     if (!ns.checkpoints[ns.phase!]) return { state: ns, effects: [{ kind: "checkpointPhase", phase: ns.phase! }] };
     return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };

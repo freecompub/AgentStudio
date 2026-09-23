@@ -35,8 +35,14 @@ son nom, avec les signatures minimales pour compiler. Recopie les valeurs des cr
 Un test qui passe déjà doit être requalifié dans test-plan.md par une ligne « - @ac-<n> : role: regression — justification : <raison> ».
 Appelle run_tests pour vérifier que les tests sont rouges pour la bonne raison.${COMMON}`,
 
+  test: `Tu écris des tests unitaires en TDD, un seul par pas : le plus petit comportement suivant du scénario en cours.
+Écris-le dans les dossiers de tests unitaires, jamais dans les tests d'acceptance ni dans le code de production.
+Appelle run_tests pour vérifier qu'il échoue sur une assertion ou sur un symbole manquant, puis rends la main.${COMMON}`,
+
   dev: `Tu livres la story en TDD : pour chaque scénario du plan d'implémentation, fais passer son test d'acceptance au vert
-par petits pas (un test unitaire rouge, le code minimal, le nettoyage). Ne modifie jamais un test d'acceptance.${COMMON}`,
+par petits pas : écris le code minimal qui fait passer le test unitaire indiqué, puis nettoie sans changer le comportement.
+Tu ne modifies jamais un test, unitaire ou d'acceptance. Garde des méthodes courtes, peu imbriquées, et le domaine sans dépendance
+vers l'infrastructure ou l'interface.${COMMON}`,
 
   lens: (name: string, focus: string) => `Tu es la lentille de revue « ${name} ». ${focus}
 Les faits fournis (tests, preuves, portes) sont établis par le code : ne les revérifie pas.

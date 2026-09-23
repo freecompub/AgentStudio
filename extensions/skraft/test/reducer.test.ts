@@ -318,6 +318,127 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
   });
 });
 
+// ---------- DELIVER (§7.4) ---------------------------------------------------------------
+
+const SCENARIOS = [
+  { id: "ac-1", ac: 1, acceptanceTestId: "A > ac-1", role: "driver", status: "pending" },
+  { id: "ac-2", ac: 2, acceptanceTestId: "A > ac-2", role: "driver", status: "pending" },
+  { id: "ac-3", ac: 3, acceptanceTestId: "A > ac-3", role: "regression", status: "done" },
+] as const;
+const PLANNED: Ev = { type: "DELIVER_PLANNED", scenarios: SCENARIOS.map((x) => ({ ...x })), all: ["A > ac-1", "A > ac-2", "A > ac-3", "U > old"], passed: ["A > ac-3", "U > old"] };
+const STARTED: Ev = { type: "SCENARIO_STARTED", checkpointId: "cp-s" };
+const REP_TEST: Ev = { type: "AGENT_REPORTED", role: "skraft-test", summary: "t", files: [] };
+const REP_DEV: Ev = { type: "AGENT_REPORTED", role: "skraft-dev", summary: "d", files: [] };
+const RED_OK = (n: number): Ev => ({ type: "STEP_OK", checkpointId: `cp-red-${n}`, all: [], passed: ["U > old"], newTest: `U > t${n}`, unitTestsHash: `h${n}` });
+const GREEN_OK = (acceptanceGreen: boolean, n = 1, passed: string[] = ["U > old"]): Ev => ({ type: "STEP_OK", checkpointId: `cp-green-${n}`, all: [], passed, acceptanceGreen });
+const FAIL = (reason = "motif"): Ev => ({ type: "STEP_FAIL", reason });
+const DISTILL_FROZEN: Ev[] = [CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc" } as Ev, LENSES(lens("APPROVED")), COMMITTED];
+const toDeliver = (level = "medium-hard") => [...toFirstPhase(level), ...researchPhase, ...designPhase, ...DISTILL_FROZEN, CP("DELIVER")];
+
+describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
+  it("début de DELIVER : plan des scénarios par le code ; les non-régressions sont déjà faites ; empreinte gelée reprise", () => {
+    expect(play(toDeliver()).effects).toEqual([{ kind: "planDeliver" }]);
+    const { state, effects } = play([...toDeliver(), PLANNED]);
+    expect(effects).toEqual([{ kind: "startScenario", scenarioId: "ac-1" }]);
+    expect(state.deliver).toMatchObject({ granularity: "turn-per-scenario", acceptanceHash: "acc", current: 0 });
+    expect(state.deliver!.scenarios.map((x) => x.status)).toEqual(["in_progress", "pending", "done"]);
+    expect(validateState(state)).toEqual({ ok: true });
+  });
+
+  it("un tour par pas : test rouge, puis code, jusqu'au vert de l'acceptance ; porte de fin de scénario", () => {
+    let r = play([...toDeliver(), PLANNED, STARTED]);
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    r = play([...toDeliver(), PLANNED, STARTED, REP_TEST]);
+    expect(r.effects).toEqual([
+      { kind: "verifyUnitRed", scenarioId: "ac-1", since: "cp-s", baseline: { all: PLANNED.type === "DELIVER_PLANNED" ? PLANNED.all : [], passed: ["A > ac-3", "U > old"] }, pending: ["A > ac-1", "A > ac-2"] },
+    ]);
+    r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV]);
+    expect(r.effects).toEqual([
+      { kind: "verifyUnitGreen", mode: "dev", scenarioId: "ac-1", since: "cp-red-1", newTest: "U > t1", unitTestsHash: "h1", pending: ["A > ac-1", "A > ac-2"] },
+    ]);
+    // Acceptance encore rouge : nouveau test unitaire.
+    r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(false)]);
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    // Acceptance verte : porte de fin de scénario, le test du scénario suivant reste autorisé à échouer.
+    r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(false), REP_TEST, RED_OK(2), REP_DEV, GREEN_OK(true, 2)]);
+    expect(r.effects).toEqual([{ kind: "scenarioGate", scenarioId: "ac-1", since: "cp-s", unitTests: ["U > t1", "U > t2"], pending: ["A > ac-2"] }]);
+    r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: ["n"] }]);
+    expect(r.effects).toEqual([{ kind: "startScenario", scenarioId: "ac-2" }]);
+    expect(r.state.deliver).toMatchObject({ current: 1, unitTests: [], notes: ["n"] });
+  });
+
+  it("scénario déjà vert à son début : directement la porte ; dernier scénario → porte de phase", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev];
+    const r = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }]);
+    expect(r.effects).toEqual([{ kind: "scenarioGate", scenarioId: "ac-2", since: "cp-s2", unitTests: [], pending: [] }]);
+    const end = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }, { type: "SCENARIO_OK", notes: [] }]);
+    expect(end.state.stage).toBe("ARTIFACT_GATE");
+    expect(end.effects).toEqual([{ kind: "runGate", phase: "DELIVER", attempt: 1 }]);
+  });
+
+  it("sessions séparées (challenging ou réglage) : rouge, vert, nettoyage ; nettoyage refusé → retour au vert sans escalade", () => {
+    expect(play([...toDeliver("challenging"), PLANNED]).state.deliver?.granularity).toBe("session-per-step");
+    expect(play([...toDeliver(), PLANNED], { storyPath: "stories/us-12.md", granularity: "session-per-step" } as never).state.deliver?.granularity).toBe("session-per-step");
+    const strict = [...toDeliver("challenging"), PLANNED, STARTED, REP_TEST, RED_OK(1)];
+    expect(play(strict).effects).toEqual([{ kind: "runDeliverAgent", step: "green", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    expect(play([...strict, REP_DEV]).effects[0]).toMatchObject({ kind: "verifyUnitGreen", mode: "green" });
+    expect(play([...strict, REP_DEV, GREEN_OK(true)]).effects).toEqual([{ kind: "runDeliverAgent", step: "refactor", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    const refused = play([...strict, REP_DEV, GREEN_OK(true), REP_DEV, FAIL("suite rouge")]);
+    expect(refused.effects).toEqual([
+      { kind: "rollback", to: "cp-green-1" },
+      { kind: "scenarioGate", scenarioId: "ac-1", since: "cp-s", unitTests: ["U > t1"], pending: ["A > ac-2"] },
+    ]);
+    expect(refused.state.deliver?.attempts).toBe(0);
+    expect(refused.state.deliver?.notes).toEqual(["Scénario ac-1 : nettoyage annulé (suite rouge)"]);
+  });
+
+  it("pas refusé : rollback au dernier point sûr, relance ciblée ; budget épuisé en mode tour → scénario repris en sessions séparées", () => {
+    const dev = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV];
+    const once = play([...dev, FAIL("tests unitaires modifiés")]);
+    expect(once.effects).toEqual([
+      { kind: "rollback", to: "cp-red-1" },
+      { kind: "runDeliverAgent", step: "dev", scenarioId: "ac-1", attempt: 2, feedback: ["tests unitaires modifiés"] },
+    ]);
+    const exhausted = play([...dev, FAIL("a"), REP_DEV, FAIL("b"), REP_DEV, FAIL("c")]);
+    expect(exhausted.effects).toEqual([{ kind: "rollback", to: "cp-s" }, { kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: ["c"] }]);
+    expect(exhausted.state.deliver).toMatchObject({ granularity: "session-per-step", unitTests: [], scenarioFailures: 1, stepCheckpoint: "cp-s" });
+    expect(exhausted.state.stage).toBe("SPECIALIST");
+  });
+
+  it("porte de fin de scénario refusée : reprise du scénario avec les motifs, puis escalade au budget ; « retry » relance le scénario", () => {
+    const gate = [...toDeliver("challenging"), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2)];
+    const fail1 = play([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }]);
+    expect(fail1.effects).toEqual([{ kind: "rollback", to: "cp-s" }, { kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: ["Mutation : 95 %"] }]);
+    const again = (st: Ev[]) => [...st, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2), { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] } as Ev];
+    const esc = play(again(again([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }])));
+    expect(esc.state.stage).toBe("ESCALATED");
+    expect(esc.effects).toEqual([
+      { kind: "rollback", to: "cp-s" },
+      { kind: "askEscalation", reason: "Scénario ac-1 : Mutation : 95 %", options: ["retry", "skip", "abort"] },
+    ]);
+    const retried = transition(esc.state, DECIDE("retry"));
+    expect(retried.effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: ["Mutation : 95 %"] }]);
+    expect(retried.state.deliver?.scenarioFailures).toBe(0);
+  });
+
+  it("blocage métier pendant un pas → BLOCKED ; la réponse relance le même pas", () => {
+    const blocked = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), { type: "BLOCKER_REPORTED", question: "Plafond par prise ?", choices: ["oui", "non"] }]);
+    expect(blocked.state.stage).toBe("BLOCKED");
+    const r = transition(blocked.state, DECIDE("oui"));
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "dev", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    expect(r.state.answers).toEqual([{ question: "Plafond par prise ?", answer: "oui" }]);
+  });
+
+  it("panne d'environnement pendant un scénario : retour au début du scénario et escalade, sans perdre les scénarios livrés", () => {
+    const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: [] } as Ev, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev];
+    const r = play([...base, REP_TEST, { type: "ENV_FAILURE", reason: "swift introuvable" }]);
+    expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "askEscalation", reason: "swift introuvable", options: ["retry", "skip", "abort"] }]);
+    expect(r.state.deliver!.scenarios.map((x) => x.status)).toEqual(["done", "in_progress", "done"]);
+    expect(transition(r.state, DECIDE("retry")).effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-2", attempt: 1, feedback: [] }]);
+  });
+});
+
 describe("Invariants (§5.3)", () => {
   /** Générateur pseudo-aléatoire déterministe : suites d'événements plausibles et absurdes. */
   function* randomRuns(n: number): Generator<Ev[]> {
@@ -328,6 +449,8 @@ describe("Invariants (§5.3)", () => {
       DECIDE("answer:q1", "par prise"), DECIDE("defer:q1"), CP("RESEARCH"), CP("DESIGN"), CP("DISTILL"), CP("DELIVER"), REPORTED, GATE_OK, GATE_FAIL, { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "p", status: "Proposed" }] },
       LENSES(lens("APPROVED")), LENSES(lens("APPROVED", ["major"])), LENSES(lens("REJECTED"), lens("REJECTED")), COMMITTED,
       { type: "TIMEOUT", reason: "t" }, { type: "BLOCKER_REPORTED", question: "q", choices: [] }, { type: "RESUMED" },
+      PLANNED, STARTED, REP_TEST, REP_DEV, RED_OK(1), GREEN_OK(false), GREEN_OK(true), { type: "STEP_FAIL", reason: "r" }, { type: "SCENARIO_OK", notes: [] },
+      { type: "SCENARIO_FAIL", reasons: ["m"] }, { type: "ENV_FAILURE", reason: "e" }, DECIDE("abort"),
     ];
     for (let i = 0; i < n; i++) yield Array.from({ length: 5 + Math.floor(rnd() * 60) }, () => pool[Math.floor(rnd() * pool.length)]!);
   }
@@ -344,6 +467,10 @@ describe("Invariants (§5.3)", () => {
         s = transition(s, e).state;
         // 3. le budget n'est jamais dépassé
         expect(s.attempts).toBeLessThanOrEqual(s.budget.maxAttemptsPerPhase);
+        if (s.deliver) {
+          expect(s.deliver.attempts).toBeLessThan(s.budget.maxAttemptsPerPhase);
+          expect(s.deliver.scenarioFailures).toBeLessThanOrEqual(s.budget.maxAttemptsPerPhase);
+        }
         // 4. append-only
         expect(s.phasesCompleted.slice(0, prevCompleted.length)).toEqual(prevCompleted);
         const artifacts = Object.values(s.artifacts).flat().length;
