@@ -22,8 +22,8 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
   });
   afterEach(async () => {
     await shutdownHosts();
-    await rm(root, { recursive: true, force: true });
-    await rm(tasksDir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it("citation hors limites rejetée avec le motif exact, corrigée au réessai ; questions posées ; réponse transmise à DESIGN", async () => {

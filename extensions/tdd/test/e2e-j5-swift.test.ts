@@ -63,8 +63,8 @@ describe.skipIf(!toolchain)("Extension tdd — critères de sortie de J5 (Swift)
   });
   afterEach(async () => {
     await shutdownHosts();
-    await rm(root, { recursive: true, force: true });
-    await rm(tasksDir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it("/tdd déroule un cycle sur un projet Swift : rouge (symbole manquant) puis vert, preuves et usage par état", async () => {

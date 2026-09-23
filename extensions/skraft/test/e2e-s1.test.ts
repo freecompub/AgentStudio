@@ -40,8 +40,8 @@ describe("skraft — critères de sortie de S1", () => {
   });
   afterEach(async () => {
     await shutdownHosts();
-    await rm(root, { recursive: true, force: true });
-    await rm(tasksDir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {

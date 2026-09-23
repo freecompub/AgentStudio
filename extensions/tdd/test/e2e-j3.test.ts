@@ -59,8 +59,8 @@ describe.each(HOST_MODES)("Extension tdd — critères de sortie de J3 (extensio
   });
   afterEach(async () => {
     await shutdownHosts();
-    await rm(root, { recursive: true, force: true });
-    await rm(tasksDir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   async function launch(app: Awaited<ReturnType<typeof assemble>>, args: string) {
