@@ -1,0 +1,655 @@
+# SPEC — Extension `skraft`
+
+> Spécification de l'extension `skraft` pour l'application `agent-studio`.
+> Elle complète `SPEC.md` (le cœur de l'application) et fait autorité pour tout ce qui concerne skraft.
+> Source analysée : [skraft-plugin](https://github.com/SebastienDegodez/skraft-plugin), plugin `skraft-framework` version 1.5.2.
+> Version : 2026-09-23. Auteur : Samir.
+
+---
+
+## 0. Consignes pour Claude Code
+
+1. **Lis `SPEC.md` avant ce document.** Tout ce qui touche au cœur (moteur de tâches, `ctx`, portes génériques, sessions, interactions, sécurité) y est défini ; ce document ne le répète pas.
+2. **Prérequis** : les jalons J2 (moteur de tâches, extension `tdd`), J3 (`run_tests`, interactions persistées) et J4 (isolation, arbitre) de `SPEC.md` sont terminés. L'adaptateur de stack Swift (J5) est requis à partir de S5.
+3. **Porte bloquante licence** : skraft est sous **GPL-3.0-or-later**. Ne copie aucun prompt, skill ni code du dépôt source tant que la question O9 de `SPEC.md` n'est pas tranchée. En attendant, implémente le réducteur, les portes et les schémas (sections 5 à 11), qui sont notre propre conception, avec des prompts de substitution minimaux.
+4. **Ne reproduis pas l'architecture de contrôle de skraft** (orchestrateur LLM + hooks). La section 3 liste ses défauts constatés : chacun doit être impossible par construction dans notre implémentation.
+5. **Le scénario US-12 (section 13) est le test d'acceptance de l'extension.** Chaque jalon S1 à S6 a des critères de sortie qui s'y rattachent.
+
+---
+
+## 1. Objectif et périmètre
+
+skraft transforme une story en code livré, à travers quatre phases menées par des agents spécialisés et revues par des reviewers adverses :
+
+```
+RESEARCH → DESIGN → DISTILL → DELIVER
+```
+
+| Phase | Spécialiste | Reviewer | Produit |
+| --- | --- | --- | --- |
+| RESEARCH | Solution Researcher | aucun (remplacé par une porte, voir 7.1) | Document de recherche sourcé, recommandation |
+| DESIGN | Solution Architect | Solution Architect Reviewer | Modèle d'événements, DDD, ADR, contrats, diagrammes |
+| DISTILL | Acceptance Designer | Acceptance Designer Reviewer | Scénarios Gherkin, plans de test et d'implémentation, tests d'acceptance rouges |
+| DELIVER | Software Engineer | Software Engineer Reviewer | Code, tests unitaires, preuves de qualité, commits |
+
+**Dans le périmètre** : les quatre phases, la classification de difficulté, la ratification des ADR, les revues par lentilles.
+
+**Hors périmètre du MVP** :
+- Backlog Discoverer et Backlog Planner (production des stories à partir des issues GitHub) : restent des agents autonomes (O8). En entrée du pipeline, on attend un fichier de story fourni par l'utilisateur ou produit séparément par Backlog Planner.
+- Agents brownfield (Analyst, Harness Builder, Refactorer) et workers (contract-testing, mocking, refactoring).
+
+### 1.1 Entrée attendue
+
+Un fichier de story Markdown contenant : identifiant, titre, énoncé « En tant que… je veux… », critères d'acceptation numérotés, section « Questions ouvertes » (éventuellement vide). Format exact : section 6.1.
+
+---
+
+## 2. Principe : ce qui change par rapport à skraft-plugin
+
+| | skraft-plugin | Extension `skraft` |
+| --- | --- | --- |
+| Qui enchaîne les phases | Un agent LLM orchestrateur, guidé par un prompt de 2 750 mots | Le réducteur de la section 5 |
+| Nature du contrôle | Négatif : des hooks peuvent refuser | Positif : le code lance chaque agent et chaque vérification |
+| Écriture de l'état | CLI `state.mjs` + éditions manuelles par le LLM | Uniquement le moteur de tâches |
+| Sorties des agents | Markdown, verdict extrait par regex | Outils terminaux à schéma |
+| Preuves de qualité | Écrites par l'agent | Écrites par l'outil `run_tests` (notre code) |
+| Tests d'acceptance | Scénario 1 en DISTILL, les suivants par l'ingénieur | Tous en DISTILL, gelés par empreinte |
+| Synthèse de revue | Table appliquée par un LLM | Même table, appliquée par le code |
+| Réessais | Le LLM décide de s'arrêter | Budget du réducteur, rollback, relance ciblée |
+
+---
+
+## 3. Défauts constatés dans skraft-plugin 1.5.2, à rendre impossibles
+
+| Réf. | Défaut constaté | Garantie attendue dans notre implémentation |
+| --- | --- | --- |
+| C1 | G1, G4, G5, G6 ne s'exécutent que si le payload contient `projectSlug`, que les harnais n'envoient jamais | Le contexte (slug, rôle, phase) est connu du code qui ouvre la session ; aucune vérification ne dépend d'un payload externe |
+| C2 | Deux modèles d'état incompatibles (G1/G6 attendent `specialistDone`, `reviewerVerdict`, `retries`, `skipPhases` ; le CLI écrit `verdicts`, `retryCount`, `phasesCompleted`) | Un seul type `SkraftState` (section 4), un seul validateur |
+| C3 | `init` crée l'état en `DISCOVER` ; la machine suit un cycle à cinq phases, la configuration en compte quatre | `phaseOrder` lu depuis une seule source ; état initialisé sur `phaseOrder[0]` ; test qui l'assure |
+| C4 | Les outils `Write`/`Edit` ne passent par aucun hook ; noms d'outils Copilot (`bash`, `edit`) non reconnus | Gardes du cœur sur tous les outils d'écriture, noms normalisés ; détection par diff à chaque porte |
+| C5 | Sortie des hooks `{decision, message}` non conforme aux formats des harnais | Hooks du SDK typés, en processus ; pas de format à traduire |
+| C6 | Verdicts `APPROVED/NEEDS_REWORK/REJECTED` dans les rapports, `APPROVED/CHANGES_REQUESTED` dans l'état ; traduction par le LLM | Enum unique `APPROVED \| CHANGES_REQUESTED \| REJECTED` imposé par le schéma de `submit_lens_verdict` |
+| C7 | Contrôle de lecture des skills en fail-open (transcript attendu inline, champ `path` au lieu de `file_path`) | Skills obligatoires injectées dans la session ; `load_skill` tracé ; contrôle par les effets |
+| E1 | « Commit vérifié » = arbre Git propre, même si rien n'a été fait | Commits créés par le code à partir du SHA de départ enregistré |
+| E2 | L'ordre des phases ne dépend que du prompt | Ordre imposé par le réducteur |
+| E3 | L'arrêt à budget épuisé dépend du LLM | Budget appliqué par le réducteur |
+| E4 | DESIGN et DISTILL exigent les artefacts de DISCUSS, phase supprimée | Dossier de passation construit à partir des phases réellement exécutées |
+| E5 | La ratification des ADR se fait par édition manuelle de `adrRatification`, sans blocage | État `RATIFICATION` bloquant et persisté |
+| E6 | Seul un adaptateur de qualité .NET existe ; sortie DISTILL codée en `*AcceptanceTests.cs` | Adaptateurs de stack ; chemins fournis par l'adaptateur |
+| E7 | La skill de difficulté décrit encore le pipeline à cinq phases et ne donne aucun critère | Indicateurs calculés et grille explicite (section 8) |
+
+---
+
+## 4. Plan de reprise du dépôt source
+
+À appliquer **après** la décision de licence (O9). Chemins relatifs à `plugins/skraft-framework/`.
+
+### 4.1 Agents
+
+| Source | Action | Rôle dans l'extension |
+| --- | --- | --- |
+| `agents/skraft-orchestrator.agent.md` | **Ne pas reprendre** | Remplacé par le réducteur. Seules les règles de routage par difficulté sont transposées (section 8) |
+| `agents/solution-researcher.agent.md` | Adapter | `skraft-researcher` |
+| `agents/solution-architect.agent.md` | Adapter, découper en deux rôles | `skraft-architect-model` (étapes 1 à 6 : lecture, réutilisation, revue des ADR, Event Modeling, DDD) et `skraft-architect-decide` (étapes 7 à 10 : ADR, contrats, réconciliation, synthèse) |
+| `agents/solution-architect-reviewer.agent.md` | Adapter | Configuration de la revue DESIGN |
+| `agents/acceptance-designer.agent.md` | Adapter | `skraft-acceptance` ; écrit **tous** les tests d'acceptance |
+| `agents/acceptance-designer-reviewer.agent.md` | Adapter | Configuration de la revue DISTILL |
+| `agents/software-engineer.agent.md` | Adapter | `skraft-test` et `skraft-dev` (séparation des rôles, section 7.4) |
+| `agents/software-engineer-reviewer.agent.md` | Adapter | Configuration de la revue DELIVER |
+| `agents/reviewer-lenses/cold-reader-lens.agent.md` | Reprendre, sortie JSON | Lentille `cold-reader` |
+| `agents/reviewer-lenses/test-integrity-lens.agent.md` | Reprendre, sortie JSON | Lentille `test-integrity` |
+| `agents/reviewer-lenses/architecture-boundaries-lens.agent.md` | Reprendre, recentrer sur le jugement | Lentille `architecture` (la règle de dépendance est vérifiée par le code) |
+| `agents/reviewer-lenses/quality-gates-lens.agent.md` | **Supprimer** | Ses contrôles sont faits par le code |
+| `agents/backlog-*`, `agents/brownfield-*`, `agents/workers/*` | Hors MVP | — |
+
+Adaptation commune à tous les prompts repris :
+- supprimer toute instruction d'appel à `state.mjs`, d'édition de `state.json`, de commit, d'exécution directe des tests ou d'écriture de preuves ;
+- remplacer la fin de mission par l'appel de l'outil terminal du rôle (section 6.3) ;
+- supprimer les références à DISCUSS et DISCOVER ;
+- remplacer « escalader vers … » par `report_blocker` ;
+- retirer les consignes d'impression de journaux ou de checklists dans le chat.
+
+### 4.2 Skills
+
+| Catégorie | Skills | Action |
+| --- | --- | --- |
+| Méthode (reprises telles quelles) | `outside-in-tdd`, `bdd-methodology`, `test-design-mandates`, `craft-discipline`, `test-refactoring-catalog`, `clean-architecture-testing`, `architecture-patterns`, `architecture-decisions`, `adr-eligibility-gate`, `mutation-testing` (partie méthode) | Reprendre ; injectées ou chargées selon le rôle (section 6.4) |
+| Critères de revue | `acceptance-review-criteria`, `architecture-review-criteria`, `adversarial-review-lenses` | Reprendre ; la table de pondération de `adversarial-review-lenses` est **transcrite en code** (section 9.3) |
+| Devenues du code | `quality-gates-evidence-contract`, `quality-gates-dotnet`, `resolving-stack-commands`, `skraft-quality-bar` | Ne plus les donner aux agents. Leur contenu devient : schéma de preuves écrit par `run_tests`, adaptateurs de stack, seuils de la porte de fin de scénario |
+| À réécrire | `skraft-difficulty-routing` | Remplacée par la section 8 |
+| Hors MVP | `issue-*`, `sprint-planning`, `github-search-protocol`, `discovery-review-criteria`, `planning-review-criteria`, `characterize-*`, `compose-brownfield-prd`, `mikado-method`, `strangler-fig-method`, `contract-testing*`, `mocking-*`, `playwright-evidence` | — |
+
+### 4.3 Code
+
+| Source | Action |
+| --- | --- |
+| `src/domain/state-machine.mjs` (invariants I1 à I9) | Transposer les invariants en préconditions du réducteur (section 5.3), **pas** le code tel quel |
+| `src/domain/artifact-policy.mjs` | Reprendre la correspondance motifs d'artefacts ; corriger le vocabulaire de verdict (C6) |
+| `src/domain/skill-policy.mjs` | Remplacé par la table `mandatorySkills` du manifeste |
+| `src/domain/pipeline-policy.mjs` | Ne pas reprendre (calcul de l'agent attendu : le réducteur le sait déjà) |
+| `src/domain/session-guard-policy.mjs` | S'en inspirer pour les motifs de détection d'écriture shell des gardes du cœur |
+| Commande `artifact adr` (rendu d'ADR depuis un gabarit, refus si champ manquant) | Reprendre comme outil `render_adr` (section 7.2) |
+| `src/adapters/api/hooks/*`, `src/cli/hook.mjs`, manifestes `hooks.json` | Ne pas reprendre |
+| `src/cli/state.mjs`, `src/cli/housekeeping.mjs` | Remplacés par le moteur de tâches |
+| `skraft-framework.config.json` | Source pour générer le manifeste (`phaseAgents`, `agentSkills`, `agentArtifacts`) |
+| `tests/skraft-framework/*` | Reprendre les tests des politiques conservées |
+
+---
+
+## 5. Modèle d'état et réducteur
+
+### 5.1 État unifié
+
+```ts
+export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
+export type Difficulty = "simple" | "medium" | "medium-hard" | "challenging";
+export type Verdict = "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+
+export type Stage =
+  | "INIT" | "CLASSIFY" | "CONFIRM_DIFFICULTY" | "ROUTE"
+  | "SPECIALIST" | "ARTIFACT_GATE" | "REVIEW" | "VERDICT_GATE"
+  | "RATIFICATION" | "COMMIT" | "BLOCKED" | "ESCALATED"
+  | "DONE" | "ABORTED";
+
+export interface SkraftState {
+  schemaVersion: 1;
+  slug: string;                              // dérivé de l'identifiant de la story (ex. "us-12")
+  storyPath: string;
+  stage: Stage;
+  phase: Phase | null;                       // phase courante, null avant ROUTE
+  phaseOrder: Phase[];                       // copie de la configuration au démarrage
+  skipPhases: Phase[];                       // calculé par règle depuis la difficulté
+  phasesCompleted: Phase[];                  // append-only
+  difficulty: { level: Difficulty; indicators: DifficultyIndicators; confirmedBy: "user" | "auto" } | null; // écrit une fois
+  baseSha: string;                           // SHA Git de départ
+  branch: string;                            // "skraft/<slug>"
+  checkpoints: Partial<Record<Phase, string>>; // SHA au début de chaque phase
+  artifacts: Record<Phase, ArtifactRecord[]>;  // append-only
+  reviews: Record<Phase, ReviewRecord[]>;      // append-only
+  attempts: number;                          // essais dans la phase courante
+  budget: { maxAttemptsPerPhase: number };   // 3 par défaut
+  lastRejection: { gate: string; reasons: string[] } | null;
+  openQuestions: { id: string; text: string; answer?: string }[];
+  adrs: { id: string; path: string; status: "Proposed" | "Accepted" | "Rejected"; decisionBy?: string }[];
+  pendingInteraction: string | null;         // id de demande d'interaction
+  deliver: DeliverState | null;              // sous-machine, section 7.4
+}
+
+export interface ArtifactRecord { path: string; sha256: string; producedBy: string; attempt: number }
+export interface ReviewRecord { attempt: number; lenses: LensVerdict[]; verdict: Verdict; reportPath: string }
+```
+
+Validation par schéma (Zod) à chaque chargement ; un état invalide met la tâche en `ESCALATED` avec motif `ENV_FAILURE: état corrompu`, jamais en exécution.
+
+### 5.2 Transitions
+
+| Stage | Événement | Garde | Stage suivant | Effets |
+| --- | --- | --- | --- | --- |
+| INIT | `START` (état neuf) | story valide (6.1) | CLASSIFY | créer branche, enregistrer `baseSha`, calculer indicateurs |
+| INIT | `START` (état existant) | — | stage persisté | reprise (SPEC.md 6.3) |
+| CLASSIFY | `DIFFICULTY_PROPOSED` | niveau dans l'enum | CONFIRM_DIFFICULTY | demande d'interaction (mode simple) ou confirmation auto |
+| CONFIRM_DIFFICULTY | `HUMAN_DECISION` | — | ROUTE | écrire `difficulty`, calculer `skipPhases` |
+| ROUTE | (interne) | reste une phase non sautée | SPECIALIST | checkpoint de phase, construire le dossier de passation, lancer le spécialiste |
+| ROUTE | (interne) | plus de phase | DONE | bilan final |
+| SPECIALIST | `AGENT_REPORTED` | — | ARTIFACT_GATE | exécuter la porte de la phase |
+| SPECIALIST | `BLOCKER_REPORTED` | — | BLOCKED | demande d'interaction avec la question |
+| BLOCKED | `HUMAN_DECISION` | — | SPECIALIST | relancer avec la réponse dans le dossier |
+| ARTIFACT_GATE | `GATE_OK` | phase avec reviewer | REVIEW | lancer les lentilles |
+| ARTIFACT_GATE | `GATE_OK` | phase sans reviewer | COMMIT | — |
+| ARTIFACT_GATE | `GATE_FAIL` | `attempts + 1 < max` | SPECIALIST | rollback au checkpoint de phase, relance ciblée |
+| ARTIFACT_GATE | `GATE_FAIL` | budget épuisé | ESCALATED | demande d'interaction |
+| REVIEW | `LENSES_DONE` | — | VERDICT_GATE | synthèse par le code (9.3) |
+| VERDICT_GATE | `APPROVED` | phase = DESIGN | RATIFICATION | une demande d'interaction par ADR `Proposed` |
+| VERDICT_GATE | `APPROVED` | autre phase | COMMIT | — |
+| VERDICT_GATE | `CHANGES_REQUESTED` | budget restant | SPECIALIST | rollback, relance avec les défauts des lentilles |
+| VERDICT_GATE | `REJECTED` ou budget épuisé | — | ESCALATED | demande d'interaction |
+| RATIFICATION | `HUMAN_DECISION` | tous les ADR décidés, aucun `amend` | COMMIT | basculer les statuts via `render_adr` |
+| RATIFICATION | `HUMAN_DECISION` (`amend`) | — | SPECIALIST | relance de `skraft-architect-decide` avec la demande |
+| COMMIT | (interne) | — | ROUTE | commit `docs(skraft):` ou `feat:` selon la phase, `phasesCompleted += phase`, `attempts = 0` |
+| ESCALATED | `HUMAN_DECISION` (`retry`) | — | SPECIALIST | `attempts = 0` |
+| ESCALATED | `HUMAN_DECISION` (`skip`) | — | ROUTE | rollback au checkpoint de phase, phase ajoutée à `skipPhases` |
+| ESCALATED | `HUMAN_DECISION` (`abort`) | — | ABORTED | — |
+| tous | `ABORT` | — | ABORTED | — |
+| tous | `TIMEOUT` | budget restant | SPECIALIST | comme `GATE_FAIL` |
+| tous | `ENV_FAILURE` | — | ESCALATED | escalade immédiate |
+
+### 5.3 Invariants (transposés de skraft I1 à I9)
+
+1. On ne quitte une phase qu'après `APPROVED` (ou `GATE_OK` pour une phase sans reviewer).
+2. La phase suivante est toujours la prochaine de `phaseOrder` hors `skipPhases`.
+3. `attempts` ne dépasse jamais `budget.maxAttemptsPerPhase`.
+4. `phasesCompleted`, `artifacts`, `reviews` sont append-only.
+5. `difficulty` n'est écrite qu'une fois.
+6. `DONE` et `ABORTED` sont terminaux.
+7. `DISTILL` est inatteignable tant qu'un ADR est `Proposed`.
+8. Aucun agent n'écrit l'état : seul le moteur le fait.
+
+Chaque invariant a un test unitaire dédié sur le réducteur.
+
+---
+
+## 6. Entrées, sorties, rôles
+
+### 6.1 Format de la story
+
+```markdown
+# US-12 — Plafonner le bolus proposé
+
+En tant que patient, quand le calcul propose une dose de bolus supérieure au plafond défini par mon médecin,
+je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'explique pourquoi.
+
+## Critères d'acceptation
+1. Plafond de 10 U, calcul à 6 U : dose proposée 6 U, pas d'alerte.
+2. Plafond de 10 U, calcul à 12,5 U : dose proposée 10 U, alerte « Dose plafonnée à 10 U ».
+3. Aucun plafond configuré : dose proposée égale au calcul, pas d'alerte.
+
+## Questions ouvertes
+- Le plafond s'applique-t-il par prise ou par jour ?
+```
+
+Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3).
+
+### 6.2 Arborescence des artefacts
+
+Racine : `.skraft/<slug>/` dans le dépôt (OUVERT S-O1 : garder la racine `.copilot-tracking/skraft-plans/` de skraft pour compatibilité ?).
+
+```
+.skraft/<slug>/
+├── story.md                       # copie de l'entrée
+├── research/research.md
+├── design/event-model.md
+├── design/diagrams.md
+├── design/contracts.md
+├── design/context-map.md
+├── design/consistency-matrix.md
+├── distill/features/<feature>.feature
+├── distill/test-plan.md
+├── distill/impl-plan.md
+├── reviews/<phase>-review-<n>.md  # rapport lisible, généré par le code depuis les JSON des lentilles
+├── reviews/<phase>-review-<n>.json
+└── evidence/<scenario>/…          # preuves écrites par run_tests
+docs/adr/adr-<NNN>-<slug>.md       # dans le dépôt, append-only
+docs/adr/supersessions.md
+```
+
+Les tests d'acceptance et le code vont aux emplacements fournis par l'adaptateur de stack (par exemple `Tests/AcceptanceTests/` en Swift).
+
+### 6.3 Rôles, périmètres, outils terminaux
+
+| Rôle | Phase | Écrit dans | Outils | Outil terminal |
+| --- | --- | --- | --- | --- |
+| `skraft-classifier` | CLASSIFY | rien | — | `submit_difficulty` |
+| `skraft-researcher` | RESEARCH | `.skraft/<slug>/research/**` | lecture, recherche web si autorisée, `load_skill` | `report_phase` |
+| `skraft-architect-model` | DESIGN | `.skraft/<slug>/design/**` | lecture, `load_skill` | `report_phase` |
+| `skraft-architect-decide` | DESIGN | `.skraft/<slug>/design/**` | `render_adr`, `load_skill` | `report_phase` |
+| `skraft-acceptance` | DISTILL | `.skraft/<slug>/distill/**`, dossier des tests d'acceptance | `run_tests`, `load_skill` | `report_phase` |
+| `skraft-test` | DELIVER | dossiers de tests unitaires | `run_tests`, `load_skill` | `report_phase` |
+| `skraft-dev` | DELIVER | dossiers de production | `run_tests`, `load_skill` | `report_phase` |
+| lentilles | revues | rien | lecture | `submit_lens_verdict` |
+
+Tous les rôles disposent aussi de `report_blocker`. Aucun rôle n'écrit dans `docs/adr/` directement : seul `render_adr` le fait.
+
+### 6.4 Skills par rôle
+
+| Rôle | Injectées (obligatoires) | À la demande (`load_skill`) |
+| --- | --- | --- |
+| `skraft-researcher` | — | — |
+| `skraft-architect-model` | `architecture-patterns` | `architecture-decisions` |
+| `skraft-architect-decide` | `architecture-decisions`, `adr-eligibility-gate` | `architecture-patterns` |
+| `skraft-acceptance` | `bdd-methodology`, `test-design-mandates` | `outside-in-tdd`, `craft-discipline` |
+| `skraft-test` | `test-design-mandates`, `outside-in-tdd` (sections RED) | `test-refactoring-catalog`, `clean-architecture-testing` |
+| `skraft-dev` | `craft-discipline`, `outside-in-tdd` (sections GREEN/REFACTOR) | `clean-architecture-testing`, `test-refactoring-catalog` |
+| lentilles | critères de la phase revue | — |
+
+Injecter une **section** plutôt qu'une skill entière quand c'est possible : c'est l'un des principaux leviers d'économie de tokens.
+
+### 6.5 Outils spécifiques à l'extension
+
+```ts
+submit_difficulty({ level: Difficulty, justification: string })           // terminal
+render_adr({ number?, title, status: "Proposed", context, decision,
+             consequences, alternatives, supersedes?: string[] })          // refus si champ manquant ou numéro en double
+submit_lens_verdict({ lens: string, verdict: Verdict,
+                      defects: { severity: "blocker" | "major" | "minor", file?: string, line?: number, description: string }[] }) // terminal
+```
+
+`report_phase`, `report_blocker`, `run_tests`, `load_skill` sont fournis par le cœur (SPEC.md 6.5).
+
+---
+
+## 7. Phases
+
+Pour chaque phase : ce que reçoit l'agent, ce qu'il produit, la porte exécutée par le code, et l'exemple US-12.
+
+### 7.1 RESEARCH
+
+Exécutée seulement si la phase n'est pas dans `skipPhases` (`medium-hard` et `challenging`).
+
+**Préparation (code)** : présélection des fichiers candidats par mots-clés extraits de la story (noms, termes métier), limitée à vingt fichiers, placée dans le dossier de passation.
+
+**Agent** `skraft-researcher` : enquête sur le code et les sources externes, produit `research/research.md` selon le gabarit : périmètre et critères de succès, fichiers analysés, recherches effectuées, conventions du projet, découvertes clés (chaque affirmation sourcée), approches évaluées, recommandation unique, passage de relais à DESIGN (décisions à valider, questions ouvertes).
+
+**Porte citations (code), pas de reviewer LLM** :
+
+| Contrôle | Rejet si |
+| --- | --- |
+| Sections du gabarit | Une section manque |
+| Chemins cités (`chemin/fichier.ext` ou `chemin:12-40`) | Le fichier n'existe pas dans le dépôt |
+| Plages de lignes | La plage dépasse la longueur du fichier ou est inversée |
+| URL | Mal formée |
+| Recommandation | Absente ou multiple |
+| Questions ouvertes | — (pas de rejet) : extraites, ajoutées à `openQuestions` |
+
+En fin de porte, chaque question ouverte **sans réponse** génère une demande d'interaction ; la phase suivante ne démarre qu'une fois toutes les questions répondues ou explicitement reportées par l'utilisateur.
+
+**US-12** : la citation `Sources/Bolus/BolusCalculator.swift:40-72` est rejetée (fichier de 55 lignes) avec le motif exact ; l'agent corrige. La question « par prise ou par jour ? » est posée ; réponse : « par prise ».
+
+### 7.2 DESIGN
+
+Deux sessions successives, dans la même phase.
+
+**`skraft-architect-model`** : lit la story, la recherche, les ADR existants et le code ; produit `event-model.md` (commandes, événements, vues), `context-map.md`, le modèle DDD tactique (agrégats, value objects, événements de domaine, interfaces de repository) et la liste des ADR existants à reconsidérer.
+
+**`skraft-architect-decide`** : applique le test d'éligibilité aux ADR (une convention déjà imposée par le projet ne mérite pas d'ADR), rédige chaque ADR **uniquement via `render_adr`** en statut `Proposed`, produit `contracts.md`, `diagrams.md`, `consistency-matrix.md`, et met à jour `supersessions.md` via `render_adr`. Refus d'adopter CQRS, Event Sourcing ou microservices sans justification mesurée (règle reprise de skraft).
+
+**Porte cohérence (code)** :
+
+| Contrôle | Rejet si |
+| --- | --- |
+| En-tête de chaque nouvel ADR | Champ obligatoire absent, statut différent de `Proposed` |
+| Numérotation | Trou ou doublon |
+| Événements cités dans `contracts.md` et `diagrams.md` | Absent de `event-model.md` |
+| Agrégats cités | Absent du modèle |
+| Remplacements | Un ADR remplacé n'apparaît pas à la fois dans le nouvel ADR et dans `supersessions.md` |
+| ADR existants | Un ADR existant a été modifié (append-only) |
+
+L'extraction des noms repose sur une convention imposée dans les prompts : identifiants en `PascalCase` entre backticks dans les documents de conception.
+
+**Revue** : lentilles `cold-reader` et `architecture` (section 9).
+
+**Ratification** : une demande d'interaction par ADR, réservée au profil architecte ; options `accept`, `reject`, `amend` (avec texte). Tant qu'un ADR est `Proposed`, DISTILL est inatteignable (invariant 7).
+
+**US-12** : `contracts.md` cite `BolusLimited`, absent du modèle qui définit `BolusCapped` → rejet « `BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ». Après correction et approbation, l'`ADR-008 — Plafond appliqué dans le domaine` est ratifié par l'architecte.
+
+### 7.3 DISTILL
+
+**Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements fournis par l'adaptateur de stack ; les valeurs sont copiées mot pour mot des critères.
+
+**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables.
+
+**Porte RED d'acceptance (code)** : exécution des tests d'acceptance via l'adaptateur de stack.
+
+| Résultat d'un test | Décision |
+| --- | --- |
+| Échec sur assertion | Accepté |
+| Échec sur symbole manquant (compilation) | Accepté |
+| Erreur de syntaxe, crash de setup | Rejeté |
+| Réussi | Signalé : requalifié en test de non-régression (champ `role: "regression"` dans `test-plan.md`), visible des lentilles ; rejeté si le scénario était censé piloter un nouveau comportement et qu'aucune justification n'est donnée |
+
+À la sortie de la porte : **empreinte de tous les tests d'acceptance** enregistrée ; ils sont gelés pour toute la suite du pipeline.
+
+**Revue** : lentilles `cold-reader` et `test-integrity`.
+
+**US-12** : scénario 2 écrit avec « 12 U » → rejet « la valeur 12,5 du critère 2 n'apparaît pas dans le scénario 2 ». Puis : scénario 1 rouge sur `BolusCapPolicy` introuvable (accepté), scénario 2 rouge sur assertion 10 ≠ 12,5 (accepté), scénario 3 vert (requalifié en non-régression, justifié : le comportement « aucun plafond » existe déjà).
+
+### 7.4 DELIVER
+
+Sous-machine exécutée pour chaque scénario de `impl-plan.md`, dans l'ordre.
+
+```ts
+export interface DeliverState {
+  scenarios: { id: string; acceptanceTestId: string; role: "driver" | "regression"; status: "pending" | "in_progress" | "done" }[];
+  current: number;
+  granularity: "turn-per-scenario" | "session-per-step";   // SPEC.md D22
+  acceptanceHash: string;                                    // empreinte gelée en DISTILL
+  unitTestsHash: string | null;                              // empreinte après chaque RED validé
+  scenarioCheckpoint: string | null;
+}
+```
+
+**Granularité par défaut (`turn-per-scenario`)** : `skraft-test` écrit le test unitaire suivant puis rend la main ; `skraft-dev` fait passer au vert et refactore dans le même tour ; chaque exécution de tests passe par `run_tests`, qui enregistre les preuves. Les gardes du cœur refusent toute écriture de `skraft-dev` dans un dossier de tests. La boucle alterne test / dev jusqu'à ce que le test d'acceptance du scénario soit vert.
+
+**Granularité stricte (`session-per-step`)** : identique à l'extension `tdd` (SPEC.md 8.2 et 8.3), avec la vérification d'acceptance en plus. Activée par réglage, pour `challenging`, ou automatiquement après un échec de scénario.
+
+**Vérifications pendant la boucle (code)** : mêmes portes que l'extension `tdd` (SPEC.md 8.3), plus : empreinte des tests d'acceptance toujours égale à `acceptanceHash`.
+
+**Porte de fin de scénario (code)** :
+
+| Contrôle | Seuil ou règle |
+| --- | --- |
+| Test d'acceptance du scénario | Vert |
+| Suite complète | Verte, aucun test ignoré |
+| Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
+| Mutation (adaptateur de stack) | 100 % domaine et application ; 90 % API et infrastructure |
+| Règle de dépendance | Aucun import du domaine vers l'infrastructure ou l'interface |
+| Object Calisthenics mesurables | Longueur de méthode, niveaux d'indentation, nombre d'attributs : seuils configurables |
+| Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
+
+Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables par projet (`ctx.settings`).
+
+**Preuves** : on reprend le schéma de `quality-gates-evidence-contract` (sortie, code de sortie, empreintes sha256, instantanés rouge et vert) ; l'écrivain est `run_tests`, jamais l'agent.
+
+**Blocage métier** : une valeur ou une règle manquante → `report_blocker` → stage `BLOCKED` → question à l'utilisateur → relance.
+
+**Revue** : lentilles `cold-reader`, `test-integrity`, `architecture`, après le dernier scénario. OUVERT S-O2 : revue par scénario pour `challenging` ?
+
+**US-12, scénario 2** : `skraft-test` écrit `testCapsDoseAboveMax` ; `run_tests` enregistre l'échec sur `XCTAssertEqual(10, 12.5)` ; `skraft-dev` crée `BolusCapPolicy`, la branche dans `BolusCalculator`, extrait le value object `MaxBolus` ; `run_tests` enregistre le vert ; porte de fin de scénario : acceptance verte, Muter 100 % sur le module Domain, module Domain sans import d'infrastructure. Si `skraft-dev` tente de modifier `testCapsDoseAboveMax`, la garde refuse l'écriture ; si la modification passe par un autre chemin, l'empreinte la détecte et le tour est annulé par rollback.
+
+---
+
+## 8. Difficulté
+
+### 8.1 Indicateurs calculés par le code
+
+| Indicateur | Calcul |
+| --- | --- |
+| `acceptanceCriteria` | Nombre de critères numérotés dans la story |
+| `modulesTouched` | Nombre de modules du dépôt dont un nom ou un fichier est cité, ou ressort de la présélection (7.1) |
+| `newExternalIntegration` | Mention d'une API, base, file de messages ou service absent du code actuel |
+| `openBusinessQuestions` | Nombre de questions ouvertes portant sur une règle métier |
+
+### 8.2 Grille initiale
+
+| Niveau | Condition (la première qui s'applique, du plus élevé au plus bas) |
+| --- | --- |
+| `challenging` | `newExternalIntegration` et `modulesTouched ≥ 3`, ou `openBusinessQuestions ≥ 2` |
+| `medium-hard` | `acceptanceCriteria > 5`, ou `modulesTouched ≥ 3`, ou `openBusinessQuestions ≥ 1` |
+| `medium` | `acceptanceCriteria ≥ 3` ou `modulesTouched = 2` |
+| `simple` | sinon |
+
+Les seuils sont des réglages ; ils seront ajustés à partir des mesures d'usage (SPEC.md D37).
+
+Le LLM (`skraft-classifier`) reçoit les indicateurs et le niveau proposé par la grille ; il peut proposer un cran de plus ou de moins avec une justification. L'utilisateur confirme en mode simple (SPEC.md O3).
+
+### 8.3 Effets du niveau
+
+| Niveau | RESEARCH | Granularité DELIVER | Lentilles | Budget de réessais |
+| --- | --- | --- | --- | --- |
+| `simple` | sautée | `turn-per-scenario` | `cold-reader`, `test-integrity` | 2 |
+| `medium` | sautée | `turn-per-scenario` | toutes | 3 |
+| `medium-hard` | exécutée | `turn-per-scenario` | toutes | 3 |
+| `challenging` | exécutée | `session-per-step` | toutes, revue par scénario si S-O2 | 3 |
+
+**US-12** : 3 critères, 2 modules, pas d'intégration, 1 question métier ouverte → grille `medium-hard` → confirmé par l'utilisateur → RESEARCH exécutée.
+
+---
+
+## 9. Revue
+
+### 9.1 Faits établis avant la revue
+
+Le code joint au dossier des lentilles un bloc de faits, présentés comme acquis : résultats de tests, séquences rouge/vert, mutation, règle de dépendance, empreintes, résultats des portes. Les lentilles ne revérifient pas ces faits.
+
+### 9.2 Lentilles
+
+| Lentille | Contexte reçu | Juge |
+| --- | --- | --- |
+| `cold-reader` | **Aucun contexte du producteur** : seulement les artefacts, le code et les tests | Compréhensibilité, noms, intentions lisibles |
+| `test-integrity` | Tests, critères, faits | Pertinence des tests, tests faibles, tests qui ne tuent aucun mutant, requalifications en non-régression |
+| `architecture` | ADR ratifiés, code, faits | Fidélité aux ADR et au modèle, découpage, dette introduite |
+
+Chaque lentille tourne dans une session neuve, en parallèle, et rend `submit_lens_verdict`.
+
+### 9.3 Synthèse par le code
+
+La table de pondération de la skill `adversarial-review-lenses` est transcrite dans une fonction pure `synthesize(lenses: LensVerdict[]): Verdict`, couverte par des tests à partir de cas tabulés. Règles minimales en attendant la transcription :
+- un défaut `blocker` dans une lentille → `CHANGES_REQUESTED` ;
+- deux lentilles `REJECTED` → `REJECTED` ;
+- toutes `APPROVED` sans défaut `major` → `APPROVED` ;
+- sinon `CHANGES_REQUESTED`.
+
+Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depuis les JSON. Lors d'un réessai, seuls les défauts `blocker` et `major` sont transmis au spécialiste, avec fichier et ligne.
+
+**US-12** : `cold-reader` signale « `MaxBolus` accepte une valeur négative » (`major`) → `CHANGES_REQUESTED` → rollback au dernier commit vert du scénario concerné, relance de `skraft-dev` avec ce seul défaut.
+
+---
+
+## 10. Manifeste de l'extension
+
+```jsonc
+{
+  "id": "agent-studio.skraft",
+  "version": "0.1.0",
+  "publisher": "agent-studio",
+  "engines": { "appApi": "^0.1" },
+  "main": "dist/index.js",
+  "activationEvents": ["onCommand:skraft"],
+  "permissions": [
+    "fs:read",
+    "fs:write:.skraft/**", "fs:write:docs/adr/**",
+    "fs:write:<dossiers de tests et de production fournis par l'adaptateur de stack>",
+    "shell:test", "git:commit", "git:branch", "git:revert",
+    "copilot:sessions",
+    "net:none"
+  ],
+  "contributes": {
+    "commands": [
+      { "name": "skraft", "title": "Livrer une story avec skraft", "handler": "startPipeline" },
+      { "name": "skraft-status", "title": "État du pipeline skraft", "handler": "status" }
+    ],
+    "agents": [
+      { "name": "skraft-classifier",       "role": "roles/classifier.md",       "tools": ["submit_difficulty"],                    "write": [] },
+      { "name": "skraft-researcher",       "role": "roles/researcher.md",       "tools": ["load_skill", "report_phase", "report_blocker"], "write": [".skraft/*/research/**"] },
+      { "name": "skraft-architect-model",  "role": "roles/architect-model.md",  "tools": ["load_skill", "report_phase", "report_blocker"], "write": [".skraft/*/design/**"] },
+      { "name": "skraft-architect-decide", "role": "roles/architect-decide.md", "tools": ["render_adr", "load_skill", "report_phase", "report_blocker"], "write": [".skraft/*/design/**"] },
+      { "name": "skraft-acceptance",       "role": "roles/acceptance.md",       "tools": ["run_tests", "load_skill", "report_phase", "report_blocker"], "write": [".skraft/*/distill/**", "@stack:acceptanceTests"] },
+      { "name": "skraft-test",             "role": "roles/test.md",             "tools": ["run_tests", "load_skill", "report_phase", "report_blocker"], "write": ["@stack:unitTests"] },
+      { "name": "skraft-dev",              "role": "roles/dev.md",              "tools": ["run_tests", "load_skill", "report_phase", "report_blocker"], "write": ["@stack:sources"] }
+    ],
+    "skills": [
+      { "name": "architecture-patterns", "path": "skills/architecture-patterns", "mandatoryFor": ["skraft-architect-model"] },
+      { "name": "architecture-decisions", "path": "skills/architecture-decisions", "mandatoryFor": ["skraft-architect-decide"] }
+      // … table complète en section 6.4
+    ],
+    "tools": [
+      { "name": "submit_difficulty", "handler": "submitDifficulty", "terminal": true },
+      { "name": "render_adr", "handler": "renderAdr" },
+      { "name": "submit_lens_verdict", "handler": "submitLensVerdict", "terminal": true }
+    ],
+    "tasks": [{
+      "name": "skraft-pipeline",
+      "handler": "skraftTask",
+      "states": {
+        "CLASSIFY": "Évaluation de la difficulté",
+        "RESEARCH": "Enquête sur le code existant",
+        "DESIGN": "Conception et décisions d'architecture",
+        "RATIFICATION": "Décisions d'architecture à valider",
+        "DISTILL": "Écriture des scénarios et des tests d'acceptance",
+        "DELIVER": "Implémentation en TDD",
+        "REVIEW": "Revue"
+      },
+      "milestones": ["PHASE_APPROVED", "RATIFICATION_REQUIRED", "SCENARIO_DONE", "DONE"],
+      "alerts": ["GATE_FAIL", "RETRY", "TIMEOUT", "BLOCKED", "ESCALATED"]
+    }]
+  }
+}
+```
+
+Les motifs `@stack:*` sont résolus par l'adaptateur de stack du projet au moment de l'ouverture de session. Ce mécanisme est à ajouter au schéma de manifeste du cœur (SPEC.md 5.1).
+
+---
+
+## 11. Interactions et progression
+
+| Demande d'interaction | Déclencheur | Profil autorisé | Options |
+| --- | --- | --- | --- |
+| Confirmer la difficulté | CLASSIFY (mode simple) | tout profil | niveau proposé, un cran au-dessus, un cran au-dessous |
+| Répondre à une question ouverte | Fin de RESEARCH, ou story sans RESEARCH avec questions | PO / BA, développeur | texte libre, « reporter » |
+| Ratifier un ADR | RATIFICATION | architecte | `accept`, `reject`, `amend` + texte |
+| Débloquer un agent | `report_blocker` | selon la nature (métier : PO / BA ; technique : développeur) | choix proposés par l'agent + texte libre |
+| Décider après escalade | ESCALATED | développeur | `retry`, `skip`, `abort` |
+
+Carte de tâche : `US-12 — Plafonner le bolus` · phase · étape (`Scénario 2 sur 3 : écriture du code`) · progression · durée · usage.
+
+Jalons : phase approuvée, ADR à ratifier, scénario terminé, pipeline terminé. Alertes : porte rejetée (avec motif), réessai n sur m, délai dépassé, blocage, escalade.
+
+Bilan final (carte + résumé injecté dans la session principale) : phases exécutées et sautées, difficulté, ADR ratifiés, scénarios livrés, commits, résultats de tests et de mutation, défauts de revue corrigés, usage par phase.
+
+---
+
+## 12. Usage
+
+Leviers propres à skraft, en plus de ceux de SPEC.md section 13 :
+- plus d'orchestrateur LLM (2 750 mots de prompt et l'accumulation de tous les comptes rendus disparaissent) ;
+- skills d'exécution de portes retirées des contextes (environ 4 500 mots en moins par session DELIVER) ;
+- lentille `quality-gates` supprimée : une session de moins par revue ;
+- architecte découpé en deux sessions plus courtes ;
+- escalade immédiate des défauts d'environnement (exemple typique : outil de mutation absent pour la stack).
+
+Mesurer par état : tokens, requêtes, réessais. Objectif de S6 : comparer le pipeline sur US-12 et deux autres stories réelles.
+
+---
+
+## 13. Tests
+
+### 13.1 Unitaires (sans LLM, sans disque)
+
+- Réducteur : chaque ligne du tableau 5.2 et chaque invariant de 5.3.
+- Grille de difficulté : cas tabulés, dont US-12 → `medium-hard`.
+- Synthèse de revue : cas tabulés de 9.3.
+- Extraction des littéraux d'une story (6.1), normalisation des nombres.
+- Parsing des citations (7.1) et des identifiants `PascalCase` (7.2).
+
+### 13.2 Portes (avec fixtures de fichiers)
+
+| Fixture | Porte | Attendu |
+| --- | --- | --- |
+| `research.md` citant `BolusCalculator.swift:40-72`, fichier de 55 lignes | citations | Rejet, motif mentionnant la longueur réelle |
+| `contracts.md` citant `BolusLimited`, modèle avec `BolusCapped` | cohérence | Rejet nommant les deux fichiers |
+| ADR existant modifié | cohérence | Rejet |
+| `.feature` avec « 12 U » au lieu de « 12,5 U » | valeurs | Rejet nommant le critère 2 |
+| Test d'acceptance déjà vert sans justification | RED d'acceptance | Rejet |
+| Test d'acceptance modifié en DELIVER | empreinte | Rollback et réessai |
+
+### 13.3 Bout en bout
+
+Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
+
+Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un rejet de citation puis question « par prise ou par jour » → DESIGN avec un rejet de cohérence puis ratification d'ADR-008 → DISTILL avec un rejet de valeur puis scénario 3 requalifié → DELIVER des scénarios 1 et 2, une tentative de modification de test refusée → revue avec un défaut `major` corrigé → DONE avec bilan.
+
+---
+
+## 14. Jalons
+
+| Jalon | Contenu | Critères de sortie |
+| --- | --- | --- |
+| **S0** | Décision de licence (SPEC.md O9) ; prompts de substitution si la reprise est refusée | Décision consignée en ADR |
+| **S1** | Types `SkraftState`, réducteur complet, invariants, grille de difficulté, lecture de la story, INIT / CLASSIFY / ROUTE / COMMIT, agents simulés | Tous les tests 13.1 verts ; pipeline complet à vide avec agents simulés ; saut de RESEARCH par règle ; reprise après redémarrage à chaque stage |
+| **S2** | RESEARCH : présélection, rôle `skraft-researcher`, porte citations, questions ouvertes | Fixture citations rejetée ; question posée et réponse présente dans le dossier de passation de DESIGN |
+| **S3** | DESIGN : deux rôles, `render_adr`, porte cohérence, revue DESIGN, état RATIFICATION | Fixture cohérence rejetée ; DISTILL inatteignable avant ratification ; `amend` relance le bon rôle |
+| **S4** | DISTILL : rôle `skraft-acceptance`, porte valeurs, porte RED d'acceptance, gel des tests d'acceptance | Fixtures valeurs et RED traitées ; empreinte enregistrée |
+| **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet Swift de démonstration ; modification de test refusée puis détectée par empreinte |
+| **S6** | Revue : faits, trois lentilles, synthèse par le code, rapports générés ; mesures d'usage | Verdict reproductible depuis les mêmes JSON ; bout en bout 13.3 vert ; mesures sur trois stories |
+
+---
+
+## 15. Questions ouvertes propres à skraft
+
+| # | Question | Hypothèse provisoire |
+| --- | --- | --- |
+| S-O1 | Racine des artefacts : `.skraft/<slug>/` ou `.copilot-tracking/skraft-plans/<slug>/` (compatibilité avec skraft-plugin) ? | `.skraft/<slug>/` |
+| S-O2 | Revue par scénario en DELIVER pour `challenging` ? | Oui, avec `cold-reader` et `test-integrity` seulement |
+| S-O3 | Brancher Backlog Planner en amont du pipeline (story générée depuis une issue GitHub) ? | Plus tard, après S6 |
+| S-O4 | Seuils de mutation configurables par module ou globalement ? | Par couche (domaine, application, API, infrastructure) |
+| S-O5 | Faut-il proposer à l'auteur de skraft-plugin les corrections des défauts C1 à C7 ? | Oui, via le document d'analyse déjà rédigé |
+| S-O6 | Autoriser la recherche web pour `skraft-researcher` ? | Oui, via une permission `net:` dédiée, désactivée par défaut |
