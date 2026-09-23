@@ -9,15 +9,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assemble, createProject, git, type HangPoint, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, git, type HangPoint, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
 
 type App = Awaited<ReturnType<typeof assemble>>;
 
-/** Répond à la confirmation de difficulté en retenant le niveau proposé. */
+/** Répond à la confirmation de difficulté en retenant le niveau proposé ; les questions ouvertes sont répondues au fil de l'eau. */
 async function confirmDifficulty(app: App) {
+  answerQuestions(app);
   await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
   const req = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
   await app.interactions.respond(req.id, req.options[0]!.id);
+}
+
+async function done(app: App, id: string) {
+  await until(async () => ["DONE", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+  await app.engine.idle(id);
 }
 
 async function taskId(app: App): Promise<string> {
@@ -44,7 +50,7 @@ describe("skraft — critères de sortie de S1", () => {
     await app.registry.command("skraft")!.handler("stories/us-12.md");
     const id = await taskId(app);
     await confirmDifficulty(app);
-    await app.engine.idle(id);
+    await done(app, id);
 
     const s = stateOf(await app.engine.status(id))!;
     expect(s.stage).toBe("DONE");
@@ -75,7 +81,7 @@ describe("skraft — critères de sortie de S1", () => {
     await app.registry.command("skraft")!.handler("stories/us-7.md");
     const id = await taskId(app);
     await confirmDifficulty(app);
-    await app.engine.idle(id);
+    await done(app, id);
 
     const s = stateOf(await app.engine.status(id))!;
     expect(s.difficulty?.level).toBe("simple");
@@ -104,7 +110,7 @@ describe("skraft — critères de sortie de S1", () => {
     { name: "CONFIRM_DIFFICULTY (en attente)", stage: "CONFIRM_DIFFICULTY", waitDifficulty: true },
     { name: "SPECIALIST RESEARCH", stage: "SPECIALIST", phase: "RESEARCH", hungRole: "skraft-researcher" },
     { name: "SPECIALIST DESIGN (décisions)", stage: "SPECIALIST", phase: "DESIGN", hungRole: "skraft-architect-decide" },
-    { name: "ARTIFACT_GATE", stage: "ARTIFACT_GATE", phase: "RESEARCH", hang: "changedFiles" },
+    { name: "ARTIFACT_GATE", stage: "ARTIFACT_GATE", phase: "DESIGN", hang: "changedFiles" },
     { name: "REVIEW", stage: "REVIEW", phase: "DESIGN", hungRole: "skraft-lens-architecture" },
     { name: "COMMIT", stage: "COMMIT", phase: "RESEARCH", hang: "commit" },
     { name: "SPECIALIST DELIVER", stage: "SPECIALIST", phase: "DELIVER", hungRole: "skraft-dev" },
@@ -127,10 +133,10 @@ describe("skraft — critères de sortie de S1", () => {
     // Redémarrage : nouveaux services sur le même dépôt et les mêmes stockages, agents sains.
     const second = simulatedAgents(new ScriptedRuntime(), root);
     const app2 = await assemble(root, second, tasksDir);
+    answerQuestions(app2);
     await app2.engine.resumeAll();
     if (["INIT", "CLASSIFY", "CONFIRM_DIFFICULTY"].includes(c.stage)) await confirmDifficulty(app2);
-    await app2.engine.idle(id);
-    await until(async () => stateOf(await app2.engine.status(id))?.stage === "DONE");
+    await done(app2, id);
 
     const s = stateOf(await app2.engine.status(id))!;
     expect(s.phasesCompleted).toEqual(["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]);
@@ -160,16 +166,17 @@ describe("skraft — critères de sortie de S1", () => {
       "skraft-researcher": async (t) => {
         briefAfterAnswer = t.prompt;
         const { put } = await import("./support/harness.js");
-        await put(root, ".skraft/us-12/research/research.md", "# Recherche\n");
+        await put(root, ".skraft/us-12/research/research.md", researchDoc());
         await t.callTool("report_phase", { summary: "ok", files: [] });
       },
     });
     const app2 = await assemble(root, second, tasksDir);
+    answerQuestions(app2);
     await app2.engine.resumeAll();
-    const [question] = await app2.interactions.pending();
+    const question = (await app2.interactions.pending()).find((p) => p.title.startsWith("Question de l'agent"));
     expect(question?.detail).toBe("Le plafond est-il par prise ou par jour ?");
     await app2.interactions.respond(question!.id, "par prise", undefined, { role: "po" });
-    await app2.engine.idle(id);
+    await done(app2, id);
     expect(briefAfterAnswer).toContain("Le plafond est-il par prise ou par jour ? → par prise");
     expect(stateOf(await app2.engine.status(id))?.stage).toBe("DONE");
   }, 120_000);

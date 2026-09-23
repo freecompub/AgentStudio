@@ -67,6 +67,37 @@ export async function createProject(): Promise<string> {
 
 export const ROLE = (name: string) => `agent-studio.skraft/${name}`;
 
+/** Document de recherche conforme au gabarit (§7.1), citations valides sur le projet de démonstration. */
+export function researchDoc(over: Partial<Record<string, string>> = {}): string {
+  const body: Record<string, string> = {
+    "Périmètre et critères de succès": "Plafonner la dose proposée au maximum défini par le médecin.",
+    "Fichiers analysés": "- `Sources/Domain/BolusCalculator.swift:1-1`\n- `Sources/Settings/MaxBolusSetting.swift`",
+    "Recherches effectuées": "XCTest : https://developer.apple.com/documentation/xctest",
+    "Conventions du projet": "Objets-valeurs immuables dans le domaine.",
+    Découvertes: "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:1-1`.",
+    "Approches évaluées": "1. Plafond dans le domaine.\n2. Plafond dans l'interface.",
+    Recommandation: "Appliquer le plafond dans le domaine.",
+    "Passage de relais": "Décision à valider : emplacement du plafond.\n\n### Questions ouvertes\n- Le plafond est-il rappelé au patient ?",
+    ...over,
+  };
+  return ["# Recherche", ...Object.entries(body).map(([h, t]) => `## ${h}\n\n${t}`)].join("\n\n");
+}
+
+/** Répond automatiquement aux questions ouvertes (profil PO), avec la réponse donnée. */
+export function answerQuestions(app: { interactions: import("@agent-studio/core").InteractionService }, answer = "par prise"): () => void {
+  const answered = new Set<string>();
+  const tick = async () => {
+    for (const q of await app.interactions.pending()) {
+      if (!q.title.startsWith("Question ouverte") || answered.has(q.id)) continue;
+      answered.add(q.id);
+      await app.interactions.respond(q.id, q.options[0]!.id, answer, { role: "po" }).catch(() => answered.delete(q.id));
+    }
+  };
+  const off = app.interactions.onChange(() => void tick());
+  void tick();
+  return off;
+}
+
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
 export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Partial<Record<string, ScriptedBehavior>> = {}): ScriptedRuntime {
   const writer = (rel: string, content: string): ScriptedBehavior => async (t) => {
@@ -78,7 +109,7 @@ export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Pa
       const proposed = /Niveau proposé par la grille : (\S+)/.exec(t.prompt)?.[1] ?? "medium";
       await t.callTool("submit_difficulty", { level: proposed, justification: "conforme à la grille" });
     },
-    "skraft-researcher": writer(".skraft/us-12/research/research.md", "# Recherche\n"),
+    "skraft-researcher": writer(".skraft/us-12/research/research.md", researchDoc()),
     "skraft-architect-model": async (t) => {
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
       await writer(`.skraft/${slug}/design/event-model.md`, "`BolusCapped`\n")(t);

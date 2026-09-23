@@ -47,8 +47,10 @@ const kinds = (e: SkraftEffect[]) => e.map((x) => x.kind);
 const toFirstPhase = (level = "medium-hard") => [INITIALIZED, PROPOSED(level), DECIDE(level)];
 /** Déroule une phase sans reviewer (RESEARCH) jusqu'au commit. */
 const researchPhase = [CP("RESEARCH"), REPORTED, GATE_OK, COMMITTED];
+/** Réponse à la question ouverte de US-12 (posée avant DESIGN). */
+const ANSWER = DECIDE("answer:q1", "par prise");
 /** Déroule DESIGN (deux sessions) jusqu'au commit, sans ADR. */
-const designPhase = [CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED")), COMMITTED];
+const designPhase = [ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED")), COMMITTED];
 const reviewedPhase = (p: "DISTILL" | "DELIVER") => [CP(p), REPORTED, GATE_OK, LENSES(lens("APPROVED")), COMMITTED];
 
 describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () => {
@@ -102,9 +104,9 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
     expect(effects).toEqual([{ kind: "checkpointPhase", phase: "RESEARCH" }]);
   });
 
-  it("saut de RESEARCH par règle : simple et medium commencent par DESIGN", () => {
+  it("saut de RESEARCH par règle : simple et medium commencent par DESIGN (après la question ouverte)", () => {
     for (const level of ["simple", "medium"]) {
-      const { state } = play(toFirstPhase(level));
+      const { state } = play([...toFirstPhase(level), ANSWER]);
       expect(state.skipPhases).toEqual(["RESEARCH"]);
       expect(state.phase).toBe("DESIGN");
     }
@@ -131,10 +133,10 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("DESIGN : deux sessions successives, modélisation puis décisions, avant la porte", () => {
-    const after = play([...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED]);
+    const after = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED]);
     expect(after.state.stage).toBe("SPECIALIST");
     expect(after.effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 1, feedback: [] }]);
-    expect(kinds(play([...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED, REPORTED]).effects)).toEqual(["runGate"]);
+    expect(kinds(play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED]).effects)).toEqual(["runGate"]);
   });
 
   it("GATE_OK sans reviewer (RESEARCH) → COMMIT ; artefacts ajoutés", () => {
@@ -145,7 +147,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau", () => {
-    const { state, effects } = play([...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED, REPORTED, GATE_OK]);
+    const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK]);
     expect(state.stage).toBe("REVIEW");
     expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture"], attempt: 1 }]);
   });
@@ -195,7 +197,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("REVIEW : APPROVED → COMMIT ; rapport consigné", () => {
-    const { state, effects } = play([...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))]);
+    const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))]);
     expect(state.stage).toBe("COMMIT");
     expect(state.reviews.DESIGN).toEqual([{ attempt: 1, lenses: [lens("APPROVED")], verdict: "APPROVED", reportPath: ".skraft/us-12/reviews/x.md" }]);
     expect(kinds(effects)).toEqual(["commitPhase"]);
@@ -211,12 +213,12 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("REVIEW : REJECTED → ESCALATED", () => {
-    const { state } = play([...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("REJECTED"), lens("REJECTED"))]);
+    const { state } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("REJECTED"), lens("REJECTED"))]);
     expect(state.stage).toBe("ESCALATED");
   });
 
   it("COMMIT → ROUTE : phase complétée, essais remis à zéro, phase suivante", () => {
-    const { state, effects } = play([...toFirstPhase(), ...researchPhase]);
+    const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER]);
     expect(state.phasesCompleted).toEqual(["RESEARCH"]);
     expect(state).toMatchObject({ stage: "SPECIALIST", phase: "DESIGN", attempts: 0 });
     expect(effects).toEqual([{ kind: "checkpointPhase", phase: "DESIGN" }]);
@@ -230,9 +232,49 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 });
 
+describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
+  it("les questions de la story sont reprises à l'initialisation", () => {
+    expect(play([INITIALIZED]).state.openQuestions).toEqual([{ id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
+  });
+
+  it("RESEARCH démarre sans attendre ; avant DESIGN, chaque question sans réponse est posée une fois", () => {
+    expect(play(toFirstPhase()).state.phase).toBe("RESEARCH");
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Le plafond est-il affiché ?"] }, COMMITTED]);
+    expect(state).toMatchObject({ stage: "ROUTE", phase: null });
+    expect(effects).toEqual([
+      { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
+      { kind: "askQuestion", id: "q2", text: "Le plafond est-il affiché ?" },
+    ]);
+  });
+
+  it("réponse libre ou report ; la phase suivante démarre quand tout est tranché", () => {
+    const base = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
+    const one = play([...base, DECIDE("answer:q1", "par prise")]);
+    expect(one.state.stage).toBe("ROUTE");
+    expect(one.effects).toEqual([]);
+    const both = play([...base, DECIDE("answer:q1", "par prise"), DECIDE("defer:q2")]);
+    expect(both.state.openQuestions).toEqual([
+      { id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?", answer: "par prise" },
+      { id: "q2", text: "Affiché ?", answer: "(question reportée par l'utilisateur)" },
+    ]);
+    expect(both.state).toMatchObject({ stage: "SPECIALIST", phase: "DESIGN" });
+  });
+
+  it("story sans RESEARCH : les questions sont posées avant DESIGN", () => {
+    const { state, effects } = play(toFirstPhase("simple"));
+    expect(state.stage).toBe("ROUTE");
+    expect(kinds(effects)).toEqual(["askQuestion"]);
+  });
+
+  it("réponse à une question inconnue ou déjà tranchée : ignorée", () => {
+    const base = play([...toFirstPhase("simple")]);
+    expect(transition(base.state, DECIDE("answer:q9", "x"))).toEqual({ state: base.state, effects: [] });
+  });
+});
+
 describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
   const withAdr: Ev = { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Proposed" }] };
-  const toRatification = [...toFirstPhase(), ...researchPhase, CP("DESIGN"), REPORTED, REPORTED, withAdr, LENSES(lens("APPROVED"))];
+  const toRatification = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, withAdr, LENSES(lens("APPROVED"))];
 
   it("DESIGN approuvé avec ADR proposés → RATIFICATION : une demande par ADR", () => {
     const { state, effects } = play(toRatification);
@@ -258,7 +300,7 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     expect(play([...escalated, DECIDE("retry")]).effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 1, feedback: [] }]);
     const skipped = play([...escalated, DECIDE("skip")]);
     expect(skipped.state.skipPhases).toEqual(["RESEARCH"]);
-    expect(skipped.effects).toEqual([{ kind: "rollback", to: "cp-RESEARCH" }, { kind: "checkpointPhase", phase: "DESIGN" }]);
+    expect(skipped.effects).toEqual([{ kind: "rollback", to: "cp-RESEARCH" }, { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
     expect(play([...escalated, DECIDE("abort")]).state.stage).toBe("ABORTED");
   });
 
@@ -275,7 +317,7 @@ describe("Invariants (§5.3)", () => {
     const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
     const pool: Ev[] = [
       INITIALIZED, PROPOSED("simple"), PROPOSED("medium-hard"), DECIDE("medium"), DECIDE("challenging"), DECIDE("retry"), DECIDE("skip"), DECIDE("accept:ADR-008"), DECIDE("amend:ADR-008", "x"),
-      CP("RESEARCH"), CP("DESIGN"), CP("DISTILL"), CP("DELIVER"), REPORTED, GATE_OK, GATE_FAIL, { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "p", status: "Proposed" }] },
+      DECIDE("answer:q1", "par prise"), DECIDE("defer:q1"), CP("RESEARCH"), CP("DESIGN"), CP("DISTILL"), CP("DELIVER"), REPORTED, GATE_OK, GATE_FAIL, { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "p", status: "Proposed" }] },
       LENSES(lens("APPROVED")), LENSES(lens("APPROVED", ["major"])), LENSES(lens("REJECTED"), lens("REJECTED")), COMMITTED,
       { type: "TIMEOUT", reason: "t" }, { type: "BLOCKER_REPORTED", question: "q", choices: [] }, { type: "RESUMED" },
     ];

@@ -5,6 +5,8 @@ import { buildBrief } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
+import { preselectFiles } from "./preselect.js";
+import { checkResearch } from "./research.js";
 import { parseStory, slugOf } from "./story.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
@@ -89,7 +91,13 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     }
 
     case "runSpecialist": {
-      const brief = buildBrief(state, effect.phase, effect.feedback);
+      let brief = buildBrief(state, effect.phase, effect.feedback);
+      if (effect.phase === "RESEARCH" && state.story) {
+        // Présélection par le code (§7.1) : placée dans le dossier de passation.
+        const files = await ctx.workspace.listFiles();
+        const selected = preselectFiles(state.story, files);
+        if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
+      }
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files };
@@ -136,6 +144,20 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       });
       return;
 
+    case "askQuestion":
+      await ctx.interactions.request({
+        taskId,
+        title: `Question ouverte (${state.story?.id ?? "skraft"})`,
+        detail: effect.text,
+        options: [
+          { id: `answer:${effect.id}`, label: "Répondre" },
+          { id: `defer:${effect.id}`, label: "Reporter" },
+        ],
+        freeText: true,
+        requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
+      });
+      return;
+
     case "askEscalation":
       await ctx.interactions.request({
         taskId,
@@ -161,6 +183,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 
 /** Porte minimale S1 : au moins un livrable produit dans la phase, empreintes enregistrées. */
 async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, attempt: number): Promise<Ev> {
+  if (phase === "RESEARCH") return researchGate(ctx, state, attempt);
   const cp = state.checkpoints[phase];
   if (!cp) throw new EnvFailureError(`Point de retour de la phase ${phase} introuvable`);
   const changed = (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted");
@@ -169,6 +192,30 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   return { type: "GATE_OK", artifacts };
+}
+
+/** Porte citations (§7.1) : document au gabarit, citations vérifiées sur le dépôt, questions ouvertes. */
+async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: number): Promise<Ev> {
+  const path = `.skraft/${state.slug}/research/research.md`;
+  let md: string;
+  try {
+    md = await ctx.workspace.readFile(path);
+  } catch {
+    return { type: "GATE_FAIL", gate: "citations", reasons: [`Document de recherche absent : ${path}`] };
+  }
+  const files = new Set(await ctx.workspace.listFiles());
+  const lines = new Map<string, number>();
+  for (const cited of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))) {
+    if (files.has(cited)) lines.set(cited, (await ctx.workspace.readFile(cited)).replace(/\n$/, "").split("\n").length);
+  }
+  const { reasons, openQuestions } = checkResearch(md, { lineCount: (p) => lines.get(p) ?? null });
+  if (reasons.length) return { type: "GATE_FAIL", gate: "citations", reasons };
+  const known = new Set(state.openQuestions.map((q) => q.text));
+  return {
+    type: "GATE_OK",
+    artifacts: [{ path, sha256: createHash("sha256").update(md).digest("hex"), producedBy: "skraft-researcher", attempt }],
+    openQuestions: openQuestions.filter((q) => !known.has(q)),
+  };
 }
 
 function reviewReport(phase: Phase, attempt: number, verdicts: TerminalOutput<"submit_lens_verdict">[]): string {

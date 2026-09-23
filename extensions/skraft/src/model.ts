@@ -100,6 +100,8 @@ export interface SkraftState {
   escalation: { from: "INIT" | "CLASSIFY" | "PHASE"; reason: string } | null;
   /** Réponses de l'utilisateur à transmettre au prochain dossier de passation. */
   answers: { question: string; answer: string }[];
+  /** Questions ouvertes déjà soumises à l'utilisateur (pas de double demande). */
+  questionsAsked: string[];
 }
 
 export type SkraftEvent =
@@ -131,6 +133,7 @@ export type SkraftEffect =
   | { kind: "runReview"; phase: Phase; lenses: LensName[]; attempt: number }
   | { kind: "askRatification"; adr: AdrRecord }
   | { kind: "askBlocker"; question: string; choices: string[] }
+  | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
   | { kind: "rollback"; to: string }
   | { kind: "commitPhase"; phase: Phase; message: string }
@@ -145,6 +148,7 @@ export const STAGE_LABELS: Record<string, string> = {
   DESIGN: "Conception et décisions d'architecture",
   DISTILL: "Écriture des scénarios et des tests d'acceptance",
   DELIVER: "Implémentation en TDD",
+  ROUTE: "Questions à trancher avant la suite",
   ARTIFACT_GATE: "Vérification des livrables",
   REVIEW: "Revue",
   RATIFICATION: "Décisions d'architecture à valider",

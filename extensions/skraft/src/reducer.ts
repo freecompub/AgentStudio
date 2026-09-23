@@ -41,6 +41,7 @@ export function initialState(input: SkraftInput): SkraftState {
     blocker: null,
     escalation: null,
     answers: [],
+    questionsAsked: [],
   };
 }
 
@@ -50,7 +51,7 @@ export const isTerminal = (s: SkraftState): boolean => s.stage === "DONE" || s.s
 
 /** Nom d'état pour l'usage et la carte : la phase en cours, sinon le stage (§11, D37). */
 export const phaseOf = (s: SkraftState): string =>
-  ["REVIEW", "RATIFICATION", "BLOCKED", "ESCALATED", "DONE", "ABORTED", "CLASSIFY", "CONFIRM_DIFFICULTY", "INIT"].includes(s.stage) || !s.phase ? s.stage : s.phase;
+  ["REVIEW", "RATIFICATION", "BLOCKED", "ESCALATED", "DONE", "ABORTED", "CLASSIFY", "CONFIRM_DIFFICULTY", "INIT", "ROUTE"].includes(s.stage) || !s.phase ? s.stage : s.phase;
 
 /**
  * Réducteur du pipeline (SPEC-skraft §5.2). PUR : aucune I/O. Le LLM ne choisit jamais la
@@ -67,8 +68,9 @@ export function transition(s: SkraftState, e: Ev): Out {
     case "INIT":
       if (e.type === "INITIALIZED") {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
+        const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
         return {
-          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators },
+          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
         };
       }
@@ -177,6 +179,17 @@ export function transition(s: SkraftState, e: Ev): Out {
       }
       break;
 
+    case "ROUTE":
+      // Attente des réponses aux questions ouvertes (§7.1, §11) : réponse libre ou report explicite.
+      if (e.type === "HUMAN_DECISION") {
+        const [action, id] = e.decision.split(":");
+        const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
+        if (!q || (action !== "answer" && action !== "defer")) break;
+        const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (e.comment ?? "").trim() || "(réponse vide)";
+        return route({ ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) });
+      }
+      break;
+
     case "COMMIT":
       if (e.type === "COMMITTED" && s.phase) {
         return route({ ...s, phasesCompleted: [...s.phasesCompleted, s.phase], attempts: 0, lastRejection: null, designStep: "model" });
@@ -219,6 +232,15 @@ function route(s: SkraftState): Out {
   if (pendingAdrs.length) return { state: { ...s, stage: "RATIFICATION" }, effects: pendingAdrs.map((adr) => ({ kind: "askRatification", adr })) };
   const next = s.phaseOrder.find((p) => !s.phasesCompleted.includes(p) && !s.skipPhases.includes(p));
   if (!next) return { state: { ...s, stage: "DONE", phase: null }, effects: [{ kind: "finalReport" }] };
+  // Les questions ouvertes (story, recherche) sont tranchées avant toute phase autre que RESEARCH.
+  const unanswered = next === "RESEARCH" ? [] : s.openQuestions.filter((q) => q.answer === undefined);
+  if (unanswered.length) {
+    const toAsk = unanswered.filter((q) => !s.questionsAsked.includes(q.id));
+    return {
+      state: { ...s, stage: "ROUTE", phase: null, questionsAsked: [...s.questionsAsked, ...toAsk.map((q) => q.id)] },
+      effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text })),
+    };
+  }
   return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null }, effects: [{ kind: "checkpointPhase", phase: next }] };
 }
 
