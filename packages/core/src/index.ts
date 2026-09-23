@@ -2,7 +2,7 @@ export type * from "./protocols/agent-runtime.js";
 export type * from "./protocols/conversation.js";
 export type * from "./protocols/interaction.js";
 export type * from "./protocols/logger.js";
-export { runTurn, TurnTimeoutError, EnvFailureError, WorkDefectError, type RunTurnOptions } from "./turns/run-turn.js";
+export { createHeartbeat, runTurn, TurnTimeoutError, EnvFailureError, WorkDefectError, type Heartbeat, type RunTurnOptions } from "./turns/run-turn.js";
 export { createMainSession, type MainSession, type MainSessionDeps, type MainSessionEvent } from "./session/main-session.js";
 export { createJsonConversationStore } from "./conversation/json-conversation-store.js";
 export { createWorkspaceGuard, type WorkspaceGuardDeps } from "./guards/workspace-guard.js";
@@ -34,3 +34,7 @@ export {
 } from "./interactions/interaction-service.js";
 export { createLazyRuntime } from "./agents/lazy-runtime.js";
 export { MemoryInteractionStore } from "./testing/memory-doubles.js";
+export { createJsonInteractionStore } from "./interactions/json-interaction-store.js";
+export type * from "./protocols/evidence.js";
+export { createJsonEvidenceStore } from "./evidence/json-evidence-store.js";
+export { composeGuards } from "./guards/compose-guards.js";

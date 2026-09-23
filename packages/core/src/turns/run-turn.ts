@@ -27,7 +27,25 @@ export class EnvFailureError extends Error {
   }
 }
 
+/** Signe de vie émis hors session (sortie d'un outil long exécuté par notre code, §6.4). */
+export interface Heartbeat {
+  beat(): void;
+  onBeat(cb: () => void): () => void;
+}
+
+export function createHeartbeat(): Heartbeat {
+  const listeners = new Set<() => void>();
+  return {
+    beat: () => listeners.forEach((l) => l()),
+    onBeat(cb) {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+  };
+}
+
 export interface RunTurnOptions {
+  heartbeat?: Heartbeat;
   /** Seuil d'inactivité ; défaut 5 min. */
   idleMs?: number;
   onEvent?: (e: AgentEvent) => void;
@@ -53,11 +71,18 @@ export function runTurn(session: AgentSession, prompt: string, opts: RunTurnOpti
       else if (ev.type === "error") finish(() => reject(new EnvFailureError(ev.message)));
     });
 
+    const offBeat = opts.heartbeat?.onBeat(() => {
+      if (settled) return;
+      clearTimeout(timer);
+      timer = setTimeout(onSilence, idleMs);
+    });
+
     function finish(settle: () => void): void {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       off();
+      offBeat?.();
       settle();
     }
 

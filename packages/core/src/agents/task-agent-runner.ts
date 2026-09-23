@@ -1,7 +1,8 @@
-import type { AgentEvent, AgentRuntime, AgentSession } from "../protocols/agent-runtime.js";
+import type { AgentEvent, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } from "../protocols/agent-runtime.js";
 import type { Logger } from "../protocols/logger.js";
 import { createTaskAgentGuard } from "../guards/task-agent-guard.js";
-import { EnvFailureError, runTurn, WorkDefectError } from "../turns/run-turn.js";
+import { composeGuards } from "../guards/compose-guards.js";
+import { createHeartbeat, EnvFailureError, runTurn, WorkDefectError } from "../turns/run-turn.js";
 import { terminalTool, type TerminalOutput, type TerminalToolName } from "./terminal-tools.js";
 
 export interface TaskAgentSpec<N extends TerminalToolName = TerminalToolName> {
@@ -17,6 +18,10 @@ export interface TaskAgentSpec<N extends TerminalToolName = TerminalToolName> {
 export interface TaskAgentRunOptions {
   signal?: AbortSignal;
   onEvent?: (e: AgentEvent) => void;
+  /** Outils supplémentaires fournis par notre code ; `beat` signale une activité (outil long, §6.4). */
+  tools?: (beat: () => void) => ToolSpec[];
+  /** Gardes supplémentaires, appliquées après la garde du rôle (D28). */
+  guards?: ToolCallGuard[];
 }
 
 export interface TaskAgentRunner {
@@ -40,8 +45,10 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
     async run(spec, prompt, opts = {}) {
       let output: TerminalOutput<typeof spec.output> | undefined;
       let session: AgentSession | undefined;
+      const heartbeat = createHeartbeat();
       const turn = (text: string) =>
         runTurn(session!, text, {
+          heartbeat,
           ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
           ...(opts.onEvent ? { onEvent: opts.onEvent } : {}),
         });
@@ -53,8 +60,8 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
             role: spec.role,
             workingDirectory: deps.root,
             systemPrompt: spec.systemPrompt,
-            tools: [terminalTool(spec.output, (o) => void (output = o))],
-            guard: createTaskAgentGuard({ root: deps.root, writable: spec.writable }),
+            tools: [terminalTool(spec.output, (o) => void (output = o)), ...(opts.tools?.(() => heartbeat.beat()) ?? [])],
+            guard: composeGuards([createTaskAgentGuard({ root: deps.root, writable: spec.writable }), ...(opts.guards ?? [])]),
             ...(spec.model ? { model: spec.model } : {}),
           })
           .catch((err: unknown) => {

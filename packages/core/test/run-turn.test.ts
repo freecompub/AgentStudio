@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runTurn, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
+import { createHeartbeat, runTurn, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
 import { ScriptedSession } from "../src/testing/scripted-session.js";
 
 describe("runTurn — watchdog d'inactivité (D30)", () => {
@@ -66,5 +66,18 @@ describe("runTurn — watchdog d'inactivité (D30)", () => {
     s.emit({ type: "idle" });
     await turn;
     expect(seen).toEqual(["message", "idle"]);
+  });
+
+  it("un battement externe (outil long qui produit de la sortie) réarme aussi le chronomètre", async () => {
+    const s = new ScriptedSession("s1");
+    const hb = createHeartbeat();
+    const turn = runTurn(s, "tests longs", { idleMs: 1_000, heartbeat: hb });
+    for (let i = 0; i < 5; i++) {
+      await vi.advanceTimersByTimeAsync(900);
+      hb.beat();
+    }
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+    expect(s.aborted).toBe(false);
   });
 });

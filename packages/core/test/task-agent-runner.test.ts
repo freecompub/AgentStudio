@@ -89,4 +89,41 @@ describe("Exécuteur d'agent de tâche", () => {
     expect(await p).toBeInstanceOf(Error);
     expect(runtime.sessions.size).toBe(0);
   });
+
+  it("outils supplémentaires : exposés à l'agent, leur battement réarme le watchdog", async () => {
+    vi.useFakeTimers();
+    const { runtime, runner } = setup(1_000);
+    runtime.behave("tdd-test", async (t) => {
+      await t.callTool("run_tests", {});
+      await t.callTool("report_phase", { summary: "ok", files: [] });
+    });
+    const p = runner.run(TEST_AGENT, "x", {
+      tools: (beat) => [
+        {
+          name: "run_tests",
+          description: "Lance les tests",
+          parameters: { type: "object", properties: {} },
+          handler: async () => {
+            for (let i = 0; i < 5; i++) {
+              await new Promise((r) => setTimeout(r, 900));
+              beat();
+            }
+            return "vert";
+          },
+        },
+      ],
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await p).output).toEqual({ summary: "ok", files: [] });
+    expect(runtime.configs.get("fake-1")?.tools.map((t) => t.name)).toEqual(["report_phase", "run_tests"]);
+  });
+
+  it("gardes supplémentaires : appliquées après la garde du rôle, le premier refus l'emporte", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async (t) => void (await t.callTool("report_phase", { summary: "ok", files: [] })));
+    await runner.run(TEST_AGENT, "x", { guards: [{ check: async () => ({ decision: "deny", reason: "tests gelés" }) }] });
+    const guard = runtime.configs.get("fake-1")!.guard;
+    expect(await guard.check({ kind: "write", toolName: "edit", path: "tests/a.ts" })).toEqual({ decision: "deny", reason: "tests gelés" });
+    expect(await guard.check({ kind: "write", toolName: "edit", path: "src/a.ts" })).toMatchObject({ decision: "deny", reason: expect.stringMatching(/périmètre/) });
+  });
 });
