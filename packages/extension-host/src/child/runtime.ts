@@ -128,6 +128,8 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
         },
         isTestFile: (p) => testFile.test(p.replaceAll("\\", "/")),
         layout: r.layout,
+        mutation: (opts) => call("stack.mutation", [], opts?.signal),
+        architecture: (rules) => call("stack.architecture", [rules]),
       },
       tasks: {
         register(def) {

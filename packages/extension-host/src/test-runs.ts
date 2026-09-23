@@ -1,5 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { Clock, Evidence, EvidenceStore, IdGenerator, ToolCallGuard, ToolSpec } from "@agent-studio/core";
+import { matchesAny, type Clock, type Evidence, type EvidenceStore, type IdGenerator, type ToolCallGuard, type ToolSpec } from "@agent-studio/core";
 import type { EvidenceTag } from "@agent-studio/extension-api";
 import { fingerprintFiles, type StackAdapter, type TestRun } from "@agent-studio/stack-adapters";
 import type { Workspace } from "@agent-studio/workspace";
@@ -107,6 +107,22 @@ export function testFreezeGuard(root: string, isTestFile: (p: string) => boolean
       if (rel.startsWith("..") || isAbsolute(rel)) return { decision: "allow" }; // hors projet : l'autre garde refuse
       return isTestFile(rel.split(sep).join("/"))
         ? { decision: "deny", reason: "Les tests sont gelés depuis ton exécution rouge : ne modifie plus aucun test, écris le code de production." }
+        : { decision: "allow" };
+    },
+  };
+}
+
+/** Garde de lecture seule : les motifs donnés ne peuvent pas être écrits pendant le tour (tests gelés, SPEC-skraft §7.4). */
+export function readOnlyGuard(root: string, globs: string[]): ToolCallGuard {
+  const base = resolve(root);
+  return {
+    async check(req) {
+      if (req.kind !== "write" || !req.path) return { decision: "allow" };
+      const rel = relative(base, resolve(base, req.path));
+      if (rel.startsWith("..") || isAbsolute(rel)) return { decision: "allow" }; // hors projet : l'autre garde refuse
+      const path = rel.split(sep).join("/");
+      return matchesAny(globs, path)
+        ? { decision: "deny", reason: `Écriture refusée : ${path} est gelé pour ce rôle (tests existants). Modifie uniquement les fichiers de ton périmètre.` }
         : { decision: "allow" };
     },
   };

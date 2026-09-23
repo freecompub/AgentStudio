@@ -203,6 +203,32 @@ describe("Hôte d'extension en processus", () => {
     expect(seen).toHaveLength(1);
   });
 
+  it("readOnly : écriture refusée sur les motifs gelés (@stack:* résolus), le reste du périmètre reste permis", async () => {
+    let seen: import("@agent-studio/core").ToolCallGuard[] = [];
+    const env = setup();
+    env.deps.agents = { run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    let ctx!: ExtensionContext;
+    await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (ctx = c) } }, env.deps);
+    await ctx.agents.run("writer", "x", { readOnly: ["@stack:acceptanceTests"] });
+    expect(seen).toHaveLength(1);
+    const deny = await seen[0]!.check({ kind: "write", toolName: "edit", path: "tests/acceptance/cap.test.ts" });
+    expect(deny).toMatchObject({ decision: "deny", reason: expect.stringContaining("tests/acceptance/cap.test.ts est gelé") });
+    expect(await seen[0]!.check({ kind: "write", toolName: "edit", path: "/projets/demo/tests/unit/cap.test.ts" })).toEqual({ decision: "allow" });
+    expect(await seen[0]!.check({ kind: "read", toolName: "view", path: "tests/acceptance/cap.test.ts" })).toEqual({ decision: "allow" });
+  });
+
+  it("stack.mutation et stack.architecture : null si la stack ne les propose pas, sinon délégués à l'adaptateur", async () => {
+    const env = setup();
+    let ctx!: ExtensionContext;
+    await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (ctx = c) } }, env.deps);
+    expect(await ctx.stack.mutation()).toBeNull();
+    expect(await ctx.stack.architecture([])).toBeNull();
+    env.deps.stack.mutation = async (o) => ({ score: o.root === "/projets/demo" ? 100 : 0, files: [] });
+    env.deps.stack.architecture = async (o) => ({ modules: [], violations: o.rules.map((r) => ({ module: r.module, file: "f", imported: r.forbidden[0]! })) });
+    expect(await ctx.stack.mutation()).toEqual({ score: 100, files: [] });
+    expect((await ctx.stack.architecture([{ module: "Domain", forbidden: ["UI"] }]))?.violations).toEqual([{ module: "Domain", file: "f", imported: "UI" }]);
+  });
+
   it("désactivation : capacités retirées du registre", async () => {
     const { deps, handle } = await activateWith((ctx) => void ctx.chat.registerCommand("demo", async () => {}));
     await handle.deactivate();

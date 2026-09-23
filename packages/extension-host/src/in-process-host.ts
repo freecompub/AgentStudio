@@ -16,7 +16,7 @@ import type { TaskEngine } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
-import { createTestRunService, runTestsTool, testFreezeGuard } from "./test-runs.js";
+import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
 export interface ExtensionChatSink {
@@ -139,6 +139,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                 : {}),
             guards: [
               ...(opts?.freezeTestsAfterRed ? [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] : []),
+              ...(opts?.readOnly?.length ? [readOnlyGuard(deps.workspace.root, resolveGlobs(opts.readOnly))] : []),
               ...deps.hooks.guards(),
             ],
           },
@@ -182,6 +183,16 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
       layout: deps.stack.layout,
+      async mutation(opts) {
+        perm.require("shell:test");
+        if (!deps.stack.mutation) return null;
+        return deps.stack.mutation({ root: deps.workspace.root, ...(opts?.signal ? { signal: opts.signal } : {}) });
+      },
+      async architecture(rules) {
+        perm.require("fs:read");
+        if (!deps.stack.architecture) return null;
+        return deps.stack.architecture({ root: deps.workspace.root, rules });
+      },
     },
 
     tasks: {

@@ -3,13 +3,13 @@
  * Une extension ne voit que `ExtensionContext` : aucun objet du SDK, aucune session (D10).
  */
 import type { Evidence, TerminalOutput, TerminalToolName } from "@agent-studio/core";
-import type { TestRun } from "@agent-studio/stack-adapters";
+import type { ArchitectureReport, DependencyRule, MutationReport, TestRun } from "@agent-studio/stack-adapters";
 import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 
 export const API_VERSION = "0.1.0";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
-export type { TestResult } from "@agent-studio/stack-adapters";
+export type { ArchitectureReport, DependencyRule, MutationReport, TestResult } from "@agent-studio/stack-adapters";
 export type { TaskEvent, EffectContext } from "@agent-studio/task-engine";
 
 // ---------- Manifeste (§5.1) ------------------------------------------------------
@@ -102,6 +102,8 @@ export interface AgentRunOptions {
   evidence?: EvidenceTag;
   /** Gel des tests actif dans le tour : après une exécution rouge, plus aucune écriture de test (D22). */
   freezeTestsAfterRed?: boolean;
+  /** Motifs (dont `@stack:*`) interdits en écriture pendant ce tour, en plus du périmètre du rôle (tests gelés). */
+  readOnly?: string[];
 }
 
 /** Sortie structurée du rôle, ou question bloquante (`report_blocker`, si le rôle le déclare). */
@@ -143,6 +145,10 @@ export interface StackApi {
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;
+  /** Tests de mutation de l'adaptateur ; `null` si la stack n'en propose pas (§9.6). */
+  mutation(opts?: { signal?: AbortSignal }): Promise<MutationReport | null>;
+  /** Contrôle des règles de dépendance entre modules ; `null` si la stack ne sait pas l'analyser. */
+  architecture(rules: DependencyRule[]): Promise<ArchitectureReport | null>;
 }
 
 /** Appel d'outil soumis aux hooks (forme normalisée, indépendante du runtime). */
