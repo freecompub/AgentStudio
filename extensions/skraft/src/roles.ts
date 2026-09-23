@@ -29,8 +29,11 @@ avec son numéro. Écris dans .skraft/<slug>/design/ : contracts.md, diagrams.md
 définis dans event-model.md ou domain-model.md. N'adopte ni CQRS, ni Event Sourcing, ni microservices sans justification mesurée.${COMMON}`,
 
   acceptance: `Tu écris les scénarios d'acceptance. Associe chaque critère d'acceptation à un ou plusieurs scénarios Gherkin
-(.skraft/<slug>/distill/features/), rédige test-plan.md et impl-plan.md, puis écris les tests d'acceptance de TOUS les scénarios
-avec les signatures minimales pour compiler. Recopie les valeurs des critères mot pour mot.${COMMON}`,
+(.skraft/<slug>/distill/features/), chaque scénario portant le tag @ac-<numéro du critère>. Rédige test-plan.md et impl-plan.md,
+puis écris les tests d'acceptance de TOUS les scénarios, à l'emplacement indiqué, chaque test portant le marqueur ac-<numéro> dans
+son nom, avec les signatures minimales pour compiler. Recopie les valeurs des critères mot pour mot.
+Un test qui passe déjà doit être requalifié dans test-plan.md par une ligne « - @ac-<n> : role: regression — justification : <raison> ».
+Appelle run_tests pour vérifier que les tests sont rouges pour la bonne raison.${COMMON}`,
 
   dev: `Tu livres la story en TDD : pour chaque scénario du plan d'implémentation, fais passer son test d'acceptance au vert
 par petits pas (un test unitaire rouge, le code minimal, le nettoyage). Ne modifie jamais un test d'acceptance.${COMMON}`,

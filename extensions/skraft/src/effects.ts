@@ -9,6 +9,8 @@ import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign } from "./design.js";
+import { checkAcceptanceRed, checkValues } from "./distill.js";
+import { matchesAny } from "@agent-studio/core";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { parseStory, slugOf } from "./story.js";
 
@@ -101,13 +103,14 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         const selected = preselectFiles(state.story, files);
         if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
       }
+      if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files };
     }
 
     case "runGate":
-      return runGate(ctx, state, effect.phase, effect.attempt);
+      return runGate(ctx, state, effect.phase, effect.attempt, signal, taskId);
 
     case "runReview": {
       const verdicts = await Promise.all(
@@ -189,9 +192,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 }
 
 /** Porte minimale S1 : au moins un livrable produit dans la phase, empreintes enregistrées. */
-async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, attempt: number): Promise<Ev> {
+async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, attempt: number, signal: AbortSignal, taskId: string): Promise<Ev> {
   if (phase === "RESEARCH") return researchGate(ctx, state, attempt);
   if (phase === "DESIGN") return designGate(ctx, state, attempt);
+  if (phase === "DISTILL") return distillGate(ctx, state, attempt, signal, taskId);
   const cp = state.checkpoints[phase];
   if (!cp) throw new EnvFailureError(`Point de retour de la phase ${phase} introuvable`);
   const changed = (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted");
@@ -263,6 +267,37 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
     artifacts,
     adrs: adrs.filter((a) => a.isNew).map((a) => ({ id: parseAdr(a.md).id, path: a.path, status: "Proposed" as const })),
   };
+}
+
+/** Porte valeurs puis porte RED d'acceptance (§7.3) ; à la sortie, gel des tests d'acceptance. */
+async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: number, signal: AbortSignal, taskId: string): Promise<Ev> {
+  const dir = `.skraft/${state.slug}/distill`;
+  const files = await ctx.workspace.listFiles();
+  const read = async (paths: string[]) => Promise.all(paths.map(async (path) => ({ path, content: await ctx.workspace.readFile(path) })));
+  const features = await read(files.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
+  const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
+  const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
+  const criteria = state.story?.criteria ?? [];
+
+  const valueReasons = checkValues({ criteria, features, acceptanceTests });
+  if (valueReasons.length) return { type: "GATE_FAIL", gate: "valeurs", reasons: valueReasons };
+
+  let testPlan = "";
+  try {
+    testPlan = await ctx.workspace.readFile(`${dir}/test-plan.md`);
+  } catch {
+    return { type: "GATE_FAIL", gate: "valeurs", reasons: [`Plan de test absent : ${dir}/test-plan.md`] };
+  }
+  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
+  if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
+  const results = run.results.filter((r) => matchesAny(acceptanceGlobs, r.file) || matchesAny(acceptanceGlobs, r.id));
+  const red = checkAcceptanceRed({ criteria, testPlan, results });
+  if (red.reasons.length) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: red.reasons };
+
+  const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
+  const artifacts: ArtifactRecord[] = [];
+  for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
+  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
 }
 
 function reviewReport(phase: Phase, attempt: number, verdicts: TerminalOutput<"submit_lens_verdict">[]): string {

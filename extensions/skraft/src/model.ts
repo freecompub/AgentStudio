@@ -102,6 +102,10 @@ export interface SkraftState {
   answers: { question: string; answer: string }[];
   /** Questions ouvertes déjà soumises à l'utilisateur (pas de double demande). */
   questionsAsked: string[];
+  /** Empreinte des tests d'acceptance, gelés à la sortie de DISTILL (§7.3). */
+  acceptanceHash: string | null;
+  /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
+  regressions: string[];
 }
 
 export type SkraftEvent =
@@ -118,7 +122,7 @@ export type SkraftEvent =
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
   | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
-  | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[] }
+  | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
   | { type: "LENSES_DONE"; lenses: LensVerdict[]; reportPath: string }
   | { type: "COMMITTED"; sha: string | null };

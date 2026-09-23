@@ -42,6 +42,8 @@ export function initialState(input: SkraftInput): SkraftState {
     escalation: null,
     answers: [],
     questionsAsked: [],
+    acceptanceHash: null,
+    regressions: [],
   };
 }
 
@@ -135,6 +137,8 @@ export function transition(s: SkraftState, e: Ev): Out {
           adrs: p === "DESIGN" ? [...s.adrs, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
           lastRejection: null,
+          // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
+          ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: ns.lenses, attempt: ns.attempts + 1 }] };
         return commit(ns);

@@ -17,6 +17,7 @@ import {
 } from "@agent-studio/core";
 import { sequentialIds, type ScriptedBehavior, type ScriptedRuntime } from "@agent-studio/core/testing";
 import { activateInProcess, activateIsolated, bundle, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
+import type { StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord } from "@agent-studio/task-engine";
 import { openWorkspace, type Workspace } from "@agent-studio/workspace";
 import { manifest, skraftExtension, type SkraftState } from "../../src/index.js";
@@ -120,7 +121,13 @@ export function simulatedAgents(runtime: ScriptedRuntime, root: string, over: Pa
     },
     "skraft-acceptance": async (t) => {
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
-      await writer(`.skraft/${slug}/distill/features/plafond.feature`, "Fonctionnalité: plafond\n")(t);
+      const criteria = [...t.prompt.matchAll(/^\s+(\d+)\. (.+)$/gm)].map((m) => ({ n: m[1]!, text: m[2]! }));
+      const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
+      const tests = criteria.map((c) => `  func testAc${c.n}() { XCTFail(${JSON.stringify(c.text)}) } // ac-${c.n}`).join("\n");
+      await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
+      await put(root, `.skraft/${slug}/distill/test-plan.md`, "# Plan de test\n");
+      await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
+      await writer("Tests/AcceptanceTests/StoryAcceptanceTests.swift", `import XCTest\nfinal class StoryAcceptanceTests: XCTestCase {\n${tests}\n}\n`)(t);
     },
     "skraft-dev": writer("Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n"),
     ...Object.fromEntries(
@@ -166,7 +173,26 @@ export async function shutdownHosts(): Promise<void> {
   for (const h of handles.splice(0)) await h.deactivate().catch(() => undefined);
 }
 
-export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; isolated?: boolean } = {}) {
+/**
+ * Fausse exécution Swift : chaque test d'acceptance marqué `ac-<n>` est rouge sur assertion tant que le
+ * fichier de production `Sources/Domain/BolusCap.swift` n'existe pas, vert ensuite.
+ */
+async function fakeSwiftRun(opts: { root: string }) {
+  const { readdir, readFile: read, access } = await import("node:fs/promises");
+  const results: { id: string; file: string; status: "passed" | "failed"; failureKind?: "assertion"; message?: string }[] = [];
+  const dir = join(opts.root, "Tests/AcceptanceTests");
+  const delivered = await access(join(opts.root, "Sources/Domain/BolusCap.swift")).then(() => true, () => false);
+  for (const f of await readdir(dir).catch(() => [] as string[])) {
+    const content = await read(join(dir, f), "utf8");
+    for (const m of content.matchAll(/func (testAc\d+)/g))
+      results.push(delivered
+        ? { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "passed" }
+        : { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "failed", failureKind: "assertion", message: "XCTFail" });
+  }
+  return { results, exitCode: results.some((r) => r.status === "failed") ? 1 : 0, timedOut: false, output: "", durationMs: 1 };
+}
+
+export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; isolated?: boolean; stack?: StackAdapter } = {}) {
   const workspace = withHang(await openWorkspace(root), opts.hang);
   const usage = createUsageRecorder(join(tasksDir, "usage"));
   const engine = createTaskEngine({
@@ -189,7 +215,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     engine,
     agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
     workspace,
-    stack: { id: "swift", detect: async () => true, isTestFile: (p) => /(^|\/)Tests\//.test(p), testFilePattern: "(^|\\/)Tests\\/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) },
+    stack: opts.stack ?? { id: "swift", layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },  detect: async () => true, isTestFile: (p) => /(^|\/)Tests\//.test(p), testFilePattern: "(^|\\/)Tests\\/", runTests: fakeSwiftRun },
     interactions,
     chat: { post: (_e, md) => void posted.push(md) },
     evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),

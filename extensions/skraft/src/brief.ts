@@ -24,6 +24,8 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   if (decided.length) lines.push("ADR décidés :", ...decided.map((a) => `  - ${a.id} (${a.status}) : ${a.path}`));
   const answered = [...s.openQuestions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer! })), ...s.answers];
   if (answered.length) lines.push("Réponses de l'utilisateur :", ...answered.map((a) => `  - ${a.question} → ${a.answer}`));
+  if (s.regressions.length) lines.push("Tests d'acceptance requalifiés en non-régression :", ...s.regressions.map((r) => `  - ${r}`));
+  if (s.acceptanceHash) lines.push("Les tests d'acceptance sont gelés : ne les modifie jamais.");
   if (feedback.length) lines.push("Rejet précédent :", ...feedback.map((f) => `  - ${f}`));
   return lines.join("\n");
 }
