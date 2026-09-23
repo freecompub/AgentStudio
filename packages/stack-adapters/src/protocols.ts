@@ -31,6 +31,24 @@ export interface RunTestsOptions {
   onOutput?: (chunk: string) => void;
 }
 
+/** Rapport de mutation (§9.6) : score global et par fichier, mutants survivants. */
+export interface MutationReport {
+  /** Pourcentage de mutants tués, de 0 à 100. */
+  score: number;
+  files: { file: string; score: number; survived: { line: number; operator: string }[] }[];
+}
+
+/** Règle de dépendance : un module ne doit pas importer certains modules (§9.7). */
+export interface DependencyRule {
+  module: string;
+  forbidden: string[];
+}
+
+export interface ArchitectureReport {
+  modules: { name: string; imports: string[] }[];
+  violations: { module: string; file: string; imported: string }[];
+}
+
 export interface StackAdapter {
   readonly id: "typescript" | "swift" | "dotnet";
   /** Vrai si l'adaptateur reconnaît le projet. */
@@ -39,6 +57,10 @@ export interface StackAdapter {
   isTestFile(path: string): boolean;
   /** Motif (source d'expression régulière) équivalent à `isTestFile`, transmissible à un autre processus. */
   readonly testFilePattern: string;
+  /** Tests de mutation (facultatif selon la stack). */
+  mutation?(opts: { root: string; timeoutMs?: number; signal?: AbortSignal }): Promise<MutationReport>;
+  /** Analyse des dépendances entre modules (facultatif selon la stack). */
+  architecture?(opts: { root: string; rules: DependencyRule[] }): Promise<ArchitectureReport>;
 }
 
 // ---------- Exécution de processus ------------------------------------------------

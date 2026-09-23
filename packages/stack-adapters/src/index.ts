@@ -3,3 +3,9 @@ export { createTypeScriptAdapter, type TypeScriptAdapterDeps } from "./typescrip
 export { parseVitestReport, classifyFailure } from "./typescript/vitest-report.js";
 export { createNodeProcessRunner } from "./process/node-process-runner.js";
 export { fingerprintFiles, type ReadableFiles } from "./fingerprint.js";
+export { createSwiftAdapter, type SwiftAdapterDeps, type SwiftToolchain } from "./swift/swift-adapter.js";
+export { analyzeSwiftImports, parseSwiftImports } from "./swift/swift-architecture.js";
+export { parseMuterReport } from "./swift/muter-report.js";
+export { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, parseXunit } from "./swift/swift-report.js";
+export { selectStackAdapter } from "./select-stack.js";
+export { findLocalSwiftToolchain } from "./swift/local-toolchain.js";
