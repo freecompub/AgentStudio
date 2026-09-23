@@ -12,7 +12,10 @@ export interface TaskEngineDeps {
 export interface TaskEngine {
   register<S, E extends { type: string }, F, D>(def: TaskDefinition<S, E, F, D>, deps: D): void;
   start(name: string, input: unknown): Promise<string>;
-  /** Injecte un événement (décision humaine, annulation…) dans une tâche. */
+  /**
+   * Injecte un événement (décision humaine…) : résout dès que la transition est persistée ;
+   * les effets qui en découlent s'exécutent ensuite en arrière-plan (voir `idle`).
+   */
   dispatch(taskId: string, event: TaskEvent<{ type: string }>): Promise<void>;
   cancel(taskId: string): Promise<void>;
   /** Au démarrage : reprend les tâches non terminées (§6.3). */
@@ -159,10 +162,8 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
     async dispatch(taskId, event) {
       const t = getLive(taskId);
       if (t.record.status === "finished") throw new Error(`La tâche ${taskId} est terminée`);
-      await enqueue(t, async () => {
-        await apply(t, event);
-        await drain(t);
-      });
+      await enqueue(t, () => apply(t, event));
+      void enqueue(t, () => drain(t));
     },
 
     async cancel(taskId) {

@@ -202,6 +202,29 @@ describe("Moteur de tâches", () => {
     expect(((await store.load(id))?.state as S).phase).toBe("ABORTED");
   });
 
+  it("dispatch rend la main dès la transition persistée, sans attendre les effets suivants", async () => {
+    let calls = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const def = counterTask(async (f) => {
+      if (f.kind === "notify") return;
+      if (++calls === 1) return { type: "NEEDS_HUMAN" };
+      await gate; // effet long déclenché par la décision
+      return { type: "WORKED" };
+    });
+    const { engine, store } = start(def);
+    const id = await engine.start("compteur", { target: 1 });
+    await engine.idle(id);
+
+    await engine.dispatch(id, { type: "HUMAN_DECISION", decision: "go" });
+    expect(((await store.load(id))?.state as S).phase).toBe("WORKING");
+    expect((await store.load(id))?.status).toBe("running");
+
+    release();
+    await engine.idle(id);
+    expect((await store.load(id))?.status).toBe("finished");
+  });
+
   it("refuse les événements pour une tâche terminée ou inconnue", async () => {
     const def = counterTask(async () => ({ type: "WORKED" }));
     const { engine } = start(def);
