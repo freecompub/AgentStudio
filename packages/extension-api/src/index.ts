@@ -110,7 +110,8 @@ export interface WorkspaceApi {
 }
 
 export interface GitApi {
-  commit(message: string): Promise<string | null>;
+  /** Commit de tous les changements, ou des seuls `paths`. */
+  commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
   head(): Promise<string>;
 }
 

@@ -15,8 +15,8 @@ export function createGitRepository(git: GitRunner): Repository {
   return {
     head,
 
-    async commit(message) {
-      await git.run(["add", "-A"]);
+    async commit(message, opts = {}) {
+      await git.run(opts.paths?.length ? ["add", "-A", "--", ...opts.paths] : ["add", "-A"]);
       const staged = await git.run(["diff", "--cached", "--name-only"]);
       if (!staged.trim()) return null;
       // Si l'utilisateur n'a pas d'identité Git configurée, on signe avec celle de l'application.

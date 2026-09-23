@@ -1,13 +1,14 @@
 import type { TddState } from "./model.js";
 
 const PHASE_TEXT = {
+  CYCLE: "cycle complet en un tour : test rouge, puis code vert",
   RED: "phase rouge : écrire le test",
   GREEN: "phase verte : faire passer le test",
   REFACTOR: "phase de nettoyage : améliorer sans changer le comportement",
 } as const;
 
 const STATUS_TEXT = { done: "fait", skipped: "sauté", pending: "à faire" } as const;
-const REPORT_PHASE = { RED: "rouge", GREEN: "vert", REFACTOR: "nettoyage" } as const;
+const REPORT_PHASE = { CYCLE: "cycle", RED: "rouge", GREEN: "vert", REFACTOR: "nettoyage" } as const;
 
 /**
  * Dossier de passation construit par le code pour chaque session neuve (§6.6, D17).

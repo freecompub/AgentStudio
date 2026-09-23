@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { TddEffect, TddState } from "../src/model.js";
+import type { TddEffect, TddInput, TddState } from "../src/model.js";
 import { initialEffects, initialState, transition, type Ev } from "../src/reducer.js";
 
 /** Rejoue une suite d'événements depuis l'état initial ; renvoie l'état final et les effets du dernier pas. */
-function play(events: Ev[], input = { feature: "Plafonner le bolus", autoApprovePlan: true }) {
-  let state = initialState(input);
+function play(events: Ev[], input: Partial<TddInput> = {}) {
+  input = { feature: "Plafonner le bolus", autoApprovePlan: true, granularity: "strict", ...input };
+  let state = initialState(input as TddInput);
   let effects: TddEffect[] = initialEffects(state);
   for (const e of events) ({ state, effects } = transition(state, e));
   return { state, effects };
@@ -30,6 +31,7 @@ describe("Réducteur TDD — planification", () => {
     const s = initialState({ feature: "F" });
     expect(s.phase).toBe("PLANNING");
     expect(s.maxAttempts).toBe(3);
+    expect(s.granularity).toBe("turn");
     expect(initialEffects(s)).toEqual([{ kind: "runPlanner", feature: "F" }]);
   });
 
@@ -134,7 +136,7 @@ describe("Réducteur TDD — cycle d'une étape", () => {
       feature: "F",
       autoApprovePlan: true,
       skipRefactor: true,
-    } as never);
+    });
     expect(state.steps[0]?.status).toBe("done");
   });
 
@@ -283,5 +285,62 @@ describe("Réducteur TDD — événements système et robustesse", () => {
     transition(before, FAIL("x"));
     transition(before, RED_OK);
     expect(before).toEqual(frozen);
+  });
+});
+
+describe("Réducteur TDD — un tour par comportement (D22, défaut)", () => {
+  const TURN = { granularity: "turn" as const };
+  const CYCLE_OK: Ev = { type: "VERIFY_OK", checkpointId: "cp-cycle", newTestIds: ["t1"], testsHash: "h1" };
+
+  it("checkpoint pris : un seul tour d'agent binôme pour l'étape", () => {
+    const { state, effects } = play([PLAN, CP("cp-s1", ["old"])], TURN);
+    expect(state.phase).toBe("CYCLE");
+    expect(effects).toEqual([{ kind: "runPairAgent", step: state.steps[0] }]);
+  });
+
+  it("tour terminé : vérification du cycle depuis le début d'étape, résumé conservé", () => {
+    const { state, effects } = play([PLAN, CP("cp-s1", ["old"]), DONE], TURN);
+    expect(state.phase).toBe("CYCLE_VERIFY");
+    expect(effects).toEqual([{ kind: "verifyCycle", since: "cp-s1", baseline: ["old"], step: state.steps[0] }]);
+    expect(state.reports.at(-1)).toMatchObject({ stepId: "s1", phase: "CYCLE" });
+  });
+
+  it("cycle valide : étape terminée, étape suivante en mode tour", () => {
+    const { state, effects } = play([PLAN, CP("cp-s1"), DONE, CYCLE_OK], TURN);
+    expect(state.steps[0]?.status).toBe("done");
+    expect(state.checkpoints.green).toBe("cp-cycle");
+    expect(effects).toEqual([{ kind: "createCheckpoint", label: "Avant l'étape s2" }]);
+    const next = play([PLAN, CP("cp-s1"), DONE, CYCLE_OK, CP("cp-s2")], TURN);
+    expect(next.state.phase).toBe("CYCLE");
+  });
+
+  it("cycle rejeté : rollback au début d'étape et bascule automatique en mode strict pour l'étape", () => {
+    const { state, effects } = play([PLAN, CP("cp-s1"), DONE, FAIL("pas de rouge dans les preuves")], TURN);
+    expect(state.phase).toBe("RED");
+    expect(state.stepStrict).toBe(true);
+    expect(state.attempts).toBe(0);
+    expect(effects).toEqual([
+      { kind: "rollback", to: "cp-s1" },
+      { kind: "runTestAgent", step: state.steps[0], feedback: "Le tour unique a été rejeté (pas de rouge dans les preuves) : reprise pas à pas." },
+    ]);
+  });
+
+  it("TIMEOUT pendant le tour : même bascule en mode strict", () => {
+    const { state, effects } = play([PLAN, CP("cp-s1"), { type: "TIMEOUT", reason: "silence" }], TURN);
+    expect(state.phase).toBe("RED");
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-s1" });
+  });
+
+  it("ENV_FAILURE pendant le tour : escalade immédiate", () => {
+    const { state } = play([PLAN, CP("cp-s1"), { type: "ENV_FAILURE", reason: "quota" }], TURN);
+    expect(state.phase).toBe("ESCALATED");
+    expect(state.escalation?.from).toBe("RED");
+  });
+
+  it("après une étape en mode strict, l'étape suivante revient au tour unique", () => {
+    const strictStep = [CP("cp-s1"), DONE, FAIL("x"), DONE, RED_OK, DONE, OK("g"), DONE, OK("r")];
+    const { state } = play([PLAN, ...strictStep, CP("cp-s2")], TURN);
+    expect(state.stepStrict).toBe(false);
+    expect(state.phase).toBe("CYCLE");
   });
 });

@@ -58,8 +58,8 @@ export interface SyncResult {
 /** Opérations Git simplifiées (D7). */
 export interface Repository {
   head(): Promise<string>;
-  /** Indexe tout et commit ; `null` s'il n'y a rien à valider. */
-  commit(message: string): Promise<string | null>;
+  /** Indexe tout (ou seulement `paths`) et commit ; `null` s'il n'y a rien à valider. */
+  commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
   /** Avance rapide depuis l'amont puis push ; échoue en cas de divergence. */
   sync(): Promise<SyncResult>;
 }

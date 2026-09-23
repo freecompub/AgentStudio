@@ -52,6 +52,17 @@ describe("Workspace — clonage, commit, synchronisation", () => {
     expect(await git(ws.root, "status", "--porcelain")).toBe("");
   });
 
+  it("commit limité à des chemins : le reste reste en attente", async () => {
+    const ws = await cloneWorkspace(`file://${remote}`, join(base, "clone"));
+    await put(ws.root, "tests/a.test.ts", "t\n");
+    await put(ws.root, "src/a.ts", "s\n");
+    await ws.repo.commit("test: a", { paths: ["tests/a.test.ts"] });
+    expect(await git(ws.root, "show", "--name-only", "--format=%s", "HEAD")).toBe("test: a\n\ntests/a.test.ts");
+    expect(await git(ws.root, "status", "--porcelain")).toBe("?? src/");
+    await ws.repo.commit("feat: a");
+    expect(await git(ws.root, "status", "--porcelain")).toBe("");
+  });
+
   it("commit sans changement ne crée rien et renvoie null", async () => {
     const ws = await cloneWorkspace(`file://${remote}`, join(base, "clone"));
     expect(await ws.repo.commit("rien")).toBeNull();

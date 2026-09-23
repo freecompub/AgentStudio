@@ -15,6 +15,8 @@ export function initialState(input: TddInput): TddState {
     maxAttempts: input.maxAttempts ?? 3,
     skipRefactor: input.skipRefactor ?? false,
     autoApprovePlan: input.autoApprovePlan ?? false,
+    granularity: input.granularity ?? "turn",
+    stepStrict: false,
     checkpoints: {},
     baselineTests: [],
     newTestIds: [],
@@ -84,9 +86,29 @@ export function transition(s: TddState, e: Ev): Out {
           newTestIds: [],
         });
         delete ns.testsHash;
+        if (s.granularity === "turn" && !s.stepStrict) return { state: { ...ns, phase: "CYCLE" }, effects: [{ kind: "runPairAgent", step }] };
         return { state: ns, effects: [{ kind: "runTestAgent", step }] };
       }
       if (e.type === "ENV_FAILURE") return escalate(s, e.reason, "RED", null);
+      break;
+
+    case "CYCLE":
+      if (!step || !s.checkpoints.step) break;
+      if (e.type === "AGENT_DONE")
+        return {
+          state: { ...s, phase: "CYCLE_VERIFY", reports: [...s.reports, report(step, "CYCLE", e)] },
+          effects: [{ kind: "verifyCycle", since: s.checkpoints.step, baseline: s.baselineTests, step, ...(e.runId ? { runId: e.runId } : {}) }],
+        };
+      if (e.type === "TIMEOUT") return fallbackToStrict(s, e.reason);
+      if (e.type === "ENV_FAILURE") return escalate(s, e.reason, "RED", s.checkpoints.step);
+      break;
+
+    case "CYCLE_VERIFY":
+      if (!s.checkpoints.step) break;
+      if (e.type === "VERIFY_OK" && e.newTestIds && e.testsHash)
+        return finishStep({ ...withoutFeedback(s), newTestIds: e.newTestIds, testsHash: e.testsHash, checkpoints: { ...s.checkpoints, green: e.checkpointId } });
+      if (e.type === "VERIFY_FAIL") return fallbackToStrict(s, e.reason);
+      if (e.type === "ENV_FAILURE") return escalate(s, e.reason, "RED", s.checkpoints.step);
       break;
 
     case "RED":
@@ -161,7 +183,7 @@ export function transition(s: TddState, e: Ev): Out {
 
 // ---------- aides internes ------------------------------------------------------
 
-function report(step: Step, phase: "RED" | "GREEN" | "REFACTOR", e: { summary: string; files: string[] }) {
+function report(step: Step, phase: "CYCLE" | "RED" | "GREEN" | "REFACTOR", e: { summary: string; files: string[] }) {
   return { stepId: step.id, phase, summary: e.summary, files: e.files };
 }
 
@@ -170,10 +192,23 @@ function withoutFeedback(s: TddState): TddState {
   return rest;
 }
 
+/** D22 : un échec du tour unique fait passer l'étape en mode strict, sans consommer le budget. */
+function fallbackToStrict(s: TddState, reason: string): Out {
+  const step = s.steps[s.current]!;
+  const feedback = `Le tour unique a été rejeté (${reason}) : reprise pas à pas.`;
+  return {
+    state: { ...s, phase: "RED", stepStrict: true, attempts: 0, feedback },
+    effects: [
+      { kind: "rollback", to: s.checkpoints.step! },
+      { kind: "runTestAgent", step, feedback },
+    ],
+  };
+}
+
 function startStep(s: TddState): Out {
   const step = s.steps[s.current];
   if (!step) return { state: { ...s, phase: "DONE" }, effects: [] };
-  return { state: { ...s, phase: "STEP_START" }, effects: [{ kind: "createCheckpoint", label: `Avant l'étape ${step.id}` }] };
+  return { state: { ...s, phase: "STEP_START", stepStrict: false }, effects: [{ kind: "createCheckpoint", label: `Avant l'étape ${step.id}` }] };
 }
 
 function nextStep(s: TddState): Out {

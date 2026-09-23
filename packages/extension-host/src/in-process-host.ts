@@ -121,7 +121,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     },
 
     git: {
-      commit: async (message) => (perm.require("git:commit"), deps.workspace.repo.commit(message)),
+      commit: async (message, opts) => (perm.require("git:commit"), deps.workspace.repo.commit(message, opts)),
       head: () => deps.workspace.repo.head(),
     },
 
