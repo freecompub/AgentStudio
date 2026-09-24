@@ -1,11 +1,13 @@
-# Vérification des pull requests : types puis suite de tests complète.
+# Vérification de chaque poussée : types, suite de tests complète, puis build.
 # Aucun appel réel au LLM (§16) : les tests d'intégration utilisent un `AgentRuntime` scripté.
 name: CI
 
 on:
-  pull_request:
+  # Toutes les branches : le travail reste vérifié même hors pull request — une PR fusionnée
+  # cesse de déclencher la CI sur sa branche.
   push:
-    branches: [main]
+    branches: ["**"]
+  pull_request:
 
 # Une PR mise à jour annule le run précédent, encore en cours.
 concurrency:
@@ -18,6 +20,9 @@ permissions:
 jobs:
   verification:
     name: Types et tests
+    # Une PR interne est déjà couverte par le push sur sa branche : on ne la vérifie deux fois
+    # que si elle vient d'un dépôt externe, dont les commits n'ont pas déclenché de push ici.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
