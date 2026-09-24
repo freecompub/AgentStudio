@@ -58,3 +58,17 @@ describe("Grille de difficulté (SPEC-skraft §8.2)", () => {
     expect(levelEffects("challenging")).toMatchObject({ skipResearch: false, granularity: "session-per-step" });
   });
 });
+
+describe("gradeDifficulty — seuils personnalisés", () => {
+  it("compte les modules à partir du seuil, pas seulement à sa valeur exacte", () => {
+    // Avec les seuils par défaut (2 et 3), l'écart ne se voit pas : ils sont adjacents.
+    // `Thresholds` étant un paramètre exporté, un écart plus large révèle le défaut.
+    const t = { challengingModules: 9, challengingQuestions: 9, hardCriteria: 9, hardModules: 5, mediumCriteria: 9, mediumModules: 2 };
+    const story = (modulesTouched: number) => ({ acceptanceCriteria: 1, modulesTouched, openBusinessQuestions: 0, newExternalIntegration: false });
+    expect(gradeDifficulty(story(1), t)).toBe("simple");
+    expect(gradeDifficulty(story(2), t)).toBe("medium");
+    expect(gradeDifficulty(story(3), t)).toBe("medium");
+    expect(gradeDifficulty(story(4), t)).toBe("medium");
+    expect(gradeDifficulty(story(5), t)).toBe("medium-hard");
+  });
+});

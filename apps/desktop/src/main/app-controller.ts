@@ -115,10 +115,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
    * le croirait ouvert et ses requêtes (commandes, tâches, interactions) échoueraient.
    */
   async function attach(ws: Workspace): Promise<void> {
-    const anciens = services;
-    workspace = null;
-    services = null;
-    await anciens?.dispose();
+    // Les services sont construits avant de toucher à l'existant : si la construction échoue
+    // — adaptateur introuvable, extension illisible —, le projet en cours reste utilisable
+    // plutôt que de laisser une conversation ouverte sur un contrôleur sans projet.
     const prets = await deps.workspaceServices({
       workspace: ws,
       runtime: ensureRuntime,
@@ -130,8 +129,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
         else deps.logger?.info("message d'extension hors conversation", { extensionId });
       },
     });
+    const anciens = services;
     workspace = ws;
     services = prets;
+    await anciens?.dispose();
   }
 
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {

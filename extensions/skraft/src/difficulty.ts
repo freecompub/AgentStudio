@@ -35,7 +35,7 @@ const LEVELS: Difficulty[] = ["simple", "medium", "medium-hard", "challenging"];
 export function gradeDifficulty(i: DifficultyIndicators, t: Thresholds): Difficulty {
   if ((i.newExternalIntegration && i.modulesTouched >= t.challengingModules) || i.openBusinessQuestions >= t.challengingQuestions) return "challenging";
   if (i.acceptanceCriteria > t.hardCriteria || i.modulesTouched >= t.hardModules || i.openBusinessQuestions >= 1) return "medium-hard";
-  if (i.acceptanceCriteria >= t.mediumCriteria || i.modulesTouched === t.mediumModules) return "medium";
+  if (i.acceptanceCriteria >= t.mediumCriteria || i.modulesTouched >= t.mediumModules) return "medium";
   return "simple";
 }
 

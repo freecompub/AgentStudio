@@ -54,7 +54,10 @@ function emit<C extends EventChannel>(channel: C, payload: EventPayload<C>): voi
     logger.error("événement hors contrat", { channel });
     return;
   }
-  window?.webContents.send(channel, checked.data);
+  // La fenêtre peut avoir été détruite avant la fin d'une tâche : `window` reste alors non nul,
+  // mais `webContents` lève « Object has been destroyed » — ce qui ferait échouer `dispose()`.
+  if (!window || window.isDestroyed()) return;
+  window.webContents.send(channel, checked.data);
 }
 
 function hardenSession(): void {
@@ -87,6 +90,9 @@ function createWindow(): BrowserWindow {
     },
   });
   win.once("ready-to-show", () => win.show());
+  win.once("closed", () => {
+    if (window === win) window = null;
+  });
   // Aucune navigation hors de l'application ; liens https ouverts dans le navigateur système.
   win.webContents.on("will-navigate", (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -230,6 +236,13 @@ app.whenReady().then(async () => {
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
+}).catch((err: unknown) => {
+  // Sans cela, une erreur au démarrage laisse une application vivante, sans fenêtre ni IPC :
+  // rien à l'écran et aucune explication.
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error("démarrage impossible", { error: message });
+  dialog.showErrorBox("agent-studio n'a pas pu démarrer", message);
+  app.exit(1);
 });
 
 app.on("window-all-closed", () => app.quit());
