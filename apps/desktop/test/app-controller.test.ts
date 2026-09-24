@@ -189,6 +189,47 @@ describe("AppController — espaces de travail", () => {
     expect(await controller["workspace:current"]({})).toBeNull();
   });
 
+  it("une restauration concurrente attend que les services du projet soient prêts", async () => {
+    // React monte deux fois en <StrictMode> : deux `workspace:current` partent en parallèle.
+    let libere!: () => void;
+    const servicesPrets = new Promise<void>((r) => (libere = r));
+    let creations = 0;
+    const { controller } = setup({
+      settings: { lastWorkspace: "/projets/demo" },
+      extra: {
+        workspaceServices: async () => {
+          creations++;
+          await servicesPrets;
+          return {
+            route: async () => ({ kind: "chat" as const }),
+            commands: () => [],
+            hookGuards: () => [],
+            tasks: async () => [],
+            cancelTask: async () => {},
+            pendingInteractions: async () => [],
+            respond: async () => {},
+            dispose: async () => {},
+          };
+        },
+      },
+    });
+
+    const premiere = controller["workspace:current"]({});
+    const seconde = controller["workspace:current"]({});
+    let secondeResolue = false;
+    void seconde.then(() => (secondeResolue = true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(secondeResolue).toBe(false);
+
+    libere();
+    expect(await premiere).toEqual({ root: "/projets/demo", name: "demo" });
+    expect(await seconde).toEqual({ root: "/projets/demo", name: "demo" });
+    // Un seul jeu de services : sinon les extensions seraient activées deux fois.
+    expect(creations).toBe(1);
+    // Le projet annoncé ouvert l'est vraiment : ses services répondent.
+    expect(await controller["tasks:list"]({})).toEqual([]);
+  });
+
   it("on peut rouvrir un projet après l'avoir clôturé", async () => {
     const { controller, serviceLog } = setup();
     await controller["workspace:open"]({ path: "/projets/demo" });

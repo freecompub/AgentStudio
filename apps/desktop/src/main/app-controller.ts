@@ -79,6 +79,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
   let runtime: AgentRuntime | null = null;
   let session: MainSession | null = null;
   let offSession: (() => void) | null = null;
+  /** Restauration du dernier projet, partagée entre appels concurrents. */
+  let restauration: Promise<WorkspaceInfoDto | null> | null = null;
 
   const info = (ws: Workspace): WorkspaceInfoDto => ({ root: ws.root, name: basename(ws.root) });
 
@@ -104,10 +106,16 @@ export function createAppController(deps: AppControllerDeps): AppController {
     return services;
   }
 
+  /**
+   * Attache un projet. Il n'est exposé qu'une fois ses services prêts : sinon un appel concurrent
+   * le croirait ouvert et ses requêtes (commandes, tâches, interactions) échoueraient.
+   */
   async function attach(ws: Workspace): Promise<void> {
-    await services?.dispose();
-    workspace = ws;
-    services = await deps.workspaceServices({
+    const anciens = services;
+    workspace = null;
+    services = null;
+    await anciens?.dispose();
+    const prets = await deps.workspaceServices({
       workspace: ws,
       runtime: ensureRuntime,
       onTask: (card) => deps.sink.emit("task:update", card),
@@ -118,6 +126,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
         else deps.logger?.info("message d'extension hors conversation", { extensionId });
       },
     });
+    workspace = ws;
+    services = prets;
   }
 
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {
@@ -171,15 +181,26 @@ export function createAppController(deps: AppControllerDeps): AppController {
     "shell:open-device-page": () => deps.external.open(DEVICE_PAGE),
 
     "workspace:current": async () => {
+      // Le renderer peut appeler ce canal plusieurs fois en parallèle (React <StrictMode> monte
+      // deux fois) : une seule restauration, partagée par tous les appels concurrents.
+      if (restauration) return restauration;
       if (workspace) return info(workspace);
-      const last = (await deps.settings.load()).lastWorkspace;
-      if (!last) return null;
+      const encours = (async (): Promise<WorkspaceInfoDto | null> => {
+        const last = (await deps.settings.load()).lastWorkspace;
+        if (!last) return null;
+        try {
+          await attach(await deps.workspaces.open(last));
+          return info(workspace!);
+        } catch (err) {
+          deps.logger?.warn("dernier projet introuvable", { root: last, error: String(err) });
+          return null;
+        }
+      })();
+      restauration = encours;
       try {
-        await attach(await deps.workspaces.open(last));
-        return info(workspace!);
-      } catch (err) {
-        deps.logger?.warn("dernier projet introuvable", { root: last, error: String(err) });
-        return null;
+        return await encours;
+      } finally {
+        restauration = null;
       }
     },
 
