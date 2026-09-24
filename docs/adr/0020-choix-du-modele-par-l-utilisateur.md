@@ -43,12 +43,30 @@ Le CLI route donc lui-même, et son choix varie dans le temps (`gpt-5.6-luna` le
 `mai-code-1.1-flash` l'après-midi). Brancher la vraie liste par `onListModels` ne servirait à
 rien : l'utilisateur choisirait sans que rien ne change — une liste déroulante mensongère.
 
+### D'où vient la limite : l'offre **et** l'intégration
+
+Deux causes distinctes, mesurées séparément :
+
+- **L'offre gratuite** explique les 21 modèles `disabled`. Demander `claude-opus-5` à l'API
+  répond `model_not_supported`.
+- **L'intégration** explique le reste, et c'est elle qui bloque vraiment. Sur les 13 modèles
+  autorisés, l'API **respecte** le modèle demandé : `gpt-4.1` renvoie bien
+  `gpt-4.1-2025-04-14`. Mais l'API a été interrogée avec `Copilot-Integration-Id: vscode-chat`,
+  alors que le CLI utilise la sienne — et n'expose qu'`auto`. GitHub restreint donc les modèles
+  par intégration, indépendamment de ce que le compte autorise.
+
+Autrement dit, le choix de modèle est techniquement possible sur ce compte, mais **pas par la
+voie que l'application emprunte** (port `AgentRuntime` → Copilot SDK → CLI, D3/D35). Le
+contourner en appelant l'API directement reviendrait à court-circuiter le CLI, qui apporte les
+outils, les permissions et la reprise de session : ce n'est pas un compromis acceptable.
+
 **Conséquence retenue** : le code reste en place, mais `auto` est écarté (doublon du choix
 automatique), donc la liste ne s'affiche pas tant qu'aucun choix réel n'est offert. Elle
 apparaîtra d'elle-même si le runtime expose un jour de vrais modèles.
 
-**À revérifier** avec une offre Copilot payante, où le routage imposé pourrait ne pas s'appliquer,
-et à chaque montée de version du SDK (`copilotCliVersion` 1.0.85 ici).
+**À revérifier** avec une offre Copilot payante — plausible mais non vérifié : rien ne prouve que
+l'intégration CLI exposerait alors plus qu'`auto` — et à chaque montée de version du SDK
+(`copilotCliVersion` 1.0.85 ici).
 
 ## Ce qui reste ouvert
 
