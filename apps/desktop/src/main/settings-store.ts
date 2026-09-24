@@ -3,7 +3,17 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import type { AppSettings, SettingsStore } from "./protocols.js";
 
-const schema = z.object({ lastWorkspace: z.string().optional() });
+/**
+ * Toute clé de `AppSettings` doit figurer ici : zod écarte les clés non déclarées, et le
+ * contrôleur enregistre par `{ ...(await load()), x }` — une clé absente du schéma serait
+ * effacée du fichier à la sauvegarde suivante.
+ */
+const schema = z.object({
+  lastWorkspace: z.string().optional(),
+  uiMode: z.enum(["simple", "advanced"]).optional(),
+  models: z.record(z.string(), z.string()).optional(),
+  authHostname: z.string().optional(),
+});
 
 /** Réglages de l'application en JSON, écriture atomique ; un fichier illisible vaut réglages vides. */
 export function createJsonSettingsStore(file: string): SettingsStore {

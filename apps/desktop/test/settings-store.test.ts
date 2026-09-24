@@ -21,6 +21,39 @@ describe("JsonSettingsStore", () => {
     expect(await createJsonSettingsStore(file).load()).toEqual({ lastWorkspace: "/projets/demo" });
   });
 
+  it("relit tous les réglages, pas seulement le dernier projet", async () => {
+    const file = join(dir, "s.json");
+    const tout = {
+      lastWorkspace: "/projets/demo",
+      uiMode: "simple" as const,
+      models: { "/projets/demo": "claude-sonnet-4.5" },
+      authHostname: "github.exemple.fr",
+    };
+    await createJsonSettingsStore(file).save(tout);
+    expect(await createJsonSettingsStore(file).load()).toEqual(tout);
+  });
+
+  it("enregistrer un réglage n'efface pas les autres", async () => {
+    const file = join(dir, "s.json");
+    const store = createJsonSettingsStore(file);
+    await store.save({ lastWorkspace: "/projets/demo", authHostname: "github.exemple.fr", uiMode: "advanced" });
+
+    // Comme le contrôleur : relire, modifier une clé, réécrire.
+    await store.save({ ...(await store.load()), uiMode: "simple" });
+
+    expect(await store.load()).toEqual({
+      lastWorkspace: "/projets/demo",
+      authHostname: "github.exemple.fr",
+      uiMode: "simple",
+    });
+  });
+
+  it("une clé inconnue est ignorée sans faire perdre les autres", async () => {
+    const file = join(dir, "s.json");
+    await writeFile(file, JSON.stringify({ lastWorkspace: "/projets/demo", inconnu: 1 }));
+    expect(await createJsonSettingsStore(file).load()).toEqual({ lastWorkspace: "/projets/demo" });
+  });
+
   it("un fichier illisible ou hors schéma vaut réglages vides", async () => {
     const file = join(dir, "s.json");
     await writeFile(file, "{ cassé");

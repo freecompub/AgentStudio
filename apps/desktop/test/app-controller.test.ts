@@ -369,6 +369,29 @@ describe("AppController — conversation", () => {
     expect(tokens).toHaveLength(1);
   });
 
+  it("deux canaux concurrents ne démarrent qu'un seul runtime", async () => {
+    // `ChatScreen` lance `chat:start` et `models:list` dans le même tour : tous deux
+    // appellent `ensureRuntime`. Deux runtimes, c'est deux processus Copilot dont un fuit.
+    const { controller, tokens } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+
+    await Promise.all([controller["chat:start"]({}), controller["models:list"]({})]);
+
+    expect(tokens).toHaveLength(1);
+  });
+
+  it("un runtime qui refuse de démarrer n'est pas retenu : le suivant réessaie", async () => {
+    const { controller, runtime, tokens } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    runtime.failStart = new Error("démarrage impossible");
+
+    await expect(controller["chat:start"]({})).rejects.toThrow(/démarrage impossible/);
+
+    runtime.failStart = null;
+    await controller["chat:start"]({});
+    expect(tokens).toHaveLength(2);
+  });
+
   it("deux démarrages concurrents n'ouvrent qu'une seule session", async () => {
     // React monte deux fois en <StrictMode> : `chat:start` part deux fois en parallèle.
     const { controller, runtime } = setup();

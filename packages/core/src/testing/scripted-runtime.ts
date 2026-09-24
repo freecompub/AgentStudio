@@ -79,7 +79,11 @@ export class ScriptedRuntime implements AgentRuntime {
     return this.models ?? [];
   }
 
+  /** Fait échouer `start()` : sert à vérifier qu'un runtime en échec n'est pas mémorisé. */
+  failStart: Error | null = null;
+
   async start(): Promise<void> {
+    if (this.failStart) throw this.failStart;
     this.started = true;
   }
 
