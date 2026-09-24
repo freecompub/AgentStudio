@@ -2,7 +2,8 @@
 
 - Date : 2026-09-23
 - Branche : `feat/j5-swift-usage` (partie de `feat/j4-isolation-extensions`)
-- État : **critères de sortie vérifiés avec une vraie chaîne Swift 6.1.2, agents scriptés.**
+- État : **critères de sortie vérifiés avec une vraie chaîne Swift 6.1.2, agents scriptés** ;
+  **jalon partiellement livré** : les profils de stack déclaratifs restent à faire (voir plus bas).
 
 ## Critères de sortie (SPEC §14)
 
@@ -29,6 +30,18 @@ ADR : 0010.
 La chaîne Swift a été installée **hors système** dans `~/.cache/agent-studio/swift` (environ 3 Go), avec
 un dossier `compat/` : lien vers `libxml2.so.16`, objets GCC 16 extraits de paquets `.deb`, `ld.lld`.
 Pour la supprimer : `rm -rf ~/.cache/agent-studio/swift`.
+
+## Livré autrement que prévu : adaptateurs plutôt que profils
+
+La feuille de route (SPEC §15) décrit des **profils de stack déclaratifs** : schéma, fichier de
+profil, `/stack init`, `/stack doctor`, parseurs en bac à sable, mutation Stryker. Ce jalon a
+livré des **adaptateurs écrits en TypeScript**, un par langage, sans fichier de profil ni
+commandes `/stack`. Les critères de sortie retenus (`/tdd` en Swift, usage par état) sont bien
+atteints, mais l'objectif des profils reste entier.
+
+Restent à faire : schéma et fichier de profil (O11), `/stack init` et `/stack doctor`, parseurs
+en bac à sable, liste des programmes autorisés (O12, D47), et la mutation Stryker pour
+TypeScript — seul Muter (Swift) est branché.
 
 ## Limites connues
 

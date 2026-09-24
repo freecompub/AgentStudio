@@ -28,12 +28,16 @@ Un jalon = une branche partie du précédent, avec des commits séparés par bri
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # un seul projet : core, workspace, task-engine, stack-adapters, extension-host, runtime-copilot, github-auth, ext-tdd, desktop
+pnpm vitest run --project core  # projets : core, task-engine, workspace, stack-adapters, runtime-copilot, github-auth,
+                                #            extension-api, extension-host, extension-manifest, extension-installer,
+                                #            extension-packaging, ext-tdd, ext-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)
 pnpm build                      # build Electron dans apps/desktop/out
 pnpm smoke:copilot              # essai réel contre Copilot (hors CI, consomme des requêtes)
+pnpm ext:build <src> <sortie>   # compile une extension du dépôt (entrée + manifest.json)
+pnpm ext:keys / pnpm ext:pack   # clés d'éditeur, puis paquet .asx (non signé sans clé)
 ```
 
 Les paquets internes exportent directement `src/index.ts` (pas d'étape de build, ADR 0001).
@@ -45,7 +49,7 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 
 ## Documents de référence (à lire avant de coder)
 
-- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
+- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §15 (feuille de route J1–J6, S1–S6), §16 (points SDK à vérifier), §17 (conventions).
 - `docs/specs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
 - `docs/reference/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
 - `docs/reference/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
@@ -77,7 +81,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 - **Workspace** est le seul service à toucher le disque et Git.
 - Humain : jamais d'attente bloquante ; décisions longues = demandes d'interaction persistées, réinjectées comme `HUMAN_DECISION`.
 
-Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,extension-host,extension-api,extension-manifest,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
+Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
 
 ## Conventions (§16)
 

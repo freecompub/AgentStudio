@@ -135,7 +135,7 @@ Marketplace en ligne, synchronisation multi-postes, édition collaborative, web 
 | D35 | Port **`AgentRuntime`** avec déclaration de capacités ; adaptateurs : Copilot SDK (J1), puis Claude Agent SDK, puis client ACP | DÉCIDÉ (port) / OUVERT (ordre des adaptateurs suivants) | Généraliser à d'autres IA sans toucher au cœur |
 | D36 | Contrôle en deux couches : **prévention** (hooks, permissions — dépend du runtime) et **détection** (portes — indépendantes) ; sans hooks, le moteur renforce la détection après chaque tour | DÉCIDÉ | Dégradation propre sur un runtime moins riche |
 | D37 | **Instrumentation de l'usage** par état de machine (tokens, requêtes, réessais), affichée dans l'unité du fournisseur | DÉCIDÉ | Chiffrer les économies au lieu de les estimer |
-| D38 | Choix du **modèle par rôle** (fort pour conception et revues, léger pour tâches mécaniques) et **politique de fournisseur par projet** | OUVERT | Coût et confidentialité |
+| D38 | Choix du **modèle par rôle** (fort pour conception et revues, léger pour tâches mécaniques) et **politique de fournisseur par projet** | DÉCIDÉ (choix du modèle par l'utilisateur, ADR 0020) / OUVERT (par rôle, fournisseur) | Coût et confidentialité. Le Copilot CLI n'honore pas encore le modèle demandé : mesures dans l'ADR 0020 |
 | D39 | Nom définitif de l'application | OUVERT | « Copilot Studio » est déjà un produit Microsoft : à éviter |
 
 ### 3.6 Extension skraft
@@ -144,7 +144,7 @@ Marketplace en ligne, synchronisation multi-postes, édition collaborative, web 
 | --- | --- | --- | --- |
 | D40 | skraft est porté comme **extension**, avec son pipeline RESEARCH → DESIGN → DISTILL → DELIVER piloté par notre réducteur | DÉCIDÉ | Voir section 10 |
 | D41 | Réutiliser ses prompts d'agents, ses skills (36 en 1.5.2, 38 en 1.6.0), politiques pures de `domain/`, schéma de preuves et commande `artifact adr` **après unification du modèle d'état** | DÉCIDÉ (sous réserve D42) | Méthode riche, mécanisme de contrôle défaillant |
-| D42 | Compatibilité de la licence **GPL-3.0-or-later** de skraft avec la distribution de l'extension | OUVERT | À valider avant toute reprise de code ou de prompts |
+| D42 | Compatibilité de la licence **GPL-3.0-or-later** de skraft avec la distribution de l'extension | DÉCIDÉ (ADR 0012, option C : autorisation de l'auteur) | Reprise non commencée : trace écrite, licence de redistribution et dépôt source restent à réunir |
 
 ### 3.7 Profils de stack
 
@@ -885,6 +885,25 @@ Chaque jalon est livrable seul et a des critères de sortie vérifiables.
 | **S6** | Revue : faits établis par le code, lentilles à schéma, synthèse par le code | Verdict reproductible à partir des mêmes JSON de lentilles |
 | **API 1.0** | Gel de l'API `ctx` | Après S6 (D14) |
 
+### État au 2026-09-24
+
+J1 à J6 et S1 à S6 sont livrés (bilans dans `docs/jalons/`), à une réserve près.
+
+**J5 n'est livré qu'en partie.** Le jalon décrit des *profils de stack déclaratifs* — schéma,
+fichier de profil, `/stack init`, `/stack doctor`, mutation par Stryker. Ce qui existe est un
+**adaptateur de stack en TypeScript** par langage (`packages/stack-adapters` : TypeScript/Vitest
+et Swift/XCTest, mutation par Muter), sans fichier de profil ni commandes `/stack`. Les critères
+de sortie retenus au moment du jalon portaient sur `/tdd` en Swift et l'usage par état (ADR 0010),
+tous deux atteints.
+
+Restent donc à faire, et le vocabulaire de J2, J5, O11 et O13 s'y rapporte :
+
+- schéma de profil de stack et fichier déclaratif (O11 : YAML validé par JSON Schema) ;
+- commandes `/stack init` et `/stack doctor` ;
+- parseurs exécutés en bac à sable ;
+- liste des programmes autorisés par profil (O12, D47) ;
+- mutation Stryker pour TypeScript — seul Muter (Swift) est branché.
+
 ---
 
 ## 16. Points à vérifier sur les SDK
@@ -928,10 +947,10 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | O3 | Confirmation de la difficulté : toujours, ou seulement en mode simple ? | Mode simple seulement |
 | O4 | Garder une variante par hooks pour Claude Code et Copilot CLI, réutilisant les politiques pures ? | Non dans un premier temps |
 | O5 | Attribution des profils : fichier de configuration signé, annuaire d'entreprise, ou administrateur local ? | Fichier de configuration géré par un administrateur |
-| O6 | Stockage de l'état des tâches : JSON dans le projet ou SQLite dans le profil utilisateur ? | SQLite dans le profil, export JSON possible |
+| O6 | Stockage de l'état des tâches : JSON dans le projet ou SQLite dans le profil utilisateur ? | **Tranchée** (ADR 0019) : SQLite dans le profil, aligné sur VS Code. Décidée, pas encore implémentée |
 | O7 | Framework du renderer | Au choix, à consigner dans un ADR au jalon J1 |
 | O8 | Backlog Discoverer et Backlog Planner de skraft : intégrés au pipeline ou agents autonomes ? | Autonomes |
-| O9 | Licence GPL-3.0-or-later de skraft (D42) | À trancher avant S1 |
+| O9 | Licence GPL-3.0-or-later de skraft (D42) | **Tranchée** (ADR 0012) : option C, autorisation de l'auteur. Conditions de reprise à réunir |
 | O10 | Nom définitif de l'application (D39) | `agent-studio` comme nom de code |
 | O11 | Format du profil de stack : YAML ou JSON ? | YAML pour la lisibilité, validé par JSON Schema |
 | O12 | Contenu initial de la liste des programmes autorisés dans un profil (D47) | Lanceurs de tests et outils de mutation courants, extensible par l'utilisateur |
