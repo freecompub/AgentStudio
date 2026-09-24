@@ -12,10 +12,9 @@ const out = resolve(here, "../out");
 const banner = { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' };
 const common = { bundle: true, platform: "node", format: "esm", target: "node22", logLevel: "warning", banner };
 
-const BUILT_IN = [
-  { dir: "extensions/tdd", entry: "src/entry.ts", manifest: "src/manifest.ts", exportName: "manifest" },
-  { dir: "extensions/skraft", entry: "src/entry.ts", manifest: "src/manifest.ts", exportName: "manifest" },
-];
+// Extensions livrées avec l'application. `skraft` n'en fait plus partie : elle se distribue en
+// paquet `.asx` et s'installe depuis un fichier (`pnpm ext:build` puis `pnpm ext:pack`).
+const BUILT_IN = [{ dir: "extensions/tdd", entry: "src/entry.ts", manifest: "src/manifest.ts", exportName: "manifest" }];
 
 await build({ ...common, entryPoints: [join(repo, "packages/extension-host/src/child/entry.ts")], outfile: join(out, "extension-host/extension-child.mjs") });
 

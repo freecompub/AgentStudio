@@ -8,7 +8,9 @@ Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, bl
 `docs/jalons/J1-blocages.md`), J2 livré (`feat/j2-moteur-taches`, bilan dans `docs/jalons/J2-bilan.md`), J3 livré
 (`feat/j3-preuves-interactions`, `docs/jalons/J3-bilan.md`), J4 livré (`feat/j4-isolation-extensions`,
 `docs/jalons/J4-bilan.md`). Les extensions internes sont compilées par
-`pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`).
+`pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`) ; seule
+`tdd` est livrée avec l'application. `skraft` se distribue à part en paquet `.asx`
+(`pnpm ext:build` puis `pnpm ext:pack`), non signé donc réservé au mode développeur (ADR 0021).
 J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift utilisent la chaîne de
 `~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés

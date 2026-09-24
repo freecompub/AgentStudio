@@ -13,7 +13,9 @@
   },
   "devDependencies": {
     "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/extension-installer": "workspace:*",
     "@agent-studio/extension-manifest": "workspace:*",
+    "@agent-studio/extension-packaging": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "esbuild": "^0.28.2"

@@ -32,7 +32,10 @@ ADR : 0009.
   **Levé le 2026-09-24** : sur macOS, `pnpm dev` active les deux extensions internes dans leur
   propre processus (`extension activée (processus isolé)`, un pid par extension). Le repli par
   `execArgv` restreint ou `child_process.fork` n'est pas nécessaire.
-- Le bundle de `tdd` embarque une partie du cœur (classes d'erreur) : environ 765 Ko. À réduire en
-  exposant ces erreurs dans `extension-api`.
+- ~~Le bundle de `tdd` embarque une partie du cœur (classes d'erreur) : environ 765 Ko.~~
+  **Réglé le 2026-09-24**, mais la cause n'était pas celle-ci : les classes d'erreur ne pesaient
+  que 4,2 Ko ; les 732 Ko restants étaient **zod**, tiré à travers le cœur alors que `tdd` ne
+  s'en sert pas. Les erreurs et `matchesAny` sont désormais définis dans `extension-api`
+  (ADR 0021), et le bundle tombe à 23,8 Ko.
 - Pas encore de signature ni d'installation depuis un fichier (J6).
 - ~~Hérité de J1~~ : les deux blocages de J1 sont levés (`J1-blocages.md`).
