@@ -9,7 +9,9 @@ import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 export const API_VERSION = "0.1.0";
 
 // Erreurs et utilitaires utilisables sans dépendre du cœur (D10). Voir `errors.ts`.
-export { EnvFailureError, TurnTimeoutError, WorkDefectError, globToRegExp, matchesAny } from "./errors.js";
+export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "./errors.js";
+// Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
+export { globToRegExp, matchesAny } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { ArchitectureReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";

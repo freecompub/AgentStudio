@@ -3,7 +3,8 @@
  * d'après ce nom (`extension-host/src/rpc/endpoint.ts`). Le contrat est donc le nom, pas la classe.
  */
 import { describe, expect, it } from "vitest";
-import { EnvFailureError, matchesAny, TurnTimeoutError, WorkDefectError } from "../src/errors.js";
+import { EnvFailureError, TurnTimeoutError, WorkDefectError } from "../src/errors.js";
+import { matchesAny } from "@agent-studio/stack-adapters";
 
 describe("Erreurs exposées aux extensions", () => {
   it("portent le nom attendu par l'hôte", () => {

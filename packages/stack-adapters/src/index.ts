@@ -12,3 +12,5 @@ export { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, pa
 export { selectStackAdapter } from "./select-stack.js";
 export { findLocalSwiftToolchain } from "./swift/local-toolchain.js";
 export { parseStackProfile, REPORT_READERS, type ReportReader, type StackProfile } from "./profile/stack-profile.js";
+export { globToRegExp, matchesAny } from "./glob.js";
+export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile-adapter.js";

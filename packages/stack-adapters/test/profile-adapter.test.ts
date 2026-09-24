@@ -1,0 +1,110 @@
+/**
+ * Adaptateur générique (J5, brique 2) : il exécute ce qu'un profil déclare, sans rien savoir du
+ * langage. C'est lui qui doit remplacer, à terme, les adaptateurs écrits à la main.
+ */
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createProfileAdapter } from "../src/profile/profile-adapter.js";
+import { parseStackProfile } from "../src/profile/stack-profile.js";
+import type { ProcessResult, ProcessRunner } from "../src/protocols.js";
+
+const PROFIL = `
+id: python
+detect: [pyproject.toml]
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+  report: junit-xml
+lint:
+  command: [eslint, --format, json, "--", "{fichiers}"]
+  report: eslint-json
+layout:
+  acceptanceTests: ["tests/acceptance/**"]
+  unitTests: ["tests/**"]
+  sources: ["src/**"]
+infrastructureModules: [django]
+`;
+
+const profil = () => {
+  const r = parseStackProfile(PROFIL, { allowedPrograms: ["pytest", "eslint"] });
+  if ("error" in r) throw new Error(r.error);
+  return r.profile;
+};
+
+const sortie = (over: Partial<ProcessResult> = {}): ProcessResult => ({ exitCode: 0, stdout: "", stderr: "", timedOut: false, durationMs: 1, ...over });
+
+function runner(reponse: ProcessResult | ((cmd: string, args: readonly string[]) => ProcessResult | Promise<ProcessResult>)) {
+  const appels: { cmd: string; args: string[] }[] = [];
+  const r: ProcessRunner & { appels: typeof appels } = {
+    appels,
+    async run(cmd, args) {
+      appels.push({ cmd, args: [...args] });
+      return typeof reponse === "function" ? reponse(cmd, args) : reponse;
+    },
+  };
+  return r;
+}
+
+let racine: string;
+beforeEach(async () => {
+  racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-"));
+});
+afterEach(() => rm(racine, { recursive: true, force: true }));
+
+describe("Adaptateur bâti sur un profil", () => {
+  it("reprend l'identité, les emplacements et l'infrastructure déclarés", () => {
+    const a = createProfileAdapter(profil(), { runner: runner(sortie()) });
+    expect(a.id).toBe("python");
+    expect(a.layout.unitTests).toEqual(["tests/**"]);
+    expect(a.infrastructureModules).toEqual(["django"]);
+  });
+
+  it("reconnaît le projet aux fichiers déclarés", async () => {
+    const a = createProfileAdapter(profil(), { runner: runner(sortie()) });
+    expect(await a.detect(racine)).toBe(false);
+    await writeFile(join(racine, "pyproject.toml"), "");
+    expect(await a.detect(racine)).toBe(true);
+  });
+
+  it("lance la commande déclarée, en substituant le fichier de rapport", async () => {
+    const run = runner(sortie());
+    const a = createProfileAdapter(profil(), { runner: run });
+    await a.runTests({ root: racine }).catch(() => undefined); // le rapport n'existe pas : peu importe ici
+    expect(run.appels[0]?.cmd).toBe("pytest");
+    const arg = run.appels[0]!.args[0]!;
+    expect(arg.startsWith("--junit-xml=")).toBe(true);
+    expect(arg).not.toContain("{rapport}");
+  });
+
+  it("lit le rapport au format déclaré", async () => {
+    const junit = `<?xml version="1.0"?><testsuites><testsuite name="s"><testcase classname="C" name="a"/><testcase classname="C" name="b"><failure message="boum">x</failure></testcase></testsuite></testsuites>`;
+    const run = runner(async (_c, args) => {
+      const cible = args.find((x) => x.startsWith("--junit-xml="))!.slice("--junit-xml=".length);
+      await writeFile(cible, junit);
+      return sortie();
+    });
+    const a = createProfileAdapter(profil(), { runner: run });
+    const r = await a.runTests({ root: racine });
+    expect(r.results.map((x) => x.status)).toEqual(["passed", "failed"]);
+  });
+
+  it("le lint substitue les fichiers demandés", async () => {
+    const run = runner(sortie({ stdout: "[]" }));
+    const a = createProfileAdapter(profil(), { runner: run });
+    await a.lint!({ root: racine, files: ["src/a.py", "src/b.py"] });
+    expect(run.appels[0]?.args).toEqual(["--format", "json", "--", "src/a.py", "src/b.py"]);
+  });
+
+  it("une capacité non déclarée n'existe pas", () => {
+    const sansMutation = createProfileAdapter(profil(), { runner: runner(sortie()) });
+    expect(sansMutation.mutation).toBeUndefined();
+    expect(sansMutation.lint).toBeDefined();
+  });
+
+  it("les fichiers de test sont reconnus d'après les emplacements déclarés", () => {
+    const a = createProfileAdapter(profil(), { runner: runner(sortie()) });
+    expect(a.isTestFile("tests/test_bolus.py")).toBe(true);
+    expect(a.isTestFile("src/bolus.py")).toBe(false);
+  });
+});
