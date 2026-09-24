@@ -15,8 +15,8 @@ J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift u
 `~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
-skraft : S0 en attente de décision de licence (ADR 0012, aucune reprise de skraft-plugin, prompts de
-substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
+skraft : S0 tranché (ADR 0012, option C : l'auteur autorise la reprise ; elle n'a pas commencé,
+les prompts de substitution restent en place), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
 (`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`), S3 livré (`feat/s3-skraft-design`,
 `docs/jalons/S3-bilan.md`), S4 livré (`feat/s4-skraft-distill`, `docs/jalons/S4-bilan.md`),
 S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`feat/s6-skraft-review`,
@@ -64,7 +64,7 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 - TDD strict. Réducteurs et politiques : fonctions pures, testées sans LLM, sans Git, sans disque.
 - Toute nouvelle décision technique → ADR dans `docs/adr/NNNN-titre.md` (contexte, décision, conséquences, statut).
 - Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §15) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
-- **skraft est GPL-3.0-or-later** : ne copier aucun prompt, skill ni code de skraft-plugin tant que la question O9/D42 n'est pas tranchée.
+- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C : autorisation de l'auteur), mais la reprise reste interdite tant que trois conditions ne sont pas réunies : la trace écrite de l'autorisation versée au dépôt, la licence de redistribution précisée, et l'accès au dépôt source. Jusque-là, ne copier aucun prompt, skill ni code de skraft-plugin.
 
 ## Architecture cible (vue d'ensemble)
 
