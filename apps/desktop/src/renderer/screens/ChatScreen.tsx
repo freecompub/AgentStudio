@@ -63,7 +63,10 @@ export function ChatScreen(props: {
     return () => offs.forEach((off) => off());
   }, [props.workspace.root]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages, streaming, tools]);
+  // Corps en bloc : la valeur de retour d'un effet sert de nettoyage, `scrollIntoView` n'en est pas un.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, streaming, tools]);
 
   async function send(e?: FormEvent, override?: string) {
     e?.preventDefault();

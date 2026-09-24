@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { App } from "../../src/renderer/App";
 import type { ChatMessageDto } from "../../src/shared/ipc-contract";
@@ -184,6 +185,30 @@ describe("Renderer — tâches et décisions (J2)", () => {
     api.handle("chat:start", () => [{ id: "n1", role: "notice", text: "Cycle TDD lancé", createdAt: "", origin: "diabeo.tdd" }]);
     render(<App />);
     expect(await screen.findByText("diabeo.tdd")).toBeTruthy();
+  });
+
+  it("tient dans <StrictMode>, qui monte et démonte chaque effet deux fois", async () => {
+    chatReady();
+    // Un effet ne doit rien renvoyer d'autre qu'une fonction de nettoyage : React appelle sa
+    // valeur de retour au démontage, et <StrictMode> démonte chaque effet une fois de plus.
+    Element.prototype.scrollIntoView = () => "valeur inattendue" as unknown as void;
+    const plantages: unknown[] = [];
+    const onError = (e: ErrorEvent) => plantages.push(e.error ?? e.message);
+    window.addEventListener("error", onError);
+    try {
+      render(
+        <StrictMode>
+          <App />
+        </StrictMode>,
+      );
+      expect(await screen.findByLabelText("Votre message")).toBeTruthy();
+      await act(async () => {});
+      // L'interface survit au double montage : l'arbre n'a pas été démonté par une erreur.
+      expect(plantages).toEqual([]);
+      expect(screen.getByLabelText("Votre message")).toBeTruthy();
+    } finally {
+      window.removeEventListener("error", onError);
+    }
   });
 
   it("clôture le projet et revient au choix d'un projet", async () => {
