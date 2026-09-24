@@ -61,6 +61,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Part
     },
   };
   const opened: string[] = [];
+  const conversations = new MemoryConversationStore();
   const serviceLog: string[] = [];
   const hookGuards: import("@agent-studio/core").ToolCallGuard[] = [];
   let servicesArgs: WorkspaceServicesArgs | undefined;
@@ -94,7 +95,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Part
       tokens.push(token);
       return runtime;
     },
-    conversations: new MemoryConversationStore(),
+    conversations,
     settings: { load: async () => settings, save: async (s) => void (settings = s) },
     folderPicker: { pick: async () => "/choisi" },
     external: { open: async (url) => void opened.push(url) },
@@ -104,7 +105,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Part
     systemPrompt: "Rôle.",
     ...opts.extra,
   });
-  return { controller, runtime, tokens, emitted, workspaces, opened, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
+  return { controller, runtime, tokens, emitted, workspaces, opened, conversations, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
 }
 
 describe("AppController — authentification", () => {
@@ -323,6 +324,32 @@ describe("AppController — conversation", () => {
 
     await controller["chat:start"]({});
     expect(tokens).toHaveLength(1);
+  });
+
+  it("deux démarrages concurrents n'ouvrent qu'une seule session", async () => {
+    // React monte deux fois en <StrictMode> : `chat:start` part deux fois en parallèle.
+    const { controller, runtime } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+
+    const [a, b] = await Promise.all([controller["chat:start"]({}), controller["chat:start"]({})]);
+
+    expect(runtime.history).toHaveLength(1);
+    expect(a).toEqual(b);
+  });
+
+  it("une reprise concurrente ne reprend pas deux fois la même session", async () => {
+    const premier = setup();
+    await premier.controller["workspace:open"]({ path: "/projets/demo" });
+    await premier.controller["chat:start"]({});
+    const id = premier.runtime.last.id;
+
+    // Nouveau contrôleur sur les mêmes stockages : la conversation est reprise.
+    const suivant = setup({ settings: premier.getSettings(), extra: { conversations: premier.conversations } });
+    await suivant.controller["workspace:open"]({ path: "/projets/demo" });
+    suivant.runtime.sessions.set(id, premier.runtime.last);
+
+    await Promise.all([suivant.controller["chat:start"]({}), suivant.controller["chat:start"]({})]);
+    expect(suivant.runtime.history).toHaveLength(1);
   });
 
   it("annulation et changements d'un tour s'appuient sur son checkpoint", async () => {

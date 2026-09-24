@@ -15,7 +15,7 @@ import { ROLE_LABELS, type Profile } from "@agent-studio/core";
 import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
-import type { RequestChannel, RequestInput, RequestOutput, WorkspaceInfoDto } from "../shared/ipc-contract.js";
+import type { ChatMessageDto, RequestChannel, RequestInput, RequestOutput, WorkspaceInfoDto } from "../shared/ipc-contract.js";
 import { createIpcConfirmer } from "./ipc-confirmer.js";
 import { createIpcConsent } from "./ipc-consent.js";
 import type {
@@ -81,6 +81,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
   let offSession: (() => void) | null = null;
   /** Restauration du dernier projet, partagée entre appels concurrents. */
   let restauration: Promise<WorkspaceInfoDto | null> | null = null;
+  /** Démarrage de la conversation en cours, partagé entre appels concurrents. */
+  let demarrage: Promise<ChatMessageDto[]> | null = null;
 
   const info = (ws: Workspace): WorkspaceInfoDto => ({ root: ws.root, name: basename(ws.root) });
 
@@ -245,6 +247,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
     "chat:start": async () => {
       const ws = requireWorkspace();
       if (session) return session.messages();
+      // Le renderer appelle ce canal deux fois en parallèle (React <StrictMode>) : sans partage,
+      // la session serait ouverte — ou reprise — deux fois, et le premier écouteur fuirait.
+      if (demarrage) return demarrage;
+      const encours = (async (): Promise<ChatMessageDto[]> => {
       const rt = await ensureRuntime();
       const modele = await selectedModel();
       const s = createMainSession({
@@ -271,8 +277,15 @@ export function createAppController(deps: AppControllerDeps): AppController {
         else if (e.type === "busy") deps.sink.emit("chat:busy", { busy: e.busy });
         else if (e.event.type !== "activity" && e.event.type !== "usage") deps.sink.emit("chat:agent", { event: e.event });
       });
-      session = s;
-      return s.start();
+        session = s;
+        return s.start();
+      })();
+      demarrage = encours;
+      try {
+        return await encours;
+      } finally {
+        demarrage = null;
+      }
     },
 
     "chat:send": async ({ text }) => {
