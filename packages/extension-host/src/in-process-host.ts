@@ -193,6 +193,16 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         if (!deps.stack.architecture) return null;
         return deps.stack.architecture({ root: deps.workspace.root, rules });
       },
+      async lint(opts) {
+        // Le linter est un programme du projet : même permission que l'exécution des tests.
+        perm.require("shell:test");
+        if (!deps.stack.lint) return null;
+        return deps.stack.lint({
+          root: deps.workspace.root,
+          ...(opts?.files ? { files: opts.files } : {}),
+          ...(opts?.signal ? { signal: opts.signal } : {}),
+        });
+      },
     },
 
     tasks: {

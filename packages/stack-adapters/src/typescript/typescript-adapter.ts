@@ -3,6 +3,7 @@ import { access, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
+import { parseEslintReport } from "./eslint-report.js";
 import type { ProcessRunner, StackAdapter } from "../protocols.js";
 import { parseVitestReport } from "./vitest-report.js";
 
@@ -17,6 +18,7 @@ export interface TypeScriptAdapterDeps {
 export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): StackAdapter {
   const runner = deps.runner ?? createNodeProcessRunner();
   const vitestEntry = (root: string) => join(root, "node_modules", "vitest", "vitest.mjs");
+  const exists = (p: string) => access(p).then(() => true, () => false);
 
   return {
     id: "typescript",
@@ -28,6 +30,31 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
         return Boolean(pkg["devDependencies"]?.["vitest"] ?? pkg["dependencies"]?.["vitest"]);
       } catch {
         return false;
+      }
+    },
+
+    /**
+     * ESLint du projet, avec ses propres règles. Absent ou non configuré : rien n'est jugé,
+     * et la porte le dira plutôt que de conclure.
+     */
+    async lint(opts) {
+      const entry = join(opts.root, "node_modules", "eslint", "bin", "eslint.js");
+      if (!(await exists(entry))) return { available: false, violations: [] };
+      const r = await runner.run(
+        process.execPath,
+        [entry, "--format", "json", ...(opts.files?.length ? opts.files : ["."])],
+        {
+          cwd: opts.root,
+          // Le lint est court : un délai franc évite de bloquer la porte sur un outil coincé.
+          timeoutMs: opts.timeoutMs ?? 5 * 60_000,
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        },
+      );
+      if (r.timedOut) return { available: false, violations: [] };
+      try {
+        return { ...parseEslintReport(JSON.parse(r.stdout), opts.root), tool: "eslint" };
+      } catch {
+        return { available: false, violations: [] };
       }
     },
 

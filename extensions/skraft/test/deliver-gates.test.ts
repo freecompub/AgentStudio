@@ -1,6 +1,6 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { checkCalisthenics, checkDependencies, checkMutation, checkRedGreenSequence, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 const bar = (raw: string | null = null): QualityBar => {
   const r = parseQualityBar(raw);
@@ -62,7 +62,6 @@ describe("checkRedGreenSequence", () => {
 describe("barre de qualité", () => {
   it("valeurs par défaut ; surcharge partielle ; JSON invalide signalé", () => {
     expect(bar().mutation).toEqual({ coreLayers: ["Domain", "Application"], core: 100, edge: 90 });
-    expect(bar('{"calisthenics":{"maxMethodLines":10}}').calisthenics).toEqual({ maxMethodLines: 10, maxIndentation: 2, maxAttributes: 3 });
     expect(parseQualityBar("{")).toEqual({ error: "`.skraft/quality.json` n'est pas du JSON valide." });
     expect(parseQualityBar('{"mutation":{"core":120}}')).toMatchObject({ error: expect.stringMatching(/mutation\.core/) });
   });
@@ -87,62 +86,28 @@ describe("barre de qualité", () => {
   });
 });
 
-describe("Object Calisthenics mesurables", () => {
-  it("Swift : méthode trop longue, trop imbriquée, type à trop d'attributs ; propriétés calculées et statiques ignorées", () => {
-    const long = Array.from({ length: 22 }, (_, i) => `    let v${i} = ${i}`).join("\n");
-    const src = `import Foundation
-// func commentee() { if a { if b { if c { } } } }
-public struct BolusCapPolicy {
-  public let max: Double
-  let unit: String
-  var label: String
-  private var cache: Int
-  static let shared = 1
-  var computed: Int { 1 }
-  func deep(_ x: Int) -> Int {
-    if x > 0 {
-      for i in 0..<x {
-        if i > 1 { return i }
-      }
-    }
-    return 0
-  }
-  func long() {
-${long}
-  }
-}
-protocol Capping {
-  func cap(_ d: Double) -> Double
-  var name: String { get }
-}
-`;
-    expect(checkCalisthenics("Sources/Domain/BolusCapPolicy.swift", src, bar())).toEqual([
-      "Sources/Domain/BolusCapPolicy.swift : méthode « deep » à 3 niveaux d'indentation (maximum 2).",
-      "Sources/Domain/BolusCapPolicy.swift : méthode « long » de 22 lignes (maximum 20).",
-      "Sources/Domain/BolusCapPolicy.swift : type « BolusCapPolicy » à 4 attributs (maximum 3).",
+describe("Qualité de forme : le linter du projet, pas un analyseur maison", () => {
+  it("les violations du linter deviennent des motifs de rejet, règle citée", () => {
+    const rapport = {
+      available: true,
+      tool: "eslint",
+      violations: [
+        { file: "src/bolus.ts", line: 12, rule: "max-lines-per-function", message: "Function has too many lines (48)." },
+        { file: "src/bolus.ts", rule: "max-depth", message: "Blocks are nested too deeply (4)." },
+      ],
+    };
+    expect(checkLint(rapport)).toEqual([
+      "Lint : src/bolus.ts:12 — max-lines-per-function : Function has too many lines (48).",
+      "Lint : src/bolus.ts — max-depth : Blocks are nested too deeply (4).",
     ]);
   });
 
-  it("TypeScript : méthodes, fonctions fléchées et propriétés de constructeur", () => {
-    const src = `export class Cap {
-  private readonly max: number;
-  unit = "U";
-  constructor(private a: number, readonly b: number) {}
-  apply(dose: number): number {
-    if (dose > this.max) { if (dose > 2) { if (dose > 3) { return 1; } } }
-    return dose;
-  }
-}
-export const f = (x: number) => { return x; };
-`;
-    expect(checkCalisthenics("src/cap.ts", src, bar())).toEqual([
-      "src/cap.ts : méthode « apply » à 3 niveaux d'indentation (maximum 2).",
-      "src/cap.ts : type « Cap » à 4 attributs (maximum 3).",
-    ]);
+  it("un projet propre ne produit aucun motif", () => {
+    expect(checkLint({ available: true, tool: "eslint", violations: [] })).toEqual([]);
   });
 
-  it("code conforme ou fichier non analysable : aucun motif", () => {
-    expect(checkCalisthenics("Sources/Domain/Cap.swift", "public func cap(_ d: Double, max: Double) -> Double { Swift.min(d, max) }\n", bar())).toEqual([]);
-    expect(checkCalisthenics("README.md", "func x() { if a { if b { if c {} } } }", bar())).toEqual([]);
+  it("sans linter, rien n'est reproché : la porte ne juge pas ce qu'elle n'a pas mesuré", () => {
+    expect(checkLint({ available: false, violations: [] })).toEqual([]);
+    expect(checkLint(null)).toEqual([]);
   });
 });

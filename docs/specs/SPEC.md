@@ -784,7 +784,7 @@ Pour chaque scénario, dans l'ordre du plan d'implémentation :
 
 1. Le test d'acceptance du scénario (écrit en DISTILL) est rouge.
 2. Boucle intérieure RED unitaire → GREEN → REFACTOR, avec les portes de la section 9.3, jusqu'à ce que le test d'acceptance soit vert.
-3. Fin de scénario : mutation selon le profil de stack (seuils : 100 % domaine et application, 90 % API et infrastructure), analyse de la règle de dépendance, contrôles mesurables d'Object Calisthenics (longueur de méthode, indentation, nombre d'attributs).
+3. Fin de scénario : mutation selon le profil de stack (seuils : 100 % domaine et application, 90 % API et infrastructure), analyse de la règle de dépendance, qualité de forme jugée par le linter du projet, avec ses propres seuils (ADR 0022).
 4. Un test qui ne tue aucun mutant est **signalé au reviewer**, jamais supprimé par l'agent.
 5. Une valeur métier manquante → `report_blocker`, suspension, question à l'utilisateur (jamais « escalader vers DISCUSS »).
 
@@ -901,7 +901,7 @@ Restent donc à faire, et le vocabulaire de J2, J5, O11 et O13 s'y rapporte :
 - schéma de profil de stack et fichier déclaratif (O11 : YAML validé par JSON Schema) ;
 - commandes `/stack init` et `/stack doctor` ;
 - parseurs exécutés en bac à sable ;
-- liste des programmes autorisés par profil (O12, D47) ;
+- liste des programmes autorisés par profil (O12, D47), linter compris (ADR 0022) ;
 - mutation Stryker pour TypeScript — seul Muter (Swift) est branché.
 
 ---

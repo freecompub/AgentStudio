@@ -40,8 +40,12 @@ commandes `/stack`. Les critères de sortie retenus (`/tdd` en Swift, usage par 
 atteints, mais l'objectif des profils reste entier.
 
 Restent à faire : schéma et fichier de profil (O11), `/stack init` et `/stack doctor`, parseurs
-en bac à sable, liste des programmes autorisés (O12, D47), et la mutation Stryker pour
-TypeScript — seul Muter (Swift) est branché.
+en bac à sable, liste des programmes autorisés (O12, D47 — le **linter** s'y ajoute depuis
+l'ADR 0022), et la mutation Stryker pour TypeScript — seul Muter (Swift) est branché.
+
+Le manque de profils a déjà coûté une fois : la porte de fin de scénario de S5 a dû embarquer un
+analyseur de code par langage, faute de l'endroit prévu pour le déclarer. Il est supprimé
+(ADR 0022), la qualité de forme revenant au linter du projet.
 
 ## Limites connues
 

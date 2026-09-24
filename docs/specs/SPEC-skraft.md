@@ -428,7 +428,7 @@ export interface DeliverState {
 | Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
 | Mutation (profil de stack) | Seuils du profil ; par défaut 100 % domaine et application, 90 % API et infrastructure. Capacité absente : porte non disponible, selon la politique du projet |
 | Règle de dépendance | Couches et imports autorisés déclarés dans le profil ; capacité absente : porte non disponible |
-| Object Calisthenics mesurables | Longueur de méthode, niveaux d'indentation, nombre d'attributs : seuils configurables |
+| Qualité de forme | Le **linter du projet** (ESLint, SwiftLint…), avec ses propres règles : longueur de méthode, imbrication, taille des types. Capacité absente : porte non disponible, constat « non mesurée » |
 | Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
 
 Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables par projet (`ctx.settings`).

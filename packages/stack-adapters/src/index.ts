@@ -1,6 +1,8 @@
 export type * from "./protocols.js";
 export { createTypeScriptAdapter, type TypeScriptAdapterDeps } from "./typescript/typescript-adapter.js";
 export { parseVitestReport, classifyFailure } from "./typescript/vitest-report.js";
+export { parseEslintReport } from "./typescript/eslint-report.js";
+export { parseSwiftLintReport } from "./swift/swiftlint-report.js";
 export { createNodeProcessRunner } from "./process/node-process-runner.js";
 export { fingerprintFiles, type ReadableFiles } from "./fingerprint.js";
 export { createSwiftAdapter, type SwiftAdapterDeps, type SwiftToolchain } from "./swift/swift-adapter.js";

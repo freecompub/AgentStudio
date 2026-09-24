@@ -4,7 +4,7 @@
  * mesurables. Aucune I/O : les effets leur passent le contenu lu par le code.
  */
 import { z } from "zod";
-import type { ArchitectureReport, DependencyRule, Evidence, MutationReport } from "@agent-studio/extension-api";
+import type { ArchitectureReport, DependencyRule, Evidence, LintReport, MutationReport } from "@agent-studio/extension-api";
 import { acOf } from "./distill.js";
 
 export type Granularity = "turn-per-scenario" | "session-per-step";
@@ -82,14 +82,9 @@ const qualitySchema = z.object({
   dependencyRules: z
     .array(z.object({ module: z.string(), forbidden: z.array(z.string()) }))
     .default([{ module: "Domain", forbidden: ["Infrastructure", "Interface", "UI", "API", "SwiftUI", "UIKit", "AppKit"] }]),
-  calisthenics: z
-    .object({
-      maxMethodLines: z.number().int().min(1).default(20),
-      maxIndentation: z.number().int().min(0).default(2),
-      maxAttributes: z.number().int().min(0).default(3),
-    })
-    .prefault({}),
 });
+// Les seuils de forme ne figurent plus ici : ils appartiennent à la configuration du linter du
+// projet (`.eslintrc`, `.swiftlint.yml`…), seul endroit où ils ne peuvent pas se contredire.
 
 export type QualityBar = z.infer<typeof qualitySchema>;
 
@@ -133,121 +128,19 @@ export function checkDependencies(report: ArchitectureReport): string[] {
 
 export const dependencyRules = (bar: QualityBar): DependencyRule[] => bar.dependencyRules;
 
-// ---------- Object Calisthenics mesurables -------------------------------------------
+// ---------- Qualité de forme : le linter du projet ------------------------------------
 
-/** Remplace commentaires et chaînes par des espaces, en gardant les retours à la ligne. */
-function strip(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`/g, (m) => m.replace(/[^\n]/g, " "));
-}
-
-function matchingBrace(code: string, open: number): number {
-  let depth = 0;
-  for (let i = open; i < code.length; i++) {
-    if (code[i] === "{") depth++;
-    else if (code[i] === "}" && --depth === 0) return i;
-  }
-  return -1;
-}
-
-/** Profondeur maximale d'accolades à l'intérieur d'un corps (le corps lui-même n'en compte pas). */
-function maxDepth(body: string): number {
-  let depth = 0;
-  let max = 0;
-  for (const c of body) {
-    if (c === "{") max = Math.max(max, ++depth);
-    else if (c === "}") depth--;
-  }
-  return max;
-}
-
-const KEYWORDS = new Set(["if", "for", "while", "switch", "catch", "guard", "return", "else", "do", "repeat", "function"]);
-
-interface Unit {
-  name: string;
-  open: number;
-}
-
-function functionsOf(code: string, swift: boolean): Unit[] {
-  const out: Unit[] = [];
-  const re = swift
-    ? /\b(?:func\s+([A-Za-z_]\w*)|(init|deinit))\b[^{};]*?\{/g
-    : /(?:\bfunction\s*([A-Za-z_$][\w$]*)?\s*\([^)]*\)[^{;]*?\{|^[ \t]*(?:(?:public|private|protected|static|async|readonly|override|get|set)\s+)*([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*(?::\s*[^{;=]+)?\{|=>\s*\{)/gm;
-  for (let m = re.exec(code); m; m = re.exec(code)) {
-    const name = m[1] ?? m[2] ?? "(fonction anonyme)";
-    if (KEYWORDS.has(name)) continue;
-    // Déclaration sans corps (protocole) : l'accolade trouvée appartient à autre chose.
-    if (swift && /\n\s*\n|\bfunc\b|\bvar\b|\blet\b/.test(m[0].slice(4))) continue;
-    out.push({ name, open: m.index + m[0].length - 1 });
-  }
-  return out;
-}
-
-function typesOf(code: string, swift: boolean): Unit[] {
-  const re = swift ? /\b(?:class|struct|actor)\s+([A-Za-z_]\w*)[^{;]*\{/g : /\bclass\s+([A-Za-z_$][\w$]*)[^{;]*\{/g;
-  const out: Unit[] = [];
-  for (let m = re.exec(code); m; m = re.exec(code)) out.push({ name: m[1]!, open: m.index + m[0].length - 1 });
-  return out;
-}
-
-/** Lignes du corps d'un type au premier niveau (hors corps des méthodes et blocs imbriqués). */
-function topLevelLines(body: string): string[] {
-  const lines: string[] = [];
-  let depth = 0;
-  let current = "";
-  for (const c of body) {
-    if (c === "\n") {
-      if (depth === 0) lines.push(current);
-      current = "";
-      continue;
-    }
-    if (c === "{") {
-      if (depth === 0) current += "{";
-      depth++;
-    } else if (c === "}") depth--;
-    else if (depth === 0) current += c;
-  }
-  if (depth === 0) lines.push(current);
-  return lines;
-}
-
-function attributesOf(body: string, swift: boolean): number {
-  let n = 0;
-  for (const line of topLevelLines(body)) {
-    const l = line.trim();
-    if (swift) {
-      // Propriété stockée : `let`/`var` d'instance, sans corps (propriété calculée) ni `static`.
-      if (/^(?:@\w+\s+)*(?:(?:public|private|fileprivate|internal|open|final|weak|unowned|lazy)(?:\(set\))?\s+)*(?:let|var)\s+\w+/.test(l) && !/\bstatic\b|\bclass\s+var\b/.test(l) && !l.includes("{"))
-        n++;
-    } else {
-      if (/^(?:(?:public|private|protected|readonly|declare|override)\s+)*#?[A-Za-z_$][\w$]*\s*[?!]?\s*[:=]/.test(l) && !/^\s*static\b/.test(l) && !/^[\w$#]+\s*\(/.test(l)) n++;
-      const ctor = /constructor\s*\(([^)]*)\)/.exec(l);
-      if (ctor) n += (ctor[1]!.match(/\b(?:public|private|protected|readonly)\s+[A-Za-z_$]/g) ?? []).length;
-    }
-  }
-  return n;
-}
-
-/** Object Calisthenics mesurables : longueur des méthodes, niveaux d'indentation, attributs par type. */
-export function checkCalisthenics(path: string, source: string, bar: QualityBar): string[] {
-  const swift = path.endsWith(".swift");
-  if (!swift && !/\.[cm]?tsx?$/.test(path)) return [];
-  const { maxMethodLines, maxIndentation, maxAttributes } = bar.calisthenics;
-  const code = strip(source);
-  const reasons: string[] = [];
-  for (const f of functionsOf(code, swift)) {
-    const close = matchingBrace(code, f.open);
-    if (close === -1) continue;
-    const body = code.slice(f.open + 1, close);
-    const lines = body.split("\n").filter((l) => l.trim()).length;
-    if (lines > maxMethodLines) reasons.push(`${path} : méthode « ${f.name} » de ${lines} lignes (maximum ${maxMethodLines}).`);
-    const depth = maxDepth(body);
-    if (depth > maxIndentation) reasons.push(`${path} : méthode « ${f.name} » à ${depth} niveaux d'indentation (maximum ${maxIndentation}).`);
-  }
-  for (const t of typesOf(code, swift)) {
-    const close = matchingBrace(code, t.open);
-    if (close === -1) continue;
-    const count = attributesOf(code.slice(t.open + 1, close), swift);
-    if (count > maxAttributes) reasons.push(`${path} : type « ${t.name} » à ${count} attributs (maximum ${maxAttributes}).`);
-  }
-  return reasons;
+/**
+ * La qualité de forme — longueur des méthodes, imbrication, nombre d'attributs — est jugée par
+ * le linter que le projet a déjà configuré, avec ses propres seuils. Un analyseur maison
+ * imposerait une seconde autorité, qui rejetterait du code que la CI du projet accepte, et ne
+ * saurait lire que les langages dont on aurait écrit la grammaire.
+ *
+ * Pas de linter : aucun motif, et la porte le dit au lieu de conclure (voir `deliver-effects`).
+ */
+export function checkLint(report: LintReport | null): string[] {
+  if (!report?.available) return [];
+  return report.violations.map(
+    (v) => `Lint : ${v.file}${v.line !== undefined ? `:${v.line}` : ""} — ${v.rule} : ${v.message}`,
+  );
 }
