@@ -25,12 +25,12 @@ jobs:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       CI: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # La version de pnpm vient du champ `packageManager` du package.json.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Version embarquée par Electron 44, donc celle sur laquelle l'application tourne
           # réellement. Le modèle de permissions des extensions isolées exige `--permission`,
