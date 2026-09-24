@@ -69,6 +69,7 @@ export function App() {
           mode={mode}
           onModeChange={changeMode}
           onProjectClosed={() => setPhase({ kind: "project", user: phase.user })}
+          onLoggedOut={() => void boot()}
         />
       )}
       <ConfirmDialog />

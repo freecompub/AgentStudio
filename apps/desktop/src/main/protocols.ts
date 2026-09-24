@@ -22,6 +22,8 @@ export interface AppSettings {
   uiMode?: "simple" | "advanced";
   /** Modèle retenu par projet (racine → identifiant), D38 / ADR 0020. */
   models?: Record<string, string>;
+  /** Hôte GitHub retenu : `github.com` ou une instance Enterprise (D4). */
+  authHostname?: string;
 }
 
 export interface SettingsStore {

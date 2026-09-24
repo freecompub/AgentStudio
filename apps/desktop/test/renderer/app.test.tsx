@@ -6,7 +6,7 @@ import { App } from "../../src/renderer/App";
 import type { ChatMessageDto } from "../../src/shared/ipc-contract";
 import { FakeApi } from "./fake-api";
 
-const OAUTH = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true } as const;
+const OAUTH = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true, hostname: "github.com" } as const;
 const WS = { root: "/projets/demo", name: "demo" };
 
 let api: FakeApi;
@@ -36,7 +36,7 @@ const user = (id: string, text: string, extra: Partial<ChatMessageDto> = {}): Ch
 describe("Renderer", () => {
   it("demande une reconnexion par navigateur quand le jeton est un PAT classique, et affiche le code", async () => {
     api
-      .handle("auth:status", () => ({ loggedIn: true, user: "octo", tokenKind: "classic-pat", copilotCompatible: false }))
+      .handle("auth:status", () => ({ loggedIn: true, user: "octo", tokenKind: "classic-pat", copilotCompatible: false, hostname: "github.com" }))
       .handle("auth:login", () => new Promise(() => {}));
     render(<App />);
     expect(await screen.findByText(/jeton personnel classique/)).toBeTruthy();
@@ -211,6 +211,52 @@ describe("Renderer — tâches et décisions (J2)", () => {
     } finally {
       window.removeEventListener("error", onError);
     }
+  });
+
+  it("non connecté : propose GitHub.com ou une instance Enterprise", async () => {
+    api.handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" })).handle("auth:login", () => new Promise(() => {}));
+    render(<App />);
+    await screen.findByRole("button", { name: "Se connecter avec GitHub" });
+
+    // Par défaut, github.com : aucun domaine à saisir.
+    expect(screen.queryByLabelText("Adresse de votre instance")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "GitHub Enterprise" }));
+    expect(screen.getByLabelText("Adresse de votre instance")).toBeTruthy();
+  });
+
+  it("connexion à une instance Enterprise : le domaine est transmis", async () => {
+    api.handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" })).handle("auth:login", () => new Promise(() => {}));
+    render(<App />);
+    await screen.findByRole("button", { name: "Se connecter avec GitHub" });
+
+    fireEvent.click(screen.getByRole("radio", { name: "GitHub Enterprise" }));
+    fireEvent.change(screen.getByLabelText("Adresse de votre instance"), { target: { value: "github.exemple.fr" } });
+    fireEvent.click(screen.getByRole("button", { name: "Se connecter avec GitHub" }));
+
+    await waitFor(() => expect(api.calls.some((c) => c.channel === "auth:login")).toBe(true));
+    expect(api.calls.find((c) => c.channel === "auth:login")?.input).toEqual({ hostname: "github.exemple.fr" });
+  });
+
+  it("GitHub.com : aucun domaine n'est transmis", async () => {
+    api.handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" })).handle("auth:login", () => new Promise(() => {}));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Se connecter avec GitHub" }));
+    await waitFor(() => expect(api.calls.some((c) => c.channel === "auth:login")).toBe(true));
+    expect(api.calls.find((c) => c.channel === "auth:login")?.input).toEqual({});
+  });
+
+  it("se déconnecter ramène à l'écran de connexion", async () => {
+    chatReady();
+    api.handle("auth:logout", () => undefined);
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+
+    fireEvent.click(screen.getByRole("button", { name: "Se déconnecter" }));
+
+    api.handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" }));
+    expect(await screen.findByRole("button", { name: "Se connecter avec GitHub" })).toBeTruthy();
+    expect(api.calls.some((c) => c.channel === "auth:logout")).toBe(true);
   });
 
   it("propose les modèles disponibles avec leur coût relatif", async () => {

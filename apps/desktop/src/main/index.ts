@@ -144,8 +144,15 @@ async function createController(): Promise<AppController> {
     setInterval(() => void installer.applyRevocations().catch(() => undefined), 6 * 3_600_000).unref();
   }
   const git = cliGitRunnerFactory({ config: { "credential.https://github.com.helper": "!gh auth git-credential" } });
+  const settings = createJsonSettingsStore(join(userData, "settings.json"));
+  // L'hôte retenu (github.com ou une instance Enterprise) est relu avant toute interrogation (D4).
+  const authHostname = (await settings.load()).authHostname;
   const controller = createAppController({
-    auth: createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() }),
+    auth: createGhAuth({
+      runner: createNodeCommandRunner(),
+      spawner: createNodeProcessSpawner(),
+      ...(authHostname ? { hostname: authHostname } : {}),
+    }),
     workspaces: {
       open: (path) => openWorkspace(path, { git }),
       clone: (url, dest) => cloneWorkspace(url, dest, { git }),
@@ -175,7 +182,7 @@ async function createController(): Promise<AppController> {
         logger: logger.child({ component: "runtime" }),
       }),
     conversations: createJsonConversationStore(join(userData, "conversations")),
-    settings: createJsonSettingsStore(join(userData, "settings.json")),
+    settings,
     folderPicker: {
       async pick() {
         const r = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });

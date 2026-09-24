@@ -5,6 +5,7 @@
 export const REQUEST_CHANNELS = [
   "auth:status",
   "auth:login",
+  "auth:logout",
   "workspace:current",
   "workspace:pick-folder",
   "workspace:open",

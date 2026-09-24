@@ -6,7 +6,7 @@ import { createAppController } from "../src/main/app-controller.js";
 import type { AppSettings, EventSink, WorkspaceProvider, WorkspaceServices, WorkspaceServicesArgs } from "../src/main/protocols.js";
 import type { EventChannel } from "../src/shared/ipc-contract.js";
 
-const OAUTH: AuthStatus = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true };
+const OAUTH: AuthStatus = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true, hostname: "github.com" };
 
 function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs: string[] } {
   const rolledBack: string[] = [];
@@ -52,12 +52,19 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Part
     },
   };
   let settings: AppSettings = opts.settings ?? {};
+  // Comme `index.ts` : l'hôte retenu est lu dans les réglages avant de construire l'auth.
+  let hote = opts.settings?.authHostname ?? "github.com";
+  let deconnecte = false;
   const auth: GitHubAuth = {
-    status: async () => opts.status ?? OAUTH,
+    status: async () => (deconnecte ? { loggedIn: false, hostname: hote } : (opts.status ?? { ...OAUTH, hostname: hote })),
     token: async () => "gho_secret",
-    login: async (onCode) => {
-      onCode({ code: "AB12-CD34", verificationUrl: "https://github.com/login/device" });
-      return OAUTH;
+    hostname: () => hote,
+    logout: async () => void (deconnecte = true),
+    login: async (onCode, o) => {
+      if (o?.hostname) hote = o.hostname;
+      deconnecte = false;
+      onCode({ code: "AB12-CD34", verificationUrl: `https://${hote}/login/device` });
+      return { ...OAUTH, hostname: hote };
     },
   };
   const opened: string[] = [];
@@ -119,6 +126,42 @@ describe("AppController — authentification", () => {
     const { controller, opened } = setup();
     await controller["shell:open-device-page"]({});
     expect(opened).toEqual(["https://github.com/login/device"]);
+  });
+});
+
+describe("AppController — connexion et déconnexion", () => {
+  it("se connecter à une instance GitHub Enterprise retient l'hôte", async () => {
+    const { controller, getSettings } = setup();
+    expect(await controller["auth:login"]({ hostname: "github.exemple.fr" })).toMatchObject({ hostname: "github.exemple.fr" });
+    expect(getSettings().authHostname).toBe("github.exemple.fr");
+  });
+
+  it("l'hôte retenu est réutilisé au démarrage suivant", async () => {
+    const premier = setup();
+    await premier.controller["auth:login"]({ hostname: "github.exemple.fr" });
+    const suivant = setup({ settings: premier.getSettings() });
+    expect((await suivant.controller["auth:status"]({})).hostname).toBe("github.exemple.fr");
+  });
+
+  it("la déconnexion clôture le projet ouvert et arrête le runtime", async () => {
+    const { controller, runtime, serviceLog } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    const session = runtime.last;
+
+    await controller["auth:logout"]({});
+
+    expect(session.closed).toBe(true);
+    expect(serviceLog).toContain("libérés:/projets/demo");
+    expect(runtime.started).toBe(false);
+    expect(await controller["auth:status"]({})).toMatchObject({ loggedIn: false });
+    expect(await controller["workspace:current"]({})).toBeNull();
+  });
+
+  it("déconnexion sans projet ouvert : rien ne casse", async () => {
+    const { controller } = setup();
+    await controller["auth:logout"]({});
+    expect(await controller["auth:status"]({})).toMatchObject({ loggedIn: false });
   });
 });
 
@@ -302,7 +345,7 @@ describe("AppController — conversation", () => {
   });
 
   it("refuse de démarrer avec un PAT classique en expliquant quoi faire", async () => {
-    const { controller } = setup({ status: { loggedIn: true, user: "o", tokenKind: "classic-pat", copilotCompatible: false } });
+    const { controller } = setup({ status: { loggedIn: true, user: "o", tokenKind: "classic-pat", copilotCompatible: false, hostname: "github.com" } });
     await controller["workspace:open"]({ path: "/projets/demo" });
     await expect(controller["chat:start"]({})).rejects.toThrow(/navigateur/);
   });

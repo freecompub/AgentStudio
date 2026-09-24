@@ -22,12 +22,14 @@ export const chatMessageSchema = z.object({
 export type ChatMessageDto = z.infer<typeof chatMessageSchema>;
 
 export const authStatusSchema = z.union([
-  z.object({ loggedIn: z.literal(false) }),
+  z.object({ loggedIn: z.literal(false), hostname: z.string() }),
   z.object({
     loggedIn: z.literal(true),
     user: z.string(),
     tokenKind: z.enum(["oauth", "classic-pat", "fine-grained-pat", "unknown"]),
     copilotCompatible: z.boolean(),
+    /** `github.com` ou l'instance GitHub Enterprise choisie. */
+    hostname: z.string(),
   }),
 ]);
 export type AuthStatusDto = z.infer<typeof authStatusSchema>;
@@ -137,7 +139,8 @@ const empty = z.object({}).strict();
 /** Requêtes (renderer → principal, `invoke`) : entrée et sortie par canal. */
 export const requests = {
   "auth:status": { input: empty, output: authStatusSchema },
-  "auth:login": { input: empty, output: authStatusSchema },
+  "auth:login": { input: z.object({ hostname: text(253).min(1).optional() }).strict(), output: authStatusSchema },
+  "auth:logout": { input: empty, output: z.void() },
   "workspace:current": { input: empty, output: workspaceInfoSchema.nullable() },
   "workspace:pick-folder": { input: empty, output: z.string().nullable() },
   "workspace:open": { input: z.object({ path: text(4096).min(1) }).strict(), output: workspaceInfoSchema },

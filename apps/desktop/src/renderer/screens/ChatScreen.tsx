@@ -20,6 +20,7 @@ export function ChatScreen(props: {
   mode: UiMode;
   onModeChange: (m: UiMode) => void;
   onProjectClosed: () => void;
+  onLoggedOut: () => void;
 }) {
   const advanced = props.mode === "advanced";
   const [extensionsOpen, setExtensionsOpen] = useState(false);
@@ -128,6 +129,16 @@ export function ChatScreen(props: {
     api.call("model:set", { id: selected }).catch((err: Error) => setError(err.message));
   }
 
+  async function logout() {
+    setError(null);
+    try {
+      await api.call("auth:logout", {});
+      props.onLoggedOut();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function closeProject() {
     setError(null);
     try {
@@ -177,6 +188,9 @@ export function ChatScreen(props: {
           {props.user}
           {props.profile && <span className="hint"> ({props.profile.roleLabel})</span>}
         </span>
+        <button className="link" onClick={() => void logout()}>
+          Se déconnecter
+        </button>
       </header>
 
       <TaskPanel />

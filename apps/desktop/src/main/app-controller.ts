@@ -140,6 +140,14 @@ export function createAppController(deps: AppControllerDeps): AppController {
     return info(ws);
   }
 
+  /** Ferme la session et arrête le runtime : le prochain tour en ouvrira un avec le jeton courant. */
+  async function oublierRuntime(): Promise<void> {
+    if (!runtime) return;
+    await closeSession();
+    await runtime.stop();
+    runtime = null;
+  }
+
   /** Modèle retenu pour le projet courant (D38, ADR 0020) ; `null` = le runtime décide. */
   async function selectedModel(): Promise<string | null> {
     if (!workspace) return null;
@@ -176,14 +184,24 @@ export function createAppController(deps: AppControllerDeps): AppController {
   return {
     "auth:status": () => deps.auth.status(),
 
-    "auth:login": async () => {
-      const status = await deps.auth.login((code) => deps.sink.emit("auth:device-code", code));
-      if (runtime) {
-        await closeSession();
-        await runtime.stop();
-        runtime = null; // nouveau jeton au prochain démarrage
-      }
+    "auth:login": async ({ hostname }) => {
+      const status = await deps.auth.login(
+        (code) => deps.sink.emit("auth:device-code", code),
+        ...(hostname ? [{ hostname }] : []),
+      );
+      await oublierRuntime();
+      // L'hôte choisi est retenu : au démarrage suivant, on interroge la bonne instance.
+      await deps.settings.save({ ...(await deps.settings.load()), authHostname: deps.auth.hostname() });
       return status;
+    },
+
+    "auth:logout": async () => {
+      // Se déconnecter en laissant une conversation ouverte sur un runtime authentifié n'aurait
+      // pas de sens : on clôture le projet, donc la session et les extensions, avant de rendre
+      // le jeton.
+      await close();
+      await oublierRuntime();
+      await deps.auth.logout();
     },
 
     "shell:open-device-page": () => deps.external.open(DEVICE_PAGE),
