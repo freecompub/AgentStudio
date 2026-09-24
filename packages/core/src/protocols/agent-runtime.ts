@@ -20,9 +20,25 @@ export interface RuntimeCapabilities {
   resumableSessions: boolean;
 }
 
+/**
+ * Modèle proposé à l'utilisateur (D38, ADR 0020). Données sérialisables uniquement :
+ * aucun objet de SDK ne traverse ce port (D10).
+ */
+export interface ModelChoice {
+  id: string;
+  name: string;
+  /** Coût relatif du modèle, quand le runtime le fournit (Copilot). */
+  multiplier?: number;
+}
+
 export interface AgentRuntime {
   readonly id: RuntimeId;
   readonly capabilities: RuntimeCapabilities;
+  /**
+   * Modèles que le compte peut réellement utiliser. Facultatif : tous les runtimes n'en
+   * fournissent pas. Ne doit jamais échouer — une liste vide laisse le runtime décider.
+   */
+  listModels?(): Promise<ModelChoice[]>;
   start(): Promise<void>;
   stop(): Promise<void>;
   openSession(cfg: AgentSessionConfig): Promise<AgentSession>;

@@ -1,5 +1,6 @@
 import type {
   MessageOptions,
+  ModelInfo,
   ResumeSessionConfig,
   SessionConfig,
   SessionEvent,
@@ -24,4 +25,5 @@ export interface CopilotClientPort {
   createSession(config: SessionConfig): Promise<CopilotSessionPort>;
   resumeSession(sessionId: string, config: ResumeSessionConfig): Promise<CopilotSessionPort>;
   deleteSession(sessionId: string): Promise<void>;
+  listModels(): Promise<ModelInfo[]>;
 }

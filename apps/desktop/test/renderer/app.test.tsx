@@ -126,7 +126,9 @@ describe("Renderer — tâches et décisions (J2)", () => {
       .handle("tasks:list", () => [])
       .handle("interactions:list", () => [])
       .handle("interaction:respond", () => undefined)
-      .handle("task:cancel", () => undefined);
+      .handle("task:cancel", () => undefined)
+      .handle("models:list", () => ({ models: [], selected: null }))
+      .handle("model:set", () => undefined);
   }
 
   it("propose les commandes quand on tape /", async () => {
@@ -209,6 +211,49 @@ describe("Renderer — tâches et décisions (J2)", () => {
     } finally {
       window.removeEventListener("error", onError);
     }
+  });
+
+  it("propose les modèles disponibles avec leur coût relatif", async () => {
+    chatReady();
+    api.handle("models:list", () => ({
+      models: [
+        { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", multiplier: 1 },
+        { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", multiplier: 3 },
+      ],
+      selected: "claude-sonnet-4.5",
+    }));
+    render(<App />);
+
+    const liste = (await screen.findByLabelText("Modèle")) as HTMLSelectElement;
+    expect(liste.value).toBe("claude-sonnet-4.5");
+    expect([...liste.options].map((o) => o.textContent)).toEqual([
+      "Automatique",
+      "GPT-5.6 Luna (×1)",
+      "Claude Sonnet 4.5 (×3)",
+    ]);
+  });
+
+  it("choisir un modèle l'enregistre pour le projet", async () => {
+    chatReady();
+    api.handle("models:list", () => ({ models: [{ id: "gpt-5.6-luna", name: "GPT-5.6 Luna", multiplier: 1 }], selected: null }));
+    render(<App />);
+
+    const liste = await screen.findByLabelText("Modèle");
+    fireEvent.change(liste, { target: { value: "gpt-5.6-luna" } });
+    await waitFor(() => expect(api.calls.some((c) => c.channel === "model:set")).toBe(true));
+    expect(api.calls.find((c) => c.channel === "model:set")?.input).toEqual({ id: "gpt-5.6-luna" });
+
+    // Revenir à « Automatique » efface le choix.
+    fireEvent.change(liste, { target: { value: "" } });
+    await waitFor(() => expect(api.calls.filter((c) => c.channel === "model:set")).toHaveLength(2));
+    expect(api.calls.filter((c) => c.channel === "model:set").at(-1)?.input).toEqual({ id: null });
+  });
+
+  it("aucun modèle proposé : la liste déroulante n'est pas affichée", async () => {
+    chatReady();
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+    expect(screen.queryByLabelText("Modèle")).toBeNull();
   });
 
   it("clôture le projet et revient au choix d'un projet", async () => {

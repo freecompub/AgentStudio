@@ -243,6 +243,18 @@ label {
   font-weight: 600;
 }
 
+.model-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.model-pick select {
+  max-width: 16rem;
+}
+
 .spacer {
   flex: 1;
 }

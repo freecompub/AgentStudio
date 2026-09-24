@@ -138,6 +138,12 @@ export function createAppController(deps: AppControllerDeps): AppController {
     return info(ws);
   }
 
+  /** Modèle retenu pour le projet courant (D38, ADR 0020) ; `null` = le runtime décide. */
+  async function selectedModel(): Promise<string | null> {
+    if (!workspace) return null;
+    return (await deps.settings.load()).models?.[workspace.root] ?? null;
+  }
+
   /** Clôture le projet courant : session, services et extensions libérés, aucun projet mémorisé. */
   async function close(): Promise<void> {
     if (!workspace) return;
@@ -214,16 +220,40 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     "workspace:sync": () => requireWorkspace().repo.sync(),
 
+    "models:list": async () => {
+      const selected = await selectedModel();
+      try {
+        const rt = await ensureRuntime();
+        return { models: (await rt.listModels?.()) ?? [], selected };
+      } catch (err) {
+        // Pas encore connecté, ou runtime indisponible : on ne propose rien plutôt que d'échouer.
+        deps.logger?.info("modèles indisponibles", { error: String(err) });
+        return { models: [], selected };
+      }
+    },
+
+    "model:set": async ({ id }) => {
+      const ws = requireWorkspace();
+      const reglages = await deps.settings.load();
+      const models = { ...(reglages.models ?? {}) };
+      if (id === null) delete models[ws.root];
+      else models[ws.root] = id;
+      await deps.settings.save({ ...reglages, models });
+      deps.logger?.info("modèle choisi", { root: ws.root, model: id });
+    },
+
     "chat:start": async () => {
       const ws = requireWorkspace();
       if (session) return session.messages();
       const rt = await ensureRuntime();
+      const modele = await selectedModel();
       const s = createMainSession({
         runtime: rt,
         store: deps.conversations,
         checkpoints: ws.checkpoints,
         workspaceRoot: ws.root,
         systemPrompt: deps.systemPrompt,
+        ...(modele ? { model: modele } : {}),
         // Arbitre unique : politique du cœur → hooks des extensions → règles → question (D27).
         guard: createPermissionArbiter({
           root: ws.root,

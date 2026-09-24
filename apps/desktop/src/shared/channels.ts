@@ -11,6 +11,8 @@ export const REQUEST_CHANNELS = [
   "workspace:close",
   "workspace:clone",
   "workspace:sync",
+  "models:list",
+  "model:set",
   "chat:start",
   "chat:send",
   "chat:undo",

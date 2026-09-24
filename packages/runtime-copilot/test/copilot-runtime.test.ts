@@ -1,4 +1,4 @@
-import type { MessageOptions, ResumeSessionConfig, SessionConfig, SessionEvent } from "@github/copilot-sdk";
+import type { MessageOptions, ModelInfo, ResumeSessionConfig, SessionConfig, SessionEvent } from "@github/copilot-sdk";
 import type { AgentEvent, AgentSessionConfig } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
 import { createCopilotRuntime } from "../src/copilot-runtime.js";
@@ -53,7 +53,18 @@ class FakeClient implements CopilotClientPort {
   async deleteSession(id: string) {
     this.deleted.push(id);
   }
+  modelsError: Error | null = null;
+  models: ModelInfo[] = [];
+  listModelsAppels = 0;
+  async listModels() {
+    this.listModelsAppels++;
+    if (this.modelsError) throw this.modelsError;
+    return this.models;
+  }
 }
+
+const modele = (id: string, name: string, over: Partial<ModelInfo> = {}): ModelInfo =>
+  ({ id, name, capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 1000 } }, ...over }) as ModelInfo;
 
 const cfg = (over: Partial<AgentSessionConfig> = {}): AgentSessionConfig => ({
   role: "main",
@@ -152,6 +163,44 @@ describe("CopilotRuntime", () => {
     const s = await createCopilotRuntime({ client }).resumeSession("ancienne", cfg());
     expect(s.id).toBe("ancienne");
     expect(client.resumed[0]?.config.workingDirectory).toBe("/projets/demo");
+  });
+
+  it("liste les modèles disponibles avec leur coût relatif", async () => {
+    const client = new FakeClient();
+    client.models = [
+      modele("gpt-5.6-luna", "GPT-5.6 Luna", { billing: { multiplier: 1 } }),
+      modele("claude-sonnet-4.5", "Claude Sonnet 4.5", { billing: { multiplier: 3 } }),
+    ];
+    const rt = createCopilotRuntime({ client });
+    expect(await rt.listModels!()).toEqual([
+      { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", multiplier: 1 },
+      { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", multiplier: 3 },
+    ]);
+  });
+
+  it("écarte les modèles désactivés par la politique du compte", async () => {
+    const client = new FakeClient();
+    client.models = [
+      modele("autorise", "Autorisé", { policy: { state: "enabled", terms: "" } }),
+      modele("refuse", "Refusé", { policy: { state: "disabled", terms: "" } }),
+      modele("sans-politique", "Sans politique"),
+    ];
+    const rt = createCopilotRuntime({ client });
+    expect((await rt.listModels!()).map((m) => m.id)).toEqual(["autorise", "sans-politique"]);
+  });
+
+  it("une liste indisponible ne casse rien : aucun modèle proposé", async () => {
+    const client = new FakeClient();
+    client.modelsError = new Error("hors ligne");
+    const rt = createCopilotRuntime({ client });
+    expect(await rt.listModels!()).toEqual([]);
+  });
+
+  it("le modèle choisi est transmis à la session", async () => {
+    const client = new FakeClient();
+    const rt = createCopilotRuntime({ client });
+    await rt.openSession(cfg({ model: "claude-sonnet-4.5" }));
+    expect(client.created[0]?.model).toBe("claude-sonnet-4.5");
   });
 
   it("close() déconnecte ; deleteSession supprime côté runtime", async () => {

@@ -1,4 +1,4 @@
-import type { AgentRuntime, AgentSessionConfig, RuntimeCapabilities } from "../protocols/agent-runtime.js";
+import type { AgentRuntime, AgentSessionConfig, ModelChoice, RuntimeCapabilities } from "../protocols/agent-runtime.js";
 import { ScriptedSession } from "./scripted-session.js";
 
 /** Ce qu'un comportement d'agent scripté peut faire pendant un tour. */
@@ -28,6 +28,8 @@ export class ScriptedRuntime implements AgentRuntime {
     usageUnit: "requests",
     resumableSessions: true,
   };
+  /** Modèles annoncés par ce faux runtime ; `null` simule un runtime qui n'en propose pas. */
+  models: ModelChoice[] | null = [];
   readonly sessions = new Map<string, ScriptedSession>();
   readonly configs = new Map<string, AgentSessionConfig>();
   readonly deleted: string[] = [];
@@ -71,6 +73,10 @@ export class ScriptedRuntime implements AgentRuntime {
       }
       if (!hung) s.emit({ type: "idle" });
     };
+  }
+
+  async listModels(): Promise<ModelChoice[]> {
+    return this.models ?? [];
   }
 
   async start(): Promise<void> {

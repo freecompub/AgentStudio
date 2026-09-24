@@ -82,6 +82,15 @@ export type InteractionDto = z.infer<typeof interactionSchema>;
 export const commandListingSchema = z.object({ invocation: z.string(), title: z.string(), description: z.string() });
 export type CommandListingDto = z.infer<typeof commandListingSchema>;
 
+/** Modèles proposés et celui retenu pour le projet ; `null` = le runtime décide (D38, ADR 0020). */
+const modelListingSchema = z
+  .object({
+    models: z.array(z.object({ id: text(200), name: text(200), multiplier: z.number().optional() }).strict()),
+    selected: text(200).nullable(),
+  })
+  .strict();
+export type ModelListingDto = z.infer<typeof modelListingSchema>;
+
 export const uiModeSchema = z.enum(["simple", "advanced"]);
 export type UiMode = z.infer<typeof uiModeSchema>;
 
@@ -138,6 +147,8 @@ export const requests = {
     output: workspaceInfoSchema,
   },
   "workspace:sync": { input: empty, output: z.object({ pulled: z.number(), pushed: z.number() }) },
+  "models:list": { input: empty, output: modelListingSchema },
+  "model:set": { input: z.object({ id: text(200).min(1).nullable() }).strict(), output: z.void() },
   "chat:start": { input: empty, output: z.array(chatMessageSchema) },
   "chat:send": { input: z.object({ text: text(100_000).min(1) }).strict(), output: z.void() },
   "chat:undo": { input: z.object({ messageId: text(200).min(1) }).strict(), output: z.void() },

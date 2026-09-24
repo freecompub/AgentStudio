@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessageDto, CommandListingDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
+import type { ChatMessageDto, CommandListingDto, ModelListingDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
 import { GuidedActions } from "../components/GuidedActions";
@@ -34,6 +34,7 @@ export function ChatScreen(props: {
   const [armedUndo, setArmedUndo] = useState<string | null>(null);
   const [openChanges, setOpenChanges] = useState<string | null>(null);
   const [commands, setCommands] = useState<CommandListingDto[]>([]);
+  const [models, setModels] = useState<ModelListingDto>({ models: [], selected: null });
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function ChatScreen(props: {
     api.call("chat:start", {}).then(setMessages, (err: Error) => setError(err.message));
     const loadCommands = () => api.call("commands:list", {}).then(setCommands, () => undefined);
     void loadCommands();
+    void api.call("models:list", {}).then(setModels, () => undefined);
     offs.push(api.on("extensions:changed", () => void loadCommands()));
     return () => offs.forEach((off) => off());
   }, [props.workspace.root]);
@@ -120,6 +122,12 @@ export function ChatScreen(props: {
     }
   }
 
+  function chooseModel(id: string) {
+    const selected = id === "" ? null : id;
+    setModels((m) => ({ ...m, selected }));
+    api.call("model:set", { id: selected }).catch((err: Error) => setError(err.message));
+  }
+
   async function closeProject() {
     setError(null);
     try {
@@ -144,6 +152,19 @@ export function ChatScreen(props: {
         {syncNote && <span className="hint">{syncNote}</span>}
         <button onClick={() => void sync()}>Synchroniser</button>
         <button onClick={() => setExtensionsOpen(true)}>Extensions</button>
+        {models.models.length > 0 && (
+          <label className="model-pick">
+            <span>Modèle</span>
+            <select value={models.selected ?? ""} onChange={(e) => chooseModel(e.target.value)}>
+              <option value="">Automatique</option>
+              {models.models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.multiplier === undefined ? m.name : `${m.name} (×${m.multiplier})`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="mode-switch" role="group" aria-label="Mode d'affichage">
           <button aria-pressed={!advanced} onClick={() => props.onModeChange("simple")}>
             Simple

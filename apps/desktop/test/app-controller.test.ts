@@ -239,6 +239,61 @@ describe("AppController — espaces de travail", () => {
   });
 });
 
+describe("AppController — choix du modèle (D38, ADR 0020)", () => {
+  it("liste les modèles du runtime et signale celui retenu pour le projet", async () => {
+    const { controller, runtime } = setup();
+    runtime.models = [
+      { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", multiplier: 1 },
+      { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", multiplier: 3 },
+    ];
+    await controller["workspace:open"]({ path: "/projets/demo" });
+
+    expect(await controller["models:list"]({})).toEqual({
+      models: [
+        { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", multiplier: 1 },
+        { id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", multiplier: 3 },
+      ],
+      selected: null,
+    });
+  });
+
+  it("le modèle choisi est retenu par projet et transmis aux sessions suivantes", async () => {
+    const ctx = setup();
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    await ctx.controller["model:set"]({ id: "claude-sonnet-4.5" });
+    await ctx.controller["chat:start"]({});
+    expect(ctx.runtime.configs.get("fake-1")?.model).toBe("claude-sonnet-4.5");
+
+    // Un autre projet garde son propre choix.
+    await ctx.controller["workspace:open"]({ path: "/projets/b" });
+    expect((await ctx.controller["models:list"]({})).selected).toBeNull();
+
+    // Et le premier retrouve le sien, y compris au démarrage suivant.
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    expect((await ctx.controller["models:list"]({})).selected).toBe("claude-sonnet-4.5");
+    const suivant = setup({ settings: ctx.getSettings() });
+    await suivant.controller["workspace:open"]({ path: "/projets/a" });
+    expect((await suivant.controller["models:list"]({})).selected).toBe("claude-sonnet-4.5");
+  });
+
+  it("revenir au choix automatique efface le modèle retenu", async () => {
+    const { controller, runtime } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["model:set"]({ id: "claude-sonnet-4.5" });
+    await controller["model:set"]({ id: null });
+    expect((await controller["models:list"]({})).selected).toBeNull();
+    await controller["chat:start"]({});
+    expect(runtime.configs.get("fake-1")?.model).toBeUndefined();
+  });
+
+  it("un runtime sans liste de modèles n'empêche pas de converser", async () => {
+    const { controller, runtime } = setup();
+    runtime.models = null; // le port rend `listModels` facultatif
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    expect(await controller["models:list"]({})).toEqual({ models: [], selected: null });
+  });
+});
+
 describe("AppController — conversation", () => {
   it("refuse de démarrer sans projet ouvert", async () => {
     const { controller } = setup();

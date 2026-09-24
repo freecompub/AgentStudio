@@ -73,6 +73,21 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       usageUnit: "requests",
       resumableSessions: true,
     },
+    /**
+     * Modèles réellement disponibles pour ce compte (ADR 0020). Un échec (hors ligne, quota)
+     * ne doit pas empêcher de converser : la liste est alors vide et le runtime décide.
+     */
+    async listModels() {
+      try {
+        return (await client.listModels())
+          .filter((m) => m.policy?.state !== "disabled")
+          .map((m) => ({ id: m.id, name: m.name, ...(m.billing?.multiplier !== undefined ? { multiplier: m.billing.multiplier } : {}) }));
+      } catch (err) {
+        logger?.warn("liste des modèles indisponible", { error: String(err) });
+        return [];
+      }
+    },
+
     start: () => client.start(),
     stop: async () => {
       const errors = await client.stop();

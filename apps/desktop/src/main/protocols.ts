@@ -20,6 +20,8 @@ export interface AppSettings {
   lastWorkspace?: string;
   /** Mode d'affichage choisi par l'utilisateur ; absent = mode par défaut du profil. */
   uiMode?: "simple" | "advanced";
+  /** Modèle retenu par projet (racine → identifiant), D38 / ADR 0020. */
+  models?: Record<string, string>;
 }
 
 export interface SettingsStore {
