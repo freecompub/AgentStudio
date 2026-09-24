@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
 import { z } from "zod";
 import type { FailureKind, TestResult } from "../protocols.js";
@@ -46,9 +47,17 @@ function toStatus(s: string): TestResult["status"] {
 export function parseVitestReport(raw: unknown, root: string): TestResult[] {
   const parsed = reportSchema.safeParse(raw);
   if (!parsed.success) throw new Error("Rapport de tests illisible (format Vitest JSON attendu)");
+  // Vitest rapporte des chemins réels : une racine passant par un lien symbolique (macOS,
+  // où /var pointe vers /private/var) donnerait des identifiants « ../../../private/var/… ».
+  let racine = root;
+  try {
+    racine = realpathSync(root);
+  } catch {
+    /* racine inexistante : on garde le chemin fourni */
+  }
   const results: TestResult[] = [];
   for (const file of parsed.data.testResults) {
-    const rel = (isAbsolute(file.name) ? relative(root, file.name) : file.name).replaceAll("\\", "/");
+    const rel = (isAbsolute(file.name) ? relative(racine, file.name) : file.name).replaceAll("\\", "/");
     if (file.assertionResults.length === 0) {
       // La suite n'a pas pu être chargée (module introuvable, erreur de syntaxe…).
       if (file.status === "failed")

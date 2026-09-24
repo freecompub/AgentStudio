@@ -2,7 +2,7 @@ import { dirname } from "node:path";
 import type { ExtensionContext, ExtensionManifest, ExtensionModule, TaskDefinition } from "@agent-studio/extension-api";
 import type { ActivationRequest } from "./child/runtime.js";
 import { activateInProcess, type ExtensionHandle, type HostDeps } from "./in-process-host.js";
-import type { ChildHandle, ProcessLauncher } from "./launchers/protocol.js";
+import { cheminReel, type ChildHandle, type ProcessLauncher } from "./launchers/protocol.js";
 import { createRpcEndpoint, type RpcEndpoint } from "./rpc/endpoint.js";
 
 export interface IsolatedExtension {
@@ -127,7 +127,9 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
           },
         });
         rpc = endpoint;
-        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: ext.entry, testFilePattern: deps.stack.testFilePattern, layout: deps.stack.layout };
+        // Chemin réel : sous `--permission`, Node compare le chemin tel que fourni, sans
+        // résoudre les liens symboliques — importer par un lien refuserait l'accès.
+        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: cheminReel(ext.entry), testFilePattern: deps.stack.testFilePattern, layout: deps.stack.layout };
         await endpoint.call("activate", [req], { timeoutMs: opts.activationTimeoutMs ?? 15_000 });
       },
       async deactivate() {

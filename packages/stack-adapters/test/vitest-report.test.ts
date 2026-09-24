@@ -60,3 +60,30 @@ describe("classifyFailure", () => {
     expect(classifyFailure(msg)).toBe(kind);
   });
 });
+
+describe("parseVitestReport — racine passant par un lien symbolique", () => {
+  it("rend des chemins relatifs à la racine, même quand le rapport donne le chemin réel", async () => {
+    // macOS : `tmpdir()` passe par /var → /private/var. Vitest rapporte le chemin réel ;
+    // sans résolution, `relative()` produit des identifiants du genre « ../../../private/var/… ».
+    const { mkdtemp, realpath, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const racine = await mkdtemp(join(tmpdir(), "agent-studio-lien-"));
+    try {
+      const reel = await realpath(racine);
+      const rapport = {
+        testResults: [
+          {
+            name: join(reel, "tests/cap.test.ts"),
+            status: "passed",
+            assertionResults: [{ fullName: "sous le plafond", status: "passed" }],
+          },
+        ],
+      };
+      const [r] = parseVitestReport(rapport, racine);
+      expect(r).toMatchObject({ file: "tests/cap.test.ts", id: "tests/cap.test.ts > sous le plafond" });
+    } finally {
+      await rm(racine, { recursive: true, force: true });
+    }
+  });
+});

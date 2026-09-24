@@ -1,12 +1,13 @@
 import { fork } from "node:child_process";
 import type { RpcMessage } from "../rpc/protocol.js";
-import { isolationExecArgv, type ProcessLauncher } from "./protocol.js";
+import { cheminReel, isolationExecArgv, type ProcessLauncher } from "./protocol.js";
 
 /** Lanceur Node (`child_process.fork`) : tests et exécution hors Electron. */
 export function createNodeLauncher(opts: { onStderr?: (chunk: string) => void } = {}): ProcessLauncher {
   return {
     launch(launch) {
-      const child = fork(launch.entry, [], {
+      // Chemin réel : sous `--permission`, Node lit le script d'entrée par son chemin résolu.
+      const child = fork(cheminReel(launch.entry), [], {
         execArgv: isolationExecArgv(launch),
         stdio: ["ignore", "ignore", "pipe", "ipc"],
         env: { NODE_ENV: process.env["NODE_ENV"] ?? "production" },

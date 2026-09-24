@@ -1,5 +1,5 @@
 import { utilityProcess } from "electron";
-import { isolationExecArgv, type ProcessLauncher, type RpcMessage } from "@agent-studio/extension-host";
+import { cheminReel, isolationExecArgv, type ProcessLauncher, type RpcMessage } from "@agent-studio/extension-host";
 
 /**
  * Lanceur Electron : un `utilityProcess` par extension (D9), sous le modèle de permissions Node
@@ -8,7 +8,7 @@ import { isolationExecArgv, type ProcessLauncher, type RpcMessage } from "@agent
 export function createUtilityProcessLauncher(opts: { onStderr?: (chunk: string) => void } = {}): ProcessLauncher {
   return {
     launch(launch) {
-      const child = utilityProcess.fork(launch.entry, [], {
+      const child = utilityProcess.fork(cheminReel(launch.entry), [], {
         execArgv: isolationExecArgv(launch),
         serviceName: "agent-studio-extension",
         stdio: ["ignore", "ignore", "pipe"],

@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import type { MessageChannelLike } from "../rpc/protocol.js";
 
 /** Processus hôte d'une extension, vu du principal. */
@@ -22,7 +23,24 @@ export interface ProcessLauncher {
   launch(opts: LaunchOptions): ChildHandle;
 }
 
+/**
+ * Chemin réel, liens symboliques résolus. Le modèle de permissions de Node compare les chemins
+ * réels : `--allow-fs-read=/var/…` n'autorise rien quand `/var` pointe vers `/private/var`
+ * (macOS). Un chemin encore inexistant est gardé tel quel, pour ne pas empêcher le lancement.
+ */
+export function cheminReel(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
 /** Options Node communes : modèle de permissions (§4.1, §10.1) et budget mémoire. */
 export function isolationExecArgv(opts: LaunchOptions): string[] {
-  return ["--permission", ...opts.readPaths.map((p) => `--allow-fs-read=${p}`), `--max-old-space-size=${opts.maxOldSpaceMb ?? 256}`];
+  return [
+    "--permission",
+    ...opts.readPaths.map((p) => `--allow-fs-read=${cheminReel(p)}`),
+    `--max-old-space-size=${opts.maxOldSpaceMb ?? 256}`,
+  ];
 }

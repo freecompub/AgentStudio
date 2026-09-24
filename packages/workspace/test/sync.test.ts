@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cloneWorkspace } from "../src/workspace.js";
@@ -30,7 +30,9 @@ describe("Workspace — clonage, commit, synchronisation", () => {
 
   it("clone un dépôt distant et l'ouvre comme espace de travail", async () => {
     const ws = await cloneWorkspace(`file://${remote}`, join(base, "clone"));
-    expect(ws.root).toBe(join(base, "clone"));
+    // `git rev-parse --show-toplevel` renvoie le chemin réel : sur macOS, le dossier temporaire
+    // passe par /var → /private/var.
+    expect(ws.root).toBe(await realpath(join(base, "clone")));
     expect(await readFile(join(ws.root, "README.md"), "utf8")).toBe("v1\n");
   });
 
