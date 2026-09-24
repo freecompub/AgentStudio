@@ -1,6 +1,6 @@
 # ADR 0020 — Choix du modèle par l'utilisateur
 
-- Statut : **décidé** (tranche la première moitié de D38)
+- Statut : **décidé, sans effet à ce jour** — le Copilot CLI n'honore pas le choix (mesures ci-dessous)
 - Date : 2026-09-24
 - Jalon : hors jalon (dette reprise après S6)
 
@@ -27,6 +27,28 @@ Une liste déroulante dans la barre du haut, à côté du sélecteur de mode.
   Laisser le choix vide conserve le comportement actuel : le runtime décide.
 - Le port `AgentRuntime` gagne `listModels()`. Comme pour le reste, aucun objet du SDK ne sort de
   `runtime-copilot` (D10) : seules des données sérialisables traversent.
+
+## Mesuré le 2026-09-24 : le runtime n'honore pas le choix
+
+Sur le compte de développement, la fonctionnalité ne peut pas tenir sa promesse :
+
+| Voie | Résultat |
+| --- | --- |
+| `client.listModels()` | un seul modèle, d'identifiant `auto` |
+| API Copilot (`/models`) | 57 modèles, dont 13 autorisés : GPT-5.6 Luna, Claude Haiku 4.5, GPT-4.1, GPT-5 mini, Kimi K3, MAI-Code… |
+| `createSession({ model })` | ignoré : `claude-haiku-4.5` puis `gpt-4.1` demandés, `mai-code-1.1-flash` utilisé |
+| `session.setModel()` | accepté sans erreur, sans effet : même modèle avant et après |
+
+Le CLI route donc lui-même, et son choix varie dans le temps (`gpt-5.6-luna` le matin,
+`mai-code-1.1-flash` l'après-midi). Brancher la vraie liste par `onListModels` ne servirait à
+rien : l'utilisateur choisirait sans que rien ne change — une liste déroulante mensongère.
+
+**Conséquence retenue** : le code reste en place, mais `auto` est écarté (doublon du choix
+automatique), donc la liste ne s'affiche pas tant qu'aucun choix réel n'est offert. Elle
+apparaîtra d'elle-même si le runtime expose un jour de vrais modèles.
+
+**À revérifier** avec une offre Copilot payante, où le routage imposé pourrait ne pas s'appliquer,
+et à chaque montée de version du SDK (`copilotCliVersion` 1.0.85 ici).
 
 ## Ce qui reste ouvert
 
