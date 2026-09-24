@@ -28,6 +28,7 @@ export function createNodeProcessSpawner(): ProcessSpawner {
           child.stderr.setEncoding("utf8").on("data", cb);
         },
         write: (data) => void child.stdin.write(data),
+        kill: () => void child.kill("SIGTERM"),
         exited,
       };
     },

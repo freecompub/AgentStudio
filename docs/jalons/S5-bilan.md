@@ -22,6 +22,13 @@
 
 ADR : 0017.
 
+## Critère non couvert
+
+La feuille de route de S5 demande « **même pipeline sur un projet TypeScript** sans modifier
+l'extension, seulement son profil ». Ce point n'a pas été vérifié : le pipeline n'a tourné que
+sur le projet Swift de démonstration. La formulation suppose en outre des profils de stack
+déclaratifs, qui n'existent pas (J5 partiellement livré).
+
 ## Limites
 
 - Mutation Swift simulée. ~~Pas de Muter sous Linux.~~ Possible sur macOS depuis le 2026-09-24.

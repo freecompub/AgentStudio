@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { ProcessRunner, StackAdapter, TestResult } from "../protocols.js";
 import { parseMuterReport } from "./muter-report.js";
+import { parseSwiftLintReport } from "./swiftlint-report.js";
 import { analyzeSwiftImports } from "./swift-architecture.js";
 import { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, parseXunit } from "./swift-report.js";
 
@@ -35,6 +36,8 @@ export interface SwiftToolchain {
   swift?: string;
   /** Binaire `muter` ; défaut : `muter` du PATH. */
   muter?: string;
+  /** Binaire `swiftlint` ; défaut : `swiftlint` du PATH. */
+  swiftlint?: string;
   /** Variables d'environnement propres à la chaîne (bibliothèques, options du compilateur…). */
   env?: Record<string, string>;
 }
@@ -118,6 +121,27 @@ export function createSwiftAdapter(deps: SwiftAdapterDeps = {}): StackAdapter {
         return { results, exitCode: r.exitCode, timedOut: false, output: tail, durationMs: r.durationMs };
       } finally {
         await rm(report, { force: true });
+      }
+    },
+
+    /** SwiftLint du projet, avec son `.swiftlint.yml`. Absent : rien n'est jugé. */
+    async lint(opts) {
+      const r = await runner
+        .run(tc.swiftlint ?? "swiftlint", ["lint", "--quiet", "--reporter", "json", ...(opts.files?.length ? ["--", ...opts.files] : [])], {
+          cwd: opts.root,
+          env,
+          timeoutMs: opts.timeoutMs ?? 5 * 60_000,
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        })
+        .catch(() => null);
+      // `swiftlint` sort en 0 (rien) ou 2 (violations trouvées) ; tout autre code signale un
+      // échec — configuration illisible, argument refusé — avec un stdout souvent vide. Le
+      // prendre pour « aucune violation » attesterait une conformité jamais vérifiée.
+      if (!r || r.timedOut || (r.exitCode !== 0 && r.exitCode !== 2) || !r.stdout.trim()) return { available: false, violations: [] };
+      try {
+        return { ...parseSwiftLintReport(JSON.parse(r.stdout), opts.root), tool: "swiftlint" };
+      } catch {
+        return { available: false, violations: [] };
       }
     },
 

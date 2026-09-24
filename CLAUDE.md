@@ -15,8 +15,8 @@ J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift u
 `~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
-skraft : S0 en attente de décision de licence (ADR 0012, aucune reprise de skraft-plugin, prompts de
-substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
+skraft : S0 tranché (ADR 0012, option C : l'auteur autorise la reprise ; elle n'a pas commencé,
+les prompts de substitution restent en place), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
 (`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`), S3 livré (`feat/s3-skraft-design`,
 `docs/jalons/S3-bilan.md`), S4 livré (`feat/s4-skraft-distill`, `docs/jalons/S4-bilan.md`),
 S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`feat/s6-skraft-review`,
@@ -28,12 +28,16 @@ Un jalon = une branche partie du précédent, avec des commits séparés par bri
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # un seul projet : core, workspace, task-engine, stack-adapters, extension-host, runtime-copilot, github-auth, ext-tdd, desktop
+pnpm vitest run --project core  # projets : core, task-engine, workspace, stack-adapters, runtime-copilot, github-auth,
+                                #            extension-api, extension-host, extension-manifest, extension-installer,
+                                #            extension-packaging, ext-tdd, ext-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)
 pnpm build                      # build Electron dans apps/desktop/out
 pnpm smoke:copilot              # essai réel contre Copilot (hors CI, consomme des requêtes)
+pnpm ext:build <src> <sortie>   # compile une extension du dépôt (entrée + manifest.json)
+pnpm ext:keys / pnpm ext:pack   # clés d'éditeur, puis paquet .asx (non signé sans clé)
 ```
 
 Les paquets internes exportent directement `src/index.ts` (pas d'étape de build, ADR 0001).
@@ -45,7 +49,7 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 
 ## Documents de référence (à lire avant de coder)
 
-- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
+- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §15 (feuille de route J1–J6, S1–S6), §16 (points SDK à vérifier), §17 (conventions).
 - `docs/specs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
 - `docs/reference/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
 - `docs/reference/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
@@ -59,8 +63,8 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 - Suivre les jalons dans l'ordre en commençant par **J1** ; ne passer au suivant qu'une fois tous ses critères de sortie remplis.
 - TDD strict. Réducteurs et politiques : fonctions pures, testées sans LLM, sans Git, sans disque.
 - Toute nouvelle décision technique → ADR dans `docs/adr/NNNN-titre.md` (contexte, décision, conséquences, statut).
-- Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §15) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
-- **skraft est GPL-3.0-or-later** : ne copier aucun prompt, skill ni code de skraft-plugin tant que la question O9/D42 n'est pas tranchée.
+- Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §16) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
+- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C : autorisation de l'auteur), mais la reprise reste interdite tant que trois conditions ne sont pas réunies : la trace écrite de l'autorisation versée au dépôt, la licence de redistribution précisée, et l'accès au dépôt source. Jusque-là, ne copier aucun prompt, skill ni code de skraft-plugin.
 
 ## Architecture cible (vue d'ensemble)
 
@@ -77,9 +81,9 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 - **Workspace** est le seul service à toucher le disque et Git.
 - Humain : jamais d'attente bloquante ; décisions longues = demandes d'interaction persistées, réinjectées comme `HUMAN_DECISION`.
 
-Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,extension-host,extension-api,extension-manifest,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
+Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
 
-## Conventions (§16)
+## Conventions (§17)
 
 - TypeScript `strict`, ESM, pnpm workspaces ; tests Vitest.
 - Tests d'intégration avec un faux `AgentRuntime` scripté ; aucun appel réel au LLM en CI.

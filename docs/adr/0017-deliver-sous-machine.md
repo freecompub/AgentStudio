@@ -54,3 +54,20 @@ gelés, preuves produites par `run_tests`, seuils de qualité vérifiés à la f
   et tests.
 - Muter n'existe pas sous Linux : la mutation Swift n'est vérifiée qu'au travers de son rapport
   (doublure dans les tests). Le format réel reste à vérifier (§15).
+
+## Amendement du 2026-09-24 : la qualité de forme passe au linter du projet
+
+La porte de fin de scénario embarquait un analyseur de code écrit ici, à base d'expressions
+régulières, pour Swift et TypeScript. Il mesurait la longueur des méthodes, l'imbrication et le
+nombre d'attributs, avec des seuils tenus dans `.skraft/quality.json`.
+
+Cette brique n'était pas un choix : le plan de reprise (SPEC-skraft §4) prévoyait que la part
+dépendante du langage vive dans le **profil de stack**. Les profils n'ayant pas été livrés (J5
+partiellement livré), elle a été écrite en dur dans l'extension.
+
+Trois défauts en découlaient : l'analyseur ne connaissait que deux langages et retournait
+silencieusement zéro motif ailleurs, tout en laissant la porte **produire un fait attestant la
+conformité** ; ses seuils pouvaient contredire ceux du linter déjà configuré par le projet ; et
+il refaisait, en moins fiable, le travail d'outils bâtis sur de vrais parseurs.
+
+L'analyseur est supprimé au profit de `ctx.stack.lint()` (ADR 0022).

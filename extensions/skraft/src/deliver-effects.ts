@@ -1,7 +1,7 @@
 import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkCalisthenics, checkDependencies, checkMutation, checkRedGreenSequence, concerns, parseQualityBar, planScenarios } from "./deliver.js";
+import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, parseQualityBar, planScenarios } from "./deliver.js";
 import { featureScenarios } from "./distill.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
@@ -190,11 +190,20 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
       for (const f of mutation.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
         facts.push(`Mutation (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
     } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
-    const before = reasons.length;
-    for (const p of sources) reasons.push(...checkCalisthenics(p, await ctx.workspace.readFile(p), bar));
-    if (reasons.length === before) {
-      const c = bar.calisthenics;
-      facts.push(`Object Calisthenics (${e.scenarioId}) : méthodes de ${c.maxMethodLines} lignes au plus, ${c.maxIndentation} niveaux d'indentation au plus, ${c.maxAttributes} attributs par type au plus, dans ${sources.join(", ")}.`);
+    // Qualité de forme : le linter du projet, avec ses propres règles. Sans linter, on le dit
+    // au lieu de produire un fait — une porte qui n'a rien mesuré n'atteste de rien.
+    const lint = await ctx.stack.lint({ files: sources, ...(signal ? { signal } : {}) });
+    if (!lint?.available) {
+      notes.push("Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.");
+    } else {
+      const motifs = checkLint(lint);
+      reasons.push(...motifs);
+      // Un fichier que le linter a ignoré n'a pas été jugé : n'attester que de ce qu'il a lu.
+      const examines = lint.analyzed ?? sources;
+      const omis = sources.filter((p) => !examines.includes(p));
+      if (motifs.length === 0 && examines.length > 0)
+        facts.push(`Lint (${e.scenarioId}) : ${lint.tool ?? "linter du projet"} sans erreur sur ${examines.join(", ")}.`);
+      if (omis.length > 0) notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
     }
   }
   const architecture = await ctx.stack.architecture(bar.dependencyRules);

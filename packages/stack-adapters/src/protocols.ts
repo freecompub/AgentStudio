@@ -38,6 +38,26 @@ export interface MutationReport {
   files: { file: string; score: number; survived: { line: number; operator: string }[] }[];
 }
 
+/**
+ * Rapport du linter du projet. La qualité de forme — longueur des méthodes, imbrication,
+ * nombre d'attributs — est jugée par l'outil que le projet a déjà configuré (ESLint, SwiftLint,
+ * ruff…), avec ses propres seuils : deux autorités contradictoires sur la même question
+ * bloqueraient du code que la CI du projet accepte.
+ */
+export interface LintReport {
+  /** Faux quand le projet n'a pas de linter configuré : la porte ne juge alors rien. */
+  available: boolean;
+  /** Commande employée, citée dans les faits de la revue. */
+  tool?: string;
+  /**
+   * Fichiers réellement examinés, chemins relatifs. Une liste vide, ou incomplète au regard des
+   * fichiers demandés, veut dire que le linter n'a rien jugé — absence de violation ne vaut
+   * alors pas conformité.
+   */
+  analyzed?: string[];
+  violations: { file: string; line?: number; rule: string; message: string }[];
+}
+
 /** Règle de dépendance : un module ne doit pas importer certains modules (§9.7). */
 export interface DependencyRule {
   module: string;
@@ -69,6 +89,11 @@ export interface StackAdapter {
   mutation?(opts: { root: string; timeoutMs?: number; signal?: AbortSignal }): Promise<MutationReport>;
   /** Analyse des dépendances entre modules (facultatif selon la stack). */
   architecture?(opts: { root: string; rules: DependencyRule[] }): Promise<ArchitectureReport>;
+  /**
+   * Linter du projet (facultatif selon la stack). Ne lève pas quand l'outil est absent :
+   * renvoie `available: false`, pour que la porte le dise au lieu de conclure.
+   */
+  lint?(opts: { root: string; files?: string[]; timeoutMs?: number; signal?: AbortSignal }): Promise<LintReport>;
 }
 
 // ---------- Exécution de processus ------------------------------------------------

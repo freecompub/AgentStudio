@@ -161,7 +161,10 @@ describe("skraft — porte de fin de scénario (pile simulée)", () => {
     expect(testPrompts).toHaveLength(2);
     expect(testPrompts[1]).toContain("Mutation : Sources/Domain/BolusCap.swift à 50 % (minimum 100 %) ; mutants survivants : ligne 1 (RemoveSideEffects).");
     expect(s.deliver?.granularity).toBe("session-per-step");
-    expect(s.deliver?.notes).toEqual(["Scénario ac-1 : repris en sessions séparées après un échec."]);
+    expect(s.deliver?.notes).toEqual([
+      "Scénario ac-1 : repris en sessions séparées après un échec.",
+      "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+    ]);
     // Après la reprise : sessions séparées pour le vert puis le nettoyage.
     const deliverRoles = roles.filter((r) => r === "skraft-test" || r === "skraft-dev");
     expect(deliverRoles).toEqual(["skraft-test", "skraft-dev", "skraft-test", "skraft-dev", "skraft-dev"]);

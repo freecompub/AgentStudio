@@ -5,7 +5,7 @@ describe("Permissions en langage clair (§5.3)", () => {
   it.each([
     ["fs:read", "Lire les fichiers du projet"],
     ["fs:write:src/**", "Modifier les fichiers du projet correspondant à « src/** »"],
-    ["shell:test", "Lancer les tests du projet"],
+    ["shell:test", "Lancer les tests et le linter du projet"],
     ["shell:npm,make", "Exécuter les commandes : npm, make"],
     ["git:commit", "Enregistrer des modifications dans l'historique (commits)"],
     ["git:branch", "Créer ou changer de branche"],

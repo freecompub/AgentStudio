@@ -48,6 +48,8 @@ export interface CommandRunner {
 export interface InteractiveProcess {
   onOutput(cb: (chunk: string) => void): void;
   write(data: string): void;
+  /** Interrompt le processus (connexion abandonnée). Facultatif : les doubles peuvent l'omettre. */
+  kill?(): void;
   readonly exited: Promise<number>;
 }
 

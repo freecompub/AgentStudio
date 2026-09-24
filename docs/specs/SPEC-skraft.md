@@ -428,7 +428,7 @@ export interface DeliverState {
 | Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
 | Mutation (profil de stack) | Seuils du profil ; par défaut 100 % domaine et application, 90 % API et infrastructure. Capacité absente : porte non disponible, selon la politique du projet |
 | Règle de dépendance | Couches et imports autorisés déclarés dans le profil ; capacité absente : porte non disponible |
-| Object Calisthenics mesurables | Longueur de méthode, niveaux d'indentation, nombre d'attributs : seuils configurables |
+| Qualité de forme | Le **linter du projet** (ESLint, SwiftLint…), avec ses propres règles : longueur de méthode, imbrication, taille des types. Capacité absente : porte non disponible, constat « non mesurée » |
 | Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
 
 Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables par projet (`ctx.settings`).
@@ -528,7 +528,7 @@ Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depu
   "version": "0.1.0",
   "publisher": "agent-studio",
   "engines": { "appApi": "^0.1" },
-  "main": "dist/index.js",
+  "main": "dist/index.mjs",
   "activationEvents": ["onCommand:skraft"],
   "permissions": [
     "fs:read",
@@ -639,9 +639,9 @@ Mesurer par état : tokens, requêtes, réessais. Objectif de S6 : comparer le p
 
 ### 13.3 Bout en bout
 
-Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), avec un profil de stack généré par `/stack init` et vérifié par `/stack doctor`, story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
+Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
 
-Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un rejet de citation puis question « par prise ou par jour » → DESIGN avec un rejet de cohérence puis ratification d'ADR-008 → DISTILL avec un rejet de valeur puis scénario 3 requalifié → DELIVER des scénarios 1 et 2, une tentative de modification de test refusée → revue avec un défaut `major` corrigé → DONE avec bilan.
+Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un rejet de citation puis question « par prise ou par jour » → DESIGN avec un rejet de cohérence puis ratification d'un ADR → DISTILL avec un rejet de valeur puis scénario 3 requalifié → DELIVER des scénarios 1 et 2, une tentative de modification de test refusée → revue avec un défaut `major` corrigé → DONE avec bilan.
 
 ---
 
@@ -656,6 +656,25 @@ Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un re
 | **S4** | DISTILL : rôle `skraft-acceptance`, porte valeurs, porte RED d'acceptance, gel des tests d'acceptance | Fixtures valeurs et RED traitées ; empreinte enregistrée |
 | **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet Swift de démonstration ; modification de test refusée puis détectée par empreinte ; même pipeline sur un projet TypeScript sans modifier l'extension, seulement son profil |
 | **S6** | Revue : faits, trois lentilles, synthèse par le code, rapports générés ; mesures d'usage | Verdict reproductible depuis les mêmes JSON ; bout en bout 13.3 vert ; mesures sur trois stories |
+
+### État au 2026-09-24
+
+S0 à S6 sont livrés (bilans dans `docs/jalons/`), avec deux réserves.
+
+- **S5, critère « même pipeline sur un projet TypeScript »** : non couvert. Le pipeline n'a tourné
+  que sur le projet Swift de démonstration. La formulation renvoie d'ailleurs à un « profil » de
+  stack, notion qui n'existe pas encore (voir l'état des jalons de `SPEC.md` §15).
+- **S6, mesures sur trois stories** : le mécanisme est vérifié, mais les mesures proviennent
+  d'agents simulés. Le run réel contre Copilot reste à faire ; il n'est plus bloqué.
+
+**S0 est tranché** (ADR 0012, option C : l'auteur autorise la reprise). La reprise n'a pas
+commencé : la trace écrite de l'autorisation, la licence de redistribution et l'accès au dépôt
+source restent à réunir. Les prompts de substitution sont donc toujours en place, et leur qualité
+demeure l'inconnue à surveiller lors des runs réels.
+
+**Distribution** : depuis l'ADR 0021, `skraft` n'est plus livrée avec l'application. Elle se
+construit en paquet `.asx` (`pnpm ext:build` puis `pnpm ext:pack`) et s'installe depuis un
+fichier. Non signée pour l'instant, elle exige le mode développeur.
 
 ---
 

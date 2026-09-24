@@ -74,8 +74,10 @@ describe("skraft — critères de sortie de S1", () => {
     expect(report.map((l: { lens: string }) => l.lens)).toEqual(["cold-reader", "test-integrity", "architecture"]);
     // DELIVER : un scénario moteur, les deux autres déjà verts ; constats transmis aux lentilles.
     expect(s.deliver?.scenarios.map((x) => [x.id, x.status])).toEqual([["ac-1", "done"], ["ac-2", "done"], ["ac-3", "done"]]);
+    // Ce que la porte n'a pas pu mesurer est dit, jamais supposé conforme.
     expect(s.deliver?.notes).toEqual([
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
+      "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
     ]);
     expect(app.posted.at(-1)).toMatch(/Pipeline skraft terminé pour \*\*US-12\*\*/);

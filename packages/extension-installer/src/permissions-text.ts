@@ -2,7 +2,7 @@
 export function describePermission(p: string): string {
   if (p === "fs:read") return "Lire les fichiers du projet";
   if (p.startsWith("fs:write:")) return `Modifier les fichiers du projet correspondant à « ${p.slice(9)} »`;
-  if (p === "shell:test") return "Lancer les tests du projet";
+  if (p === "shell:test") return "Lancer les tests et le linter du projet";
   if (p.startsWith("shell:")) return `Exécuter les commandes : ${p.slice(6).split(",").join(", ")}`;
   if (p === "git:commit") return "Enregistrer des modifications dans l'historique (commits)";
   if (p === "git:branch") return "Créer ou changer de branche";

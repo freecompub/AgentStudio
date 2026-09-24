@@ -186,6 +186,12 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
       if (t.record.status === "finished") return;
       t.abort.abort();
       await enqueue(t, () => apply(t, { type: "ABORT" }));
+      // Le signal a interrompu le travail en cours ; les effets de clôture émis par la
+      // transition ABORT — bilan, nettoyage — doivent encore pouvoir s'exécuter. Sans ce
+      // renouvellement et ce drainage, ils resteraient en attente et la tâche demeurerait
+      // « running » indéfiniment.
+      t.abort = new AbortController();
+      await enqueue(t, () => drain(t));
     },
 
     async resumeAll() {
