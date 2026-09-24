@@ -11,3 +11,4 @@ export { parseMuterReport } from "./swift/muter-report.js";
 export { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, parseXunit } from "./swift/swift-report.js";
 export { selectStackAdapter } from "./select-stack.js";
 export { findLocalSwiftToolchain } from "./swift/local-toolchain.js";
+export { parseStackProfile, REPORT_READERS, type ReportReader, type StackProfile } from "./profile/stack-profile.js";
