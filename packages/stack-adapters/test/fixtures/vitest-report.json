@@ -1,0 +1,107 @@
+{
+ "numTotalTestSuites": 4,
+ "numPassedTestSuites": 0,
+ "numFailedTestSuites": 4,
+ "numPendingTestSuites": 0,
+ "numTotalTests": 4,
+ "numPassedTests": 1,
+ "numFailedTests": 2,
+ "numPendingTests": 1,
+ "numTodoTests": 0,
+ "snapshot": {
+  "added": 0,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0,
+  "didUpdate": false
+ },
+ "startTime": 0,
+ "success": false,
+ "testResults": [
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "cap"
+     ],
+     "fullName": "cap passe",
+     "status": "passed",
+     "title": "passe",
+     "duration": 0,
+     "failureMessages": [],
+     "meta": {},
+     "tags": []
+    },
+    {
+     "ancestorTitles": [
+      "cap"
+     ],
+     "fullName": "cap assertion",
+     "status": "failed",
+     "title": "assertion",
+     "duration": 0,
+     "failureMessages": [
+      "AssertionError: expected 10 to be 11 // Object.is equality\n    at /projet/tests/bolus.test.ts:5:45\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+     ],
+     "meta": {},
+     "tags": []
+    },
+    {
+     "ancestorTitles": [
+      "cap"
+     ],
+     "fullName": "cap ignor\u00e9",
+     "status": "skipped",
+     "title": "ignor\u00e9",
+     "failureMessages": [],
+     "meta": {},
+     "tags": []
+    },
+    {
+     "ancestorTitles": [
+      "cap"
+     ],
+     "fullName": "cap symbole",
+     "status": "failed",
+     "title": "symbole",
+     "duration": 0,
+     "failureMessages": [
+      "ReferenceError: notThere is not defined\n    at /projet/tests/bolus.test.ts:8:5\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///home/diabeo/Projets/AgentStudio/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64"
+     ],
+     "meta": {},
+     "tags": []
+    }
+   ],
+   "startTime": 0,
+   "endTime": 0,
+   "status": "failed",
+   "message": "",
+   "name": "/projet/tests/bolus.test.ts"
+  },
+  {
+   "assertionResults": [],
+   "startTime": 0,
+   "endTime": 0,
+   "status": "failed",
+   "message": "Cannot find module '../src/alert' imported from /projet/tests/missing.test.ts",
+   "name": "/projet/tests/missing.test.ts"
+  },
+  {
+   "assertionResults": [],
+   "startTime": 0,
+   "endTime": 0,
+   "status": "failed",
+   "message": "Transform failed with 1 error:\n\n\u001b[31m[PARSE_ERROR] \u001b[0mUnexpected token\n   \u001b[38;5;246m\u256d\u001b[0m\u001b[38;5;246m\u2500\u001b[0m\u001b[38;5;246m[\u001b[0m tests/syntax.test.ts:2:23 \u001b[38;5;246m]\u001b[0m\n   \u001b[38;5;246m\u2502\u001b[0m\n \u001b[38;5;246m2 \u2502\u001b[0m \u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m\u001b[38;5;249m\"\u001b[0m\u001b[38;5;249mx\u001b[0m\u001b[38;5;249m\"\u001b[0m\u001b[38;5;249m,\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m(\u001b[0m\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m>\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m=\u001b[38;5;249m \u001b[0m\u001b[38;5;249m1\u001b[0m\u001b[38;5;249m;\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m  \u2502\u001b[0m                       \u252c  \n \u001b[38;5;240m  \u2502\u001b[0m                       \u2570\u2500\u2500 \n\u001b[38;5;246m\u2500\u2500\u2500\u256f\u001b[0m\n",
+   "name": "/projet/tests/syntax.test.ts"
+  }
+ ]
+}

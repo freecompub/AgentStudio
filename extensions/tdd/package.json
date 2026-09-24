@@ -1,0 +1,23 @@
+{
+  "name": "@agent-studio/ext-tdd",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "esbuild": "^0.28.2"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

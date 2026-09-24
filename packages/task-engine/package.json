@@ -1,0 +1,13 @@
+{
+  "name": "@agent-studio/task-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

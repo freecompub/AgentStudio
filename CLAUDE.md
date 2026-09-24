@@ -2,19 +2,52 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## État du dépôt
+## État du dépôt et commandes
 
-Le dépôt ne contient **encore aucun code applicatif** : uniquement la spécification (`docs/`) et deux prototypes TypeScript. Il n'y a ni `package.json`, ni commandes de build, lint ou test pour l'instant. Quand le monorepo sera créé, mettre à jour ce fichier avec les commandes réelles (pnpm, Vitest, lancement d'Electron, exécution d'un seul test).
+Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, blocages dans
+`docs/jalons/J1-blocages.md`), J2 livré (`feat/j2-moteur-taches`, bilan dans `docs/jalons/J2-bilan.md`), J3 livré
+(`feat/j3-preuves-interactions`, `docs/jalons/J3-bilan.md`), J4 livré (`feat/j4-isolation-extensions`,
+`docs/jalons/J4-bilan.md`). Les extensions internes sont compilées par
+`pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`).
+J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift utilisent la chaîne de
+`~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
+J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
+(`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
+skraft : S0 en attente de décision de licence (ADR 0012, aucune reprise de skraft-plugin, prompts de
+substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`), S2 livré
+(`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`), S3 livré (`feat/s3-skraft-design`,
+`docs/jalons/S3-bilan.md`), S4 livré (`feat/s4-skraft-distill`, `docs/jalons/S4-bilan.md`),
+S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`feat/s6-skraft-review`,
+`docs/jalons/S6-bilan.md`) ; les mesures réelles attendent un run Copilot, désormais possible :
+les blocages de J1 (jeton Copilot, Electron injouable) sont levés depuis le 2026-09-24
+(`docs/jalons/J1-blocages.md`).
+Un jalon = une branche partie du précédent, avec des commits séparés par brique.
+
+```bash
+pnpm install
+pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
+pnpm vitest run --project core  # un seul projet : core, workspace, task-engine, stack-adapters, extension-host, runtime-copilot, github-auth, ext-tdd, desktop
+pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
+pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
+pnpm dev                        # Electron en développement (electron-vite)
+pnpm build                      # build Electron dans apps/desktop/out
+pnpm smoke:copilot              # essai réel contre Copilot (hors CI, consomme des requêtes)
+```
+
+Les paquets internes exportent directement `src/index.ts` (pas d'étape de build, ADR 0001).
+Chaque paquet décrit ses capacités dans `src/protocols.ts` (ou `src/protocols/`) ; les implémentations
+sont des fabriques `createX(deps)` injectables. Les doubles de test du cœur sont exportés par
+`@agent-studio/core/testing` (`ScriptedRuntime`, `ScriptedSession`…).
 
 Toute la documentation est en français ; écrire les ADR, messages et libellés en français.
 
 ## Documents de référence (à lire avant de coder)
 
-- `docs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
-- `docs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
-- `docs/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
-- `docs/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
-  `SPEC.md` les désigne sous `reference/` : ce sont des prototypes à découper, pas du code de production.
+- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
+- `docs/specs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
+- `docs/reference/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
+- `docs/reference/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
+  Ce sont des prototypes à découper, pas du code de production.
 - `docs/01…04-*.md` — documents d'analyse (architecture, audit de skraft-plugin 1.5.2, comparaison des diagrammes d'état). Contexte uniquement.
 
 ## Règles de travail imposées par la spec

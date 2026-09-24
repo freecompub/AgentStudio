@@ -12,13 +12,14 @@
 1. **Lis ce document en entier avant d'écrire du code.** Les sections se répondent.
 2. **Les décisions marquées `DÉCIDÉ` (section 3) ne se rediscutent pas pendant l'implémentation.** Si une décision te semble bloquante ou fausse, arrête-toi et pose la question au lieu de la contourner.
 3. **Les décisions marquées `OUVERT` ne doivent pas être tranchées silencieusement.** Implémente derrière une interface ou une option de configuration, et signale le choix provisoire.
-4. **Commence par le jalon J1 (section 14)**, dans l'ordre. Chaque jalon a des critères de sortie vérifiables : ne passe au suivant que lorsqu'ils sont tous remplis.
+4. **Commence par le jalon J1 (section 15)**, dans l'ordre. Chaque jalon a des critères de sortie vérifiables : ne passe au suivant que lorsqu'ils sont tous remplis.
 5. **Travaille en TDD** : un test qui échoue, le code minimal, le refactor. Le moteur de tâches et les réducteurs sont des fonctions pures, testables sans LLM, sans Git et sans disque.
 6. **Consigne chaque décision technique nouvelle dans un ADR** sous `docs/adr/NNNN-titre.md` (format : contexte, décision, conséquences, statut).
-7. **Vérifie les API des SDK sur la version installée** avant de t'y fier. Les points signalés `À VÉRIFIER` (section 15) ont été constatés sur une version donnée et peuvent avoir changé.
+7. **Vérifie les API des SDK sur la version installée** avant de t'y fier. Les points signalés `À VÉRIFIER` (section 16) ont été constatés sur une version donnée et peuvent avoir changé.
 8. **Deux fichiers de référence accompagnent ce document** : `reference/tdd-orchestrator.ts` (machine à états TDD complète, compilée en TypeScript strict) et `reference/copilot-agents.ts` (adaptateur Copilot SDK : sessions par rôle, garde de périmètre, outils terminaux). Ce sont des prototypes à reprendre et découper, pas du code de production.
    La spécification détaillée de l'extension skraft est dans `SPEC-skraft.md`.
-9. **Ne jamais exposer un objet du SDK à une extension** (voir D7). C'est la règle de sécurité la plus importante du projet.
+9. **Ne jamais exposer un objet du SDK à une extension** (voir D10). C'est la règle de sécurité la plus importante du projet.
+10. **Aucun code propre à un langage hors des profils de stack** (section 8) : les extensions et le moteur de portes ne connaissent ni Swift, ni TypeScript, ni .NET.
 
 ---
 
@@ -40,7 +41,7 @@ Le principe directeur de tout le projet :
 | Développeur | Piloter des workflows de développement, voir le détail technique |
 | Architecte | Ratifier les décisions d'architecture, revoir les conceptions |
 
-Deux niveaux de lecture de l'interface servent ces publics : **mode simple** (non-développeurs) et **mode avancé** (développeurs). Voir section 11.
+Deux niveaux de lecture de l'interface servent ces publics : **mode simple** (non-développeurs) et **mode avancé** (développeurs). Voir section 12.
 
 ### 1.2 Hors périmètre (pour l'instant)
 
@@ -65,7 +66,9 @@ Marketplace en ligne, synchronisation multi-postes, édition collaborative, web 
 | Outil terminal | Outil dont l'appel réussi termine le tour de l'agent ; sert de contrat de sortie structurée |
 | Dossier de passation | Contexte explicite transmis à une nouvelle session (plan, étape, résumés, motif de rejet) |
 | Checkpoint | SHA Git enregistré avant un effet, point de retour garanti |
-| Adaptateur de stack | Module qui sait lancer les tests, lire leur rapport, lancer la mutation et analyser l'architecture pour un langage |
+| Profil de stack | Fichier déclaratif qui décrit, pour un projet, les commandes de test et de mutation, les formats de rapport, les emplacements, les motifs d'erreur et les couches d'architecture (section 8) |
+| Parseur complémentaire | Petit module en bac à sable qui convertit un rapport non standard en résultats normalisés |
+| Canari | Test généré exprès, dont le résultat attendu est connu, pour vérifier un profil |
 
 ---
 
@@ -139,9 +142,20 @@ Marketplace en ligne, synchronisation multi-postes, édition collaborative, web 
 
 | # | Décision | Statut | Justification |
 | --- | --- | --- | --- |
-| D40 | skraft est porté comme **extension**, avec son pipeline RESEARCH → DESIGN → DISTILL → DELIVER piloté par notre réducteur | DÉCIDÉ | Voir section 9 |
-| D41 | Réutiliser ses 22 prompts d'agents, 36 skills, politiques pures de `domain/`, schéma de preuves et commande `artifact adr` **après unification du modèle d'état** | DÉCIDÉ (sous réserve D42) | Méthode riche, mécanisme de contrôle défaillant |
+| D40 | skraft est porté comme **extension**, avec son pipeline RESEARCH → DESIGN → DISTILL → DELIVER piloté par notre réducteur | DÉCIDÉ | Voir section 10 |
+| D41 | Réutiliser ses prompts d'agents, ses skills (36 en 1.5.2, 38 en 1.6.0), politiques pures de `domain/`, schéma de preuves et commande `artifact adr` **après unification du modèle d'état** | DÉCIDÉ (sous réserve D42) | Méthode riche, mécanisme de contrôle défaillant |
 | D42 | Compatibilité de la licence **GPL-3.0-or-later** de skraft avec la distribution de l'extension | OUVERT | À valider avant toute reprise de code ou de prompts |
+
+### 3.7 Profils de stack
+
+| # | Décision | Statut | Justification |
+| --- | --- | --- | --- |
+| D43 | Tout ce qui dépend du langage est externalisé dans un **profil de stack déclaratif** versionné dans le dépôt ; aucune extension ne contient de code propre à un langage | DÉCIDÉ | Extensions génériques ; nouvelle stack sans écrire d'adaptateur |
+| D44 | Le moteur ne lit que des **formats standards** (JUnit XML, TAP, rapport de mutation Stryker) ; un parseur complémentaire n'est écrit que pour un outil qui n'en produit aucun | DÉCIDÉ | Couverture large avec un seul moteur |
+| D45 | Les capacités d'un profil sont **déclarées** ; une porte sans capacité est « non disponible », jamais un échec, et la politique du projet décide (`ignore`, `warn`, `require-decision`) | DÉCIDÉ | Éviter les boucles de réessais sans issue (défaut observé dans skraft) |
+| D46 | Le profil peut être **généré par un agent** (`/stack init`), mais il n'est adopté qu'après **vérification par exécution** (`/stack doctor`), avec tests canaris dont le résultat est connu d'avance | DÉCIDÉ | Le LLM propose, le code vérifie |
+| D47 | Les commandes du profil sont la **liste blanche** de `shell:test` ; toute modification du profil exige une confirmation ; exécution de vérification en worktree isolé | DÉCIDÉ | Le profil définit ce qui s'exécute sur la machine |
+| D48 | Les parseurs complémentaires sont des fonctions pures exécutées en **bac à sable**, avec fixtures rejouées | DÉCIDÉ | Code généré par un LLM, donc non fiable par défaut |
 
 ---
 
@@ -251,7 +265,9 @@ agent-studio/
 │   ├── extension-host/          # lancement utilityProcess, RPC, cycle de vie
 │   ├── extension-api/           # types publics de ctx (publié pour les tiers)
 │   ├── extension-manifest/      # schéma JSON du manifeste + validation
-│   └── stack-adapters/          # swift, typescript, dotnet : tests, rapport, mutation, architecture
+│   └── stack-profiles/          # moteur générique : lecteurs JUnit/TAP/Stryker, classification, imports,
+│                                #   schéma stack-profile@1, /stack init, /stack doctor, bac à sable des parseurs
+├── profiles/                    # profils d'exemple (swift-spm, typescript-vitest, dotnet) et gabarits de canaris
 ├── extensions/
 │   ├── tdd/                     # première extension interne (jalon J2)
 │   └── skraft/                  # deuxième extension (jalons S1 à S6)
@@ -305,7 +321,7 @@ Le schéma JSON du manifeste vit dans `packages/extension-manifest` et est valid
 | --- | --- |
 | `fs:read` | Lecture sous la racine du projet |
 | `fs:write:<glob>` | Écriture limitée aux chemins déclarés |
-| `shell:test` | Commandes de test fournies par l'adaptateur de stack uniquement |
+| `shell:test` | Commandes déclarées dans le profil de stack approuvé uniquement (D47) |
 | `shell:<liste>` | Commandes explicitement listées |
 | `git:commit`, `git:branch`, `git:revert` | Opérations Git via Workspace |
 | `copilot:sessions` | Ouvrir des sessions de tâche (consomme le quota de l'utilisateur) |
@@ -335,7 +351,7 @@ Une mise à jour d'extension qui élargit les permissions exige un nouvel accord
 | `ctx.panels` | `update(id, data)`, `onAction` | aucune |
 | `ctx.storage` | `get`, `set` (espace privé à l'extension) | aucune |
 | `ctx.settings` | `get`, `onChange` | aucune |
-| `ctx.stack` | `detect()`, `testCommand()`, `parseReport()`, `mutation()`, `architectureCheck()` | `shell:test` |
+| `ctx.stack` | `profile()`, `capabilities()`, `runTests(scope)`, `runMutation(scope)`, `checkArchitecture()`, `resolvePaths(kind)` — résultats normalisés (8.3) | `shell:test` |
 
 ### 5.5 Composition des hooks
 
@@ -417,7 +433,7 @@ async function runTurn(session: AgentSession, prompt: string, idleMs = 5 * 60_00
 
 | Outil | Rôle | Particularité |
 | --- | --- | --- |
-| `run_tests` | Lance la suite ou un sous-ensemble via l'adaptateur de stack | Handler = notre code : capture sortie, code de sortie, empreintes, écrit la preuve (D20) |
+| `run_tests` | Lance la suite ou un sous-ensemble via le profil de stack | Handler = notre code : capture sortie, code de sortie, empreintes, écrit la preuve (D20) |
 | `report_phase` | Clôt la phase avec un résumé et la liste des fichiers | Terminal ; **refuse** (erreur) si une skill à la demande requise n'a pas été chargée ou si une précondition manque |
 | `report_blocker` | Signale une question métier bloquante avec des choix | Terminal ; suspend la tâche et crée une demande d'interaction (D31) |
 | `load_skill` | Charge une skill facultative, éventuellement une section | Chaque appel est tracé dans l'état de la tâche (D26) |
@@ -479,15 +495,156 @@ La réponse est validée (option autorisée, profil autorisé à décider) puis 
 
 ---
 
-## 8. Extension n°1 : `tdd`
+## 8. Profils de stack
+
+Tout ce qui dépend du langage ou de l'outillage d'un projet est **externalisé dans un profil de stack**, un fichier déclaratif. Les extensions et le moteur de portes ne contiennent aucune connaissance propre à un langage.
+
+### 8.1 Trois couches
+
+| Couche | Nature | Contenu |
+| --- | --- | --- |
+| Moteur de portes | Code du cœur, générique | Lancer une commande, lire un rapport dans un format standard, classer les échecs, analyser les imports, appliquer seuils et règles |
+| Profil de stack | Données (YAML), versionnées dans le dépôt | Commandes, emplacements, formats de rapport, motifs d'erreur, couches d'architecture, consignes pour les agents |
+| Parseur complémentaire | Petit module, en bac à sable | Uniquement pour un outil qui ne produit aucun format standard |
+
+### 8.2 Format du profil
+
+Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON Schema `stack-profile@1` (publié par `packages/stack-profiles`).
+
+```yaml
+schema: agent-studio/stack-profile@1
+name: swift-spm
+detect: ["Package.swift"]
+
+paths:
+  sources: ["Sources/**"]
+  unitTests: ["Tests/DomainTests/**", "Tests/ApplicationTests/**"]
+  acceptanceTests: ["Tests/AcceptanceTests/**"]
+
+tests:
+  run: "swift test --parallel --xunit-output .build/junit.xml"
+  runOne: "swift test --filter {testId} --xunit-output .build/junit.xml"
+  report: { format: junit-xml, path: ".build/junit.xml" }
+  timeoutSeconds: 600
+  failureKinds:
+    missingSymbol: ["cannot find '.+' in scope", "has no member '.+'"]
+    syntax: ["expected expression", "consecutive statements"]
+
+mutation:
+  run: "muter --format json --output .build/muter.json"
+  report: { format: custom, parser: "parsers/muter.js", path: ".build/muter.json" }
+  thresholds: { Domain: 100, Application: 100, Infrastructure: 90 }
+
+architecture:
+  imports: '^\s*(?:@testable\s+)?import\s+(\w+)'
+  layers:
+    Domain:         { paths: ["Sources/Domain/**"],         mayImport: ["Foundation"] }
+    Application:    { paths: ["Sources/Application/**"],    mayImport: ["Foundation", "Domain"] }
+    Infrastructure: { paths: ["Sources/Infrastructure/**"], mayImport: ["*"] }
+
+hints:
+  testFramework: "XCTest, une classe par comportement, XCTAssertEqual"
+  naming: "test<Comportement>_<Condition>"
+
+verification:            # écrit par /stack doctor, jamais à la main
+  lastRun: "2026-09-24T10:12:00Z"
+  toolVersions: { swift: "6.1" }
+  results: { tests: ok, failureKinds: ok, mutation: ok, architecture: ok }
+```
+
+Les commandes de l'exemple sont illustratives : elles doivent être vérifiées par `/stack doctor` sur chaque projet (8.6).
+
+### 8.3 Moteur générique
+
+- **Lecteurs de formats standards** : JUnit XML pour les tests, TAP en secours, schéma de rapport de mutation de Stryker (StrykerJS, Stryker.NET, Stryker4s). Toute sortie est convertie en résultats normalisés :
+
+```ts
+interface NormalizedTestResult {
+  testId: string;
+  status: "passed" | "failed" | "skipped";
+  failureKind?: "assertion" | "missing_symbol" | "syntax" | "crash";
+  message?: string;
+  file?: string;
+}
+```
+
+- **Classification des échecs** : `<failure>` JUnit donne `assertion`, `<error>` donne `crash`, puis les motifs `failureKinds` du profil affinent en `missing_symbol` ou `syntax`.
+- **Analyse d'architecture** : expression régulière d'import et couches du profil, contrôle « la couche X n'importe que Y » identique pour tous les langages.
+- **Exécution** : mode non interactif imposé (option ajoutée si connue, sinon variable `CI=1`), délai par commande, arrêt de l'arbre de processus, sortie capturée pour les preuves (D20).
+- **Emplacements** : les motifs `@stack:sources`, `@stack:unitTests`, `@stack:acceptanceTests` des manifestes d'extension sont résolus depuis `paths`.
+- **Consignes** : `hints` est injecté dans le message système des agents qui écrivent des tests ou du code.
+
+### 8.4 Capacités déclarées
+
+Chaque section du profil est une capacité : `tests` (obligatoire), `mutation`, `architecture`. Une capacité absente rend la porte correspondante **non disponible pour ce projet**. Elle est affichée comme telle dans le bilan, et la politique du projet décide : `ignore`, `warn` ou `require-decision` (demande d'interaction). Une porte non disponible n'est jamais un échec qui déclenche des réessais.
+
+### 8.5 Résolution et sécurité
+
+1. Profil du projet (`.agent-studio/stack.yaml`), s'il existe.
+2. Sinon, profil contribué par une extension de type « pack de stack », choisi par `detect`.
+3. Sinon, profil minimal : l'utilisateur fournit seulement la commande de test produisant du JUnit XML.
+
+Le profil définit des commandes exécutées sur la machine : il sert de **liste blanche** à la permission `shell:test`. Toute création ou modification du profil exige une confirmation de l'utilisateur, comme un élargissement de permissions. Les programmes lancés doivent figurer dans une liste de programmes autorisés (lanceurs de tests, outils de mutation connus), extensible par l'utilisateur.
+
+### 8.6 Génération assistée : `/stack init` et `/stack doctor`
+
+L'IA propose le profil, le code le vérifie en l'exécutant. Déroulé de `/stack init` :
+
+1. **Collecte des faits par le code**, sans LLM : fichiers repères, manifestes de dépendances, scripts de test, configuration CI, arborescence. Ces contenus sont des données, jamais des instructions.
+2. **Proposition par un agent** via l'outil terminal `submit_stack_profile`, au schéma du profil. Consigne prioritaire : chercher une option produisant un format standard avant d'envisager un parseur.
+3. **Approbation des commandes** par l'utilisateur, avant toute exécution.
+4. **Vérification par exécution** (`/stack doctor`) dans un `git worktree` temporaire, jamais dans le répertoire du projet.
+5. **Réessai ciblé** avec le motif d'échec, dans la limite d'un budget ; au-delà, escalade.
+6. **Écriture du profil** avec son bloc `verification`, et commit sur confirmation.
+
+Contrôles de `/stack doctor`, avec leur oracle :
+
+| Élément | Vérification | Oracle |
+| --- | --- | --- |
+| Commande de test et rapport | Lancer, lire, compter | Rapport lisible contenant tous les tests détectés |
+| `missingSymbol` | Test canari appelant une fonction inexistante | Classé `missing_symbol` |
+| `syntax` | Test canari syntaxiquement faux | Classé `syntax`, jamais `assertion` |
+| Assertion et succès | Un canari à l'assertion fausse, un canari qui passe | Un `assertion` et un `passed` |
+| Emplacements | Motifs `paths` appliqués au dépôt | Aucun motif vide, aucun fichier de test hors motif |
+| Architecture | Expression d'import appliquée aux sources | Imports trouvés ; violations existantes listées |
+| Mutation | Commande lancée sur un seul petit fichier | Rapport lisible, au moins un mutant |
+| Parseur complémentaire | Exécuté sur les rapports des canaris | Sortie normalisée identique aux résultats attendus |
+
+Les canaris sont générés par le code à partir de gabarits par langage fournis dans le profil ou par l'agent, puis vérifiés : la bonne réponse est connue d'avance, sans demander l'avis d'un LLM.
+
+Les couches d'architecture proposées restent une **décision humaine** : si le code existant viole une règle proposée, l'architecte tranche entre assouplir la règle et corriger le code.
+
+`/stack doctor` est relancé automatiquement quand un fichier de verrouillage de dépendances change ; en cas d'échec, l'agent propose une réparation, vérifiée de la même manière.
+
+### 8.7 Parseurs complémentaires
+
+- Forme imposée : une fonction pure `parse(text: string): NormalizedTestResult[]` (ou le résultat de mutation normalisé), sans accès au disque ni au réseau.
+- Exécution dans un worker isolé : modèle de permissions Node, délai, limite de mémoire.
+- Sortie validée par JSON Schema.
+- Les rapports réels des canaris sont conservés comme fixtures et rejoués à chaque modification du parseur ou mise à jour de l'outil.
+- Emplacement : `.agent-studio/parsers/`, versionné avec le profil ; ou fourni par un pack de stack.
+
+### 8.8 Risques
+
+| Risque | Parade |
+| --- | --- |
+| Injection de prompt via un fichier du dépôt proposant une commande malveillante | Faits traités comme données, liste de programmes autorisés, approbation humaine, exécution en worktree isolé |
+| Option de ligne de commande inventée par le LLM | Détectée à l'exécution : commande en échec ou rapport absent |
+| Motif trop large (syntaxe qui attrape des assertions) | Révélé par les canaris |
+| Dérive après une mise à jour du compilateur | Relance de `/stack doctor` sur changement de dépendances |
+| Parseur ajusté à un seul exemple | Plusieurs canaris, fixtures rejouées |
+
+---
+
+## 9. Extension n°1 : `tdd`
 
 Première extension, **écrite en interne** pour éprouver l'API `ctx` (D14). Prototype complet dans `reference/tdd-orchestrator.ts` et `reference/copilot-agents.ts`.
 
-### 8.1 Usage
+### 9.1 Usage
 
 `/tdd <description de la fonctionnalité>` dans le chat. L'extension découpe en comportements, puis déroule pour chacun RED → GREEN → REFACTOR sous contrôle du code.
 
-### 8.2 Machine à états
+### 9.2 Machine à états
 
 ```mermaid
 stateDiagram-v2
@@ -512,7 +669,7 @@ stateDiagram-v2
   ESCALATED --> ABORTED
 ```
 
-### 8.3 Portes
+### 9.3 Portes
 
 | Porte | Contrôles (tous exécutés par le code) |
 | --- | --- |
@@ -522,42 +679,42 @@ stateDiagram-v2
 
 Chaque porte renvoie un **motif précis** en cas de rejet, transmis tel quel à l'agent lors du réessai.
 
-### 8.4 Rôles et périmètres
+### 9.4 Rôles et périmètres
 
 | Rôle | Écrit dans | Outils |
 | --- | --- | --- |
 | Planificateur | rien | `submit_plan` |
-| Agent test | `tests/**` | `run_tests`, `report_phase`, `load_skill` |
-| Agent dev | `src/**` | `run_tests`, `report_phase`, `load_skill` |
+| Agent test | `@stack:unitTests` (profil) | `run_tests`, `report_phase`, `load_skill` |
+| Agent dev | `@stack:sources` (profil) | `run_tests`, `report_phase`, `load_skill` |
 
 Aucun agent n'exécute de commande Git (`commit`, `reset`, `checkout`, `stash`, `rebase`, `push`, `restore`) ni de redirection shell vers des fichiers.
 
-### 8.5 Granularité (D22)
+### 9.5 Granularité (D22)
 
 - **Par défaut** : un tour d'agent par comportement, avec `run_tests` et le gel des tests actifs pendant le tour ; vérification complète en fin de tour (séquence rouge puis vert présente dans les preuves).
 - **Mode strict** (réglage, ou automatique après un échec) : une session par pas RED, GREEN, REFACTOR, comme dans la machine ci-dessus.
 
 ---
 
-## 9. Extension n°2 : `skraft`
+## 10. Extension n°2 : `skraft`
 
-Portage du plugin [skraft-plugin](https://github.com/SebastienDegodez/skraft-plugin) (version analysée : 1.5.2) en extension pilotée par notre moteur. Sous réserve de la licence (D42).
+Portage du plugin [skraft-plugin](https://github.com/SebastienDegodez/skraft-plugin) (versions analysées : 1.5.2, puis branche `refactor/v1.6.0-tracking-substrate` en version `1.6.0-hooks.1`) en extension pilotée par notre moteur. Sous réserve de la licence (D42).
 
 > **La spécification détaillée de cette extension est dans `SPEC-skraft.md`, qui fait autorité.** Cette section en donne la vue d'ensemble.
 
-### 9.1 Ce qu'on reprend, ce qu'on remplace
+### 10.1 Ce qu'on reprend, ce qu'on remplace
 
 | Reprendre | Remplacer |
 | --- | --- |
-| 22 prompts d'agents (orchestrateur exclu), 36 skills | L'orchestrateur LLM → réducteur |
+| Prompts d'agents (orchestrateur exclu), skills (38 en 1.6.0) | L'orchestrateur LLM → réducteur |
 | Politiques pures de `domain/` (après unification de l'état) | Les hooks G1 à G8 → portes et gardes du cœur |
 | Schéma de preuves de qualité | Les preuves écrites par l'agent → preuves écrites par `run_tests` |
 | Commande `artifact adr` (gabarit validé) | L'édition manuelle de `state.json` → événements du réducteur |
 | Lentilles de revue indépendantes en contextes neufs | La synthèse pondérée par un LLM → synthèse par le code |
 
-Constats sur skraft-plugin 1.5.2 à **ne pas reproduire** : gardes conditionnés à un `projectSlug` absent des payloads (C1) ; deux modèles d'état incompatibles (C2) ; initialisation en DISCOVER alors que le pipeline compte quatre phases (C3) ; outils `Write`/`Edit` non surveillés (C4) ; format de sortie des hooks non reconnu par les harnais (C5) ; vocabulaire de verdict divergent `NEEDS_REWORK` / `CHANGES_REQUESTED` (C6) ; contrôle des skills en fail-open (C7) ; « commit vérifié » réduit à un arbre Git propre.
+Constats sur skraft-plugin à **ne pas reproduire** : gardes conditionnés à un `projectSlug` absent des payloads (C1) ; deux modèles d'état incompatibles (C2) ; initialisation en DISCOVER alors que le pipeline compte quatre phases (C3) ; outils `Write`/`Edit` non surveillés (C4) ; format de sortie des hooks non reconnu par les harnais (C5) ; vocabulaire de verdict divergent `NEEDS_REWORK` / `CHANGES_REQUESTED` (C6) ; contrôle des skills en fail-open (C7) ; « commit vérifié » réduit à un arbre Git propre. La branche 1.6.0 corrige C4, C5 et C7, mais introduit deux problèmes : des champs d'état prescrits en édition directe, désormais refusés, qui bloquent le routage d'entrée et la ratification des ADR (N1), et une garde d'écriture contournable par interpréteur (N2). Détail et statut de chaque constat : `SPEC-skraft.md`, section 3.
 
-### 9.2 Pipeline
+### 10.2 Pipeline
 
 ```mermaid
 stateDiagram-v2
@@ -587,9 +744,9 @@ stateDiagram-v2
 
 - `phaseOrder` = `["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]`, **lu depuis la configuration unique** ; l'état est initialisé sur `phaseOrder[0]`.
 - Slug dérivé de l'identifiant de la story (stable entre deux lancements) ; SHA de départ et branche `skraft/<slug>` enregistrés.
-- Pour DELIVER, `SPECIALIST` est remplacé par la sous-machine de la section 9.6.
+- Pour DELIVER, `SPECIALIST` est remplacé par la sous-machine de la section 10.6.
 
-### 9.3 Difficulté
+### 10.3 Difficulté
 
 Quatre niveaux : `simple`, `medium`, `medium-hard`, `challenging`. Écrite une seule fois.
 
@@ -597,9 +754,9 @@ Quatre niveaux : `simple`, `medium`, `medium-hard`, `challenging`. Écrite une s
 2. Une **grille déterministe** propose un niveau ; toute question ouverte sur une règle métier relève le niveau d'un cran.
 3. Le LLM rend `submit_difficulty` (niveau + justification courte) pour les cas limites.
 4. **Confirmation** par l'utilisateur en mode simple, automatique en mode avancé (OUVERT O3).
-5. Routage par règle : `simple` et `medium` sautent RESEARCH ; `medium-hard` et `challenging` l'exécutent. La difficulté ne change pas la logique de contrôle, seulement les moyens (budget, parallélisme entre scénarios, nombre de passes de revue).
+5. Aucune phase n'est sautée selon la difficulté : les quatre phases s'exécutent toujours, RESEARCH compris, comme dans skraft 1.6.0 qui a supprimé ses niveaux. La difficulté ne change que les moyens (budget, granularité de DELIVER, nombre de lentilles) ; son intérêt sera confirmé par les mesures d'usage.
 
-### 9.4 Portes par phase
+### 10.4 Portes par phase
 
 | Phase | Porte | Contrôles exécutés par le code |
 | --- | --- | --- |
@@ -613,7 +770,7 @@ Quatre niveaux : `simple`, `medium`, `medium-hard`, `challenging`. Écrite une s
 
 Tous les tests d'acceptance, **pour tous les scénarios**, sont écrits en DISTILL et gelés par empreinte : l'agent de DELIVER n'écrit jamais un test d'acceptance.
 
-### 9.5 Revue
+### 10.5 Revue
 
 - Avant la revue, le code établit les **faits** : tests exécutés, mutation, règle de dépendance, empreintes. Ils sont transmis aux lentilles comme acquis.
 - La lentille « portes de qualité » de skraft est **supprimée** (ses vérifications sont faites par le code). Les lentilles restantes jugent ce qu'aucun outil ne peut juger : lisibilité, pertinence des tests, fidélité aux ADR, lecture à froid sans contexte du producteur.
@@ -621,27 +778,21 @@ Tous les tests d'acceptance, **pour tous les scénarios**, sont écrits en DISTI
 - La **table de pondération de skraft est appliquée par le code** et produit un verdict `APPROVED` | `CHANGES_REQUESTED` | `REJECTED` (enum unique).
 - Niveau `simple` : deux lentilles suffisent (lecteur à froid, intégrité des tests). OUVERT O2 pour les autres niveaux.
 
-### 9.6 Sous-machine DELIVER
+### 10.6 Sous-machine DELIVER
 
 Pour chaque scénario, dans l'ordre du plan d'implémentation :
 
 1. Le test d'acceptance du scénario (écrit en DISTILL) est rouge.
-2. Boucle intérieure RED unitaire → GREEN → REFACTOR, avec les portes de la section 8.3, jusqu'à ce que le test d'acceptance soit vert.
-3. Fin de scénario : mutation par l'adaptateur de stack (seuils : 100 % domaine et application, 90 % API et infrastructure), analyse de la règle de dépendance, contrôles mesurables d'Object Calisthenics (longueur de méthode, indentation, nombre d'attributs).
+2. Boucle intérieure RED unitaire → GREEN → REFACTOR, avec les portes de la section 9.3, jusqu'à ce que le test d'acceptance soit vert.
+3. Fin de scénario : mutation selon le profil de stack (seuils : 100 % domaine et application, 90 % API et infrastructure), analyse de la règle de dépendance, contrôles mesurables d'Object Calisthenics (longueur de méthode, indentation, nombre d'attributs).
 4. Un test qui ne tue aucun mutant est **signalé au reviewer**, jamais supprimé par l'agent.
 5. Une valeur métier manquante → `report_blocker`, suspension, question à l'utilisateur (jamais « escalader vers DISCUSS »).
 
-### 9.7 Adaptateurs de stack
+### 10.7 Stacks prises en charge
 
-| Stack | Tests et rapport | Mutation | Architecture |
-| --- | --- | --- | --- |
-| Swift (prioritaire) | XCTest, rapport `xcresult` | Muter | Analyse des imports entre modules |
-| TypeScript | Vitest ou Jest, rapport JSON | Stryker | dependency-cruiser |
-| .NET | `dotnet test`, rapport TRX | Stryker.NET | ArchUnitNET |
+skraft ne contient aucun adaptateur par langage : il utilise le profil de stack du projet (section 8). Une porte dont la capacité manque au profil (mutation, architecture) est « non disponible » et suit la politique du projet (D45). Le fil rouge US-12 suppose un profil Swift vérifié par `/stack doctor`.
 
-Chaque adaptateur force le mode non interactif (jamais de mode « watch »), applique un délai par commande et tue l'arbre de processus en cas de dépassement.
-
-### 9.8 Scénario de validation de bout en bout (fil rouge)
+### 10.8 Scénario de validation de bout en bout (fil rouge)
 
 À utiliser comme test d'acceptance de l'extension skraft, sur un projet Swift de démonstration :
 
@@ -655,9 +806,9 @@ Comportements attendus : difficulté proposée `medium-hard` (question ouverte) 
 
 ---
 
-## 10. Sécurité
+## 11. Sécurité
 
-### 10.1 Menaces et parades
+### 11.1 Menaces et parades
 
 | Menace | Parade |
 | --- | --- |
@@ -670,17 +821,17 @@ Comportements attendus : difficulté proposée `medium-hard` (question ouverte) 
 | Extension qui bloque l'application | Processus isolé, délai par appel, redémarrage automatique |
 | Hameçonnage par une fausse demande de permission | Canal de permission réservé à l'arbitre ; les extensions ne rendent que des cartes déclarées |
 
-### 10.2 Durcissement Electron
+### 11.2 Durcissement Electron
 
 `contextIsolation`, `sandbox`, pas de `nodeIntegration` ; preload minimal ; CSP stricte ; navigation externe interdite, liens ouverts dans le navigateur système ; jetons GitHub gardés dans le processus principal et le trousseau du système, jamais dans le renderer.
 
-### 10.3 Profils (D6)
+### 11.3 Profils (D6)
 
 Le profil (testeur, PO/BA, développeur, architecte, administrateur) conditionne : le mode d'affichage par défaut, la politique de permissions par défaut (prudente ou souple), et **qui peut répondre à quelle demande d'interaction** (par exemple, seul un architecte ratifie un ADR). L'utilisateur ne peut pas modifier son propre profil. Mécanisme d'attribution : OUVERT O5.
 
 ---
 
-## 11. Interface
+## 12. Interface
 
 | Aspect | Mode simple | Mode avancé |
 | --- | --- | --- |
@@ -695,7 +846,7 @@ Le profil (testeur, PO/BA, développeur, architecte, administrateur) conditionne
 
 ---
 
-## 12. Distribution des extensions
+## 13. Distribution des extensions
 
 - Archive ZIP signée : manifeste, code compilé, ressources, signature couvrant toute l'archive. Vérifiée à l'installation et à chaque mise à jour.
 - Extension non signée : installable uniquement en mode développeur, avec avertissement permanent.
@@ -706,7 +857,7 @@ Le profil (testeur, PO/BA, développeur, architecte, administrateur) conditionne
 
 ---
 
-## 13. Usage et coûts
+## 14. Usage et coûts
 
 - **Deux unités** : requêtes (Copilot : chaque message envoyé à un agent, multiplié selon le modèle ; les appels d'outils dans un même tour ne comptent pas en plus — à vérifier selon l'offre) et tokens (Claude et autres fournisseurs à l'usage).
 - **Leviers retenus** : pas d'orchestrateur LLM ; skills réduites aux besoins du rôle (les skills d'exécution de portes disparaissent des contextes) ; présélection des fichiers ; relance ciblée après rollback ; escalade immédiate des défauts d'environnement ; sorties courtes par outils terminaux ; un tour par scénario en DELIVER (D22) ; prompts système stables (mise en cache côté fournisseur).
@@ -714,19 +865,19 @@ Le profil (testeur, PO/BA, développeur, architecte, administrateur) conditionne
 
 ---
 
-## 14. Feuille de route
+## 15. Feuille de route
 
 Chaque jalon est livrable seul et a des critères de sortie vérifiables.
 
 | Jalon | Contenu | Critères de sortie |
 | --- | --- | --- |
 | **J1** | Coquille Electron durcie ; authentification via `gh auth login` ; client Copilot SDK via le port `AgentRuntime` ; session principale persistante ; service Workspace (clonage, checkpoints, diff, rollback, synchronisation) | Une conversation complète sur un dépôt cloné, avec checkpoint et annulation en un geste ; reprise de la conversation après redémarrage |
-| **J2** | Registre, routeur, API `ctx` minimale ; moteur de tâches (réducteur, effets, persistance, watchdog, reprise) ; extension `tdd` **chargée en processus** ; adaptateur de stack TypeScript | `/tdd` déroule un cycle complet sur un projet TypeScript ; tous les tests du réducteur passent sans LLM ; une modification de test par l'agent dev est détectée et annulée ; un redémarrage en plein GREEN reprend proprement |
+| **J2** | Registre, routeur, API `ctx` minimale ; moteur de tâches (réducteur, effets, persistance, watchdog, reprise) ; extension `tdd` **chargée en processus** ; moteur de profils minimal (JUnit XML, classification) et un profil TypeScript écrit à la main | `/tdd` déroule un cycle complet sur un projet TypeScript ; tous les tests du réducteur passent sans LLM ; une modification de test par l'agent dev est détectée et annulée ; un redémarrage en plein GREEN reprend proprement |
 | **J3** | Outil `run_tests` et preuves produites par le code ; granularité par défaut (un tour par comportement) ; demandes d'interaction persistées ; cartes, jalons, alertes | Preuves de rouge puis vert présentes pour chaque comportement ; une escalade survit à un redémarrage et reprend après réponse |
 | **J4** | Isolation en `utilityProcess` ; arbitre de permissions ; composition des hooks ; manifeste validé | L'extension `tdd` tourne hors du processus principal sans perte de fonction ; une permission non déclarée est refusée ; un hook qui plante n'autorise rien |
-| **J5** | Adaptateur de stack Swift (XCTest, Muter, imports) ; instrumentation de l'usage | `/tdd` sur un projet Swift ; usage affiché par état |
+| **J5** | Profils de stack complets : schéma, TAP et mutation Stryker, analyse d'imports, capacités, `/stack init`, `/stack doctor`, parseurs en bac à sable ; instrumentation de l'usage | Un profil généré par `/stack init` et vérifié par `/stack doctor` sur un projet Swift et un projet TypeScript ; `/tdd` fonctionne sur les deux ; usage affiché par état |
 | **J6** | Paquets signés, installation depuis un fichier, révocation ; modes simple et avancé ; profils | Une extension tierce s'installe depuis un fichier ; un profil non-développeur mène une tâche sans aide |
-| **S1** | Extension `skraft` : réducteur du pipeline, INIT, difficulté, routage ; état unifié | Pipeline complet à vide avec agents simulés ; saut de RESEARCH par règle |
+| **S1** | Extension `skraft` : réducteur du pipeline, INIT, difficulté, routage ; état unifié | Pipeline complet à vide avec agents simulés ; les quatre phases toujours enchaînées |
 | **S2** | RESEARCH : présélection, porte citations, questions ouvertes | Citation hors limites rejetée sur le fil rouge |
 | **S3** | DESIGN : `artifact adr`, porte cohérence, état Ratification | Incohérence de nom d'événement rejetée ; DISTILL impossible avant ratification |
 | **S4** | DISTILL : porte valeurs, porte RED d'acceptance, tous les tests d'acceptance | Valeur arrondie rejetée ; test déjà vert requalifié |
@@ -736,7 +887,7 @@ Chaque jalon est livrable seul et a des critères de sortie vérifiables.
 
 ---
 
-## 15. Points à vérifier sur les SDK
+## 16. Points à vérifier sur les SDK
 
 Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** sur la version installée.
 
@@ -752,10 +903,11 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | Plugins CLI | Mis en cache à l'installation : réinstaller pour prendre en compte une modification locale |
 | Claude Agent SDK | Clé API ou fournisseur cloud obligatoire pour une application tierce ; pas de connexion claude.ai sans accord d'Anthropic ; le produit garde sa propre marque |
 | ACP | Copilot CLI se lance en mode ACP avec `copilot --acp` ; pas d'équivalent aux hooks en code ; protocole encore en évolution |
+| Profils de stack | Options des outils à confirmer par `/stack doctor` : `swift test --xunit-output` (SwiftPM seulement ; un projet Xcode doit convertir son `xcresult`), format JSON de Muter (conforme ou non au schéma Stryker), reporters JUnit de Vitest, Jest et `dotnet test` |
 
 ---
 
-## 16. Conventions de développement
+## 17. Conventions de développement
 
 - TypeScript `strict` partout ; ESM ; pnpm workspaces.
 - Tests : Vitest ; les réducteurs et politiques ont une couverture complète ; tests d'intégration du runtime avec un faux `AgentRuntime` scripté (réponses d'agent enregistrées), jamais d'appel réel au LLM dans la CI.
@@ -767,7 +919,7 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 
 ---
 
-## 17. Questions ouvertes
+## 18. Questions ouvertes
 
 | # | Question | Hypothèse provisoire |
 | --- | --- | --- |
@@ -781,3 +933,6 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | O8 | Backlog Discoverer et Backlog Planner de skraft : intégrés au pipeline ou agents autonomes ? | Autonomes |
 | O9 | Licence GPL-3.0-or-later de skraft (D42) | À trancher avant S1 |
 | O10 | Nom définitif de l'application (D39) | `agent-studio` comme nom de code |
+| O11 | Format du profil de stack : YAML ou JSON ? | YAML pour la lisibilité, validé par JSON Schema |
+| O12 | Contenu initial de la liste des programmes autorisés dans un profil (D47) | Lanceurs de tests et outils de mutation courants, extensible par l'utilisateur |
+| O13 | Premier profil à livrer en exemple | Swift (SwiftPM) et TypeScript (Vitest) |

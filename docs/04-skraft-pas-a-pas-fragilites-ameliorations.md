@@ -35,6 +35,23 @@ Question ouverte laissée dans la story : le plafond s'applique-t-il par prise o
 
 Cet exemple est choisi parce qu'il combine un invariant métier critique, un projet non .NET, et une ambiguïté à résoudre : trois situations où les fragilités de skraft deviennent visibles.
 
+### Mise à jour : branche 1.6.0
+
+Les exemples « skraft-plugin » de chaque étape décrivent la version 1.5.2. La branche `refactor/v1.6.0-tracking-substrate`, réanalysée le 23 septembre 2026, change plusieurs points, signalés dans chaque étape concernée :
+
+| Étape | Ce qui change en 1.6.0 |
+| --- | --- |
+| Démarrage | L'état est toujours créé en DISCOVER (C3), et l'écriture de `entryPoint` que l'orchestrateur doit faire à chaque pipeline neuf est refusée par G7 (N1) |
+| Difficulté | Niveaux supprimés : les quatre phases d'ingénierie s'exécutent toujours, RESEARCH compris. Le routage d'entrée restant ne concerne que DISCOVER, phase produit hors du pipeline |
+| RESEARCH | Rien : pas de reviewer, et la clôture par `close-phase` échoue toujours (C3) |
+| DESIGN | La ratification des ADR ne peut plus être enregistrée : l'édition directe prescrite est refusée et aucune commande CLI ne la remplace (N1) |
+| DISTILL | Rien : sortie toujours nommée en C# |
+| DELIVER | Nouvelle skill `quality-gates-javascript` (StrykerJS, TAP) ; toujours rien pour Swift ; preuves toujours écrites par l'agent |
+| Revue | Rien : vocabulaire des verdicts toujours divergent (C6) |
+| Hooks | G2, G3 et G7 fonctionnent ; G1, G4, G5 et G6 restent muets ; G7 se contourne par un interpréteur (N2) |
+
+Un plan de refonte (`.specs/plan_todo.md`, non implémenté) prévoit un état unifié, une projection calculée de la prochaine action et des commandes typées à la place des éditions directes. Il ne traite ni la résolution du projet actif par les hooks (C1), ni le contournement de G7 (N2).
+
 ## Vue d'ensemble du pipeline
 
 ```mermaid
@@ -80,7 +97,7 @@ Les deux pipelines ont les mêmes phases. La différence est dans ce qui les rel
 
 ### Position des hooks de contrôle dans skraft
 
-À chaque phase, l'orchestrateur lance un sous-agent avec l'outil Agent. Le harnais déclenche alors les hooks à six moments précis de ce cycle, toujours les mêmes quelle que soit la phase.
+À chaque phase, l'orchestrateur lance un sous-agent avec l'outil Agent. Le harnais déclenche alors les hooks à six moments précis de ce cycle, toujours les mêmes quelle que soit la phase. L'organigramme montre leur état sur la branche 1.6.0 ; le tableau qui le suit compare avec la 1.5.2.
 
 #### Les gardes G1 à G8
 
@@ -108,35 +125,35 @@ flowchart TD
   classDef det stroke:#1D9E75,stroke-width:3px
   classDef faible stroke:#E24B4A,stroke-width:3px,stroke-dasharray:6 4
   H0["🪝 SessionStart<br/>housekeeping"] --> O["🤖 Orchestrateur"]
-  O -->|appel de l'outil Agent| H1["🪝 PreToolUse Agent<br/>G1 ordre, G8 périmètre"]
+  O -->|appel de l'outil Agent| H1["🪝 PreToolUse Agent<br/>G1 ordre : inactif"]
   H1 --> H2["🪝 SubagentStart<br/>G2 skills obligatoires"]
   H2 --> A["🤖 Sous-agent de phase"]
   A -->|lecture d'un fichier| H3["🪝 PostToolUse Read<br/>G3 journal des skills"]
   H3 --> A
-  A -->|commande Bash| H4["🪝 PreToolUse Bash<br/>G7 écriture d'état"]
+  A -->|Bash, Write, Edit| H4["🪝 PreToolUse<br/>G7 actif, G8 inactif"]
   H4 --> A
-  A -.->|Write ou Edit| W["⚠️ Aucun hook<br/>outils non routés"]
+  A -.->|node -e, python -c| W["⚠️ Écriture d'état<br/>non détectée"]
   W -.-> A
-  A -->|fin du sous-agent| H5["🪝 SubagentStop<br/>G3 skills, G4 artefacts, G5 verdict"]
-  H5 --> H6["🪝 PostToolUse Agent<br/>G6 continuation"]
+  A -->|fin du sous-agent| H5["🪝 SubagentStop<br/>G3 actif, G4 G5 inactifs"]
+  H5 --> H6["🪝 PostToolUse Agent<br/>G6 inactif"]
   H6 --> O
   class O,A llm
-  class H0 det
-  class H1,H2,H3,H4,H5,H6,W faible
+  class H0,H2,H3,H4 det
+  class H1,H5,H6,W faible
 ```
 
-| Moment | Événement du harnais | Gardes | Ce qu'il devrait faire | Ce qui se passe réellement |
-| --- | --- | --- | --- | --- |
-| Ouverture de session | `SessionStart` | Housekeeping | Purger le journal d'audit et les sauvegardes expirées | Fonctionne |
-| Avant le lancement d'un sous-agent | `PreToolUse`, outil Agent | G1, G8 | Refuser un agent lancé hors séquence | Ignoré faute de `projectSlug` (C1) ; bloquerait tout sinon (C2) |
-| Au démarrage du sous-agent | `SubagentStart` | G2 | Injecter la liste des skills obligatoires | Format de sortie probablement non reconnu (C5) |
-| À chaque lecture de fichier | `PostToolUse`, outil Read | G3 | Journaliser les lectures de `SKILL.md` | Lit `path` alors que Claude Code envoie `file_path` (C7) |
-| À chaque commande shell | `PreToolUse`, outil Bash | G7 | Refuser une écriture directe dans `state.json` | Refus émis dans un format probablement ignoré (C5) ; noms d'outils Copilot non reconnus (C4) |
-| À chaque écriture par l'outil d'édition | Aucun | Aucun | Protéger `state.json`, `src/` et `tests/` | Rien n'est routé : écritures libres (C4) |
-| À la fin du sous-agent | `SubagentStop` | G3, G4, G5 | Bloquer si skill non lue, artefact absent ou verdict incohérent | Contrôle des skills en fail-open (C7) ; G4 et G5 ignorés (C1) |
-| Au retour vers l'orchestrateur | `PostToolUse`, outil Agent | G6 | Indiquer l'agent suivant, une relance ou une escalade | Ignoré (C1) |
+| Moment | Événement du harnais | Gardes | Ce qu'il devrait faire | En 1.5.2 | En 1.6.0 |
+| --- | --- | --- | --- | --- | --- |
+| Ouverture de session | `SessionStart` | Housekeeping | Purger le journal d'audit et les sauvegardes expirées | Fonctionne | Fonctionne |
+| Avant le lancement d'un sous-agent | `PreToolUse`, outil Agent ou Task | G1, G8 | Refuser un agent lancé hors séquence | Ignoré faute de `projectSlug` (C1) | Inchangé : ignoré (C1), bloquerait tout sinon (C2) |
+| Au démarrage du sous-agent | `SubagentStart` | G2 | Injecter la liste des skills obligatoires | Format probablement non reconnu (C5) | Corrigé : injection au format du harnais |
+| À chaque lecture de fichier | `PostToolUse`, outil Read | G3 | Journaliser les lectures de `SKILL.md` | Lit `path`, Claude Code envoie `file_path` (C7) | Corrigé : les deux champs sont acceptés |
+| À chaque commande shell | `PreToolUse`, outil Bash | G7 | Refuser une écriture directe dans `state.json` | Refus dans un format ignoré (C5), noms Copilot non reconnus (C4) | Corrigé ; contournable par `node -e` ou `python3 -c` (N2) |
+| À chaque écriture par un outil d'édition | `PreToolUse`, outils Write et Edit | G7, G8 | Protéger `state.json`, `src/` et `tests/` | Rien n'est routé : écritures libres (C4) | Routé : G7 refuse `state.json`, y compris les éditions prescrites à l'orchestrateur (N1) ; G8 toujours en fail-open |
+| À la fin du sous-agent | `SubagentStop` | G3, G4, G5 | Bloquer si skill non lue, artefact absent ou verdict incohérent | Skills en fail-open (C7) ; G4 et G5 ignorés (C1) | Transcript du sous-agent lu (C7 corrigé) ; G4 et G5 toujours ignorés (C1) |
+| Au retour vers l'orchestrateur | `PostToolUse`, outil Agent | G6 | Indiquer l'agent suivant, une relance ou une escalade | Ignoré (C1) | Inchangé : ignoré (C1) |
 
-Seul `SessionStart` remplit son rôle aujourd'hui. Les six autres points d'accroche sont bien placés : c'est leur exécution qui fait défaut, pas leur conception.
+En 1.5.2, seul `SessionStart` remplissait son rôle. En 1.6.0, la traduction vers les harnais est réparée : G2, G3 et G7 fonctionnent. Les quatre gardes qui dépendent de l'état du pipeline (G1, G4, G5, G6) restent muets tant que les hooks ne savent pas retrouver le projet actif, et G8 reste en fail-open pour la même raison. Les points d'accroche sont bien placés : c'est la résolution du projet qui manque.
 
 ### Structure commune d'une phase
 
@@ -248,6 +265,8 @@ flowchart LR
 ### Exemple déroulé
 
 **skraft-plugin.** L'orchestrateur lit US-12 : trois critères, une règle simple de plafonnement. Il classe la story `medium`. Ce niveau entraîne le saut de RESEARCH : l'orchestrateur écrit lui-même `entryPoint.skipPhases: ["RESEARCH"]` dans `state.json`, puis appelle `state.mjs transition --to DESIGN`. La machine à états, restée sur DISCOVER, refuse avec `ILLEGAL_PHASE_SKIP` ou `PHASE_MISMATCH`. Le LLM improvise alors : nouvelle tentative, modification manuelle de `currentPhase`, ou poursuite sans enregistrer la transition. La question ouverte « par prise ou par jour ? » est ignorée : rien dans la skill de difficulté ne la prend en compte.
+
+**skraft-plugin 1.6.0.** Les niveaux de difficulté ont été supprimés : les quatre phases d'ingénierie s'exécutent toujours, RESEARCH compris. Le critère subjectif disparaît, au prix d'une RESEARCH exécutée même pour une story triviale. Le routage d'entrée qui subsiste (skill `skraft-entry-point-routing`) ne concerne que DISCOVER, une phase produit hors du pipeline. Il pose pourtant un problème : l'orchestrateur doit écrire `entryPoint` dans `state.json` au démarrage de tout pipeline neuf, par édition directe, ce que G7 refuse désormais (N1). Et la clôture de RESEARCH par `close-phase` échoue toujours, l'état étant initialisé en DISCOVER (C3).
 
 **Notre approche.** Le code calcule des indicateurs à partir de la story :
 
@@ -382,6 +401,8 @@ flowchart LR
 
 **skraft-plugin.** L'architecte reçoit la story et la recherche. Il cherche les artefacts de DISCUSS exigés par son prompt, phase qui n'existe plus : selon les cas, il s'arrête sur un blocker ou continue avec ce qu'il trouve. Il produit un modèle d'événements (commande `ComputeBolus`, événement `BolusCapped`), un value object `MaxBolus`, et l'`ADR-008 — Plafond appliqué dans le domaine`, rendu par la commande `artifact adr` qui valide les champs obligatoires. Dans ses contrats, il nomme l'événement `BolusLimited`, incohérent avec le modèle d'événements. Sa propre étape de réconciliation ne le voit pas. Le reviewer relit et approuve. L'orchestrateur écrit alors `adrRatification` dans `state.json` et peut enchaîner sur DISTILL sans attendre la réponse humaine : rien ne l'en empêche.
 
+**skraft-plugin 1.6.0.** Le déroulé est le même jusqu'à la ratification, qui devient bloquante pour une mauvaise raison : l'orchestrateur doit écrire `adrRatification` directement dans `state.json`, G7 refuse maintenant cette édition, et le CLI d'état n'a aucune commande pour ce champ (N1). La ratification ne peut donc plus être enregistrée par la voie prévue. Un LLM bloqué ici risque de chercher un contournement, et G7 en laisse un : une écriture par `node -e` ou `python3 -c` n'est pas détectée (N2).
+
 **Notre approche.** Même travail de l'architecte, même commande `artifact adr`. Puis la porte cohérence, exécutée par le code, compare les artefacts :
 
 | Contrôle | Résultat pour US-12 |
@@ -461,7 +482,7 @@ La porte valeurs compare les critères d'acceptation et les scénarios :
 
 Rejet : « la valeur 12,5 du critère 2 n'apparaît pas dans le scénario 2 ». L'agent corrige.
 
-L'agent écrit ensuite les tests d'acceptance des trois scénarios, dans `Tests/AcceptanceTests/BolusCapAcceptanceTests.swift`, le chemin étant fourni par l'adaptateur de stack Swift. La porte RED les exécute elle-même avec XCTest et lit le rapport :
+L'agent écrit ensuite les tests d'acceptance des trois scénarios, dans `Tests/AcceptanceTests/BolusCapAcceptanceTests.swift`, le chemin étant déclaré dans le profil de stack du projet. La porte RED les exécute elle-même selon ce profil et lit le rapport JUnit :
 
 | Test | Résultat | Verdict de la porte |
 | --- | --- | --- |
@@ -486,7 +507,7 @@ Le scénario 3 passe parce que le code actuel ne plafonne jamais : le comporteme
 | Valeurs arrondies ou inventées | Porte valeurs : chaque littéral des critères doit apparaître dans le `.feature` et dans le test | Code |
 | Rouge auto-déclaré | Porte RED : exécution par le code, classification de l'échec | Code |
 | Tests d'acceptance écrits par l'ingénieur | Tous les tests d'acceptance écrits en DISTILL, gelés par empreinte | Code |
-| Nommage propre à .NET | Chemins et commandes fournis par l'adaptateur de stack | Code |
+| Nommage propre à .NET | Chemins, commandes et formats déclarés dans le profil de stack du projet | Code |
 | Test qui passe déjà | Détecté et requalifié en non-régression, visible du reviewer | Code, puis LLM encadré |
 
 ## Étape 5 — DELIVER
@@ -528,6 +549,8 @@ flowchart LR
 
 **skraft-plugin.** US-12 étant classée `medium-hard`, l'ingénieur lance un sous-agent par scénario ; en `medium`, il aurait tout fait lui-même en une seule session. Pour le scénario 2, il écrit un test unitaire `testCapsDoseAboveMax`, puis `BolusCapPolicy`, puis committe. Il lance lui-même les tests, recopie la sortie, calcule les empreintes sha256, et écrit `evidence/2026-09-22/qg-us-12.json`. Au premier essai, son test unitaire échouait sur une erreur de compilation ; il l'a corrigé, relancé, et a capturé la seconde exécution comme « RED observé ». Pour la mutation, la skill ne fournit qu'un adaptateur .NET : dans ce projet Swift, la porte ne peut pas tourner, et la règle dit qu'une porte qui ne tourne pas est un échec. L'agent le signale, ou contourne en déclarant la porte « non applicable ». Pour le scénario 3, c'est lui qui écrit le test d'acceptance, puis le code qui le fait passer. Enfin, une ligne de la skill l'autorise à supprimer un test qui ne tue aucun mutant.
 
+**skraft-plugin 1.6.0.** Une skill `quality-gates-javascript` s'ajoute (StrykerJS 9.6.1, format TAP uniquement), ce qui ouvre les portes de mutation aux projets Node. Pour ce projet Swift, rien ne change : aucun adaptateur n'existe, `quality-gates-dotnet` reste une skill obligatoire de l'ingénieur, et les preuves sont toujours écrites par l'agent lui-même.
+
 **Notre approche.** Les tests d'acceptance des trois scénarios existent déjà, gelés par empreinte depuis DISTILL. Pour le scénario 2, la sous-machine déroule :
 
 | Pas | Qui | Ce qui se passe pour US-12 |
@@ -559,7 +582,7 @@ Si l'agent dev tente de faire passer le test en modifiant `testCapsDoseAboveMax`
 | Preuves auto-déclarées | Le code exécute les tests et la mutation, capture et écrit les preuves ; même schéma que skraft | Code |
 | Examen et copie par le même agent | Tous les tests d'acceptance écrits en DISTILL ; agents test et dev séparés | Code |
 | Intégrité par consigne | Empreinte de tous les tests à chaque Vérif ; suppression soumise à validation | Code, puis humain |
-| Adaptateur .NET seul | Adaptateurs de stack en extension : XCTest et Muter, Vitest et Stryker, dotnet et Stryker.NET | Code |
+| Adaptateur .NET seul | Profil de stack déclaratif, généré par l'IA et vérifié par exécution ; mutation absente = porte non disponible, jamais un échec | Code |
 | Transitions de cycle non contrôlées | Sous-machine RED, GREEN, REFACTOR avec Vérif entre chaque pas | Code |
 | Fixture theater | Vérif GREEN exige au moins un fichier de production modifié | Code |
 | Architecture jugée par un LLM | Règle de dépendance vérifiée par analyse des imports | Code |
@@ -745,7 +768,7 @@ Le SDK remonte les événements d'usage de chaque session. Enregistrer, par éta
 | RESEARCH | Aucune vérification, citations inventées | Porte citations, questions ouvertes remontées tôt | Le fond de la recherche |
 | DESIGN | Auto-réconciliation, ratification contournable | Porte cohérence, état Ratification bloquant | Le découpage et les décisions |
 | DISTILL | Valeurs arrondies, rouge auto-déclaré | Porte valeurs, Porte RED exécutée, tous les tests d'acceptance écrits ici | La formulation des scénarios |
-| DELIVER | Preuves auto-déclarées, examen et copie par le même agent, .NET seul | Preuves produites par le code, tests gelés, adaptateurs de stack | La qualité du code |
+| DELIVER | Preuves auto-déclarées, examen et copie par le même agent, .NET seul | Preuves produites par le code, tests gelés, profils de stack | La qualité du code |
 | Revue | Synthèse et faits établis par des LLM | Faits établis par le code, synthèse par le code | Lisibilité, pertinence, fidélité aux ADR |
 | Réessais | Arrêt dépendant du LLM, essais cumulatifs | Budget, rollback, relance ciblée | Rien |
 
@@ -754,7 +777,7 @@ Le SDK remonte les événements d'usage de chaque session. Enregistrer, par éta
 Chaque étape s'appuie sur la précédente, et chacune apporte un gain mesurable seule.
 
 1. **Modèle d'état unifié et réducteur.** Une seule liste de phases, un seul schéma, un réducteur pur testé. Tout le reste en dépend.
-2. **Adaptateur de stack Swift.** Exécution des tests, rapport JSON, mutation, analyse des imports. Sans lui, aucune porte ne peut tourner sur tes projets.
+2. **Profils de stack.** Moteur générique (JUnit, TAP, rapport de mutation Stryker, analyse d'imports), puis `/stack init` et `/stack doctor` pour générer et vérifier le profil de chaque projet. Sans profil, les portes qui lancent les tests ne tournent pas ; les autres sont indépendantes du langage.
 3. **DELIVER avec l'outil `run_tests` et les tests gelés.** Le plus gros gain de fiabilité, pour environ une requête par scénario.
 4. **Porte RED et Porte valeurs en DISTILL.** Elles protègent l'entrée de DELIVER.
 5. **Synthèse de revue par le code et suppression de la lentille « portes de qualité ».** Gain de fiabilité et de tokens immédiat.
@@ -764,4 +787,4 @@ Chaque étape s'appuie sur la précédente, et chacune apporte un gain mesurable
 
 ### Ce qu'on garde de skraft
 
-Les 22 prompts d'agents et les 36 skills, qui portent la méthode (Event Modeling, DDD, double cycle TDD, lentilles adverses) ; les politiques pures de `domain/` une fois le modèle d'état unifié ; le schéma de preuves de qualité ; la commande `artifact adr` ; l'idée des lentilles en contextes neufs. Ce qu'on remplace, c'est le mécanisme qui décide et qui vérifie. La reprise de ce contenu suppose de valider la compatibilité avec sa licence GPL-3.0-or-later.
+Les prompts d'agents et les skills (38 en 1.6.0), qui portent la méthode (Event Modeling, DDD, double cycle TDD, lentilles adverses) ; les politiques pures de `domain/` une fois le modèle d'état unifié ; le schéma de preuves de qualité ; la commande `artifact adr` ; l'idée des lentilles en contextes neufs ; et, depuis la 1.6.0, la table de normalisation des noms d'outils de `harness-input.mjs`. Ce qu'on remplace, c'est le mécanisme qui décide et qui vérifie. La reprise de ce contenu suppose de valider la compatibilité avec sa licence GPL-3.0-or-later.

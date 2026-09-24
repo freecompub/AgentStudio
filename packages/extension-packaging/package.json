@@ -1,0 +1,13 @@
+{
+  "name": "@agent-studio/extension-packaging",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "zod": "^4.6.5"
+  }
+}

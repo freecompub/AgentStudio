@@ -2,7 +2,7 @@
 
 > Spécification de l'extension `skraft` pour l'application `agent-studio`.
 > Elle complète `SPEC.md` (le cœur de l'application) et fait autorité pour tout ce qui concerne skraft.
-> Source analysée : [skraft-plugin](https://github.com/SebastienDegodez/skraft-plugin), plugin `skraft-framework` version 1.5.2.
+> Sources analysées : [skraft-plugin](https://github.com/SebastienDegodez/skraft-plugin), plugin `skraft-framework` version 1.5.2 (branche `main`), puis branche [`refactor/v1.6.0-tracking-substrate`](https://github.com/SebastienDegodez/skraft-plugin/tree/refactor/v1.6.0-tracking-substrate) (version `1.6.0-hooks.1`, 23 septembre 2026). Les chemins du dépôt cités ici sont ceux de la 1.6.0.
 > Version : 2026-09-23. Auteur : Samir.
 
 ---
@@ -10,7 +10,7 @@
 ## 0. Consignes pour Claude Code
 
 1. **Lis `SPEC.md` avant ce document.** Tout ce qui touche au cœur (moteur de tâches, `ctx`, portes génériques, sessions, interactions, sécurité) y est défini ; ce document ne le répète pas.
-2. **Prérequis** : les jalons J2 (moteur de tâches, extension `tdd`), J3 (`run_tests`, interactions persistées) et J4 (isolation, arbitre) de `SPEC.md` sont terminés. L'adaptateur de stack Swift (J5) est requis à partir de S5.
+2. **Prérequis** : les jalons J2 (moteur de tâches, extension `tdd`), J3 (`run_tests`, interactions persistées) et J4 (isolation, arbitre) de `SPEC.md` sont terminés. Les profils de stack complets (J5, `SPEC.md` section 8) sont requis à partir de S4 ; un profil vérifié par `/stack doctor` est nécessaire pour le projet de démonstration.
 3. **Porte bloquante licence** : skraft est sous **GPL-3.0-or-later**. Ne copie aucun prompt, skill ni code du dépôt source tant que la question O9 de `SPEC.md` n'est pas tranchée. En attendant, implémente le réducteur, les portes et les schémas (sections 5 à 11), qui sont notre propre conception, avec des prompts de substitution minimaux.
 4. **Ne reproduis pas l'architecture de contrôle de skraft** (orchestrateur LLM + hooks). La section 3 liste ses défauts constatés : chacun doit être impossible par construction dans notre implémentation.
 5. **Le scénario US-12 (section 13) est le test d'acceptance de l'extension.** Chaque jalon S1 à S6 a des critères de sortie qui s'y rattachent.
@@ -59,53 +59,57 @@ Un fichier de story Markdown contenant : identifiant, titre, énoncé « En tant
 
 ---
 
-## 3. Défauts constatés dans skraft-plugin 1.5.2, à rendre impossibles
+## 3. Défauts constatés dans skraft-plugin, à rendre impossibles
 
-| Réf. | Défaut constaté | Garantie attendue dans notre implémentation |
-| --- | --- | --- |
-| C1 | G1, G4, G5, G6 ne s'exécutent que si le payload contient `projectSlug`, que les harnais n'envoient jamais | Le contexte (slug, rôle, phase) est connu du code qui ouvre la session ; aucune vérification ne dépend d'un payload externe |
-| C2 | Deux modèles d'état incompatibles (G1/G6 attendent `specialistDone`, `reviewerVerdict`, `retries`, `skipPhases` ; le CLI écrit `verdicts`, `retryCount`, `phasesCompleted`) | Un seul type `SkraftState` (section 4), un seul validateur |
-| C3 | `init` crée l'état en `DISCOVER` ; la machine suit un cycle à cinq phases, la configuration en compte quatre | `phaseOrder` lu depuis une seule source ; état initialisé sur `phaseOrder[0]` ; test qui l'assure |
-| C4 | Les outils `Write`/`Edit` ne passent par aucun hook ; noms d'outils Copilot (`bash`, `edit`) non reconnus | Gardes du cœur sur tous les outils d'écriture, noms normalisés ; détection par diff à chaque porte |
-| C5 | Sortie des hooks `{decision, message}` non conforme aux formats des harnais | Hooks du SDK typés, en processus ; pas de format à traduire |
-| C6 | Verdicts `APPROVED/NEEDS_REWORK/REJECTED` dans les rapports, `APPROVED/CHANGES_REQUESTED` dans l'état ; traduction par le LLM | Enum unique `APPROVED \| CHANGES_REQUESTED \| REJECTED` imposé par le schéma de `submit_lens_verdict` |
-| C7 | Contrôle de lecture des skills en fail-open (transcript attendu inline, champ `path` au lieu de `file_path`) | Skills obligatoires injectées dans la session ; `load_skill` tracé ; contrôle par les effets |
-| E1 | « Commit vérifié » = arbre Git propre, même si rien n'a été fait | Commits créés par le code à partir du SHA de départ enregistré |
-| E2 | L'ordre des phases ne dépend que du prompt | Ordre imposé par le réducteur |
-| E3 | L'arrêt à budget épuisé dépend du LLM | Budget appliqué par le réducteur |
-| E4 | DESIGN et DISTILL exigent les artefacts de DISCUSS, phase supprimée | Dossier de passation construit à partir des phases réellement exécutées |
-| E5 | La ratification des ADR se fait par édition manuelle de `adrRatification`, sans blocage | État `RATIFICATION` bloquant et persisté |
-| E6 | Seul un adaptateur de qualité .NET existe ; sortie DISTILL codée en `*AcceptanceTests.cs` | Adaptateurs de stack ; chemins fournis par l'adaptateur |
-| E7 | La skill de difficulté décrit encore le pipeline à cinq phases et ne donne aucun critère | Indicateurs calculés et grille explicite (section 8) |
+La colonne « 1.6.0 » donne le statut sur la branche `refactor/v1.6.0-tracking-substrate`. Un défaut corrigé côté skraft reste une garantie à assurer chez nous, par construction.
+
+| Réf. | Défaut constaté | 1.6.0 | Garantie attendue dans notre implémentation |
+| --- | --- | --- | --- |
+| C1 | G1, G4, G5, G6 ne s'exécutent que si le payload contient `projectSlug`, que les harnais n'envoient jamais | Non corrigé, absent du plan de refonte | Le contexte (slug, rôle, phase) est connu du code qui ouvre la session ; aucune vérification ne dépend d'un payload externe |
+| C2 | Deux modèles d'état incompatibles (G1/G6 attendent `specialistDone`, `reviewerVerdict`, `retries`, `skipPhases` ; le CLI écrit `verdicts`, `retryCount`, `phasesCompleted`) | Non corrigé, prévu par le plan | Un seul type `SkraftState` (section 4), un seul validateur |
+| C3 | `init` crée l'état en `DISCOVER` ; la machine suit un cycle à cinq phases, la configuration en compte quatre | Non corrigé, prévu par le plan | `phaseOrder` lu depuis une seule source ; état initialisé sur `phaseOrder[0]` ; test qui l'assure |
+| C4 | Les outils `Write`/`Edit` ne passent par aucun hook ; noms d'outils Copilot (`bash`, `edit`) non reconnus | Corrigé ; contournable par interpréteur (N2) | Gardes du cœur sur tous les outils d'écriture, noms normalisés ; détection par diff à chaque porte |
+| C5 | Sortie des hooks `{decision, message}` non conforme aux formats des harnais | Corrigé | Hooks du SDK typés, en processus ; pas de format à traduire |
+| C6 | Verdicts `APPROVED/NEEDS_REWORK/REJECTED` dans les rapports, `APPROVED/CHANGES_REQUESTED` dans l'état ; traduction par le LLM | Non corrigé | Enum unique `APPROVED \| CHANGES_REQUESTED \| REJECTED` imposé par le schéma de `submit_lens_verdict` |
+| C7 | Contrôle de lecture des skills en fail-open (transcript attendu inline, champ `path` au lieu de `file_path`) | Corrigé dans le code | Skills obligatoires injectées dans la session ; `load_skill` tracé ; contrôle par les effets |
+| E1 | « Commit vérifié » = arbre Git propre, même si rien n'a été fait | Non corrigé | Commits créés par le code à partir du SHA de départ enregistré |
+| E2 | L'ordre des phases ne dépend que du prompt | Inchangé : le plan garde un orchestrateur LLM guidé par une projection | Ordre imposé par le réducteur |
+| E3 | L'arrêt à budget épuisé dépend du LLM | Inchangé | Budget appliqué par le réducteur |
+| E4 | DESIGN et DISTILL exigent les artefacts de DISCUSS, phase supprimée | Non vérifié en 1.6.0 | Dossier de passation construit à partir des phases réellement exécutées |
+| E5 | La ratification des ADR se fait par édition manuelle de `adrRatification`, sans blocage | Aggravé : l'édition est désormais refusée par G7 (N1) | État `RATIFICATION` bloquant et persisté |
+| E6 | Seul un adaptateur de qualité .NET existe ; sortie DISTILL codée en `*AcceptanceTests.cs` | Partiel : `quality-gates-javascript` ajoutée, rien pour Swift | Profil de stack du projet (`SPEC.md` section 8) ; chemins, commandes et formats fournis par le profil ; capacité absente = porte non disponible, jamais un échec |
+| E7 | La skill de difficulté décrit encore le pipeline à cinq phases et ne donne aucun critère | Niveaux supprimés ; RESEARCH toujours exécutée | Indicateurs calculés et grille explicite (section 8) |
+| N1 | Le routage d'entrée (`entryPoint`, écrit à chaque pipeline neuf) et la ratification (`adrRatification`) sont prescrits en édition directe de `state.json`, sans commande CLI ; G7 les refuse désormais | Nouveau en 1.6.0 ; commandes typées prévues par le plan | Aucun champ d'état n'est écrit par un agent : décisions persistées par le moteur de tâches, via les demandes d'interaction |
+| N2 | G7 ne détecte pas les écritures par interpréteur (`node -e`, `python3 -c`) | Nouveau en 1.6.0, absent du plan | L'état vit hors du dépôt, dans le moteur de tâches ; les écritures dans le dépôt sont vérifiées par diff et empreinte à chaque porte, quel que soit l'outil |
 
 ---
 
 ## 4. Plan de reprise du dépôt source
 
-À appliquer **après** la décision de licence (O9). Chemins relatifs à `plugins/skraft-framework/`.
+À appliquer **après** la décision de licence (O9). Chemins relatifs à `plugins/skraft-framework/` sur la branche 1.6.0. Les agents y existent en deux surfaces synchronisées, `com.github.copilot/agents/*.agent.md` et `com.anthropic.claude-code/agents/*.md` : partir de la surface Copilot. Les règles d'état données au LLM sont dans `com.github.copilot/rules/` et ne sont pas reprises.
 
 ### 4.1 Agents
 
 | Source | Action | Rôle dans l'extension |
 | --- | --- | --- |
-| `agents/skraft-orchestrator.agent.md` | **Ne pas reprendre** | Remplacé par le réducteur. Seules les règles de routage par difficulté sont transposées (section 8) |
-| `agents/solution-researcher.agent.md` | Adapter | `skraft-researcher` |
-| `agents/solution-architect.agent.md` | Adapter, découper en deux rôles | `skraft-architect-model` (étapes 1 à 6 : lecture, réutilisation, revue des ADR, Event Modeling, DDD) et `skraft-architect-decide` (étapes 7 à 10 : ADR, contrats, réconciliation, synthèse) |
-| `agents/solution-architect-reviewer.agent.md` | Adapter | Configuration de la revue DESIGN |
-| `agents/acceptance-designer.agent.md` | Adapter | `skraft-acceptance` ; écrit **tous** les tests d'acceptance |
-| `agents/acceptance-designer-reviewer.agent.md` | Adapter | Configuration de la revue DISTILL |
-| `agents/software-engineer.agent.md` | Adapter | `skraft-test` et `skraft-dev` (séparation des rôles, section 7.4) |
-| `agents/software-engineer-reviewer.agent.md` | Adapter | Configuration de la revue DELIVER |
-| `agents/reviewer-lenses/cold-reader-lens.agent.md` | Reprendre, sortie JSON | Lentille `cold-reader` |
-| `agents/reviewer-lenses/test-integrity-lens.agent.md` | Reprendre, sortie JSON | Lentille `test-integrity` |
-| `agents/reviewer-lenses/architecture-boundaries-lens.agent.md` | Reprendre, recentrer sur le jugement | Lentille `architecture` (la règle de dépendance est vérifiée par le code) |
-| `agents/reviewer-lenses/quality-gates-lens.agent.md` | **Supprimer** | Ses contrôles sont faits par le code |
-| `agents/backlog-*`, `agents/brownfield-*`, `agents/workers/*` | Hors MVP | — |
+| `com.github.copilot/agents/skraft-orchestrator.agent.md` | **Ne pas reprendre** | Remplacé par le réducteur. Seules les règles de routage d'entrée sont transposées (section 8.1) |
+| `com.github.copilot/agents/solution-researcher.agent.md` | Adapter | `skraft-researcher` |
+| `com.github.copilot/agents/solution-architect.agent.md` | Adapter, découper en deux rôles | `skraft-architect-model` (étapes 1 à 6 : lecture, réutilisation, revue des ADR, Event Modeling, DDD) et `skraft-architect-decide` (étapes 7 à 10 : ADR, contrats, réconciliation, synthèse) |
+| `com.github.copilot/agents/solution-architect-reviewer.agent.md` | Adapter | Configuration de la revue DESIGN |
+| `com.github.copilot/agents/acceptance-designer.agent.md` | Adapter | `skraft-acceptance` ; écrit **tous** les tests d'acceptance |
+| `com.github.copilot/agents/acceptance-designer-reviewer.agent.md` | Adapter | Configuration de la revue DISTILL |
+| `com.github.copilot/agents/software-engineer.agent.md` | Adapter | `skraft-test` et `skraft-dev` (séparation des rôles, section 7.4) |
+| `com.github.copilot/agents/software-engineer-reviewer.agent.md` | Adapter | Configuration de la revue DELIVER |
+| `com.github.copilot/agents/cold-reader-lens.agent.md` | Reprendre, sortie JSON | Lentille `cold-reader` |
+| `com.github.copilot/agents/test-integrity-lens.agent.md` | Reprendre, sortie JSON | Lentille `test-integrity` |
+| `com.github.copilot/agents/architecture-boundaries-lens.agent.md` | Reprendre, recentrer sur le jugement | Lentille `architecture` (la règle de dépendance est vérifiée par le code) |
+| `com.github.copilot/agents/quality-gates-lens.agent.md` | **Supprimer** | Ses contrôles sont faits par le code |
+| `backlog-*`, `brownfield-*`, `*-worker`, lentilles `discovery-*`, `planning-*`, `contract-fidelity`, `mock-fidelity` | Hors MVP | — |
 
 Adaptation commune à tous les prompts repris :
 - supprimer toute instruction d'appel à `state.mjs`, d'édition de `state.json`, de commit, d'exécution directe des tests ou d'écriture de preuves ;
 - remplacer la fin de mission par l'appel de l'outil terminal du rôle (section 6.3) ;
-- supprimer les références à DISCUSS et DISCOVER ;
+- supprimer les références à DISCUSS et DISCOVER (encore présentes en 1.6.0, y compris dans `skraft-entry-point-routing`) ;
 - remplacer « escalader vers … » par `report_blocker` ;
 - retirer les consignes d'impression de journaux ou de checklists dans le chat.
 
@@ -115,9 +119,9 @@ Adaptation commune à tous les prompts repris :
 | --- | --- | --- |
 | Méthode (reprises telles quelles) | `outside-in-tdd`, `bdd-methodology`, `test-design-mandates`, `craft-discipline`, `test-refactoring-catalog`, `clean-architecture-testing`, `architecture-patterns`, `architecture-decisions`, `adr-eligibility-gate`, `mutation-testing` (partie méthode) | Reprendre ; injectées ou chargées selon le rôle (section 6.4) |
 | Critères de revue | `acceptance-review-criteria`, `architecture-review-criteria`, `adversarial-review-lenses` | Reprendre ; la table de pondération de `adversarial-review-lenses` est **transcrite en code** (section 9.3) |
-| Devenues du code | `quality-gates-evidence-contract`, `quality-gates-dotnet`, `resolving-stack-commands`, `skraft-quality-bar` | Ne plus les donner aux agents. Leur contenu devient : schéma de preuves écrit par `run_tests`, adaptateurs de stack, seuils de la porte de fin de scénario |
-| À réécrire | `skraft-difficulty-routing` | Remplacée par la section 8 |
-| Hors MVP | `issue-*`, `sprint-planning`, `github-search-protocol`, `discovery-review-criteria`, `planning-review-criteria`, `characterize-*`, `compose-brownfield-prd`, `mikado-method`, `strangler-fig-method`, `contract-testing*`, `mocking-*`, `playwright-evidence` | — |
+| Devenues du code ou des profils | `quality-gates-evidence-contract`, `quality-gates-dotnet`, `quality-gates-javascript` (1.6.0), `resolving-stack-commands`, `skraft-quality-bar` | Ne plus les donner aux agents. Le schéma de preuves devient celui de `run_tests` ; les commandes, formats et options par langage deviennent des **profils de stack** d'exemple (`profiles/`) ou des faits pour `/stack init` ; les seuils deviennent ceux de la porte de fin de scénario et du profil |
+| Supprimée en 1.6.0 | `skraft-difficulty-routing` | Remplacée côté skraft par `skraft-entry-point-routing`, dont on reprend la règle (section 8.1) ; notre grille de difficulté ne règle que les moyens (8.4) |
+| Hors MVP | `issue-*`, `sprint-planning`, `github-search-protocol`, `discovery-review-criteria`, `planning-review-criteria`, `characterize-*`, `compose-brownfield-prd`, `mikado-method`, `strangler-fig-method`, `contract-testing*`, `mocking-*`, `playwright-evidence`, `qa-reporting` (1.6.0) | — |
 
 ### 4.3 Code
 
@@ -127,9 +131,11 @@ Adaptation commune à tous les prompts repris :
 | `src/domain/artifact-policy.mjs` | Reprendre la correspondance motifs d'artefacts ; corriger le vocabulaire de verdict (C6) |
 | `src/domain/skill-policy.mjs` | Remplacé par la table `mandatorySkills` du manifeste |
 | `src/domain/pipeline-policy.mjs` | Ne pas reprendre (calcul de l'agent attendu : le réducteur le sait déjà) |
-| `src/domain/session-guard-policy.mjs` | S'en inspirer pour les motifs de détection d'écriture shell des gardes du cœur |
+| `src/domain/session-guard-policy.mjs` | S'en inspirer pour les motifs de détection d'écriture shell des gardes du cœur, en sachant qu'ils ne voient pas les écritures par interpréteur (N2) : la détection par diff reste la garantie |
+| `src/adapters/api/hooks/harness-input.mjs` (1.6.0) | Reprendre la table de normalisation des noms d'outils (`bash`, `shell`, `edit`, `str_replace`, `create_file`, `view`, `task`…) pour les gardes du cœur et l'adaptateur `AgentRuntime` |
 | Commande `artifact adr` (rendu d'ADR depuis un gabarit, refus si champ manquant) | Reprendre comme outil `render_adr` (section 7.2) |
-| `src/adapters/api/hooks/*`, `src/cli/hook.mjs`, manifestes `hooks.json` | Ne pas reprendre |
+| Autres adaptateurs de hooks, `src/cli/hook.mjs`, manifestes `hooks.json` | Ne pas reprendre |
+| JSON Schemas d'état et de projection annoncés par le plan 1.6.0 (`.specs/plan_todo.md`) | Pas encore livrés ; à réévaluer à leur livraison pour aligner `SkraftState` si c'est compatible |
 | `src/cli/state.mjs`, `src/cli/housekeeping.mjs` | Remplacés par le moteur de tâches |
 | `skraft-framework.config.json` | Source pour générer le manifeste (`phaseAgents`, `agentSkills`, `agentArtifacts`) |
 | `tests/skraft-framework/*` | Reprendre les tests des politiques conservées |
@@ -158,7 +164,7 @@ export interface SkraftState {
   stage: Stage;
   phase: Phase | null;                       // phase courante, null avant ROUTE
   phaseOrder: Phase[];                       // copie de la configuration au démarrage
-  skipPhases: Phase[];                       // calculé par règle depuis la difficulté
+  skipPhases: Phase[];                       // vide sauf décision humaine (escalade « sauter ») ; jamais déduit de la difficulté
   phasesCompleted: Phase[];                  // append-only
   difficulty: { level: Difficulty; indicators: DifficultyIndicators; confirmedBy: "user" | "auto" } | null; // écrit une fois
   baseSha: string;                           // SHA Git de départ
@@ -185,10 +191,10 @@ Validation par schéma (Zod) à chaque chargement ; un état invalide met la tâ
 
 | Stage | Événement | Garde | Stage suivant | Effets |
 | --- | --- | --- | --- | --- |
-| INIT | `START` (état neuf) | story valide (6.1) | CLASSIFY | créer branche, enregistrer `baseSha`, calculer indicateurs |
+| INIT | `START` (état neuf) | story valide (6.1) | CLASSIFY | créer branche, enregistrer `baseSha`, calculer indicateurs, relever un éventuel transfert amont (8.1) |
 | INIT | `START` (état existant) | — | stage persisté | reprise (SPEC.md 6.3) |
 | CLASSIFY | `DIFFICULTY_PROPOSED` | niveau dans l'enum | CONFIRM_DIFFICULTY | demande d'interaction (mode simple) ou confirmation auto |
-| CONFIRM_DIFFICULTY | `HUMAN_DECISION` | — | ROUTE | écrire `difficulty`, calculer `skipPhases` |
+| CONFIRM_DIFFICULTY | `HUMAN_DECISION` | — | ROUTE | écrire `difficulty` ; régler budget, granularité et lentilles (8.4) |
 | ROUTE | (interne) | reste une phase non sautée | SPECIALIST | checkpoint de phase, construire le dossier de passation, lancer le spécialiste |
 | ROUTE | (interne) | plus de phase | DONE | bilan final |
 | SPECIALIST | `AGENT_REPORTED` | — | ARTIFACT_GATE | exécuter la porte de la phase |
@@ -272,7 +278,7 @@ docs/adr/adr-<NNN>-<slug>.md       # dans le dépôt, append-only
 docs/adr/supersessions.md
 ```
 
-Les tests d'acceptance et le code vont aux emplacements fournis par l'adaptateur de stack (par exemple `Tests/AcceptanceTests/` en Swift).
+Les tests d'acceptance et le code vont aux emplacements déclarés dans le profil de stack (`paths.acceptanceTests`, `paths.unitTests`, `paths.sources`), par exemple `Tests/AcceptanceTests/` pour un projet SwiftPM.
 
 ### 6.3 Rôles, périmètres, outils terminaux
 
@@ -323,7 +329,7 @@ Pour chaque phase : ce que reçoit l'agent, ce qu'il produit, la porte exécuté
 
 ### 7.1 RESEARCH
 
-Exécutée seulement si la phase n'est pas dans `skipPhases` (`medium-hard` et `challenging`).
+Toujours exécutée, quelle que soit la difficulté, comme dans skraft 1.6.0.
 
 **Préparation (code)** : présélection des fichiers candidats par mots-clés extraits de la story (noms, termes métier), limitée à vingt fichiers, placée dans le dossier de passation.
 
@@ -373,11 +379,11 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 ### 7.3 DISTILL
 
-**Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements fournis par l'adaptateur de stack ; les valeurs sont copiées mot pour mot des critères.
+**Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements déclarés dans le profil de stack ; les valeurs sont copiées mot pour mot des critères.
 
 **Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables.
 
-**Porte RED d'acceptance (code)** : exécution des tests d'acceptance via l'adaptateur de stack.
+**Porte RED d'acceptance (code)** : exécution des tests d'acceptance selon le profil de stack, classification des échecs par le moteur générique.
 
 | Résultat d'un test | Décision |
 | --- | --- |
@@ -409,9 +415,9 @@ export interface DeliverState {
 
 **Granularité par défaut (`turn-per-scenario`)** : `skraft-test` écrit le test unitaire suivant puis rend la main ; `skraft-dev` fait passer au vert et refactore dans le même tour ; chaque exécution de tests passe par `run_tests`, qui enregistre les preuves. Les gardes du cœur refusent toute écriture de `skraft-dev` dans un dossier de tests. La boucle alterne test / dev jusqu'à ce que le test d'acceptance du scénario soit vert.
 
-**Granularité stricte (`session-per-step`)** : identique à l'extension `tdd` (SPEC.md 8.2 et 8.3), avec la vérification d'acceptance en plus. Activée par réglage, pour `challenging`, ou automatiquement après un échec de scénario.
+**Granularité stricte (`session-per-step`)** : identique à l'extension `tdd` (SPEC.md 9.2 et 9.3), avec la vérification d'acceptance en plus. Activée par réglage, pour `challenging`, ou automatiquement après un échec de scénario.
 
-**Vérifications pendant la boucle (code)** : mêmes portes que l'extension `tdd` (SPEC.md 8.3), plus : empreinte des tests d'acceptance toujours égale à `acceptanceHash`.
+**Vérifications pendant la boucle (code)** : mêmes portes que l'extension `tdd` (SPEC.md 9.3), plus : empreinte des tests d'acceptance toujours égale à `acceptanceHash`.
 
 **Porte de fin de scénario (code)** :
 
@@ -420,8 +426,8 @@ export interface DeliverState {
 | Test d'acceptance du scénario | Vert |
 | Suite complète | Verte, aucun test ignoré |
 | Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
-| Mutation (adaptateur de stack) | 100 % domaine et application ; 90 % API et infrastructure |
-| Règle de dépendance | Aucun import du domaine vers l'infrastructure ou l'interface |
+| Mutation (profil de stack) | Seuils du profil ; par défaut 100 % domaine et application, 90 % API et infrastructure. Capacité absente : porte non disponible, selon la politique du projet |
+| Règle de dépendance | Couches et imports autorisés déclarés dans le profil ; capacité absente : porte non disponible |
 | Object Calisthenics mesurables | Longueur de méthode, niveaux d'indentation, nombre d'attributs : seuils configurables |
 | Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
 
@@ -437,9 +443,17 @@ Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables 
 
 ---
 
-## 8. Difficulté
+## 8. Routage d'entrée et difficulté
 
-### 8.1 Indicateurs calculés par le code
+### 8.1 Routage d'entrée
+
+Aligné sur skraft 1.6.0 : **les quatre phases d'ingénierie s'exécutent toujours**, RESEARCH compris. Aucune phase n'est sautée en fonction de la difficulté.
+
+Le routage d'entrée de skraft (skill `skraft-entry-point-routing`) ne concerne que DISCOVER, une phase produit hors du pipeline d'ingénierie : il détecte un transfert amont complet (backlog trié et périmètre de sprint) et demande à l'utilisateur de le confirmer. Dans notre MVP, la story est fournie directement (section 1.1) : le code relève seulement l'éventuelle provenance du transfert (issue, sprint) et l'enregistre dans l'état, pour la traçabilité. Aucune écriture d'état par un agent n'est nécessaire, contrairement à skraft où cette étape est aujourd'hui bloquée (N1).
+
+`skipPhases` ne se remplit que par une décision humaine explicite, lors d'une escalade (« sauter la phase »).
+
+### 8.2 Indicateurs calculés par le code
 
 | Indicateur | Calcul |
 | --- | --- |
@@ -448,7 +462,7 @@ Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables 
 | `newExternalIntegration` | Mention d'une API, base, file de messages ou service absent du code actuel |
 | `openBusinessQuestions` | Nombre de questions ouvertes portant sur une règle métier |
 
-### 8.2 Grille initiale
+### 8.3 Grille initiale
 
 | Niveau | Condition (la première qui s'applique, du plus élevé au plus bas) |
 | --- | --- |
@@ -461,16 +475,18 @@ Les seuils sont des réglages ; ils seront ajustés à partir des mesures d'usag
 
 Le LLM (`skraft-classifier`) reçoit les indicateurs et le niveau proposé par la grille ; il peut proposer un cran de plus ou de moins avec une justification. L'utilisateur confirme en mode simple (SPEC.md O3).
 
-### 8.3 Effets du niveau
+skraft 1.6.0 a supprimé ses niveaux de difficulté. Nous gardons une évaluation, mais elle ne décide plus d'aucun saut de phase : elle ne règle que les moyens (8.4). Son intérêt est à confirmer par les mesures d'usage (S-O7).
 
-| Niveau | RESEARCH | Granularité DELIVER | Lentilles | Budget de réessais |
-| --- | --- | --- | --- | --- |
-| `simple` | sautée | `turn-per-scenario` | `cold-reader`, `test-integrity` | 2 |
-| `medium` | sautée | `turn-per-scenario` | toutes | 3 |
-| `medium-hard` | exécutée | `turn-per-scenario` | toutes | 3 |
-| `challenging` | exécutée | `session-per-step` | toutes, revue par scénario si S-O2 | 3 |
+### 8.4 Effets du niveau
 
-**US-12** : 3 critères, 2 modules, pas d'intégration, 1 question métier ouverte → grille `medium-hard` → confirmé par l'utilisateur → RESEARCH exécutée.
+| Niveau | Granularité DELIVER | Lentilles | Budget de réessais |
+| --- | --- | --- | --- |
+| `simple` | `turn-per-scenario` | `cold-reader`, `test-integrity` | 2 |
+| `medium` | `turn-per-scenario` | toutes | 3 |
+| `medium-hard` | `turn-per-scenario` | toutes | 3 |
+| `challenging` | `session-per-step` | toutes, revue par scénario si S-O2 | 3 |
+
+**US-12** : 3 critères, 2 modules, pas d'intégration, 1 question métier ouverte → grille `medium-hard` → confirmé par l'utilisateur → granularité `turn-per-scenario`, toutes les lentilles, budget de 3. RESEARCH est exécutée, comme pour toute story.
 
 ---
 
@@ -517,7 +533,7 @@ Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depu
   "permissions": [
     "fs:read",
     "fs:write:.skraft/**", "fs:write:docs/adr/**",
-    "fs:write:<dossiers de tests et de production fournis par l'adaptateur de stack>",
+    "fs:write:@stack:sources", "fs:write:@stack:unitTests", "fs:write:@stack:acceptanceTests",
     "shell:test", "git:commit", "git:branch", "git:revert",
     "copilot:sessions",
     "net:none"
@@ -565,7 +581,7 @@ Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depu
 }
 ```
 
-Les motifs `@stack:*` sont résolus par l'adaptateur de stack du projet au moment de l'ouverture de session. Ce mécanisme est à ajouter au schéma de manifeste du cœur (SPEC.md 5.1).
+Les motifs `@stack:*` sont résolus depuis la section `paths` du profil de stack au moment de l'ouverture de session (`SPEC.md` 8.3). Ce mécanisme est à ajouter au schéma de manifeste du cœur (`SPEC.md` 5.1).
 
 ---
 
@@ -574,7 +590,7 @@ Les motifs `@stack:*` sont résolus par l'adaptateur de stack du projet au momen
 | Demande d'interaction | Déclencheur | Profil autorisé | Options |
 | --- | --- | --- | --- |
 | Confirmer la difficulté | CLASSIFY (mode simple) | tout profil | niveau proposé, un cran au-dessus, un cran au-dessous |
-| Répondre à une question ouverte | Fin de RESEARCH, ou story sans RESEARCH avec questions | PO / BA, développeur | texte libre, « reporter » |
+| Répondre à une question ouverte | Fin de RESEARCH | PO / BA, développeur | texte libre, « reporter » |
 | Ratifier un ADR | RATIFICATION | architecte | `accept`, `reject`, `amend` + texte |
 | Débloquer un agent | `report_blocker` | selon la nature (métier : PO / BA ; technique : développeur) | choix proposés par l'agent + texte libre |
 | Décider après escalade | ESCALATED | développeur | `retry`, `skip`, `abort` |
@@ -589,7 +605,7 @@ Bilan final (carte + résumé injecté dans la session principale) : phases exé
 
 ## 12. Usage
 
-Leviers propres à skraft, en plus de ceux de SPEC.md section 13 :
+Leviers propres à skraft, en plus de ceux de SPEC.md section 14 :
 - plus d'orchestrateur LLM (2 750 mots de prompt et l'accumulation de tous les comptes rendus disparaissent) ;
 - skills d'exécution de portes retirées des contextes (environ 4 500 mots en moins par session DELIVER) ;
 - lentille `quality-gates` supprimée : une session de moins par revue ;
@@ -623,7 +639,7 @@ Mesurer par état : tokens, requêtes, réessais. Objectif de S6 : comparer le p
 
 ### 13.3 Bout en bout
 
-Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
+Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), avec un profil de stack généré par `/stack init` et vérifié par `/stack doctor`, story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
 
 Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un rejet de citation puis question « par prise ou par jour » → DESIGN avec un rejet de cohérence puis ratification d'ADR-008 → DISTILL avec un rejet de valeur puis scénario 3 requalifié → DELIVER des scénarios 1 et 2, une tentative de modification de test refusée → revue avec un défaut `major` corrigé → DONE avec bilan.
 
@@ -634,11 +650,11 @@ Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un re
 | Jalon | Contenu | Critères de sortie |
 | --- | --- | --- |
 | **S0** | Décision de licence (SPEC.md O9) ; prompts de substitution si la reprise est refusée | Décision consignée en ADR |
-| **S1** | Types `SkraftState`, réducteur complet, invariants, grille de difficulté, lecture de la story, INIT / CLASSIFY / ROUTE / COMMIT, agents simulés | Tous les tests 13.1 verts ; pipeline complet à vide avec agents simulés ; saut de RESEARCH par règle ; reprise après redémarrage à chaque stage |
+| **S1** | Types `SkraftState`, réducteur complet, invariants, grille de difficulté, lecture de la story, INIT / CLASSIFY / ROUTE / COMMIT, agents simulés | Tous les tests 13.1 verts ; pipeline complet à vide avec agents simulés ; les quatre phases toujours enchaînées ; reprise après redémarrage à chaque stage |
 | **S2** | RESEARCH : présélection, rôle `skraft-researcher`, porte citations, questions ouvertes | Fixture citations rejetée ; question posée et réponse présente dans le dossier de passation de DESIGN |
 | **S3** | DESIGN : deux rôles, `render_adr`, porte cohérence, revue DESIGN, état RATIFICATION | Fixture cohérence rejetée ; DISTILL inatteignable avant ratification ; `amend` relance le bon rôle |
 | **S4** | DISTILL : rôle `skraft-acceptance`, porte valeurs, porte RED d'acceptance, gel des tests d'acceptance | Fixtures valeurs et RED traitées ; empreinte enregistrée |
-| **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet Swift de démonstration ; modification de test refusée puis détectée par empreinte |
+| **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet Swift de démonstration ; modification de test refusée puis détectée par empreinte ; même pipeline sur un projet TypeScript sans modifier l'extension, seulement son profil |
 | **S6** | Revue : faits, trois lentilles, synthèse par le code, rapports générés ; mesures d'usage | Verdict reproductible depuis les mêmes JSON ; bout en bout 13.3 vert ; mesures sur trois stories |
 
 ---
@@ -651,5 +667,7 @@ Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un re
 | S-O2 | Revue par scénario en DELIVER pour `challenging` ? | Oui, avec `cold-reader` et `test-integrity` seulement |
 | S-O3 | Brancher Backlog Planner en amont du pipeline (story générée depuis une issue GitHub) ? | Plus tard, après S6 |
 | S-O4 | Seuils de mutation configurables par module ou globalement ? | Par couche (domaine, application, API, infrastructure) |
-| S-O5 | Faut-il proposer à l'auteur de skraft-plugin les corrections des défauts C1 à C7 ? | Oui, via le document d'analyse déjà rédigé |
+| S-O5 | Faut-il proposer à l'auteur de skraft-plugin les corrections des défauts C1 à C7, N1 et N2 ? | Oui, via le document d'analyse, qui couvre aussi la branche 1.6.0 |
 | S-O6 | Autoriser la recherche web pour `skraft-researcher` ? | Oui, via une permission `net:` dédiée, désactivée par défaut |
+| S-O7 | Garder une évaluation de difficulté, alors que skraft 1.6.0 l'a supprimée ? | Oui pour régler les moyens, à confirmer par les mesures d'usage de S6 |
+| S-O8 | Suivre le plan de refonte de skraft (JSON Schemas d'état et de projection, commandes typées) pour aligner nos schémas ? | Oui, à réévaluer à chaque livraison de la branche |

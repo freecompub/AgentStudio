@@ -1,0 +1,53 @@
+# Vérification des pull requests : types puis suite de tests complète.
+# Aucun appel réel au LLM (§16) : les tests d'intégration utilisent un `AgentRuntime` scripté.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Une PR mise à jour annule le run précédent, encore en cours.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    name: Types et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Aucun test n'importe `electron` : son binaire (~250 Mo) est inutile ici.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v7
+
+      # La version de pnpm vient du champ `packageManager` du package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Version embarquée par Electron 44, donc celle sur laquelle l'application tourne
+          # réellement. Le modèle de permissions des extensions isolées exige `--permission`,
+          # disponible à partir de Node 22.13 / 23.5.
+          node-version: "24"
+          cache: pnpm
+
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Vérifier les types
+        run: pnpm typecheck
+
+      # Les tests Swift sont sautés d'eux-mêmes si la chaîne est absente (J5) : elle n'est pas
+      # installée ici, les tests Swift ne sont donc pas couverts par cette CI.
+      - name: Lancer les tests
+        run: pnpm test
+
+      - name: Construire l'application
+        run: pnpm build

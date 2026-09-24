@@ -1,0 +1,30 @@
+{
+  "name": "agent-studio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "pnpm --filter @agent-studio/desktop dev",
+    "build": "pnpm --filter @agent-studio/desktop build",
+    "smoke:copilot": "tsx scripts/smoke-copilot.ts",
+    "ext:keys": "tsx scripts/extension-tools.ts keys",
+    "ext:pack": "tsx scripts/extension-tools.ts pack"
+  },
+  "devDependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-packaging": "workspace:*",
+    "@agent-studio/github-auth": "workspace:*",
+    "@agent-studio/runtime-copilot": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "@types/node": "^22.19.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

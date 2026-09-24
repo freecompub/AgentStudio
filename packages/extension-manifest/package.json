@@ -1,0 +1,16 @@
+{
+  "name": "@agent-studio/extension-manifest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/extension-api": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@agent-studio/ext-tdd": "workspace:*"
+  }
+}
