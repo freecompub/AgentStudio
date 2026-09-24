@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { EnvFailureError, WorkDefectError } from "@agent-studio/core";
+import { EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
@@ -10,7 +10,7 @@ import { checkResearch } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign } from "./design.js";
 import { checkAcceptanceRed, checkValues } from "./distill.js";
-import { matchesAny } from "@agent-studio/core";
+import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";

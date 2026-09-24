@@ -8,6 +8,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "dependencies": {
+    "@agent-studio/extension-api": "workspace:*",
     "zod": "^4.6.5"
   }
 }

@@ -123,9 +123,6 @@ importers:
 
   extensions/skraft:
     dependencies:
-      '@agent-studio/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@agent-studio/extension-api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -154,9 +151,6 @@ importers:
 
   extensions/tdd:
     dependencies:
-      '@agent-studio/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@agent-studio/extension-api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -179,6 +173,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
       zod:
         specifier: ^4.6.5
         version: 4.6.5

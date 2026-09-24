@@ -7,7 +7,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@agent-studio/core": "workspace:*",
     "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
     "zod": "^4.6.5"
