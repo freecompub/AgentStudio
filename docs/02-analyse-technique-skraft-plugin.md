@@ -8,7 +8,7 @@ skraft transforme un assistant de code en pipeline SDLC en quatre phases (RESEAR
 
 Constat principal : les 787 tests passent, mais le contrat entre le harnais et les hooks n'est pas couvert. À l'exécution avec des payloads réalistes, les gardes liés au pipeline (G1, G4, G5, G6) ne se déclenchent pas, et le cycle de phases documenté n'est pas réalisable avec le CLI d'état. Le déterminisme effectif repose aujourd'hui sur le CLI d'état et sur l'obéissance du LLM à ses instructions.
 
-Toutes les observations portent sur la version 1.5.2 du plugin, branche `main` clonée le 22 septembre 2026.
+Les sections suivantes décrivent la version 1.5.2 (branche `main`, clonée le 22 septembre 2026). La réanalyse de la branche `refactor/v1.6.0-tracking-substrate` (23 septembre) montre que la traduction entre hooks et harnais est corrigée (C4, C5, C7), que l'état, l'ordre des phases et la résolution du projet ne le sont pas encore (C1, C2, C3, C6), et qu'un conflit nouveau empêche d'enregistrer la ratification des ADR : voir la section « Réanalyse de la branche 1.6.0 ».
 
 ## Structure du dépôt
 
@@ -173,9 +173,87 @@ Classées par ordre de traitement : chaque correction rend les suivantes vérifi
 
 Point complémentaire pour G5 : vérifier qu'un commit nouveau existe depuis le début de la phase (SHA de départ enregistré dans l'état), pas seulement que l'arbre est propre.
 
+## Réanalyse de la branche 1.6.0
+
+Branche `refactor/v1.6.0-tracking-substrate`, plugin en version `1.6.0-hooks.1`, clonée le 23 septembre 2026 (dernier commit `c82cbbb`). Même méthode qu'en 1.5.2 : lecture du runtime, exécution de la suite de tests, rejeu des hooks et du CLI d'état avec des payloads réalistes.
+
+### Ce qui change dans le dépôt
+
+| Élément | 1.5.2 | 1.6.0 |
+| --- | --- | --- |
+| Agents | `plugins/skraft-framework/agents/`, 22 agents | Une surface par client, synchronisées : `com.github.copilot/agents/` (31 fichiers) et `com.anthropic.claude-code/agents/` |
+| Règles d'état données au LLM | `instructions/` | `com.github.copilot/rules/` : `skraft-state.instructions.md`, `skraft-todo-sync.instructions.md` |
+| Skills | 36 | 38, dont `quality-gates-javascript` (StrykerJS, TAP), `skraft-entry-point-routing`, `qa-reporting` |
+| Manifestes de hooks | Trois fichiers | `hooks/hooks.json` (Claude Code) et `com.github.copilot/hooks/hooks.json`, identiques |
+| Difficulté | Quatre niveaux ; RESEARCH sautée pour les deux premiers | Niveaux supprimés : les quatre phases d'ingénierie s'exécutent toujours, RESEARCH compris. Le routage d'entrée ne concerne que DISCOVER, phase produit hors du pipeline, sautée sur transfert amont confirmé ; sa skill mentionne encore DISCUSS |
+| Reporting | Absent | CLI `report.mjs` et skill `qa-reporting` |
+| Tests | 787 | 1 517 : 1 493 réussis, 23 échecs, 1 ignoré |
+
+Les 23 échecs concernent les outils du tableau de bord et les tests des portes de mutation JavaScript. Ils semblent dus à des dépendances absentes de l'environnement d'analyse (StrykerJS, outils d'évaluation) ; ce n'est pas vérifié.
+
+### Statut des constats
+
+| # | Statut en 1.6.0 | Détail |
+| --- | --- | --- |
+| C1 | Non corrigé, vérifié | `projectSlug` n'est dérivé d'aucune source : G1, G4, G5 et G6 laissent passer, G8 passe en fail-open |
+| C2 | Non corrigé, vérifié | Avec `projectSlug` forcé, G1 refuse tout dispatch : `specialistDone`, `reviewerVerdict`, `retries`, `skipPhases` jugés invalides |
+| C3 | Non corrigé, vérifié | `init` crée l'état en DISCOVER, la machine garde le cycle à cinq phases ; `close-phase --phase RESEARCH` échoue alors que l'orchestrateur prescrit cette commande |
+| C4 | Corrigé, vérifié | Manifestes étendus à `Write`, `Edit` et `Task` ; `harness-input.mjs` normalise les noms d'outils Copilot et décode `toolArgs` ; G7 refuse les écritures dans `state.json` sur les deux harnais |
+| C5 | Corrigé, vérifié | `harness-output.mjs` émet `permissionDecision` à la racine et `hookSpecificOutput` ; une autorisation n'écrit rien |
+| C6 | Non corrigé, lu dans le code | `NEEDS_REWORK` dans les rapports, `CHANGES_REQUESTED` dans l'état |
+| C7 | Corrigé, lu dans le code | Transcript lu depuis `agent_transcript_path` ; `file_path` accepté ; non testé de bout en bout |
+| Commit vérifié | Non corrigé, lu dans le code | Toujours réduit à un arbre Git propre |
+
+### Deux problèmes nouveaux
+
+**N1 — Le routage d'entrée et la ratification des ADR ne peuvent plus être enregistrés.** Le prompt de l'orchestrateur prescrit toujours de modifier directement `state.json` pour `entryPoint`, `adrRatification` et `neighborPlanners`, et le CLI d'état n'offre aucune commande pour ces champs. `entryPoint` doit être écrit au démarrage de tout pipeline neuf, même quand aucune phase n'est sautée. Maintenant que G7 surveille `Write` et `Edit`, ces éditions sont refusées : le démarrage d'un pipeline et le point de ratification de DESIGN sont bloqués sur la voie prévue. C'est la conséquence annoncée plus haut : corriger C4 casse ce chemin tant que des commandes dédiées n'existent pas.
+
+**N2 — G7 se contourne par un interpréteur.** La détection repose sur les redirections et sur une liste de commandes (`sed -i`, `cp`, `mv`, `tee`…). Une écriture par `node -e` ou `python3 -c` passe sans refus. Combiné à N1, un LLM bloqué sur la voie légitime risque d'emprunter précisément ce contournement.
+
+### Plan de refonte annoncé
+
+Le dernier commit ajoute `.specs/plan_todo.md`, un plan non encore implémenté. Il couvre la plupart des constats : un seul ordre de phases issu de la configuration, avec initialisation en RESEARCH (C3) ; deux JSON Schemas Draft 2020-12, pour l'état et pour une projection qui calcule la prochaine action autorisée ; des gardes de dispatch dérivés du même état durable (C2) ; des commandes typées à la place de toutes les éditions directes (N1) ; des conditions de sortie de DESIGN centralisées ; une protection contre les doubles mutations (identifiant d'opération, révision attendue, verrou court).
+
+Deux points n'y figurent pas : la manière dont les hooks retrouveront le projet actif sans `projectSlug` (C1), sans laquelle G1, G4, G5 et G6 resteront muets même avec un état unifié ; et le contournement de G7 par interpréteur (N2).
+
+### Recommandations complémentaires
+
+1. **Livrer les commandes typées avant ou avec la surveillance des écritures.** Tant que `entryPoint` et `adrRatification` n'ont pas de commande, N1 bloque la ratification.
+2. **Détecter les écritures hors CLI par l'état lui-même.** Plutôt que d'allonger la liste des commandes interdites, s'appuyer sur la révision et le reçu de mutation prévus par le plan : toute modification de `state.json` sans reçu valide est détectée à la lecture suivante, quel que soit l'outil utilisé.
+3. **Résoudre le projet actif côté hooks (C1)**, par exemple via un pointeur écrit par `state.mjs init`, et l'ajouter au plan.
+
+### Reproduction sur la branche 1.6.0
+
+```bash
+git clone -b refactor/v1.6.0-tracking-substrate https://github.com/SebastienDegodez/skraft-plugin.git
+cd skraft-plugin
+S=plugins/skraft-framework/src/cli/state.mjs
+H=plugins/skraft-framework/src/cli/hook.mjs
+
+# C3 : toujours DISCOVER
+node $S init --slug demo
+node $S close-phase --slug demo --phase RESEARCH --verdict APPROVED
+# → {"code":"PHASE_MISMATCH",...}
+
+# C4 et C5 corrigés : écriture Copilot dans state.json refusée, au bon format
+echo '{"toolName":"edit","toolArgs":"{\"path\":\".copilot-tracking/skraft-plans/demo/state.json\"}"}' | node $H PreToolUse Edit
+# → {"permissionDecision":"deny",...,"hookSpecificOutput":{...}}
+
+# C1 : dispatch hors séquence toujours autorisé (aucune sortie)
+echo '{"hook_event_name":"PreToolUse","tool_name":"Agent","tool_input":{"subagent_type":"Skraft - Software Engineer"}}' | node $H PreToolUse Agent
+
+# N2 : contournement de G7 (aucune sortie = autorisé)
+node $H PreToolUse Bash <<'EOF'
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"open('.copilot-tracking/skraft-plans/demo/state.json','w').write('{}')\""}}
+EOF
+```
+
 ## Méthode et sources
 
-Dépôt cloné (`git clone --depth 1`, branche `main`, plugin en version 1.5.2), lecture intégrale du runtime `src/`, des trois manifestes de hooks, de la configuration générée et du prompt de l'orchestrateur. Suite de tests exécutée avec `node --test tests/skraft-framework/*.test.mjs` : 787 tests, 786 réussis, 1 ignoré. Les constats C1 à C4 ont été reproduits en exécutant les CLI. C5 compare la sortie du plugin aux types de hooks du Copilot SDK (`@github/copilot-sdk`) et au format documenté de Claude Code ; il reste à confirmer sur chaque harnais en conditions réelles.
+Version 1.5.2 : dépôt cloné (`git clone --depth 1`, branche `main`), lecture intégrale du runtime `src/`, des trois manifestes de hooks, de la configuration générée et du prompt de l'orchestrateur. Suite de tests exécutée avec `node --test tests/skraft-framework/*.test.mjs` : 787 tests, 786 réussis, 1 ignoré. Les constats C1 à C4 ont été reproduits en exécutant les CLI. C5 compare la sortie du plugin aux types de hooks du Copilot SDK (`@github/copilot-sdk`) et au format documenté de Claude Code.
+
+Version 1.6.0 : branche `refactor/v1.6.0-tracking-substrate` clonée le 23 septembre 2026, lecture des adaptateurs de hooks, des services, de la machine à états, du prompt de l'orchestrateur Copilot et du plan `.specs/plan_todo.md`. Suite de tests exécutée hors tests de bout en bout et d'évaluation : 1 517 tests. C1 à C5, N1 et N2 reproduits en exécutant les CLI ; C6, C7 et le « commit vérifié » établis par lecture du code.
 
 - [skraft-plugin sur GitHub](https://github.com/SebastienDegodez/skraft-plugin)
 - [README du framework skraft-framework](https://github.com/SebastienDegodez/skraft-plugin/blob/main/plugins/skraft-framework/README.md)
+- [Branche refactor/v1.6.0-tracking-substrate](https://github.com/SebastienDegodez/skraft-plugin/tree/refactor/v1.6.0-tracking-substrate)
