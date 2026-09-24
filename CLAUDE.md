@@ -41,11 +41,11 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 
 ## Documents de référence (à lire avant de coder)
 
-- `docs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
-- `docs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
-- `docs/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
-- `docs/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
-  `SPEC.md` les désigne sous `reference/` : ce sont des prototypes à découper, pas du code de production.
+- `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §14 (feuille de route J1–J6, S1–S6), §15 (points SDK à vérifier), §16 (conventions).
+- `docs/specs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
+- `docs/reference/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
+- `docs/reference/copilot-agents.ts` — prototype d'adaptateur Copilot SDK (session par rôle, garde de périmètre en `onPreToolUse`, outils terminaux).
+  Ce sont des prototypes à découper, pas du code de production.
 - `docs/01…04-*.md` — documents d'analyse (architecture, audit de skraft-plugin 1.5.2, comparaison des diagrammes d'état). Contexte uniquement.
 
 ## Règles de travail imposées par la spec
