@@ -178,6 +178,20 @@ describe("CopilotRuntime", () => {
     ]);
   });
 
+  it("écarte le modèle « auto », qui fait doublon avec le choix automatique", async () => {
+    const client = new FakeClient();
+    client.models = [modele("auto", "Auto"), modele("gpt-5.6-luna", "GPT-5.6 Luna")];
+    const rt = createCopilotRuntime({ client });
+    expect((await rt.listModels!()).map((m) => m.id)).toEqual(["gpt-5.6-luna"]);
+  });
+
+  it("un compte n'offrant que « auto » ne propose aucun choix", async () => {
+    const client = new FakeClient();
+    client.models = [modele("auto", "Auto")];
+    const rt = createCopilotRuntime({ client });
+    expect(await rt.listModels!()).toEqual([]);
+  });
+
   it("écarte les modèles désactivés par la politique du compte", async () => {
     const client = new FakeClient();
     client.models = [

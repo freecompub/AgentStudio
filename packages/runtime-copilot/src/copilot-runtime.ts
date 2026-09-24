@@ -81,6 +81,9 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       try {
         return (await client.listModels())
           .filter((m) => m.policy?.state !== "disabled")
+          // « auto » est le routage automatique du runtime : c'est déjà ce que fait l'absence
+          // de choix. L'afficher ferait deux entrées pour le même comportement.
+          .filter((m) => m.id !== "auto")
           .map((m) => ({ id: m.id, name: m.name, ...(m.billing?.multiplier !== undefined ? { multiplier: m.billing.multiplier } : {}) }));
       } catch (err) {
         logger?.warn("liste des modèles indisponible", { error: String(err) });
