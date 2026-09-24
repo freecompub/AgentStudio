@@ -2,16 +2,16 @@
 
 - Date d'origine : 2026-09-23 (branche `feat/j1-socle`)
 - Mise à jour : 2026-09-24, sur poste macOS
-- État : **les deux blocages sont levés ; les trois critères de sortie sont vérifiés en réel**,
-  hors interface. La validation des mêmes gestes *dans* l'application reste à faire.
+- État : **terminé**. Les deux blocages sont levés et les trois critères de sortie sont vérifiés
+  en réel, hors interface *et* dans l'application.
 
 ## Critères de sortie de J1 (SPEC §14)
 
 | Critère | État | Vérifié par |
 | --- | --- | --- |
-| Conversation complète sur un dépôt cloné | ✅ réel | `pnpm smoke:copilot` (2026-09-24) : l'agent crée `hello.txt` par `apply_patch` |
-| Checkpoint et annulation en un geste | ✅ réel | même essai : après `undo`, le fichier n'existe plus |
-| Reprise de la conversation après redémarrage | ✅ réel | même essai : 3 messages restaurés, l'agent rappelle la demande initiale |
+| Conversation complète sur un dépôt cloné | ✅ réel + interface | `pnpm smoke:copilot` (l'agent crée `hello.txt` par `apply_patch`), puis dans l'application |
+| Checkpoint et annulation en un geste | ✅ réel + interface | même essai ; puis « Annuler depuis ici » en deux temps : message barré et fichier défait sur le disque |
+| Reprise de la conversation après redémarrage | ✅ réel + interface | même essai (3 messages restaurés) ; puis fermeture et réouverture de la fenêtre, conversation et tour annulé conservés |
 
 Ces trois points étaient jusqu'ici couverts par les seuls tests automatisés
 (`main-session.test.ts`, `checkpoints.test.ts`, `json-conversation-store.test.ts`, `app.test.tsx`).
@@ -38,11 +38,12 @@ Ces trois points étaient jusqu'ici couverts par les seuls tests automatisés
   `workspace:current` concurrents, et un effet React renvoyant autre chose qu'une fonction de
   nettoyage (écran vide). Voir les commits `fix(desktop)` du 2026-09-24.
 
-## Reste à faire sur l'interface
+## Validation dans l'interface — faite le 2026-09-24
 
-- Refaire les gestes de J1 **dans l'application** : annulation d'un tour depuis la conversation et
-  reprise après fermeture de la fenêtre. L'essai `smoke:copilot` les valide au niveau de la session,
-  pas de l'interface.
+Les trois gestes ont été refaits à l'écran, sur un vrai projet : l'agent écrit le fichier,
+« Voir les changements » liste le diff du checkpoint, « Annuler depuis ici » (confirmation en deux
+temps) barre le message **et** supprime le fichier du disque, et la conversation est restaurée
+telle quelle après fermeture de la fenêtre.
 
 ## Points à surveiller (non bloquants)
 
