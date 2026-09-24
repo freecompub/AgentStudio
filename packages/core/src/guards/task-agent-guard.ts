@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { realPath } from "./real-path.js";
 import type { GuardDecision, ToolCallGuard } from "../protocols/agent-runtime.js";
 import { matchesAny } from "./glob.js";
 
@@ -16,9 +17,10 @@ const deny = (reason: string): GuardDecision => ({ decision: "deny", reason });
  * seul périmètre du rôle, ni shell, ni réseau, ni outil externe (§8.4, D20). Jamais de question.
  */
 export function createTaskAgentGuard(deps: TaskAgentGuardDeps): ToolCallGuard {
-  const root = resolve(deps.root);
+  // Chemins réels des deux côtés : un lien sortant placé dans le projet ne doit pas passer.
+  const root = realPath(deps.root);
   const rel = (p: string) => {
-    const r = relative(root, resolve(root, p));
+    const r = relative(root, realPath(resolve(root, p)));
     return r === ".." || r.startsWith(`..${sep}`) || isAbsolute(r) ? null : r.split(sep).join("/");
   };
 

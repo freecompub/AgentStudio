@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { realPath } from "./real-path.js";
 import type { GuardDecision, ToolCallGuard, ToolCallRequest } from "../protocols/agent-runtime.js";
 import type { UserConfirmer } from "../protocols/interaction.js";
 import { composeGuards } from "./compose-guards.js";
@@ -32,9 +33,10 @@ const deny = (reason: string): GuardDecision => ({ decision: "deny", reason });
  * réseau et outils externes soumis à l'utilisateur.
  */
 export function mainSessionPolicy(root: string, req: ToolCallRequest): PolicyVerdict {
-  const base = resolve(root);
+  // Chemins réels des deux côtés : un lien sortant placé dans le projet ne doit pas passer.
+  const base = realPath(root);
   const inside = (p: string) => {
-    const rel = relative(base, resolve(base, p));
+    const rel = relative(base, realPath(resolve(base, p)));
     return { ok: rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel), rel };
   };
   switch (req.kind) {
