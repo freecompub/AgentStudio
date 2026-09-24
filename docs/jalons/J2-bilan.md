@@ -39,7 +39,8 @@
 - Un projet sans Vitest (Jest, Swift…) échoue à la première exécution des tests : seul l'adaptateur
   TypeScript/Vitest existe (Swift au J5).
 
-## Blocages hérités de J1
+## Blocages hérités de J1 — levés
 
-Toujours ouverts : jeton `gh` refusé par Copilot, et Electron non lançable sur la machine de
-développement. Voir `docs/jalons/J1-blocages.md`.
+Les deux blocages sont levés depuis le 2026-09-24 : jeton OAuth accepté par Copilot, et Electron
+lançable sur macOS. Voir `docs/jalons/J1-blocages.md`. La validation de `/tdd` avec le vrai LLM,
+jusqu'ici impossible, est donc à faire.

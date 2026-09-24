@@ -2,8 +2,8 @@
 
 - Date : 2026-09-23
 - Branche : `feat/j6-distribution-profils` (partie de `feat/j5-swift-usage`)
-- État : **critères de sortie vérifiés en tests automatisés.** Le test d'usage avec une vraie personne
-  non développeuse et la vérification dans Electron restent à faire (poste graphique).
+- État : **critères de sortie vérifiés en tests automatisés** ; la vérification dans Electron est faite
+  depuis le 2026-09-24 (macOS). Le test d'usage avec une vraie personne non développeuse reste à faire.
 
 ## Critères de sortie (SPEC §14)
 
@@ -27,4 +27,4 @@ ADR : 0011.
 
 - **O5** : attribution des profils par un fichier administrateur, choix provisoire.
 - Test d'usage réel avec un profil non développeur.
-- Hérité de J1 : jeton `gh` refusé par Copilot, Electron non lançable sur la machine de développement.
+- ~~Hérité de J1~~ : les deux blocages de J1 sont levés (`J1-blocages.md`).

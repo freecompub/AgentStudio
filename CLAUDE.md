@@ -18,7 +18,9 @@ substitution), S1 livré (`feat/s1-skraft-pipeline`, `docs/jalons/S1-bilan.md`),
 (`feat/s2-skraft-research`, `docs/jalons/S2-bilan.md`), S3 livré (`feat/s3-skraft-design`,
 `docs/jalons/S3-bilan.md`), S4 livré (`feat/s4-skraft-distill`, `docs/jalons/S4-bilan.md`),
 S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`feat/s6-skraft-review`,
-`docs/jalons/S6-bilan.md`) ; les mesures réelles attendent un run Copilot.
+`docs/jalons/S6-bilan.md`) ; les mesures réelles attendent un run Copilot, désormais possible :
+les blocages de J1 (jeton Copilot, Electron injouable) sont levés depuis le 2026-09-24
+(`docs/jalons/J1-blocages.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 
 ```bash

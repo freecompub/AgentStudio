@@ -24,7 +24,9 @@ ADR : 0018.
 
 ## Limites
 
-- **Mesures réelles** : la comparaison sur US-12 et deux stories réelles exige un run Copilot, bloqué
-  par le jeton (PAT classique refusé) et par l'absence de GTK pour Electron (`J1-blocages.md`).
-- Mutation Swift simulée (pas de Muter sous Linux).
+- **Mesures réelles** : la comparaison sur US-12 et deux stories réelles exige un run Copilot.
+  ~~Bloqué par le jeton et par l'absence de GTK.~~ **Débloqué le 2026-09-24** (`J1-blocages.md`) :
+  ce run reste à faire.
+- Mutation Swift simulée. ~~Pas de Muter sous Linux.~~ Muter est un outil macOS : son exécution
+  réelle est désormais possible sur le poste de développement.
 - Table de pondération des lentilles : attend la décision de licence O9/D42 (S0, ADR 0012).

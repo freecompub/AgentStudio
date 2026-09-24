@@ -35,4 +35,5 @@ Pour la supprimer : `rm -rf ~/.cache/agent-studio/swift`.
 - **Muter non exécuté** : la lecture de son rapport suit sa documentation ; à valider avant S5.
 - Décompte des requêtes Copilot : un prompt × multiplicateur du modèle, à confirmer selon l'offre.
 - L'usage de la session principale n'est pas encore mesuré.
-- Hérité de J1 : jeton `gh` refusé par Copilot, Electron non lançable sur la machine de développement.
+- ~~Hérité de J1~~ : les deux blocages de J1 sont levés depuis le 2026-09-24 (`J1-blocages.md`).
+  La validation avec le vrai Copilot est donc désormais possible.

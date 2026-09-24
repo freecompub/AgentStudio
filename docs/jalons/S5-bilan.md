@@ -24,4 +24,5 @@ ADR : 0017.
 
 ## Limites
 
-- Mutation Swift simulée (pas de Muter sous Linux) ; S-O2 non tranché (revue après le dernier scénario).
+- Mutation Swift simulée. ~~Pas de Muter sous Linux.~~ Possible sur macOS depuis le 2026-09-24.
+- S-O2 non tranché (revue après le dernier scénario).

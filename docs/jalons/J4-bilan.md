@@ -2,8 +2,8 @@
 
 - Date : 2026-09-23
 - Branche : `feat/j4-isolation-extensions` (partie de `feat/j3-preuves-interactions`)
-- État : **critères de sortie vérifiés sur de vrais processus Node, sans LLM**. L'exécution sous
-  `utilityProcess` dans Electron reste à vérifier sur un poste graphique.
+- État : **critères de sortie vérifiés sur de vrais processus Node, sans LLM**, et l'exécution sous
+  `utilityProcess` dans Electron est confirmée depuis le 2026-09-24.
 
 ## Critères de sortie (SPEC §14)
 
@@ -28,10 +28,11 @@ ADR : 0009.
 
 ## Risques et limites
 
-- **Non vérifié** : dans Electron, le comportement de `utilityProcess.fork` avec `--permission`. Si
-  Electron refuse ces options, il faudra revenir au modèle de permissions par `execArgv` restreint
-  ou à un `child_process.fork` du binaire Node intégré.
+- ~~**Non vérifié** : dans Electron, le comportement de `utilityProcess.fork` avec `--permission`.~~
+  **Levé le 2026-09-24** : sur macOS, `pnpm dev` active les deux extensions internes dans leur
+  propre processus (`extension activée (processus isolé)`, un pid par extension). Le repli par
+  `execArgv` restreint ou `child_process.fork` n'est pas nécessaire.
 - Le bundle de `tdd` embarque une partie du cœur (classes d'erreur) : environ 765 Ko. À réduire en
   exposant ces erreurs dans `extension-api`.
 - Pas encore de signature ni d'installation depuis un fichier (J6).
-- Hérité de J1 : jeton `gh` refusé par Copilot, Electron non lançable sur la machine de développement.
+- ~~Hérité de J1~~ : les deux blocages de J1 sont levés (`J1-blocages.md`).

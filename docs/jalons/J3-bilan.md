@@ -30,5 +30,5 @@ ADR : 0008.
 - Pas de rappel ni de mise en pause automatique d'une demande restée sans réponse (§7.1).
 - La vue des preuves dans l'interface (mode avancé) n'existe pas encore : elles ne sont lisibles que
   dans le journal `tasks/<projet>/evidence/<tâche>.jsonl`.
-- Hérité de J1 : jeton `gh` refusé par Copilot, Electron non lançable sur la machine de
-  développement.
+- ~~Hérité de J1~~ : les deux blocages de J1 sont levés depuis le 2026-09-24 (`J1-blocages.md`).
+  La validation avec le vrai Copilot est donc désormais possible.
