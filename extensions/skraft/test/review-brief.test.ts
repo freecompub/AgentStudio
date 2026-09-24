@@ -44,6 +44,7 @@ const state: SkraftState = {
     acceptanceGreen: true,
     attempts: 0,
     scenarioFailures: 0,
+  cycles: 0,
     feedback: [],
     notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."],
     facts: ["Règle de dépendance respectée : Domain n'importe ni Infrastructure."],

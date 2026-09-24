@@ -1,4 +1,4 @@
-import { EnvFailureError, matchesAny } from "@agent-studio/core";
+import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { checkCalisthenics, checkDependencies, checkMutation, checkRedGreenSequence, concerns, parseQualityBar, planScenarios } from "./deliver.js";

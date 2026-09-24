@@ -194,6 +194,37 @@ describe("AppController — espaces de travail", () => {
     expect(await controller["workspace:sync"]({})).toEqual({ pulled: 1, pushed: 0 });
   });
 
+  it("si les services refusent de se recréer, le projet reste celui d'avant", async () => {
+    // `extensions:install` réattache le projet : un échec ne doit pas laisser une conversation
+    // ouverte sur un contrôleur qui répond « Aucun projet ouvert » à toutes les requêtes.
+    let echouer = false;
+    const ctx = setup({
+      extra: {
+        workspaceServices: async (args) => {
+          if (echouer) throw new Error("adaptateur de stack introuvable");
+          return {
+            route: async () => ({ kind: "chat" as const }),
+            commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
+            hookGuards: () => [],
+            tasks: async () => [],
+            cancelTask: async () => {},
+            pendingInteractions: async () => [],
+            respond: async () => {},
+            dispose: async () => {},
+          };
+        },
+      },
+    });
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+
+    echouer = true;
+    await expect(ctx.controller["workspace:open"]({ path: "/projets/autre" })).rejects.toThrow(/adaptateur/);
+
+    // Le projet précédent répond toujours : on n'a pas perdu l'existant au profit de rien.
+    expect(await ctx.controller["workspace:current"]({})).toEqual({ root: "/projets/demo", name: "demo" });
+    expect(await ctx.controller["commands:list"]({})).toHaveLength(1);
+  });
+
   it("clôturer libère les services du projet et n'en laisse aucun courant", async () => {
     const { controller, serviceLog } = setup();
     await controller["workspace:open"]({ path: "/projets/demo" });
@@ -369,6 +400,29 @@ describe("AppController — conversation", () => {
     expect(tokens).toHaveLength(1);
   });
 
+  it("deux canaux concurrents ne démarrent qu'un seul runtime", async () => {
+    // `ChatScreen` lance `chat:start` et `models:list` dans le même tour : tous deux
+    // appellent `ensureRuntime`. Deux runtimes, c'est deux processus Copilot dont un fuit.
+    const { controller, tokens } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+
+    await Promise.all([controller["chat:start"]({}), controller["models:list"]({})]);
+
+    expect(tokens).toHaveLength(1);
+  });
+
+  it("un runtime qui refuse de démarrer n'est pas retenu : le suivant réessaie", async () => {
+    const { controller, runtime, tokens } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    runtime.failStart = new Error("démarrage impossible");
+
+    await expect(controller["chat:start"]({})).rejects.toThrow(/démarrage impossible/);
+
+    runtime.failStart = null;
+    await controller["chat:start"]({});
+    expect(tokens).toHaveLength(2);
+  });
+
   it("deux démarrages concurrents n'ouvrent qu'une seule session", async () => {
     // React monte deux fois en <StrictMode> : `chat:start` part deux fois en parallèle.
     const { controller, runtime } = setup();
@@ -485,12 +539,14 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
     await controller["interaction:respond"]({ id: "int-1", option: "approve" });
     await controller["task:cancel"]({ taskId: "t1" });
     await controller["workspace:open"]({ path: "/projets/autre" });
+    // Les services du nouveau projet sont construits d'abord : si leur création échoue, le
+    // projet en cours reste utilisable. Les anciens ne sont libérés qu'ensuite.
     expect(serviceLog).toEqual([
       "créés:/projets/demo",
       "réponse:int-1:approve:developpeur",
       "annule:t1",
-      "libérés:/projets/demo",
       "créés:/projets/autre",
+      "libérés:/projets/demo",
     ]);
   });
 });

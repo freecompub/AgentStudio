@@ -7,5 +7,6 @@ export default defineProject({
     name: "desktop",
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "node",
+    setupFiles: ["./test/setup-renderer.ts"],
   },
 });

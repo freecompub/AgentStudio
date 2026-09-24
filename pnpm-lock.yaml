@@ -11,6 +11,9 @@ importers:
       '@agent-studio/core':
         specifier: workspace:*
         version: link:packages/core
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:packages/extension-host
       '@agent-studio/extension-packaging':
         specifier: workspace:*
         version: link:packages/extension-packaging
@@ -123,9 +126,6 @@ importers:
 
   extensions/skraft:
     dependencies:
-      '@agent-studio/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@agent-studio/extension-api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -139,9 +139,15 @@ importers:
       '@agent-studio/extension-host':
         specifier: workspace:*
         version: link:../../packages/extension-host
+      '@agent-studio/extension-installer':
+        specifier: workspace:*
+        version: link:../../packages/extension-installer
       '@agent-studio/extension-manifest':
         specifier: workspace:*
         version: link:../../packages/extension-manifest
+      '@agent-studio/extension-packaging':
+        specifier: workspace:*
+        version: link:../../packages/extension-packaging
       '@agent-studio/stack-adapters':
         specifier: workspace:*
         version: link:../../packages/stack-adapters
@@ -154,9 +160,6 @@ importers:
 
   extensions/tdd:
     dependencies:
-      '@agent-studio/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@agent-studio/extension-api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -179,6 +182,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
       zod:
         specifier: ^4.6.5
         version: 4.6.5

@@ -45,8 +45,13 @@ export function checkDesign(i: DesignInput): string[] {
     if (seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} en double.`);
     seen.add(n);
   }
+  // Seuls les trous que cette phase creuse sont reprochés : un ADR archivé avant la story
+  // laisse un trou que l'agent ne peut pas combler, et le lui reprocher ferait échouer DESIGN
+  // à chaque tentative, jusqu'à épuisement du budget.
+  const dejaLa = parsed.filter((a) => !a.isNew).map((a) => a.adr.number).filter((n) => Number.isFinite(n));
+  const depuis = (dejaLa.length ? Math.max(...dejaLa) : 0) + 1;
   const max = numbers.at(-1) ?? 0;
-  for (let n = 1; n <= max; n++) if (!seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} manque.`);
+  for (let n = depuis; n <= max; n++) if (!seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} manque.`);
 
   const registry = parseSupersessions(i.supersessions);
   for (const a of parsed.filter((x) => x.isNew))

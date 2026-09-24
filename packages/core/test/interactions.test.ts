@@ -84,3 +84,37 @@ describe("Demandes d'interaction", () => {
     expect(await service.pending()).toHaveLength(1);
   });
 });
+
+describe("Réponse concurrente à une même demande", () => {
+  it("ne délivre qu'une fois, même si deux réponses partent ensemble", async () => {
+    const { service, delivered } = setup();
+    const id = await service.request({ ...REQ, options: [{ id: "oui", label: "Oui" }] });
+
+    // Double clic, ou renvoi du renderer : les deux appels voient la demande « pending ».
+    const r = await Promise.allSettled([service.respond(id, "oui"), service.respond(id, "oui")]);
+
+    expect(delivered).toHaveLength(1);
+    expect(r.filter((x) => x.status === "rejected")).toHaveLength(1);
+  });
+
+  it("une livraison en échec laisse la demande répondable", async () => {
+    const store = new MemoryInteractionStore();
+    let echouer = true;
+    const service = createInteractionService({
+      store,
+      clock: fixedClock(),
+      ids: sequentialIds("int-"),
+      deliver: async () => {
+        if (echouer) throw new Error("moteur indisponible");
+      },
+    });
+    const id = await service.request({ ...REQ, options: [{ id: "oui", label: "Oui" }] });
+
+    await expect(service.respond(id, "oui")).rejects.toThrow(/indisponible/);
+    expect((await service.pending()).map((x) => x.id)).toContain(id);
+
+    echouer = false;
+    await service.respond(id, "oui");
+    expect(await service.pending()).toHaveLength(0);
+  });
+});

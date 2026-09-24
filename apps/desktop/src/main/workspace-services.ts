@@ -188,7 +188,10 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const offTasks = engine.onUpdate((record) => {
       records.set(record.id, record);
       publish(record);
-      if (record.status === "finished") void interactions.cancelForTask(record.id);
+      if (record.status === "finished")
+        // Écriture sur disque : un échec ne doit pas devenir une exception non capturée
+        // du processus principal.
+        void interactions.cancelForTask(record.id).catch((err: unknown) => cfg.logger?.warn("annulation des demandes impossible", { taskId: record.id, error: String(err) }));
     });
     // L'usage arrive aussi hors transition (fin d'un tour d'agent) : la carte suit.
     const offUsage = usage.onChange((taskId, rows) => {

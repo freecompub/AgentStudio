@@ -111,7 +111,12 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     const s = stateOf(await app.engine.status(id))!;
     expect(s.adrs).toEqual([{ id: "ADR-001", path: "docs/adr/adr-001-plafond-applique-dans-le-domaine.md", status: "Proposed" }]);
     expect(acceptanceRan).toBe(false);
-    const ratify = () => app.interactions.pending().then((p) => p.find((x) => x.title === "Ratifier ADR-001")!);
+    // La demande de ratification naît d'un effet asynchrone : l'attendre, plutôt que de
+    // supposer qu'elle est déjà là — sous charge, elle ne l'est pas toujours.
+    const ratify = async () => {
+      await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"));
+      return (await app.interactions.pending()).find((x) => x.title === "Ratifier ADR-001")!;
+    };
     await expect(app.interactions.respond((await ratify()).id, "accept:ADR-001", undefined, { role: "po" })).rejects.toThrow(/Architecte/);
 
     // 3. Amendement : relance de skraft-architect-decide avec la demande, nouvel ADR proposé au même numéro.

@@ -27,7 +27,7 @@ export function initialState(input: SkraftInput): SkraftState {
     artifacts: emptyByPhase(),
     reviews: emptyByPhase(),
     attempts: 0,
-    budget: { maxAttemptsPerPhase: 3 },
+    budget: { maxAttemptsPerPhase: 3, maxCyclesPerScenario: 20 },
     lastRejection: null,
     openQuestions: [],
     adrs: [],
@@ -84,7 +84,7 @@ export function transition(s: SkraftState, e: Ev): Out {
 
     case "CLASSIFY":
       if (e.type === "DIFFICULTY_PROPOSED" && s.indicators) {
-        if (!isDifficulty(e.level)) return { state: s, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
+        if (!isDifficulty(e.level)) return relancerClassifieur(s, `Niveau de difficulté inconnu : ${e.level}`);
         const proposed = { level: e.level, justification: e.justification };
         if (!s.confirmDifficulty) return applyDifficulty({ ...s, proposed }, e.level, "auto");
         return {
@@ -92,7 +92,7 @@ export function transition(s: SkraftState, e: Ev): Out {
           effects: [{ kind: "askDifficulty", proposed: e.level, justification: e.justification, options: uniq([e.level, shift(e.level, 1), shift(e.level, -1)]) }],
         };
       }
-      if (e.type === "TIMEOUT" && s.indicators) return { state: s, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
+      if (e.type === "TIMEOUT" && s.indicators) return relancerClassifieur(s, `Délai dépassé : ${e.reason}`);
       break;
 
     case "CONFIRM_DIFFICULTY":
@@ -252,7 +252,7 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
     difficulty: { level, indicators: s.indicators, confirmedBy },
     skipPhases: fx.skipResearch ? ["RESEARCH"] : [],
     lenses: fx.lenses,
-    budget: { maxAttemptsPerPhase: fx.maxAttempts },
+    budget: { maxAttemptsPerPhase: fx.maxAttempts, maxCyclesPerScenario: s.budget.maxCyclesPerScenario },
   });
 }
 
@@ -277,6 +277,20 @@ function route(s: SkraftState): Out {
 function commit(s: SkraftState): Out {
   const p = s.phase!;
   return { state: { ...s, stage: "COMMIT" }, effects: [{ kind: "commitPhase", phase: p, message: commitMessage(p, s.slug) }] };
+}
+
+/**
+ * Relance du classifieur après un défaut de travail (niveau inconnu, silence). CLASSIFY précède
+ * toute phase, donc `failure()` ne s'applique pas : le budget est compté ici, faute de quoi un
+ * agent qui répond toujours de travers rebouclerait sans fin, une requête par tour (D24).
+ */
+function relancerClassifieur(s: SkraftState, reason: string): Out {
+  const attempts = s.attempts + 1;
+  if (attempts >= s.budget.maxAttemptsPerPhase) return escalateFrom({ ...s, attempts }, "CLASSIFY", reason, ["retry", "abort"]);
+  return {
+    state: { ...s, attempts },
+    effects: [{ kind: "classify", indicators: s.indicators!, proposed: gradeDifficulty(s.indicators!, DEFAULT_THRESHOLDS) }],
+  };
 }
 
 /** Rejet de porte, de revue ou délai : réessai ciblé après rollback, ou escalade à budget épuisé (D24). */
@@ -318,7 +332,8 @@ function decide(s: SkraftState, decision: string): Out {
   if (decision === "retry") {
     if (from === "INIT") return { state: { ...s, stage: "INIT", escalation: null }, effects: [{ kind: "init", storyPath: s.storyPath }] };
     if (from === "CLASSIFY" && s.indicators)
-      return { state: { ...s, stage: "CLASSIFY", escalation: null }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
+      // Budget rendu : sans cela, le tour suivant escaladerait aussitôt.
+      return { state: { ...s, stage: "CLASSIFY", escalation: null, attempts: 0 }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
     if (!s.phase) return { state: s, effects: [] };
     if (s.phase === "DELIVER" && s.deliver && !s.phasesCompleted.includes("DELIVER") && s.deliver.scenarios.some((x) => x.status !== "done")) return retryDeliver(s);
     const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts: 0, escalation: null, designStep: "model" };

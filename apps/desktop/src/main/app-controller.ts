@@ -83,6 +83,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
   let restauration: Promise<WorkspaceInfoDto | null> | null = null;
   /** Démarrage de la conversation en cours, partagé entre appels concurrents. */
   let demarrage: Promise<ChatMessageDto[]> | null = null;
+  /** Démarrage du runtime en cours, partagé entre appels concurrents. */
+  let demarrageRuntime: Promise<AgentRuntime> | null = null;
 
   const info = (ws: Workspace): WorkspaceInfoDto => ({ root: ws.root, name: basename(ws.root) });
 
@@ -113,10 +115,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
    * le croirait ouvert et ses requêtes (commandes, tâches, interactions) échoueraient.
    */
   async function attach(ws: Workspace): Promise<void> {
-    const anciens = services;
-    workspace = null;
-    services = null;
-    await anciens?.dispose();
+    // Les services sont construits avant de toucher à l'existant : si la construction échoue
+    // — adaptateur introuvable, extension illisible —, le projet en cours reste utilisable
+    // plutôt que de laisser une conversation ouverte sur un contrôleur sans projet.
     const prets = await deps.workspaceServices({
       workspace: ws,
       runtime: ensureRuntime,
@@ -128,8 +129,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
         else deps.logger?.info("message d'extension hors conversation", { extensionId });
       },
     });
+    const anciens = services;
     workspace = ws;
     services = prets;
+    await anciens?.dispose();
   }
 
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {
@@ -169,6 +172,19 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
   async function ensureRuntime(): Promise<AgentRuntime> {
     if (runtime) return runtime;
+    // `chat:start` et `models:list` partent ensemble : sans partage, deux clients Copilot
+    // démarreraient sur le même dossier, et le second écraserait le premier, qui fuirait.
+    if (demarrageRuntime) return demarrageRuntime;
+    const encours = demarrerRuntime();
+    demarrageRuntime = encours;
+    try {
+      return await encours;
+    } finally {
+      demarrageRuntime = null;
+    }
+  }
+
+  async function demarrerRuntime(): Promise<AgentRuntime> {
     const status = await deps.auth.status();
     if (!status.loggedIn) throw new Error("Connectez-vous à GitHub pour discuter avec l'agent.");
     if (!status.copilotCompatible)

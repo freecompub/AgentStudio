@@ -1,31 +1,11 @@
 import type { AgentEvent, AgentSession } from "../protocols/agent-runtime.js";
 
 /**
- * Défaut de travail de l'agent (silence, sortie structurée absente…) : réessai ciblé
- * si le budget le permet, jamais d'escalade immédiate (D24, D25).
+ * Ces erreurs sont définies dans `@agent-studio/extension-api` : une extension doit pouvoir les
+ * lever sans dépendre du cœur (D10). Réexportées ici pour tout le reste du cœur.
  */
-export class WorkDefectError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "WorkDefectError";
-  }
-}
-
-/** Silence de l'agent au-delà du seuil : traité comme un rejet par le réducteur (§6.2). */
-export class TurnTimeoutError extends WorkDefectError {
-  constructor(readonly idleMs: number) {
-    super(`Aucune activité de l'agent depuis ${Math.round(idleMs / 1000)} s`);
-    this.name = "TurnTimeoutError";
-  }
-}
-
-/** Défaut d'environnement (runtime, quota, API) : escalade immédiate (D25). */
-export class EnvFailureError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "EnvFailureError";
-  }
-}
+export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
+import { EnvFailureError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
 
 /** Signe de vie émis hors session (sortie d'un outil long exécuté par notre code, §6.4). */
 export interface Heartbeat {

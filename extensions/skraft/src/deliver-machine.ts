@@ -37,6 +37,7 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
       acceptanceGreen: false,
       attempts: 0,
       scenarioFailures: 0,
+      cycles: 0,
       feedback: s.lastRejection?.reasons ?? [],
       notes: [],
       facts: [],
@@ -146,7 +147,14 @@ function scenarioGate(s: SkraftState, d: DeliverState): Out {
 
 function afterCode(s: SkraftState, d: DeliverState, acceptanceGreen: boolean): Out {
   if (acceptanceGreen) return scenarioGate(s, { ...d, acceptanceGreen });
-  return agent(s, { ...d, acceptanceGreen: false, step: "test" }, []);
+  // Chaque cycle ajoute un test unitaire et un checkpoint : sans plafond, un scénario dont
+  // l'acceptance ne verdit jamais tournerait sans fin, une requête par tour (D24).
+  const cycles = d.cycles + 1;
+  if (cycles >= s.budget.maxCyclesPerScenario)
+    return scenarioFailure(s, { ...d, cycles }, [
+      `Le test d'acceptance du scénario reste rouge après ${cycles} cycles test puis code.`,
+    ]);
+  return agent(s, { ...d, acceptanceGreen: false, step: "test", cycles }, []);
 }
 
 function nextScenario(s: SkraftState, d: DeliverState): Out {
@@ -189,6 +197,7 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     acceptanceGreen: false,
     attempts: 0,
     scenarioFailures: failures,
+    cycles: 0,
     baseline: d.scenarioBaseline,
     stepCheckpoint: d.scenarioCheckpoint,
     feedback: reasons,

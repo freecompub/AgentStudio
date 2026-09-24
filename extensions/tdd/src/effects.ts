@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { EnvFailureError, WorkDefectError } from "@agent-studio/core";
+import { EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import type { TddEffect, TddState } from "./model.js";

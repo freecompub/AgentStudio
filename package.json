@@ -7,17 +7,19 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.web.json",
+    "build": "pnpm --filter @agent-studio/desktop build",
+    "dev": "pnpm --filter @agent-studio/desktop dev",
+    "ext:build": "tsx scripts/extension-tools.ts build",
+    "ext:keys": "tsx scripts/extension-tools.ts keys",
+    "ext:pack": "tsx scripts/extension-tools.ts pack",
+    "smoke:copilot": "tsx scripts/smoke-copilot.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "pnpm --filter @agent-studio/desktop dev",
-    "build": "pnpm --filter @agent-studio/desktop build",
-    "smoke:copilot": "tsx scripts/smoke-copilot.ts",
-    "ext:keys": "tsx scripts/extension-tools.ts keys",
-    "ext:pack": "tsx scripts/extension-tools.ts pack"
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/desktop/tsconfig.web.json"
   },
   "devDependencies": {
     "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-host": "workspace:*",
     "@agent-studio/extension-packaging": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
