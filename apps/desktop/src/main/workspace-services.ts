@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   createHookRegistry,
@@ -29,7 +30,7 @@ import {
   type LoadedExtension,
   type ProcessLauncher,
 } from "@agent-studio/extension-host";
-import { selectStackAdapter, type StackAdapter } from "@agent-studio/stack-adapters";
+import { createProfileAdapter, parseStackProfile, selectStackAdapter, type StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
@@ -42,6 +43,8 @@ export interface WorkspaceServicesConfig {
   extensions: ExtensionSource[] | (() => Promise<ExtensionSource[]>);
   /** Adaptateurs de stack, par ordre de préférence : le premier qui reconnaît le projet est retenu. */
   stacks: StackAdapter[];
+  /** Programmes qu'un profil de stack peut lancer (D47, O12) ; vide = aucun profil n'est accepté. */
+  allowedPrograms?: readonly string[];
   /** Obligatoire dès qu'une extension est isolée. */
   isolation?: { launcher: ProcessLauncher; runtimeEntry: string };
   /** Dossier des tâches ; un sous-dossier par projet. */
@@ -117,9 +120,12 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify }) => {
     const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
     const manifests = sources.map((e) => e.manifest);
-    const detected = await selectStackAdapter(workspace.root, cfg.stacks);
+    // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
+    const declare = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
     const stack = detected ?? cfg.stacks[0];
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
+    if (declare) onPost("agent-studio", `Stack du projet : **${declare.id}**, d'après le profil \`${PROFIL_PROJET}\`.`);
     if (!detected) {
       cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
       // Dit dans la conversation, pas seulement dans le journal : le repli change ce que font
@@ -272,4 +278,34 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       },
     };
   };
+}
+
+/** Emplacement du profil, dans le dépôt : il décrit le projet et se versionne avec lui. */
+const PROFIL_PROJET = ".agent-studio/stack.yaml";
+
+/**
+ * Lit le profil déclaré par le projet, s'il existe. Un profil refusé n'interrompt pas
+ * l'ouverture : il est expliqué à l'utilisateur — champ et valeur fautive nommés — et la
+ * détection habituelle reprend la main. Le fichier vient du dépôt, donc d'une source que
+ * l'agent peut modifier : les programmes qu'il nomme sont soumis à la liste de l'administrateur.
+ */
+async function lireProfilDuProjet(
+  root: string,
+  allowedPrograms: readonly string[],
+  onPost: (extensionId: string, markdown: string) => void,
+  logger?: Logger,
+): Promise<StackAdapter | null> {
+  let brut: string;
+  try {
+    brut = await readFile(join(root, PROFIL_PROJET), "utf8");
+  } catch {
+    return null; // pas de profil : la détection s'applique, sans rien dire
+  }
+  const lu = parseStackProfile(brut, { allowedPrograms });
+  if ("error" in lu) {
+    logger?.warn("profil de stack refusé", { root, error: lu.error });
+    onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez \`${PROFIL_PROJET}\` puis rouvrez le projet.`);
+    return null;
+  }
+  return createProfileAdapter(lu.profile);
 }

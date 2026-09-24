@@ -8,7 +8,7 @@
       "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts",
       "passes": true,
-      "notes": "Refuse un lecteur inconnu et un programme hors liste. `allowedPrograms` vient désormais d'admin.json (j5-programmes-autorises) ; reste à l'y brancher, voir j5-chargement-profil."
+      "notes": "Refuse un lecteur inconnu et un programme hors liste. Branché sur admin.json depuis le 25/09."
     },
     {
       "id": "j5-adaptateur-generique",
@@ -28,8 +28,8 @@
       "id": "j5-chargement-profil",
       "title": "L'application charge le profil du projet et signale son refus dans la conversation",
       "verify": "pnpm vitest run --project desktop test/workspace-services.test.ts",
-      "passes": false,
-      "notes": "La liste blanche existe désormais (j5-programmes-autorises) : le préalable est levé. Reste à lire `.agent-studio/stack.yaml`, à passer `allowedPrograms` de l'admin, et à poster le refus dans la conversation — le canal existe (echecs-dans-la-conversation)."
+      "passes": true,
+      "notes": "`.agent-studio/stack.yaml` l'emporte sur la détection. Un profil refusé n'interrompt pas l'ouverture : il est expliqué dans la conversation — champ et valeur fautive nommés — et la détection reprend la main. `allowedPrograms` vient d'admin.json (index.ts). Jamais essayé sur un vrai projet : voir j5-profils-exemple."
     },
     {
       "id": "j5-programmes-autorises",
@@ -78,7 +78,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "867 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "870 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

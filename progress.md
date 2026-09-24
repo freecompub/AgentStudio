@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — J5, brique 4 : le profil est enfin lu par l'application
+
+**Fait.** `.agent-studio/stack.yaml` est lu à l'ouverture d'un projet et l'emporte sur la
+détection. La chaîne est complète : admin.json → `allowedPrograms` → `parseStackProfile` →
+`createProfileAdapter` → `ctx.stack`. Un projet peut donc décrire sa stack sans qu'une ligne de
+TypeScript soit écrite pour lui — ce qui était tout l'objet du jalon.
+
+**Choix.** *Un profil refusé n'interrompt pas l'ouverture.* Il est expliqué dans la conversation,
+champ et valeur fautive nommés, et la détection reprend la main. Empêcher d'ouvrir le projet pour
+un YAML mal écrit serait disproportionné, et l'utilisateur ne saurait pas quoi corriger.
+
+**Piège évité de justesse.** J'ai failli conclure la brique sans brancher `allowedPrograms` dans
+`index.ts` : les tests passaient, puisqu'ils le passent eux-mêmes. En vrai, la liste serait restée
+vide et **tout profil aurait été refusé** — un jalon livré qui ne marche pas. → Quand une option
+traverse plusieurs couches, vérifier le câblage de production, pas seulement les tests.
+
+**Prochaine étape.** Réécrire les adaptateurs Swift et TypeScript en profils d'exemple
+(`j5-profils-exemple`) : c'est ce qui prouvera que l'adaptateur générique suffit. Puis le lecteur
+TAP, puis `/stack init` et `/stack doctor`.
+
+---
+
 ## 25/09 — J5, brique 5 : la liste des programmes autorisés
 
 **Fait.** `admin.json` porte `allowedPrograms` (D47, O12). Liste par défaut : lanceurs de tests,

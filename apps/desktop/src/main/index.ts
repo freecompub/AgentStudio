@@ -176,7 +176,10 @@ async function createController(): Promise<AppController> {
         runtimeEntry: EXTENSION_RUNTIME,
       },
       // Swift (SwiftPM) puis TypeScript (Vitest) ; chaîne Swift du système ou installée hors système.
+      // Un projet qui déclare son propre profil (`.agent-studio/stack.yaml`) l'emporte sur eux.
       stacks: [createSwiftAdapter({ toolchain: findLocalSwiftToolchain() ?? {} }), createTypeScriptAdapter()],
+      // Programmes qu'un profil peut nommer : la liste vient de l'administrateur (D47, O12).
+      allowedPrograms: admin.allowedPrograms,
       tasksDir: join(userData, "tasks"),
       clock: { now: () => new Date() },
       ids: { next: () => randomUUID() },

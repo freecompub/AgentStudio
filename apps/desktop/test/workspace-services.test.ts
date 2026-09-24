@@ -2,7 +2,7 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, ScriptedRuntim
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
@@ -63,6 +63,90 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
+  async function ouvrir(opts: { profil?: string; allowedPrograms?: string[] }) {
+    const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
+    const cleanup = () => rm(racine, { recursive: true, force: true });
+    if (opts.profil !== undefined) {
+      await mkdir(join(racine, ".agent-studio"), { recursive: true });
+      await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
+    }
+    const posts: string[] = [];
+    const services = await workspaceServicesFactory({
+      extensions: [],
+      stacks: [
+        {
+          id: "typescript",
+          layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] },
+          infrastructureModules: ["Infrastructure"],
+          detect: async () => true,
+          isTestFile: () => false,
+          testFilePattern: "^tests/",
+          runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }),
+        },
+      ],
+      ...(opts.allowedPrograms ? { allowedPrograms: opts.allowedPrograms } : {}),
+      tasksDir: "/inutile",
+      taskStore: new MemoryTaskStore(),
+      evidenceStore: new MemoryEvidenceStore(),
+      interactionStore: new MemoryInteractionStore(),
+      clock: fixedClock(),
+      ids: sequentialIds("id-"),
+    })({
+      workspace: { ...fakeWorkspace(), root: racine },
+      runtime: async () => new ScriptedRuntime(),
+      onTask: () => {},
+      onInteractions: () => {},
+      onPost: (_e, md) => posts.push(md),
+    });
+    return { services, posts, racine, cleanup };
+  }
+
+  const PROFIL_VALIDE = `
+id: python
+detect: [pyproject.toml]
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+  report: junit-xml
+layout:
+  unitTests: ["tests/**"]
+  sources: ["src/**"]
+infrastructureModules: [django]
+`;
+
+  it("un profil déclaré par le projet l'emporte sur la détection", async () => {
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE, allowedPrograms: ["pytest"] });
+    try {
+      // La stack est celle du profil, pas l'adaptateur TypeScript qui prétendait reconnaître.
+      expect(posts.join("\n")).toMatch(/profil/i);
+      expect(posts.join("\n")).toMatch(/python/);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
+  it("un profil refusé est expliqué dans la conversation, et la détection reprend la main", async () => {
+    // Le champ et la valeur fautive doivent être nommés : l'auteur du profil doit savoir quoi corriger.
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE.replace("pytest", "curl"), allowedPrograms: ["pytest"] });
+    try {
+      expect(posts.join("\n")).toMatch(/curl/);
+      expect(posts.join("\n")).toMatch(/refus/i);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
+  it("sans profil, rien n'est dit et la détection s'applique", async () => {
+    const { services, posts, cleanup } = await ouvrir({});
+    try {
+      expect(posts.join("\n")).not.toMatch(/profil/i);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
   it("stack non reconnue : l'utilisateur en est averti dans la conversation, pas seulement dans le journal", async () => {
     // Le repli change ce que font les portes et les commandes : le taire laisserait
     // l'utilisateur devant des résultats inexplicables.
