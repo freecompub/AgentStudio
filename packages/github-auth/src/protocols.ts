@@ -10,8 +10,8 @@
 export type TokenKind = "oauth" | "classic-pat" | "fine-grained-pat" | "unknown";
 
 export type AuthStatus =
-  | { loggedIn: false }
-  | { loggedIn: true; user: string; tokenKind: TokenKind; copilotCompatible: boolean };
+  | { loggedIn: false; hostname: string }
+  | { loggedIn: true; user: string; tokenKind: TokenKind; copilotCompatible: boolean; hostname: string };
 
 export interface DeviceCode {
   code: string;
@@ -22,8 +22,15 @@ export interface GitHubAuth {
   status(): Promise<AuthStatus>;
   /** Jeton courant ; échoue si l'utilisateur n'est pas connecté. */
   token(): Promise<string>;
-  /** Flux de connexion par code d'appareil ; `onCode` reçoit le code à saisir dans le navigateur. */
-  login(onCode: (c: DeviceCode) => void): Promise<AuthStatus>;
+  /**
+   * Flux de connexion par code d'appareil ; `onCode` reçoit le code à saisir dans le navigateur.
+   * `hostname` vise une instance GitHub Enterprise ; l'hôte choisi devient l'hôte courant.
+   */
+  login(onCode: (c: DeviceCode) => void, opts?: { hostname?: string }): Promise<AuthStatus>;
+  /** Déconnecte `gh` de l'hôte courant. Ne se plaint pas si personne n'était connecté. */
+  logout(): Promise<void>;
+  /** Hôte courant : `github.com` ou une instance Enterprise. */
+  hostname(): string;
 }
 
 export interface CommandResult {

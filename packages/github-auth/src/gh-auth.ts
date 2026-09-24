@@ -15,9 +15,20 @@ export function tokenKindOf(token: string): TokenKind {
 
 const DEVICE_CODE = /one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/;
 
+/**
+ * Nom d'hôte acceptable : un domaine, rien d'autre. Ce texte vient de l'utilisateur et part en
+ * argument de `gh` — refuser tout ce qui pourrait passer pour une option ou un chemin.
+ */
+const HOSTNAME = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+
+function verifierHote(h: string): string {
+  if (!HOSTNAME.test(h)) throw new Error(`Hôte GitHub refusé : « ${h} ». Attendu un domaine, par exemple github.exemple.fr.`);
+  return h;
+}
+
 /** Authentification déléguée à GitHub CLI (`gh auth …`, D4). */
 export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
-  const host = deps.hostname ?? "github.com";
+  let host = deps.hostname ? verifierHote(deps.hostname) : "github.com";
 
   async function gh(...args: string[]) {
     try {
@@ -31,16 +42,23 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
 
   async function status(): Promise<AuthStatus> {
     const s = await gh("auth", "status", "--hostname", host);
-    if (s.code !== 0) return { loggedIn: false };
+    if (s.code !== 0) return { loggedIn: false, hostname: host };
     const user = await gh("api", "--hostname", host, "user", "--jq", ".login");
     const token = await gh("auth", "token", "--hostname", host);
-    if (user.code !== 0 || token.code !== 0) return { loggedIn: false };
+    if (user.code !== 0 || token.code !== 0) return { loggedIn: false, hostname: host };
     const tokenKind = tokenKindOf(token.stdout.trim());
-    return { loggedIn: true, user: user.stdout.trim(), tokenKind, copilotCompatible: tokenKind !== "classic-pat" };
+    return { loggedIn: true, user: user.stdout.trim(), tokenKind, copilotCompatible: tokenKind !== "classic-pat", hostname: host };
   }
 
   return {
     status,
+
+    hostname: () => host,
+
+    async logout() {
+      // `gh` sort en erreur si aucun compte n'est connecté : ce n'est pas un échec pour nous.
+      await gh("auth", "logout", "--hostname", host);
+    },
 
     async token() {
       const r = await gh("auth", "token", "--hostname", host);
@@ -49,7 +67,8 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
       return token;
     },
 
-    async login(onCode) {
+    async login(onCode, opts) {
+      if (opts?.hostname !== undefined) host = verifierHote(opts.hostname);
       const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", host, "--git-protocol", "https", "--web"]);
       let buffer = "";
       let sent = false;

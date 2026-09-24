@@ -28,7 +28,7 @@ const LOGGED_IN = {
 describe("GhAuth", () => {
   it("statut connecté avec le nom d'utilisateur", async () => {
     const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: null as never });
-    expect(await auth.status()).toEqual({ loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true });
+    expect(await auth.status()).toEqual({ loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true, hostname: "github.com" });
   });
 
   it.each([
@@ -49,7 +49,7 @@ describe("GhAuth", () => {
       runner: runner({ "gh auth status --hostname github.com": ko("You are not logged into any GitHub hosts") }),
       spawner: null as never,
     });
-    expect(await auth.status()).toEqual({ loggedIn: false });
+    expect(await auth.status()).toEqual({ loggedIn: false, hostname: "github.com" });
   });
 
   it("gh absent : message explicite", async () => {
@@ -104,6 +104,62 @@ describe("GhAuth", () => {
     expect(spawned[0]).toBe("gh auth login --hostname github.com --git-protocol https --web");
     expect(codes).toEqual([{ code: "AB12-CD34", verificationUrl: "https://github.com/login/device" }]);
     expect(written).toEqual(["\n"]);
+  });
+
+  it("le statut indique l'hôte auquel on est connecté", async () => {
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: null as never });
+    expect(await auth.status()).toMatchObject({ hostname: "github.com" });
+  });
+
+  it("GitHub Enterprise : toutes les commandes visent l'hôte choisi", async () => {
+    const HOTE = "github.exemple.fr";
+    const table = {
+      [`gh auth status --hostname ${HOTE}`]: ok(""),
+      [`gh api --hostname ${HOTE} user --jq .login`]: ok("salarie\n"),
+      [`gh auth token --hostname ${HOTE}`]: ok("gho_ent\n"),
+    };
+    const auth = createGhAuth({ runner: runner(table), spawner: null as never, hostname: HOTE });
+    expect(await auth.status()).toMatchObject({ loggedIn: true, user: "salarie", hostname: HOTE });
+  });
+
+  it("se connecter à une instance Enterprise vise cet hôte et le retient", async () => {
+    const HOTE = "github.exemple.fr";
+    const table = {
+      [`gh auth status --hostname ${HOTE}`]: ok(""),
+      [`gh api --hostname ${HOTE} user --jq .login`]: ok("salarie\n"),
+      [`gh auth token --hostname ${HOTE}`]: ok("gho_ent\n"),
+    };
+    const spawned: string[] = [];
+    const proc: InteractiveProcess = { onOutput: () => {}, write: () => {}, exited: Promise.resolve(0) };
+    const auth = createGhAuth({
+      runner: runner(table),
+      spawner: { spawn: (cmd, args) => (spawned.push([cmd, ...args].join(" ")), proc) },
+    });
+
+    expect(await auth.login(() => {}, { hostname: HOTE })).toMatchObject({ user: "salarie", hostname: HOTE });
+    expect(spawned[0]).toBe(`gh auth login --hostname ${HOTE} --git-protocol https --web`);
+    // L'hôte est retenu : le statut suivant l'interroge sans qu'on le repasse.
+    expect(await auth.status()).toMatchObject({ hostname: HOTE });
+  });
+
+  it("un hôte qui n'est pas un nom de domaine est refusé", async () => {
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: null as never });
+    for (const mauvais of ["--version", "a b", "http://x.fr", "", "x/y"])
+      await expect(auth.login(() => {}, { hostname: mauvais })).rejects.toThrow(/hôte/i);
+  });
+
+  it("déconnexion : appelle gh puis le statut redevient déconnecté", async () => {
+    const table = { ...LOGGED_IN, "gh auth logout --hostname github.com": ok("") };
+    const r = runner(table);
+    const auth = createGhAuth({ runner: r, spawner: null as never });
+    await auth.logout();
+    expect(r.calls).toContain("gh auth logout --hostname github.com");
+  });
+
+  it("déconnexion : ne se plaint pas si personne n'était connecté", async () => {
+    const table = { "gh auth logout --hostname github.com": ko("not logged in") };
+    const auth = createGhAuth({ runner: runner(table), spawner: null as never });
+    await expect(auth.logout()).resolves.toBeUndefined();
   });
 
   it("connexion : échec si gh se termine en erreur", async () => {
