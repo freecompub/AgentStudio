@@ -8,7 +8,7 @@
       "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts",
       "passes": true,
-      "notes": "Refuse un lecteur inconnu et un programme hors liste. La liste `allowedPrograms` n'est encore remplie par personne : voir j5-programmes-autorises."
+      "notes": "Refuse un lecteur inconnu et un programme hors liste. `allowedPrograms` vient désormais d'admin.json (j5-programmes-autorises) ; reste à l'y brancher, voir j5-chargement-profil."
     },
     {
       "id": "j5-adaptateur-generique",
@@ -29,14 +29,14 @@
       "title": "L'application charge le profil du projet et signale son refus dans la conversation",
       "verify": "pnpm vitest run --project desktop test/workspace-services.test.ts",
       "passes": false,
-      "notes": "`parseStackProfile` rend déjà un message nommant le champ et la valeur fautive ; le canal d'affichage existe (voir echecs-dans-la-conversation). Reste à brancher la lecture de `.agent-studio/stack.yaml`."
+      "notes": "La liste blanche existe désormais (j5-programmes-autorises) : le préalable est levé. Reste à lire `.agent-studio/stack.yaml`, à passer `allowedPrograms` de l'admin, et à poster le refus dans la conversation — le canal existe (echecs-dans-la-conversation)."
     },
     {
       "id": "j5-programmes-autorises",
       "title": "Seuls les programmes autorisés par l'administrateur peuvent être lancés (D47, O12)",
       "verify": "pnpm vitest run --project desktop test/admin-config.test.ts",
-      "passes": false,
-      "notes": "PRÉALABLE À j5-chargement-profil. Un profil vient du dépôt, donc d'une source que l'agent peut modifier : sans liste blanche dans admin.json, il ferait exécuter n'importe quoi."
+      "passes": true,
+      "notes": "Liste par défaut dans admin-config (O12) : lanceurs de tests, linters, outils de mutation. Ni interpréteur, ni client réseau. Le fichier de l'administrateur REMPLACE la liste — il doit pouvoir restreindre, pas seulement élargir. Un nom avec chemin est refusé, et une configuration refusée n'autorise rien. Reste à la passer à `parseStackProfile` : voir j5-chargement-profil."
     },
     {
       "id": "j5-lecteur-tap",
@@ -52,7 +52,6 @@
       "passes": false,
       "notes": "doctor doit vérifier : programme trouvable, rapport lisible, chemins existants."
     },
-
     {
       "id": "extensions-sans-langage",
       "title": "Aucune extension ne mentionne un langage dans son code",
@@ -74,13 +73,12 @@
       "passes": true,
       "notes": "Les messages postés hors session sont mis en attente et versés au démarrage, une seule fois."
     },
-
     {
       "id": "suite-verte",
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "863 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "867 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

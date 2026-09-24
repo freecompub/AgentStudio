@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — J5, brique 5 : la liste des programmes autorisés
+
+**Fait.** `admin.json` porte `allowedPrograms` (D47, O12). Liste par défaut : lanceurs de tests,
+linters, outils de mutation. Ni interpréteur (`bash`, `node`), ni client réseau (`curl`), ni outil
+capable d'écrire hors du projet.
+
+**Trois choix qui méritent d'être connus.**
+
+- *Le fichier de l'administrateur remplace la liste, il ne s'y ajoute pas.* Un poste administré
+  doit pouvoir **restreindre**, pas seulement élargir ce que nous avons jugé raisonnable. Une
+  liste vide est donc un choix valide : elle interdit tout profil de stack.
+- *Un nom avec chemin est refusé.* `/usr/local/bin/pytest` ou `./script` échapperaient à la liste
+  par le chemin ; seul un nom de commande est accepté.
+- *Une configuration refusée n'autorise rien.* Retomber sur la liste par défaut appliquerait des
+  permissions que l'administrateur n'a jamais relues.
+
+**Prochaine étape.** Le préalable est levé : on peut brancher la lecture de
+`.agent-studio/stack.yaml`, en lui passant la liste de l'admin, et poster le refus éventuel dans
+la conversation — le canal existe depuis hier.
+
+---
+
 ## 25/09 — J5, briques 1 et 2 : les profils de stack
 
 **Où j'en suis.** Branche `feat/j5-profils-de-stack`, quatre commits non poussés. Un projet peut
