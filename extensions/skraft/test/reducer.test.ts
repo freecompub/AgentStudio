@@ -89,6 +89,37 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
     expect(kinds(effects)).toEqual(["classify"]);
   });
 
+  it("CLASSIFY : les relances du classifieur consomment le budget puis escaladent", () => {
+    // Sans budget, un classifieur qui répond toujours de travers reboucle sans fin, en
+    // consommant une requête à chaque tour.
+    const { state, effects } = play([INITIALIZED, PROPOSED("énorme"), PROPOSED("énorme"), PROPOSED("énorme")]);
+    expect(state.stage).toBe("ESCALATED");
+    expect(state.escalation).toMatchObject({ from: "CLASSIFY" });
+    expect(kinds(effects)).toEqual(["askEscalation"]);
+  });
+
+  it("CLASSIFY + délai dépassé : relance, puis escalade à budget épuisé", () => {
+    const timeout: Ev = { type: "TIMEOUT", reason: "silence de l'agent" };
+    const deux = play([INITIALIZED, timeout, timeout]);
+    expect(deux.state.stage).toBe("CLASSIFY");
+    expect(kinds(deux.effects)).toEqual(["classify"]);
+
+    const trois = play([INITIALIZED, timeout, timeout, timeout]);
+    expect(trois.state.stage).toBe("ESCALATED");
+    expect(trois.state.escalation).toMatchObject({ from: "CLASSIFY" });
+    expect(kinds(trois.effects)).toEqual(["askEscalation"]);
+  });
+
+  it("après escalade de CLASSIFY, « réessayer » rend son budget au classifieur", () => {
+    const timeout: Ev = { type: "TIMEOUT", reason: "silence" };
+    const apres = play([INITIALIZED, timeout, timeout, timeout, { type: "HUMAN_DECISION", decision: "retry" }]);
+    expect(apres.state.stage).toBe("CLASSIFY");
+    expect(apres.state.attempts).toBe(0);
+    // Sans remise à zéro, le tour suivant escaladerait aussitôt.
+    const encore = play([INITIALIZED, timeout, timeout, timeout, { type: "HUMAN_DECISION", decision: "retry" }, timeout]);
+    expect(encore.state.stage).toBe("CLASSIFY");
+  });
+
   it("confirmation automatique (O3, mode avancé) : route directement", () => {
     const { state } = play([INITIALIZED, PROPOSED("medium-hard")], { storyPath: "s.md", confirmDifficulty: false } as never);
     expect(state.difficulty).toMatchObject({ level: "medium-hard", confirmedBy: "auto" });
@@ -343,6 +374,27 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     expect(state.deliver).toMatchObject({ granularity: "turn-per-scenario", acceptanceHash: "acc", current: 0 });
     expect(state.deliver!.scenarios.map((x) => x.status)).toEqual(["in_progress", "pending", "done"]);
     expect(validateState(state)).toEqual({ ok: true });
+  });
+
+  it("un scénario dont l'acceptance ne verdit jamais finit par échouer au lieu de boucler", () => {
+    // Plusieurs cycles test → code sont normaux en TDD, mais pas un nombre illimité : sans
+    // plafond, un scénario impossible ajoute un test et un checkpoint à chaque tour, sans fin.
+    const cycles = (n: number) => Array.from({ length: n }, () => [REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(false)]).flat();
+
+    // Sous le plafond (20) : le scénario continue normalement.
+    const avant = play([...toDeliver(), PLANNED, STARTED, ...cycles(19)]);
+    expect(kinds(avant.effects)).toEqual(["runDeliverAgent"]);
+    expect(avant.state.deliver?.cycles).toBe(19);
+
+    // Au plafond : le scénario est repris depuis son début, avec rollback et motif.
+    const auPlafond = play([...toDeliver(), PLANNED, STARTED, ...cycles(20)]);
+    expect(kinds(auPlafond.effects)).toContain("rollback");
+    expect(auPlafond.state.deliver).toMatchObject({ scenarioFailures: 1, cycles: 0 });
+    expect(auPlafond.state.deliver?.feedback.join(" ")).toMatch(/reste rouge/);
+
+    // Le scénario emprunte bien le chemin d'échec : il repasse en sessions séparées, d'où
+    // l'escalade à l'humain après trois reprises (couverte par les tests de la porte de scénario).
+    expect(auPlafond.state.deliver?.granularity).toBe("session-per-step");
   });
 
   it("un tour par pas : test rouge, puis code, jusqu'au vert de l'acceptance ; porte de fin de scénario", () => {

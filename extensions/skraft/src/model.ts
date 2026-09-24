@@ -83,6 +83,8 @@ export interface DeliverState {
   attempts: number;
   /** Échecs du scénario en cours (porte de fin de scénario ou budget d'un pas épuisé). */
   scenarioFailures: number;
+  /** Cycles test → code du scénario en cours : plusieurs sont normaux, une infinité ne l'est pas. */
+  cycles: number;
   /** Motif transmis au prochain agent (rejet d'une porte, revue). */
   feedback: string[];
   /** Informations pour les lentilles (mutation non mesurée, etc.). */
@@ -122,7 +124,7 @@ export interface SkraftState {
   artifacts: Record<Phase, ArtifactRecord[]>;
   reviews: Record<Phase, ReviewRecord[]>;
   attempts: number;
-  budget: { maxAttemptsPerPhase: number };
+  budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
   openQuestions: { id: string; text: string; answer?: string }[];
   adrs: AdrRecord[];
@@ -252,7 +254,7 @@ const stateSchema = z.object({
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
   reviews: byPhase(z.object({ attempt: z.number(), lenses: z.array(z.unknown()), verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]), reportPath: z.string() })),
   attempts: z.number().int().min(0),
-  budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1) }),
+  budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),

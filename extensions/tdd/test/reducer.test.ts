@@ -71,6 +71,13 @@ describe("Réducteur TDD — planification", () => {
     expect(effects[0]).toMatchObject({ kind: "runPlanner", feedback: expect.stringMatching(/unique/) });
   });
 
+  it("identifiants en double à répétition : escalade au budget épuisé, sans boucler", () => {
+    const doublons: Ev = { type: "PLAN_SUBMITTED", steps: [{ id: "a", behavior: "x" }, { id: "a", behavior: "y" }] };
+    const { state, effects } = play([doublons, doublons, doublons]);
+    expect(state.phase).toBe("ESCALATED");
+    expect(kinds(effects)).toEqual(["askHuman"]);
+  });
+
   it("délai dépassé du planificateur : réessai, puis escalade au budget épuisé", () => {
     const t: Ev = { type: "TIMEOUT", reason: "silence" };
     expect(kinds(play([t]).effects)).toEqual(["runPlanner"]);

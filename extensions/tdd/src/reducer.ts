@@ -57,7 +57,12 @@ export function transition(s: TddState, e: Ev): Out {
         if (e.steps.length === 0) return { state: { ...s, phase: "DONE" }, effects: [] };
         const ids = e.steps.map((st) => st.id);
         if (new Set(ids).size !== ids.length)
-          return { state: s, effects: [{ kind: "runPlanner", feature: s.feature, feedback: "Chaque étape doit avoir un identifiant unique." }] };
+          // Budget compté : un planificateur qui répète les mêmes identifiants bouclerait sinon.
+          return retryOrEscalate(s, "Chaque étape doit avoir un identifiant unique.", "PLANNING", null, {
+            kind: "runPlanner",
+            feature: s.feature,
+            feedback: "Chaque étape doit avoir un identifiant unique.",
+          });
         const steps: Step[] = e.steps.map((st) => ({ id: st.id, behavior: st.behavior, status: "pending" }));
         const planned: TddState = { ...s, steps, current: 0, attempts: 0 };
         if (s.autoApprovePlan) return startStep(planned);
