@@ -1,19 +1,20 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 
-/** Paquets internes du monorepo : exportent du TypeScript, donc intégrés au bundle. */
-const INTERNAL = [
-  "@agent-studio/core",
-  "@agent-studio/workspace",
-  "@agent-studio/runtime-copilot",
-  "@agent-studio/github-auth",
-  "@agent-studio/task-engine",
-  "@agent-studio/stack-adapters",
-  "@agent-studio/extension-api",
-  "@agent-studio/extension-host",
-  "@agent-studio/ext-tdd",
-];
+/**
+ * Paquets internes du monorepo : ils exportent directement `src/index.ts` (ADR 0001),
+ * donc ils doivent être intégrés au bundle et jamais externalisés — sinon Node reçoit
+ * du TypeScript non transformé. La liste est dérivée des dépendances pour rester
+ * synchronisée quand un paquet est ajouté.
+ */
+const packageJson = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, "package.json"), "utf8"),
+) as { dependencies?: Record<string, string> };
+const INTERNAL = Object.keys(packageJson.dependencies ?? {}).filter((nom) =>
+  nom.startsWith("@agent-studio/"),
+);
 
 export default defineConfig({
   main: {
