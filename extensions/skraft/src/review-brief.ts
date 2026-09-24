@@ -6,13 +6,24 @@
  */
 import type { Evidence } from "@agent-studio/extension-api";
 import type { LensName } from "./difficulty.js";
-import type { Phase, SkraftState } from "./model.js";
+import type { ArtifactRecord, Phase, SkraftState } from "./model.js";
 
 const short = (h: string) => h.slice(0, 12);
 
+/**
+ * Livrables du dernier essai validé : la liste de l'état est en ajout seul (invariant 4), mais un
+ * rollback de réessai efface les fichiers des essais précédents. Dernière empreinte par chemin.
+ */
+export function latestArtifacts(records: ArtifactRecord[]): ArtifactRecord[] {
+  const last = Math.max(0, ...records.map((a) => a.attempt));
+  const byPath = new Map<string, ArtifactRecord>();
+  for (const a of records) if (a.attempt === last) byPath.set(a.path, a);
+  return [...byPath.values()];
+}
+
 export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence[]): string[] {
   const facts: string[] = [];
-  for (const a of state.artifacts[phase]) facts.push(`Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
+  for (const a of latestArtifacts(state.artifacts[phase])) facts.push(`Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
   if ((phase === "DISTILL" || phase === "DELIVER") && state.acceptanceHash)
     facts.push(`Tests d'acceptance gelés, empreinte ${short(state.acceptanceHash)}${phase === "DELIVER" ? ", vérifiée inchangée à chaque pas de DELIVER" : ""}.`);
   for (const r of state.regressions) facts.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);
@@ -29,7 +40,7 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
           `Scénario ${sc.id} : test d'acceptance vert (${sc.acceptanceTestId}) ; tests unitaires ajoutés, chacun rouge puis vert dans les preuves : ${sc.unitTests?.length ? sc.unitTests.join(", ") : "aucun"}.`,
         );
     }
-    facts.push(...state.deliver.facts);
+    facts.push(...(state.deliver.facts ?? []));
     facts.push(...state.deliver.notes.map((n) => `À noter : ${n}`));
   }
   return facts;

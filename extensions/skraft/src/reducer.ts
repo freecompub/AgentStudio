@@ -2,7 +2,7 @@ import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
-import { actionableDefects, synthesize } from "./review.js";
+import { actionableDefects, synthesize, type LensVerdict } from "./review.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
@@ -169,8 +169,10 @@ export function transition(s: SkraftState, e: Ev): Out {
         }
         if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
         // DELIVER : correction ciblée depuis le dernier vert, avec les seuls défauts blocker et major (§9.3).
-        if (p === "DELIVER" && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, actionableDefects(e.lenses));
-        return failure(ns, "revue", actionableDefects(e.lenses));
+        const defects = actionableDefects(e.lenses);
+        if (p === "DELIVER" && defects.length && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, defects);
+        // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
+        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)]);
       }
       if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
       break;
@@ -224,6 +226,12 @@ export function transition(s: SkraftState, e: Ev): Out {
 }
 
 // ---------- aides -------------------------------------------------------------------
+
+/** Motif d'une revue « changements demandés » sans défaut blocker ni major (mineurs seuls, lentille rejetant, aucune lentille). */
+function unactionableReview(lenses: LensVerdict[]): string {
+  const verdicts = lenses.map((l) => `${l.lens} : ${l.verdict}${l.defects.length ? ` (${l.defects.map((d) => d.description).join(" ; ")})` : ""}`);
+  return `Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : ${verdicts.join(" ; ") || "aucune lentille"}.`;
+}
 
 function uniq<T>(xs: T[]): T[] {
   return [...new Set(xs)];

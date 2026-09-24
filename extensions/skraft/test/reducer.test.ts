@@ -452,6 +452,57 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     expect(back.state.deliver!.facts).toEqual(["Mutation (ac-1) : 100 %"]);
   });
 
+  describe("correction de revue : défauts conservés, correction seulement s'il y a quoi corriger", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const delivered = [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
+    ];
+    const defect = "[cold-reader, major] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
+    const major = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 2 }] });
+
+    it("pas de correction refusé : relance avec les défauts de revue ET le motif du refus", () => {
+      const r = play([...delivered, major, REP_DEV, FAIL("Tests en échec : U > t1.")]);
+      expect(r.effects).toEqual([
+        { kind: "rollback", to: "cp-s2" },
+        { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 2, feedback: [defect, "Tests en échec : U > t1."] },
+      ]);
+    });
+
+    it("porte de fin de scénario refusée après correction : les défauts de revue restent transmis", () => {
+      const r = play([...delivered, major, REP_DEV, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true }, { type: "SCENARIO_FAIL", reasons: ["Mutation : 90 %"] }]);
+      expect(r.effects.at(-1)).toEqual({ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, "Mutation : 90 %"] });
+    });
+
+    it("blocage pendant la correction : la réponse relance la correction avec ses défauts", () => {
+      const blocked = play([...delivered, major, { type: "BLOCKER_REPORTED", question: "Valeur minimale ?", choices: [] }]);
+      expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect] }]);
+    });
+
+    it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
+      const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague" }] });
+      const r = play([...delivered, minorOnly]);
+      expect(r.effects).toEqual([
+        { kind: "rollback", to: "cp-DELIVER" },
+        { kind: "planDeliver" },
+      ]);
+      expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague)."] });
+      expect(r.state.deliver?.step).not.toBe("fix");
+    });
+  });
+
+  it("état persisté avant S6 (sans retries, facts, fixing) : repris sans erreur et toujours valide", () => {
+    const current = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV]).state;
+    const { retries: _r, ...withoutRetries } = current;
+    const { facts: _f, fixing: _x, reviewDefects: _d, ...oldDeliver } = current.deliver!;
+    const old = { ...withoutRetries, deliver: oldDeliver } as SkraftState;
+    expect(validateState(old)).toEqual({ ok: true });
+    const failed = transition(old, FAIL("motif"));
+    expect(failed.state.retries).toEqual({ DELIVER: 1 });
+    const done = transition(transition(old, GREEN_OK(true)).state, { type: "SCENARIO_OK", notes: [], facts: ["f"] });
+    expect(done.state.deliver?.facts).toEqual(["f"]);
+  });
+
   it("panne d'environnement pendant un scénario : retour au début du scénario et escalade, sans perdre les scénarios livrés", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: [] } as Ev, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev];
     const r = play([...base, REP_TEST, { type: "ENV_FAILURE", reason: "swift introuvable" }]);

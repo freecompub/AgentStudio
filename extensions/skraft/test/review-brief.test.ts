@@ -2,7 +2,7 @@ import type { Evidence } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
 import { initialState } from "../src/reducer.js";
 import type { SkraftState } from "../src/model.js";
-import { lensBrief, reviewFacts } from "../src/review-brief.js";
+import { latestArtifacts, lensBrief, reviewFacts } from "../src/review-brief.js";
 import { replayReview, reviewReport, synthesize, type LensVerdict } from "../src/review.js";
 import { parseStory } from "../src/story.js";
 import { US12 } from "./story.test.js";
@@ -80,6 +80,26 @@ describe("Faits établis avant la revue (§9.1)", () => {
       "Règle de dépendance respectée : Domain n'importe ni Infrastructure.",
       "À noter : Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
     ]);
+  });
+});
+
+describe("Livrables du dernier essai (après rollback)", () => {
+  it("les livrables d'un essai annulé ne sont plus présentés comme validés ; dernière empreinte par chemin", () => {
+    const s: SkraftState = {
+      ...state,
+      artifacts: {
+        ...state.artifacts,
+        DESIGN: [
+          { path: "docs/adr/adr-001-ancien.md", sha256: "1".repeat(64), producedBy: "render_adr", attempt: 1 },
+          { path: ".skraft/us-12/design/contracts.md", sha256: "2".repeat(64), producedBy: "skraft-architect", attempt: 1 },
+          { path: ".skraft/us-12/design/contracts.md", sha256: "3".repeat(64), producedBy: "skraft-architect", attempt: 2 },
+        ],
+      },
+    };
+    expect(latestArtifacts(s.artifacts.DESIGN).map((a) => [a.path, a.attempt])).toEqual([[".skraft/us-12/design/contracts.md", 2]]);
+    const facts = reviewFacts(s, "DESIGN", []).filter((f) => f.startsWith("Livrable"));
+    expect(facts).toEqual(["Livrable .skraft/us-12/design/contracts.md : porte de DESIGN validée à l'essai 2 (sha256 333333333333)."]);
+    expect(latestArtifacts([])).toEqual([]);
   });
 });
 

@@ -12,7 +12,7 @@ import { checkDesign } from "./design.js";
 import { checkAcceptanceRed, checkValues } from "./distill.js";
 import { matchesAny } from "@agent-studio/core";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
-import { lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
+import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
@@ -335,7 +335,10 @@ async function phaseFiles(ctx: ExtensionContext, state: SkraftState, phase: Phas
   const changed = cp ? (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted" && !f.path.includes("/reviews/")).map((f) => f.path) : [];
   const tests = changed.filter((p) => ctx.stack.isTestFile(p));
   const code = changed.filter((p) => !tests.includes(p) && matchesAny(ctx.stack.layout.sources, p));
-  const artifacts = [...new Set([...state.artifacts[phase].map((a) => a.path), ...changed.filter((p) => !tests.includes(p) && !code.includes(p))])];
+  // Livrables du dernier essai seulement, et encore présents (un rollback a pu effacer ceux d'avant).
+  const existing = new Set(await ctx.workspace.listFiles());
+  const latest = latestArtifacts(state.artifacts[phase]).map((a) => a.path).filter((p) => existing.has(p));
+  const artifacts = [...new Set([...latest, ...changed.filter((p) => !tests.includes(p) && !code.includes(p))])];
   return { artifacts, code, tests };
 }
 
@@ -349,7 +352,7 @@ function finalReport(s: SkraftState): string {
     `Difficulté : ${s.difficulty?.level ?? "?"} (${s.difficulty?.confirmedBy === "user" ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
-    `Réessais par phase : ${Object.entries(s.retries).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
+    `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
     `Identifiant de suivi : ${randomUUID().slice(0, 8)}.`,
   ].join("\n");
 }

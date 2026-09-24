@@ -251,7 +251,7 @@ describe("skraft — mesures d'usage sur trois stories (§12)", () => {
         level: s.difficulty!.level,
         granularity: s.deliver!.granularity,
         phases: Object.fromEntries(usage.filter((r) => r.requests > 0).map((r) => [r.phase, r.requests])),
-        retries: s.retries,
+        retries: s.retries ?? {},
       };
       for (const r of usage.filter((x) => x.requests > 0)) expect(r.inputTokens, `${story} ${r.phase}`).toBeGreaterThan(0);
       await shutdownHosts();

@@ -7,7 +7,8 @@ type AgentStep = "test" | "dev" | "green" | "refactor" | "fix";
 
 /** Réessais par phase, pour les mesures d'usage (§12). */
 export function bumpRetries(s: SkraftState, key: string): SkraftState {
-  return { ...s, retries: { ...s.retries, [key]: (s.retries[key] ?? 0) + 1 } };
+  const retries = s.retries ?? {};
+  return { ...s, retries: { ...retries, [key]: (retries[key] ?? 0) + 1 } };
 }
 
 /**
@@ -102,8 +103,8 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
 
     case "SCENARIO_OK": {
       const scenarios = d.scenarios.map((x, i) => (i === d.current ? { ...x, status: "done" as const, unitTests: d.fixing ? (x.unitTests ?? []) : d.unitTests } : x));
-      const facts = [...new Set([...d.facts, ...(e.facts ?? [])])];
-      return nextScenario(s, { ...d, scenarios, notes: [...new Set([...d.notes, ...e.notes])], facts, feedback: [], fixing: false });
+      const facts = [...new Set([...(d.facts ?? []), ...(e.facts ?? [])])];
+      return nextScenario(s, { ...d, scenarios, notes: [...new Set([...d.notes, ...e.notes])], facts, feedback: [], fixing: false, reviewDefects: [] });
     }
 
     case "SCENARIO_FAIL":
@@ -119,9 +120,11 @@ function pending(d: DeliverState, includeCurrent: boolean): string[] {
 
 function agent(s: SkraftState, d: DeliverState, feedback: string[]): Out {
   const step = d.step as AgentStep;
+  // Correction de revue : les défauts restent visibles à chaque relance (rejet de porte, blocage, reprise).
+  const fb = step === "fix" ? [...new Set([...(d.reviewDefects ?? []), ...feedback])] : feedback;
   return {
     state: { ...s, stage: "SPECIALIST", deliver: d },
-    effects: [{ kind: "runDeliverAgent", step, scenarioId: d.scenarios[d.current]!.id, attempt: d.attempts + 1, feedback }],
+    effects: [{ kind: "runDeliverAgent", step, scenarioId: d.scenarios[d.current]!.id, attempt: d.attempts + 1, feedback: fb }],
   };
 }
 
@@ -238,7 +241,7 @@ export function startReviewFix(s0: SkraftState, defects: string[]): Out {
   const s = bumpRetries({ ...s0, attempts: s0.attempts + 1, lastRejection: { gate: "revue", reasons: defects } }, "DELIVER");
   const d = s.deliver!;
   const cp = d.stepCheckpoint!;
-  const nd: DeliverState = { ...d, step: "fix", fixing: true, attempts: 0, scenarioFailures: 0, scenarioCheckpoint: cp, unitTests: [], newTest: null, feedback: defects };
+  const nd: DeliverState = { ...d, step: "fix", fixing: true, reviewDefects: defects, attempts: 0, scenarioFailures: 0, scenarioCheckpoint: cp, unitTests: [], newTest: null, feedback: defects };
   const r = agent(s, nd, defects);
   return { state: r.state, effects: [{ kind: "rollback", to: cp }, ...r.effects] };
 }
