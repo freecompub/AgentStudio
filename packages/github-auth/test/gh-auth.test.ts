@@ -162,6 +162,30 @@ describe("GhAuth", () => {
     await expect(auth.logout()).resolves.toBeUndefined();
   });
 
+  it("une connexion en échec ne change pas l'hôte courant", async () => {
+    // Sinon toute la session vise ensuite la mauvaise instance : statut, jeton, déconnexion.
+    const proc: InteractiveProcess = { onOutput: () => {}, write: () => {}, exited: Promise.resolve(1) };
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: { spawn: () => proc } });
+    await expect(auth.login(() => {}, { hostname: "github.exemple.fr" })).rejects.toThrow(/a échoué/);
+    expect(auth.hostname()).toBe("github.com");
+    expect(await auth.status()).toMatchObject({ hostname: "github.com" });
+  });
+
+  it("code d'appareil jamais reconnu : on abandonne au lieu d'attendre indéfiniment", async () => {
+    // `gh` attend un appui sur Entrée qu'on n'envoie qu'après avoir reconnu le code. Si le
+    // format de son message change, sans délai personne ne rend jamais la main.
+    let tue = false;
+    const proc: InteractiveProcess = {
+      onOutput: (cb) => cb("un message dont le format a changé"),
+      write: () => {},
+      kill: () => void (tue = true),
+      exited: new Promise(() => {}), // ne se termine jamais
+    };
+    const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: { spawn: () => proc }, deviceCodeTimeoutMs: 20 });
+    await expect(auth.login(() => {})).rejects.toThrow(/code de connexion/i);
+    expect(tue).toBe(true);
+  });
+
   it("connexion : échec si gh se termine en erreur", async () => {
     const proc: InteractiveProcess = { onOutput: () => {}, write: () => {}, exited: Promise.resolve(1) };
     const auth = createGhAuth({ runner: runner(LOGGED_IN), spawner: { spawn: () => proc } });

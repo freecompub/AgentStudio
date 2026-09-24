@@ -4,6 +4,8 @@ export interface GhAuthDeps {
   runner: CommandRunner;
   spawner: ProcessSpawner;
   hostname?: string;
+  /** Délai d'apparition du code de connexion ; au-delà, la connexion est abandonnée. */
+  deviceCodeTimeoutMs?: number;
 }
 
 export function tokenKindOf(token: string): TokenKind {
@@ -68,21 +70,44 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
     },
 
     async login(onCode, opts) {
-      if (opts?.hostname !== undefined) host = verifierHote(opts.hostname);
-      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", host, "--git-protocol", "https", "--web"]);
+      // L'hôte visé ne devient l'hôte courant qu'une fois la connexion réussie : un échec
+      // laisserait sinon toute la session pointée sur la mauvaise instance.
+      const cible = opts?.hostname !== undefined ? verifierHote(opts.hostname) : host;
+      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"]);
       let buffer = "";
       let sent = false;
-      proc.onOutput((chunk) => {
-        buffer += chunk;
-        const m = DEVICE_CODE.exec(buffer);
-        if (m?.[1] && !sent) {
-          sent = true;
-          onCode({ code: m[1], verificationUrl: `https://${host}/login/device` });
-          proc.write("\n"); // valide « Press Enter to open … in your browser »
-        }
+      const vu = new Promise<void>((resolve) => {
+        proc.onOutput((chunk) => {
+          buffer += chunk;
+          const m = DEVICE_CODE.exec(buffer);
+          if (m?.[1] && !sent) {
+            sent = true;
+            onCode({ code: m[1], verificationUrl: `https://${cible}/login/device` });
+            proc.write("\n"); // valide « Press Enter to open … in your browser »
+            resolve();
+          }
+        });
       });
+
+      // `gh` attend cet appui sur Entrée : sans code reconnu, il ne rend jamais la main.
+      // Un format de message qui change ne doit pas figer l'application.
+      const delai = deps.deviceCodeTimeoutMs ?? 60_000;
+      let minuteur: ReturnType<typeof setTimeout> | undefined;
+      const expire = new Promise<never>((_, reject) => {
+        minuteur = setTimeout(() => reject(new Error("Le code de connexion GitHub n'est pas apparu à temps. Réessayez, ou lancez `gh auth login --web` dans un terminal.")), delai);
+      });
+      try {
+        await Promise.race([vu, proc.exited, expire]);
+      } catch (err) {
+        proc.kill?.();
+        throw err;
+      } finally {
+        clearTimeout(minuteur);
+      }
+
       const code = await proc.exited;
       if (code !== 0) throw new Error(`La connexion GitHub a échoué (code ${code}).`);
+      host = cible;
       return status();
     },
   };

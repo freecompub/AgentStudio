@@ -192,6 +192,29 @@ describe("Moteur de tâches", () => {
     expect(rec?.status).toBe("finished");
   });
 
+  it("les effets de clôture émis par l'annulation s'exécutent, et la tâche se termine", async () => {
+    // Le signal annule le travail en cours ; le bilan qu'émet la transition ABORT doit encore
+    // pouvoir tourner. Sans cela, l'effet reste en attente et la tâche demeure « running ».
+    const def = counterTask(async () => ({ type: "WORKED" }));
+    const avecBilan: typeof def = {
+      ...def,
+      transition(s, e) {
+        if (e.type === "ABORT") return { state: { ...s, log: [...s.log, e.type], phase: "ABORTED" }, effects: [{ kind: "notify", text: "bilan" }] };
+        return def.transition(s, e);
+      },
+    };
+    const { engine, store, deps } = start(avecBilan);
+    const id = await engine.start("compteur", { target: 5 });
+
+    await engine.cancel(id);
+    await engine.idle(id);
+
+    expect(deps.calls.some((c) => c.kind === "notify")).toBe(true);
+    const rec = await store.load(id);
+    expect(rec?.pending).toEqual([]);
+    expect(rec?.status).toBe("finished");
+  });
+
   it("annulation avant le démarrage de l'effet : aucun effet n'est lancé", async () => {
     const def = counterTask(async () => ({ type: "WORKED" }));
     const { engine, store, deps } = start(def);

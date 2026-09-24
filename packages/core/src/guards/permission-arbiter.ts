@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { realPath } from "./real-path.js";
@@ -18,9 +19,18 @@ export interface PermissionRules {
 
 type PolicyVerdict = GuardDecision | { decision: "ask"; title: string; detail: string; rule: PermissionRule | null };
 
-/** Commandes Git qui modifient l'historique ou l'arbre : réservées au service Workspace (D29). */
-const GIT_MUTATION =
-  /\bgit\s+(?:-\S+\s+)*(?:commit|reset|checkout|switch|stash|rebase|push|pull|restore|clean|merge|am|cherry-pick|revert|update-ref|tag|branch\s+-[dDmMfc])\b/;
+/**
+ * Commandes Git qui modifient l'historique ou l'arbre : réservées au service Workspace (D29).
+ *
+ * Les options placées avant le sous-commande sont ignorées, y compris celles qui prennent leur
+ * valeur **séparément** (`-C <chemin>`, `-c <clé=valeur>`, `--git-dir <p>`…) : ne consommer que
+ * l'option laisserait `git -C /tmp commit` passer pour une commande anodine, et D29 se
+ * contournerait par un « toujours autoriser » accordé à celle-ci.
+ */
+const GIT_OPTION_A_VALEUR = "(?:-[cC]|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix)\\s+\\S+";
+const GIT_MUTATION = new RegExp(
+  `\\bgit\\s+(?:(?:${GIT_OPTION_A_VALEUR}|-\\S+)\\s+)*(?:commit|reset|checkout|switch|stash|rebase|push|pull|restore|clean|merge|am|cherry-pick|revert|update-ref|tag|branch\\s+-[dDmMfc])\\b`,
+);
 /** Git en lecture seule, sans métacaractère de shell : autorisé sans question. */
 const GIT_READ_ONLY = /^\s*git\s+(?:status|log|diff|show)\b[^;&|`$<>()\n]*$/;
 
@@ -143,14 +153,25 @@ export function createJsonPermissionRules(file: string): PermissionRules {
       return [];
     }
   };
+  // Les ajouts se suivent : deux « toujours autoriser » simultanés reliraient tous deux l'état
+  // d'avant et l'un écraserait l'autre. Ils partageaient de surcroît le même fichier temporaire,
+  // que le premier `rename` faisait disparaître sous le second.
+  let file_d_attente: Promise<void> = Promise.resolve();
+
   return {
     list: read,
-    async add(rule) {
-      const rules = await read();
-      if (rules.some((r) => r.kind === rule.kind && r.value === rule.value)) return;
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(`${file}.tmp`, JSON.stringify([...rules, rule], null, 2));
-      await rename(`${file}.tmp`, file);
+    add(rule) {
+      const suivant = file_d_attente.then(async () => {
+        const rules = await read();
+        if (rules.some((r) => r.kind === rule.kind && r.value === rule.value)) return;
+        await mkdir(dirname(file), { recursive: true });
+        const tmp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
+        await writeFile(tmp, JSON.stringify([...rules, rule], null, 2));
+        await rename(tmp, file);
+      });
+      // La file continue même après un échec, sinon un incident bloquerait tous les ajouts.
+      file_d_attente = suivant.catch(() => undefined);
+      return suivant;
     },
   };
 }

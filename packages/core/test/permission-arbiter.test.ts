@@ -29,6 +29,29 @@ describe("Arbitre de permissions (D27)", () => {
     expect(asked).toEqual([]);
   });
 
+  it("Git mutant refusé quelles que soient les options, y compris celles qui prennent une valeur", async () => {
+    // `-C <chemin>` et `-c <clé=valeur>` séparent l'option de son argument : un motif qui ne
+    // consomme que l'option laisse passer la commande, et D29 se contourne alors par un
+    // « toujours autoriser » accordé à ce qui ressemble à une commande anodine.
+    const { arbiter } = setup("allow-once");
+    for (const c of [
+      "git commit -m x",
+      "git -C /tmp commit -m x",
+      "git -c user.name=a commit",
+      "git --git-dir=/x commit",
+      "git -C /tmp -c user.email=a@b push",
+      "git --work-tree /tmp checkout main",
+    ])
+      expect(await arbiter.check(shell(c)), c).toMatchObject({ decision: "deny" });
+  });
+
+  it("Git en lecture seule reste autorisé sans question", async () => {
+    const { arbiter, asked } = setup("allow-once");
+    for (const c of ["git status", "git log --oneline -5", "git diff HEAD"])
+      expect(await arbiter.check(shell(c)), c).toEqual({ decision: "allow" });
+    expect(asked).toEqual([]);
+  });
+
   it("un refus d'extension l'emporte avant toute question à l'utilisateur", async () => {
     const { arbiter, asked } = setup("allow-once", [{ check: async () => ({ decision: "deny", reason: "[ext] non" }) }]);
     expect(await arbiter.check(shell("npm test"))).toEqual({ decision: "deny", reason: "[ext] non" });
