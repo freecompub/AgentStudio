@@ -85,6 +85,13 @@ export function createAppController(deps: AppControllerDeps): AppController {
   let demarrage: Promise<ChatMessageDto[]> | null = null;
   /** Démarrage du runtime en cours, partagé entre appels concurrents. */
   let demarrageRuntime: Promise<AgentRuntime> | null = null;
+  /**
+   * Messages postés alors qu'aucune conversation n'est ouverte. Les échecs constatés à
+   * l'ouverture d'un projet — stack non reconnue, profil refusé — arrivent avant elle : les
+   * journaliser ne les montrerait à personne. Ils sont versés à la conversation dès qu'elle
+   * démarre, puis oubliés.
+   */
+  let enAttente: { extensionId: string; markdown: string }[] = [];
 
   const info = (ws: Workspace): WorkspaceInfoDto => ({ root: ws.root, name: basename(ws.root) });
 
@@ -126,7 +133,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
         if (session) void session.record("notice", markdown, extensionId);
-        else deps.logger?.info("message d'extension hors conversation", { extensionId });
+        else enAttente.push({ extensionId, markdown });
       },
     });
     const anciens = services;
@@ -165,6 +172,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
     await services?.dispose();
     services = null;
     workspace = null;
+    enAttente = []; // ces messages parlaient du projet qu'on vient de fermer
     const { lastWorkspace: _oublie, ...reste } = await deps.settings.load();
     await deps.settings.save(reste);
     deps.logger?.info("projet clôturé", { root });
@@ -312,7 +320,13 @@ export function createAppController(deps: AppControllerDeps): AppController {
         else if (e.event.type !== "activity" && e.event.type !== "usage") deps.sink.emit("chat:agent", { event: e.event });
       });
         session = s;
-        return s.start();
+        const messages = await s.start();
+        if (enAttente.length === 0) return messages;
+        // Versés maintenant, et une seule fois : ils appartiennent à cette conversation.
+        const differes = enAttente;
+        enAttente = [];
+        for (const m of differes) await s.record("notice", m.markdown, m.extensionId);
+        return s.messages();
       })();
       demarrage = encours;
       try {

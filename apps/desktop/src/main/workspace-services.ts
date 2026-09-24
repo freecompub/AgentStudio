@@ -120,8 +120,15 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const detected = await selectStackAdapter(workspace.root, cfg.stacks);
     const stack = detected ?? cfg.stacks[0];
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
-    if (!detected) cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
-    else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
+    if (!detected) {
+      cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
+      // Dit dans la conversation, pas seulement dans le journal : le repli change ce que font
+      // les portes et les commandes, et l'utilisateur doit savoir pourquoi.
+      onPost(
+        "agent-studio",
+        `**Ce projet n'est reconnu par aucun adaptateur.** L'application se rabat sur \`${stack.id}\`, dont les commandes de test et les emplacements de fichiers ne correspondent probablement pas. Les commandes qui exécutent des tests risquent d'échouer.`,
+      );
+    } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const usage = cfg.usageRecorder ?? createUsageRecorder(join(cfg.tasksDir, projectKey, "usage"));
     const usageRows = new Map<string, UsageRow[]>();

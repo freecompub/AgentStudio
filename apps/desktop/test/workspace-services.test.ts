@@ -63,6 +63,39 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
+  it("stack non reconnue : l'utilisateur en est averti dans la conversation, pas seulement dans le journal", async () => {
+    // Le repli change ce que font les portes et les commandes : le taire laisserait
+    // l'utilisateur devant des résultats inexplicables.
+    const posts: string[] = [];
+    await workspaceServicesFactory({
+      extensions: [],
+      stacks: [
+        {
+          id: "typescript",
+          layout: { acceptanceTests: [], unitTests: [], sources: [] },
+          infrastructureModules: [],
+          detect: async () => false, // aucun adaptateur ne reconnaît ce projet
+          isTestFile: () => false,
+          testFilePattern: "^tests/",
+          runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }),
+        },
+      ],
+      tasksDir: "/inutile",
+      taskStore: new MemoryTaskStore(),
+      evidenceStore: new MemoryEvidenceStore(),
+      interactionStore: new MemoryInteractionStore(),
+      clock: fixedClock(),
+      ids: sequentialIds("id-"),
+    })({
+      workspace: fakeWorkspace(),
+      runtime: async () => new ScriptedRuntime(),
+      onTask: () => {},
+      onInteractions: () => {},
+      onPost: (ext, md) => posts.push(`${ext}: ${md}`),
+    });
+    expect(posts.join("\n")).toMatch(/reconnu par aucun adaptateur/i);
+  });
+
   it("expose la commande /tdd de l'extension ; le texte libre part vers la session principale", async () => {
     const { services, getLoads } = await setup();
     expect(services.commands().map((c) => c.invocation)).toEqual(["tdd"]);
