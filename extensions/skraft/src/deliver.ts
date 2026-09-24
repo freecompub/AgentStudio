@@ -79,10 +79,20 @@ const qualitySchema = z.object({
       edge: z.number().min(0).max(100).default(90),
     })
     .prefault({}),
-  dependencyRules: z
-    .array(z.object({ module: z.string(), forbidden: z.array(z.string()) }))
-    .default([{ module: "Domain", forbidden: ["Infrastructure", "Interface", "UI", "API", "SwiftUI", "UIKit", "AppKit"] }]),
+  // Aucune valeur par défaut ici : les noms d'infrastructure dépendent de l'écosystème, et une
+  // extension qui les connaîtrait deviendrait spécifique à un langage. Le projet les déclare,
+  // sinon ils viennent de la stack (voir `defaultDependencyRules`).
+  dependencyRules: z.array(z.object({ module: z.string(), forbidden: z.array(z.string()) })).default([]),
 });
+
+/**
+ * Règles appliquées quand le projet n'en déclare aucune : le domaine n'importe pas ce que la
+ * stack tient pour de l'infrastructure. Les noms viennent de `ctx.stack`, jamais d'ici.
+ */
+export function defaultDependencyRules(infrastructureModules: readonly string[]): DependencyRule[] {
+  if (infrastructureModules.length === 0) return [];
+  return [{ module: "Domain", forbidden: [...infrastructureModules] }];
+}
 // Les seuils de forme ne figurent plus ici : ils appartiennent à la configuration du linter du
 // projet (`.eslintrc`, `.swiftlint.yml`…), seul endroit où ils ne peuvent pas se contredire.
 

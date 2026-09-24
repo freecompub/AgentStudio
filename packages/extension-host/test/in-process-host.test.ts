@@ -47,7 +47,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   const posted: string[] = [];
   const stack: StackAdapter = {
-    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, 
+    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"], 
     detect: async () => true,
     runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1 }),
     isTestFile: (p) => p.startsWith("tests/"),

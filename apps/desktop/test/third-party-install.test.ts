@@ -77,7 +77,7 @@ describe("Extension tierce installée depuis un fichier (J6)", () => {
       extensions: async () =>
         (await installer.active()).map((a) => ({ kind: "isolated" as const, manifest: a.manifest, directory: a.directory, entry: join(a.directory, a.manifest.main!) })),
       isolation: { launcher: createNodeLauncher(), runtimeEntry },
-      stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] },  detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+      stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"],  detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
       tasksDir: join(dir, "taches"),
       taskStore: new MemoryTaskStore(),
       evidenceStore: new MemoryEvidenceStore(),

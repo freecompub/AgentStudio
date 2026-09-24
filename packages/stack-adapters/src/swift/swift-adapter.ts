@@ -61,6 +61,8 @@ export function createSwiftAdapter(deps: SwiftAdapterDeps = {}): StackAdapter {
   return {
     id: "swift",
     layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
+    // Idem côté Apple : les frameworks d'interface n'ont rien à faire dans un domaine.
+    infrastructureModules: ["Infrastructure", "Interface", "UI", "API", "SwiftUI", "UIKit", "AppKit"],
     testFilePattern: TEST_FILE.source,
     isTestFile: (p) => TEST_FILE.test(p.replaceAll("\\", "/")),
 

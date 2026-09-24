@@ -130,7 +130,7 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
         rpc = endpoint;
         // Chemin réel : sous `--permission`, Node compare le chemin tel que fourni, sans
         // résoudre les liens symboliques — importer par un lien refuserait l'accès.
-        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: cheminReel(ext.entry), testFilePattern: deps.stack.testFilePattern, layout: deps.stack.layout };
+        const req: ActivationRequest = { extensionId: ext.manifest.id, entry: cheminReel(ext.entry), testFilePattern: deps.stack.testFilePattern, layout: deps.stack.layout, infrastructureModules: deps.stack.infrastructureModules };
         await endpoint.call("activate", [req], { timeoutMs: opts.activationTimeoutMs ?? 15_000 });
       },
       async deactivate() {

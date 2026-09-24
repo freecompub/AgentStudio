@@ -1,6 +1,6 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 const bar = (raw: string | null = null): QualityBar => {
   const r = parseQualityBar(raw);
@@ -77,6 +77,26 @@ describe("barre de qualité", () => {
     expect(checkMutation(report, ["Sources/Domain/BolusCapPolicy.swift", "Sources/Infrastructure/Store.swift", "Sources/Domain/Sans.swift"], bar())).toEqual([
       "Mutation : Sources/Domain/BolusCapPolicy.swift à 95 % (minimum 100 %) ; mutants survivants : ligne 4 (RelationalOperatorReplacement).",
     ]);
+  });
+
+  it("les règles par défaut viennent de la stack, pas de l'extension", () => {
+    // Sans projet déclarant ses règles, on interdit au domaine d'importer ce que **la stack**
+    // tient pour de l'infrastructure. L'extension ne connaît aucun nom de framework : « SwiftUI »
+    // ne veut rien dire en Python, et l'y écrire la rendrait spécifique à un langage.
+    const regles = defaultDependencyRules(["Infrastructure", "SwiftUI", "UIKit"]);
+    expect(regles).toEqual([{ module: "Domain", forbidden: ["Infrastructure", "SwiftUI", "UIKit"] }]);
+
+    // Une stack qui n'en déclare aucun ne produit aucune règle : rien n'est inventé.
+    expect(defaultDependencyRules([])).toEqual([]);
+  });
+
+  it("les règles du projet l'emportent sur celles de la stack", () => {
+    const b = bar('{"dependencyRules":[{"module":"Core","forbidden":["Web"]}]}');
+    expect(b.dependencyRules).toEqual([{ module: "Core", forbidden: ["Web"] }]);
+  });
+
+  it("sans règles déclarées, la barre n'en invente pas", () => {
+    expect(bar().dependencyRules).toEqual([]);
   });
 
   it("règle de dépendance : chaque import interdit est un motif", () => {

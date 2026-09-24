@@ -23,6 +23,9 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
   return {
     id: "typescript",
     layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**", "src/**/*.test.ts"], sources: ["src/**"] },
+    // Couches et bibliothèques que l'écosystème TypeScript tient pour de l'infrastructure ou de
+    // l'interface : ce qu'un domaine ne devrait pas importer.
+    infrastructureModules: ["Infrastructure", "Interface", "UI", "API", "react", "express", "next"],
 
     async detect(root) {
       try {

@@ -145,6 +145,11 @@ export interface GitApi {
 export interface StackApi {
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources). */
   readonly layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
+  /**
+   * Modules et frameworks que la stack tient pour de l'infrastructure ou de l'interface. Une
+   * extension ne peut pas les connaître sans devenir spécifique à un langage : elle les demande.
+   */
+  readonly infrastructureModules: string[];
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;

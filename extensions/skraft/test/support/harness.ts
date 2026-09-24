@@ -255,6 +255,7 @@ export function fakeSwiftStack(): StackAdapter {
   return {
     id: "swift",
     layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
+    infrastructureModules: ["Infrastructure"],
     detect: async () => true,
     isTestFile: (p) => /(^|\/)Tests\//.test(p),
     testFilePattern: "(^|\\/)Tests\\/",

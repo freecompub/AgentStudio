@@ -59,9 +59,20 @@ mutation et les règles de dépendance : par l'outil de la stack, jamais par un 
 - Les seuils quittent `.skraft/quality.json` : ils appartiennent à la configuration du linter,
   seul endroit où ils ne peuvent pas se contredire.
 
+## Complément du 2026-09-24 : les noms d'infrastructure aussi
+
+La même relecture a montré qu'il restait une dépendance au langage dans `skraft` : les règles de
+dépendance par défaut nommaient `SwiftUI`, `UIKit` et `AppKit`. Ces noms ne veulent rien dire en
+Python, et une extension qui les porte est spécifique à un écosystème.
+
+`StackAdapter` déclare désormais `infrastructureModules` — ce que son écosystème tient pour de
+l'infrastructure ou de l'interface — et `ctx.stack` l'expose. La barre de qualité n'a plus de
+valeur par défaut : les règles du projet l'emportent, sinon celles que la stack fournit, sinon
+la porte dit qu'elle n'a rien vérifié.
+
 ## Conséquences
 
-- `skraft` redevient **entièrement générique** : plus aucune ligne dépendante d'un langage. Un
+- `skraft` **et** `tdd` sont entièrement génériques : plus aucune mention de langage dans leur code. Un
   projet Python ou Java est jugé par ruff ou checkstyle, sans rien ajouter à l'extension.
 - 118 lignes d'expressions régulières supprimées.
 - skraft ne peut plus imposer une discipline que le projet n'a pas adoptée. C'est assumé :
