@@ -132,6 +132,7 @@ export const requests = {
   "workspace:current": { input: empty, output: workspaceInfoSchema.nullable() },
   "workspace:pick-folder": { input: empty, output: z.string().nullable() },
   "workspace:open": { input: z.object({ path: text(4096).min(1) }).strict(), output: workspaceInfoSchema },
+  "workspace:close": { input: empty, output: z.void() },
   "workspace:clone": {
     input: z.object({ url: text(2048).min(1), dest: text(4096).min(1) }).strict(),
     output: workspaceInfoSchema,

@@ -68,7 +68,7 @@ export function App() {
           profile={profile}
           mode={mode}
           onModeChange={changeMode}
-          onChangeProject={() => setPhase({ kind: "project", user: phase.user })}
+          onProjectClosed={() => setPhase({ kind: "project", user: phase.user })}
         />
       )}
       <ConfirmDialog />

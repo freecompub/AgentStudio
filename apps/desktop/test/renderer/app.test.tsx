@@ -185,4 +185,30 @@ describe("Renderer — tâches et décisions (J2)", () => {
     render(<App />);
     expect(await screen.findByText("diabeo.tdd")).toBeTruthy();
   });
+
+  it("clôture le projet et revient au choix d'un projet", async () => {
+    chatReady();
+    api.handle("workspace:close", () => undefined);
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fermer le projet" }));
+
+    expect(await screen.findByText("Sur quel projet travaille-t-on, octo ?")).toBeTruthy();
+    expect(api.calls.some((c) => c.channel === "workspace:close")).toBe(true);
+  });
+
+  it("reste sur le projet si la clôture échoue", async () => {
+    chatReady();
+    api.handle("workspace:close", () => {
+      throw new Error("Une tâche est en cours.");
+    });
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fermer le projet" }));
+
+    expect(await screen.findByText("Une tâche est en cours.")).toBeTruthy();
+    expect(screen.getByLabelText("Votre message")).toBeTruthy();
+  });
 });

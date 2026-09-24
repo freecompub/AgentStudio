@@ -149,6 +149,53 @@ describe("AppController — espaces de travail", () => {
     await controller["workspace:open"]({ path: "/projets/demo" });
     expect(await controller["workspace:sync"]({})).toEqual({ pulled: 1, pushed: 0 });
   });
+
+  it("clôturer libère les services du projet et n'en laisse aucun courant", async () => {
+    const { controller, serviceLog } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["workspace:close"]({});
+
+    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo"]);
+    expect(await controller["workspace:current"]({})).toBeNull();
+  });
+
+  it("clôturer ferme la session de conversation en cours", async () => {
+    const { controller, runtime } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    const session = runtime.last;
+
+    await controller["workspace:close"]({});
+
+    expect(session.closed).toBe(true);
+    await expect(controller["chat:start"]({})).rejects.toThrow(/Aucun projet/);
+  });
+
+  it("un projet clôturé n'est pas rouvert au démarrage suivant", async () => {
+    const first = setup();
+    await first.controller["workspace:open"]({ path: "/projets/demo" });
+    await first.controller["workspace:close"]({});
+    expect(first.getSettings().lastWorkspace).toBeUndefined();
+
+    const next = setup({ settings: first.getSettings() });
+    expect(await next.controller["workspace:current"]({})).toBeNull();
+  });
+
+  it("clôturer sans projet ouvert ne fait rien", async () => {
+    const { controller, serviceLog } = setup();
+    await controller["workspace:close"]({});
+    await controller["workspace:close"]({});
+    expect(serviceLog).toEqual([]);
+    expect(await controller["workspace:current"]({})).toBeNull();
+  });
+
+  it("on peut rouvrir un projet après l'avoir clôturé", async () => {
+    const { controller, serviceLog } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["workspace:close"]({});
+    expect(await controller["workspace:open"]({ path: "/projets/demo" })).toEqual({ root: "/projets/demo", name: "demo" });
+    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo", "créés:/projets/demo"]);
+  });
 });
 
 describe("AppController — conversation", () => {

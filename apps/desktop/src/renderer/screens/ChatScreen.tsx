@@ -19,7 +19,7 @@ export function ChatScreen(props: {
   profile: ProfileInfoDto | null;
   mode: UiMode;
   onModeChange: (m: UiMode) => void;
-  onChangeProject: () => void;
+  onProjectClosed: () => void;
 }) {
   const advanced = props.mode === "advanced";
   const [extensionsOpen, setExtensionsOpen] = useState(false);
@@ -117,12 +117,25 @@ export function ChatScreen(props: {
     }
   }
 
+  async function closeProject() {
+    setError(null);
+    try {
+      await api.call("workspace:close", {});
+      props.onProjectClosed();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   return (
     <div className="chat-layout">
       <header className="topbar">
         <span className="brand">agent-studio</span>
-        <button className="project-switch" onClick={props.onChangeProject} title={props.workspace.root}>
+        <span className="project-name" title={props.workspace.root}>
           {props.workspace.name}
+        </span>
+        <button className="project-close" onClick={() => void closeProject()}>
+          Fermer le projet
         </button>
         <span className="spacer" />
         {syncNote && <span className="hint">{syncNote}</span>}

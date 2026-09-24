@@ -128,6 +128,19 @@ export function createAppController(deps: AppControllerDeps): AppController {
     return info(ws);
   }
 
+  /** Clôture le projet courant : session, services et extensions libérés, aucun projet mémorisé. */
+  async function close(): Promise<void> {
+    if (!workspace) return;
+    const { root } = workspace;
+    await closeSession();
+    await services?.dispose();
+    services = null;
+    workspace = null;
+    const { lastWorkspace: _oublie, ...reste } = await deps.settings.load();
+    await deps.settings.save(reste);
+    deps.logger?.info("projet clôturé", { root });
+  }
+
   async function ensureRuntime(): Promise<AgentRuntime> {
     if (runtime) return runtime;
     const status = await deps.auth.status();
@@ -173,6 +186,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
     "workspace:pick-folder": () => deps.folderPicker.pick(),
 
     "workspace:open": async ({ path }) => activate(await deps.workspaces.open(path)),
+
+    "workspace:close": () => close(),
 
     "workspace:clone": async ({ url, dest }) => activate(await deps.workspaces.clone(url, dest)),
 

@@ -8,6 +8,7 @@ export const REQUEST_CHANNELS = [
   "workspace:current",
   "workspace:pick-folder",
   "workspace:open",
+  "workspace:close",
   "workspace:clone",
   "workspace:sync",
   "chat:start",
