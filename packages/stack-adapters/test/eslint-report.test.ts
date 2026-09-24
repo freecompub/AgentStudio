@@ -39,16 +39,35 @@ describe("parseEslintReport", () => {
     });
   });
 
-  it("une règle sans identifiant — erreur de parsing — est rapportée sous un nom lisible", () => {
+  it("une erreur d'analyse n'est pas une violation : le fichier n'a pas pu être lu", () => {
+    // Un parser qui ne couvre pas un fichier est une affaire de configuration, que l'agent ne
+    // peut pas corriger : en faire un motif de rejet ferait boucler le scénario jusqu'à
+    // épuisement du budget.
     const r = parseEslintReport(
       [{ filePath: "/projets/demo/a.ts", messages: [{ ruleId: null, severity: 2, message: "Parsing error: Unexpected token", line: 1 }] }],
       "/projets/demo",
     );
-    expect(r.violations[0]).toMatchObject({ rule: "erreur d'analyse", message: "Parsing error: Unexpected token" });
+    expect(r.violations).toEqual([]);
+    expect(r.analyzed).toEqual([]);
   });
 
   it("un rapport illisible ne fait pas échouer la porte : rien n'est disponible", () => {
     expect(parseEslintReport("pas du json", "/projets/demo")).toEqual({ available: false, violations: [] });
     expect(parseEslintReport([{ nimporte: true }], "/projets/demo")).toEqual({ available: false, violations: [] });
+  });
+
+  it("dit quels fichiers ont été examinés", () => {
+    expect(parseEslintReport(rapport, "/projets/demo").analyzed).toEqual(["src/bolus.ts", "src/ok.ts"]);
+  });
+
+  it("un fichier ignoré par la configuration n'est pas un fichier propre", () => {
+    // ESLint répond ceci pour un fichier ignoré qu'on lui passe explicitement : sans traitement,
+    // la sévérité 1 est filtrée, le rapport paraît vide, et la porte conclut à la conformité.
+    const r = parseEslintReport(
+      [{ filePath: "/projets/demo/src/genere.ts", messages: [{ ruleId: null, severity: 1, message: "File ignored because of a matching ignore pattern." }] }],
+      "/projets/demo",
+    );
+    expect(r.violations).toEqual([]);
+    expect(r.analyzed).toEqual([]);
   });
 });

@@ -156,6 +156,9 @@ export interface StackApi {
    * Linter du projet, avec les règles que le projet a lui-même choisies ; `null` si la stack
    * n'en propose pas. La qualité de forme se juge avec l'outil déjà configuré, jamais avec un
    * analyseur maison : deux autorités sur la même question se contrediraient.
+   *
+   * Exige la permission `shell:test` — le linter est un programme du projet, au même titre
+   * qu'un lanceur de tests. L'appeler sans l'avoir déclarée lève, comme pour `mutation`.
    */
   lint(opts?: { files?: string[]; signal?: AbortSignal }): Promise<LintReport | null>;
 }

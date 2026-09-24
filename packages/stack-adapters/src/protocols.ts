@@ -49,6 +49,12 @@ export interface LintReport {
   available: boolean;
   /** Commande employée, citée dans les faits de la revue. */
   tool?: string;
+  /**
+   * Fichiers réellement examinés, chemins relatifs. Une liste vide, ou incomplète au regard des
+   * fichiers demandés, veut dire que le linter n'a rien jugé — absence de violation ne vaut
+   * alors pas conformité.
+   */
+  analyzed?: string[];
   violations: { file: string; line?: number; rule: string; message: string }[];
 }
 

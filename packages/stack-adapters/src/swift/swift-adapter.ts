@@ -127,16 +127,19 @@ export function createSwiftAdapter(deps: SwiftAdapterDeps = {}): StackAdapter {
     /** SwiftLint du projet, avec son `.swiftlint.yml`. Absent : rien n'est jugé. */
     async lint(opts) {
       const r = await runner
-        .run(tc.swiftlint ?? "swiftlint", ["lint", "--quiet", "--reporter", "json", ...(opts.files ?? [])], {
+        .run(tc.swiftlint ?? "swiftlint", ["lint", "--quiet", "--reporter", "json", ...(opts.files?.length ? ["--", ...opts.files] : [])], {
           cwd: opts.root,
           env,
           timeoutMs: opts.timeoutMs ?? 5 * 60_000,
           ...(opts.signal ? { signal: opts.signal } : {}),
         })
         .catch(() => null);
-      if (!r || r.timedOut) return { available: false, violations: [] };
+      // `swiftlint` sort en 0 (rien) ou 2 (violations trouvées) ; tout autre code signale un
+      // échec — configuration illisible, argument refusé — avec un stdout souvent vide. Le
+      // prendre pour « aucune violation » attesterait une conformité jamais vérifiée.
+      if (!r || r.timedOut || (r.exitCode !== 0 && r.exitCode !== 2) || !r.stdout.trim()) return { available: false, violations: [] };
       try {
-        return { ...parseSwiftLintReport(JSON.parse(r.stdout || "[]"), opts.root), tool: "swiftlint" };
+        return { ...parseSwiftLintReport(JSON.parse(r.stdout), opts.root), tool: "swiftlint" };
       } catch {
         return { available: false, violations: [] };
       }

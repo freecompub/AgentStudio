@@ -42,9 +42,12 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
       if (!(await exists(entry))) return { available: false, violations: [] };
       const r = await runner.run(
         process.execPath,
-        [entry, "--format", "json", ...(opts.files?.length ? opts.files : ["."])],
+        [entry, "--format", "json", "--", ...(opts.files?.length ? opts.files : ["."])],
         {
           cwd: opts.root,
+          // `process.execPath` est le binaire Electron dans l'application : sans cette variable,
+          // il démarrerait une seconde fenêtre au lieu d'exécuter le script.
+          env: { ELECTRON_RUN_AS_NODE: "1" },
           // Le lint est court : un délai franc évite de bloquer la porte sur un outil coincé.
           timeoutMs: opts.timeoutMs ?? 5 * 60_000,
           ...(opts.signal ? { signal: opts.signal } : {}),
@@ -72,6 +75,10 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
           [entry, "run", "--reporter=json", `--outputFile=${reportFile}`, "--reporter=dot", "--no-color"],
           {
             cwd: opts.root,
+            // Dans l'application, `process.execPath` est le binaire Electron : sans cette
+            // variable, lancer les tests ouvrirait une seconde fenêtre. Invisible en test,
+            // où Vitest fait tourner l'adaptateur sous Node.
+            env: { ELECTRON_RUN_AS_NODE: "1" },
             timeoutMs: opts.timeoutMs ?? deps.defaultTimeoutMs ?? 10 * 60_000,
             ...(opts.signal ? { signal: opts.signal } : {}),
             ...(opts.onOutput ? { onOutput: opts.onOutput } : {}),

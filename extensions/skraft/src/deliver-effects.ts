@@ -192,12 +192,19 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
     // Qualité de forme : le linter du projet, avec ses propres règles. Sans linter, on le dit
     // au lieu de produire un fait — une porte qui n'a rien mesuré n'atteste de rien.
-    const lint = await ctx.stack.lint({ files: sources });
-    if (lint?.available) {
+    const lint = await ctx.stack.lint({ files: sources, ...(signal ? { signal } : {}) });
+    if (!lint?.available) {
+      notes.push("Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.");
+    } else {
       const motifs = checkLint(lint);
       reasons.push(...motifs);
-      if (motifs.length === 0) facts.push(`Lint (${e.scenarioId}) : ${lint.tool ?? "linter du projet"} sans erreur sur ${sources.join(", ")}.`);
-    } else notes.push("Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.");
+      // Un fichier que le linter a ignoré n'a pas été jugé : n'attester que de ce qu'il a lu.
+      const examines = lint.analyzed ?? sources;
+      const omis = sources.filter((p) => !examines.includes(p));
+      if (motifs.length === 0 && examines.length > 0)
+        facts.push(`Lint (${e.scenarioId}) : ${lint.tool ?? "linter du projet"} sans erreur sur ${examines.join(", ")}.`);
+      if (omis.length > 0) notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
+    }
   }
   const architecture = await ctx.stack.architecture(bar.dependencyRules);
   if (architecture) {

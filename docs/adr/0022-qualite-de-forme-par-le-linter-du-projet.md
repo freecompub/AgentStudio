@@ -40,8 +40,20 @@ mutation et les règles de dépendance : par l'outil de la stack, jamais par un 
   projet.
 - Les adaptateurs livrés l'implémentent : **ESLint** pour TypeScript, **SwiftLint** pour Swift,
   tous deux en rapport JSON.
-- **Seules les erreurs** valent rejet. Un avertissement est un choix du projet, qui n'a pas voulu
-  en faire un échec.
+- **Ce qui vaut rejet dépend de l'outil.** Pour ESLint, seules les erreurs de règle : `warn` y
+  est un niveau choisi règle par règle, qui signifie « ne pas bloquer ». Pour SwiftLint, toutes
+  les violations : il met `warning` par défaut sur presque toutes ses règles, si bien que le
+  choix du projet y est d'**activer** la règle, pas d'en régler la gravité. N'y retenir que les
+  erreurs reviendrait à ne rien reprocher à un projet Swift ordinaire, donc à attester sa
+  conformité sans l'avoir vérifiée.
+- **« Non examiné » n'est pas « propre ».** Un fichier ignoré par la configuration, ou que le
+  parser ne sait pas lire, ne compte ni comme conforme ni comme fautif : `LintReport.analyzed`
+  dit ce qui a réellement été lu, et la porte n'atteste que de cela. En faire un motif de rejet
+  demanderait à l'agent de réparer une configuration qui ne lui appartient pas, et ferait
+  boucler le scénario jusqu'à épuisement du budget.
+- **Un outil en échec ne vaut pas « sans erreur ».** Code de sortie inattendu, sortie vide,
+  délai dépassé : rien n'est jugé. C'est le piège principal, car l'absence de violation ressemble
+  à un succès.
 - **Sans linter configuré**, la porte ne juge rien et le dit : « Qualité de forme non mesurée ».
   Aucun fait de conformité n'est produit — exactement ce que fait déjà la mutation.
 - Les seuils quittent `.skraft/quality.json` : ils appartiennent à la configuration du linter,

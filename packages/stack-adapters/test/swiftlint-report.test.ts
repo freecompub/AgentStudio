@@ -23,21 +23,37 @@ const rapport = [
 ];
 
 describe("parseSwiftLintReport", () => {
-  it("ne retient que les erreurs, chemins relatifs à la racine", () => {
+  it("chemins relatifs à la racine", () => {
     const r = parseSwiftLintReport(rapport, "/projets/demo");
     expect(r.available).toBe(true);
-    expect(r.violations).toEqual([
-      {
-        file: "Sources/Domain/Bolus.swift",
-        line: 12,
-        rule: "function_body_length",
-        message: "Function body should span 40 lines or less excluding comments: currently spans 61 lines",
-      },
-    ]);
+    expect(r.violations[0]).toEqual({
+      file: "Sources/Domain/Bolus.swift",
+      line: 12,
+      rule: "function_body_length",
+      message: "Function body should span 40 lines or less excluding comments: currently spans 61 lines",
+    });
   });
 
   it("un projet sans faute donne un rapport disponible et vide", () => {
     expect(parseSwiftLintReport([], "/projets/demo")).toEqual({ available: true, violations: [] });
+  });
+
+  it("les avertissements comptent : dans SwiftLint, c'est la règle activée qui est le choix du projet", () => {
+    // Contrairement à ESLint, où `warn` est un niveau choisi règle par règle, SwiftLint met
+    // `warning` par défaut sur presque toutes ses règles. Les écarter reviendrait à ne jamais
+    // rien reprocher, donc à attester la conformité de tout projet Swift.
+    const r = parseSwiftLintReport(rapport, "/projets/demo");
+    expect(r.violations).toHaveLength(2);
+    expect(r.violations.map((v) => v.rule)).toEqual(["function_body_length", "line_length"]);
+  });
+
+  it("une entrée mal formée n'invalide pas les autres", () => {
+    const r = parseSwiftLintReport(
+      [{ file: null, line: 1, severity: "Error", reason: "sans fichier", rule_id: "x" }, ...rapport],
+      "/projets/demo",
+    );
+    expect(r.available).toBe(true);
+    expect(r.violations.map((v) => v.rule)).toEqual(["function_body_length", "line_length"]);
   });
 
   it("un rapport illisible ne fait pas échouer la porte", () => {

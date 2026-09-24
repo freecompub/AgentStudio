@@ -63,7 +63,7 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 - Suivre les jalons dans l'ordre en commençant par **J1** ; ne passer au suivant qu'une fois tous ses critères de sortie remplis.
 - TDD strict. Réducteurs et politiques : fonctions pures, testées sans LLM, sans Git, sans disque.
 - Toute nouvelle décision technique → ADR dans `docs/adr/NNNN-titre.md` (contexte, décision, conséquences, statut).
-- Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §15) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
+- Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §16) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
 - **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C : autorisation de l'auteur), mais la reprise reste interdite tant que trois conditions ne sont pas réunies : la trace écrite de l'autorisation versée au dépôt, la licence de redistribution précisée, et l'accès au dépôt source. Jusque-là, ne copier aucun prompt, skill ni code de skraft-plugin.
 
 ## Architecture cible (vue d'ensemble)
@@ -83,7 +83,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 
 Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
 
-## Conventions (§16)
+## Conventions (§17)
 
 - TypeScript `strict`, ESM, pnpm workspaces ; tests Vitest.
 - Tests d'intégration avec un faux `AgentRuntime` scripté ; aucun appel réel au LLM en CI.
