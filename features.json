@@ -1,0 +1,128 @@
+{
+  "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
+  "updated": "2026-09-25",
+  "branch": "feat/j5-profils-de-stack",
+  "items": [
+    {
+      "id": "j5-profil-schema",
+      "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts",
+      "passes": true,
+      "notes": "Refuse un lecteur inconnu et un programme hors liste. La liste `allowedPrograms` n'est encore remplie par personne : voir j5-programmes-autorises."
+    },
+    {
+      "id": "j5-adaptateur-generique",
+      "title": "Un StackAdapter complet se construit à partir d'un profil, sans code par langage",
+      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts",
+      "passes": true,
+      "notes": "Jetons {rapport} et {fichiers} uniquement. Une capacité non déclarée est `undefined`, pas une méthode qui échoue."
+    },
+    {
+      "id": "j5-profils-exemple",
+      "title": "Les adaptateurs TypeScript et Swift sont réécrits en profils YAML d'exemple",
+      "verify": "test -f profiles/typescript.yaml -a -f profiles/swift.yaml && pnpm test",
+      "passes": false,
+      "notes": "Les deux adaptateurs restent écrits à la main. Objectif : qu'ils deviennent des profils, l'adaptateur générique les exécutant."
+    },
+    {
+      "id": "j5-chargement-profil",
+      "title": "L'application charge le profil du projet et signale son refus dans la conversation",
+      "verify": "pnpm vitest run --project desktop test/workspace-services.test.ts",
+      "passes": false,
+      "notes": "`parseStackProfile` rend déjà un message nommant le champ et la valeur fautive ; le canal d'affichage existe (voir echecs-dans-la-conversation). Reste à brancher la lecture de `.agent-studio/stack.yaml`."
+    },
+    {
+      "id": "j5-programmes-autorises",
+      "title": "Seuls les programmes autorisés par l'administrateur peuvent être lancés (D47, O12)",
+      "verify": "pnpm vitest run --project desktop test/admin-config.test.ts",
+      "passes": false,
+      "notes": "PRÉALABLE À j5-chargement-profil. Un profil vient du dépôt, donc d'une source que l'agent peut modifier : sans liste blanche dans admin.json, il ferait exécuter n'importe quoi."
+    },
+    {
+      "id": "j5-lecteur-tap",
+      "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
+      "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
+      "passes": false,
+      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, swiftlint-json, muter-json. N'annoncer un format qu'une fois son lecteur écrit."
+    },
+    {
+      "id": "j5-stack-init-doctor",
+      "title": "/stack init génère un profil et /stack doctor le vérifie",
+      "verify": "pnpm vitest run --project desktop -t 'stack init'",
+      "passes": false,
+      "notes": "doctor doit vérifier : programme trouvable, rapport lisible, chemins existants."
+    },
+
+    {
+      "id": "extensions-sans-langage",
+      "title": "Aucune extension ne mentionne un langage dans son code",
+      "verify": "! grep -rniE 'swift|typescript|vitest|xctest|react|uikit' extensions/*/src/*.ts | grep -v '^\\S*: *[*/]'",
+      "passes": true,
+      "notes": "Obtenu en déléguant à ctx.stack : lint, mutation, architecture, infrastructureModules."
+    },
+    {
+      "id": "portes-n-attestent-que-du-mesure",
+      "title": "Une porte ne produit jamais de fait sur ce qu'elle n'a pas mesuré",
+      "verify": "pnpm vitest run --project stack-adapters test/lint-adapters.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
+      "passes": true,
+      "notes": "Régressé trois fois le 24/09 : repli `|| \"[]\"`, filtre severity SwiftLint, fichier ignoré par ESLint. Vérifier ce point à chaque ajout de capacité."
+    },
+    {
+      "id": "echecs-dans-la-conversation",
+      "title": "Un échec constaté à l'ouverture d'un projet est visible dans la conversation",
+      "verify": "pnpm vitest run --project desktop test/app-controller.test.ts -t 'avant la conversation'",
+      "passes": true,
+      "notes": "Les messages postés hors session sont mis en attente et versés au démarrage, une seule fois."
+    },
+
+    {
+      "id": "suite-verte",
+      "title": "La suite complète passe sans échec",
+      "verify": "pnpm typecheck && pnpm test",
+      "passes": true,
+      "notes": "863 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+    },
+    {
+      "id": "lint-execute-en-vrai",
+      "title": "ESLint et SwiftLint ont réellement tourné, pas seulement leurs rapports",
+      "verify": "MANUEL : lancer /skraft sur un projet doté d'un linter et vérifier le fait « Lint (…) sans erreur »",
+      "passes": false,
+      "notes": "Couverts par des tests de lecture de rapport et un lanceur doublé. Ce dépôt n'a pas d'ESLint configuré : un run y dirait « Qualité de forme non mesurée »."
+    },
+    {
+      "id": "tdd-avec-vrai-copilot",
+      "title": "/tdd déroule un cycle complet avec le vrai Copilot, depuis l'application",
+      "verify": "MANUEL : /tdd sur un projet TypeScript avec Vitest",
+      "passes": false,
+      "notes": "N'a tourné qu'avec des agents scriptés. Le jeton OAuth fonctionne depuis le 24/09 (pnpm smoke:copilot)."
+    },
+    {
+      "id": "skraft-installee-depuis-un-fichier",
+      "title": "Le paquet .asx de skraft s'installe depuis l'application",
+      "verify": "MANUEL : pnpm ext:build && pnpm ext:pack, puis Extensions → Installer depuis un fichier",
+      "passes": false,
+      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo)."
+    },
+    {
+      "id": "mesures-reelles-s6",
+      "title": "Les mesures d'usage de S6 viennent d'un run Copilot réel",
+      "verify": "MANUEL : US-7, US-12 et US-15, comparer les usages par état",
+      "passes": false,
+      "notes": "Aujourd'hui issues d'agents simulés. Plus bloqué depuis la levée des blocages de J1."
+    },
+    {
+      "id": "reprise-skraft",
+      "title": "La reprise du contenu de skraft-plugin est possible (O9 tranché, option C)",
+      "verify": "test -f docs/licences/autorisation-skraft.md",
+      "passes": false,
+      "notes": "BLOQUÉ, hors code : manquent la trace écrite de l'autorisation, la licence de redistribution, et l'accès au dépôt source. Ne copier aucun prompt avant."
+    },
+    {
+      "id": "stockage-sqlite",
+      "title": "L'état interne est en SQLite dans le profil utilisateur (O6, ADR 0019)",
+      "verify": "pnpm vitest run --project core -t 'sqlite'",
+      "passes": false,
+      "notes": "Décidé, pas implémenté. `node:sqlite` vérifié fonctionnel dans Electron 44 (Node 24.21) : pas de module natif à recompiler."
+    }
+  ]
+}
