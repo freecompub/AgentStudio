@@ -5,6 +5,40 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — `/stack doctor` exécute enfin ce qu'il diagnostique
+
+**Fait.** `Repository.worktree()` dans le paquet workspace, et les canaris branchés dessus. Le
+paragraphe où doctor avouait n'avoir rien exécuté disparaît dès que les canaris tournent.
+
+**Trois choix, et chacun protège de quelque chose.**
+
+- *La copie est ouverte hors du projet*, dans `tmpdir()`. Posée dedans, elle se retrouverait dans
+  les listages de fichiers, dans les motifs de `layout`, et dans le prochain `git add -A`.
+- *Elle part du dernier commit, pas du travail en cours.* Diagnostiquer des fichiers en cours
+  d'édition donnerait des résultats qui changent à chaque frappe. La copie éprouve ce qui est
+  validé — c'est écrit dans un test, parce que c'est le genre de choix qu'on oublie et qu'on
+  prend ensuite pour un bogue.
+- *`--detach`*, donc aucune branche créée : rien à nettoyer côté références.
+
+**Le point qui m'importe le plus.** Un échec des canaris — worktree impossible, lanceur absent —
+devient un **problème** dans le rapport, pas un silence. Sans ça, doctor conclurait « aucun
+problème » sur la foi d'une vérification qui n'a jamais eu lieu. C'est la même erreur que
+l'analyseur de forme du 24/09, qui attestait « conforme » pour les langages qu'il ne connaissait
+pas. Elle revient sous une forme nouvelle à chaque fois qu'on branche une mesure.
+
+**Détail qui aurait mordu.** `doctor` lance la suite de tests **une fois par canari** : plusieurs
+minutes pendant lesquelles l'application semblerait figée. Un message est posté avant de
+commencer, qui dit que ça tourne dans une copie isolée et que le travail en cours n'est pas
+touché.
+
+**Six doubles de test** ont dû fournir `worktree`. Je les fais **échouer** plutôt que rendre une
+racine vide : un double qui ment silencieusement ferait passer des tests qui ne prouvent rien.
+
+**Reste de §8.6** : la proposition par un agent via `submit_stack_profile`, le réessai ciblé à
+budget, la relance sur changement du verrou de dépendances.
+
+---
+
 ## 25/09 — Le dépôt a enfin une licence
 
 **Décidé (ADR 0023).** Propriétaire — tous droits réservés — sauf `extensions/skraft/`, en

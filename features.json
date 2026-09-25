@@ -67,6 +67,13 @@
       "notes": "Trouvé en écrivant les canaris. `createProfileAdapter.runTests` LÈVE une exception quand le rapport est absent ; l'adaptateur Swift écrit à la main, lui, lit les erreurs de compilation et les classe. Conséquence : sur un langage compilé, un profil ne peut pas produire le rouge légitime du cycle TDD — un symbole manquant arrête la compilation. C'est pourquoi profiles/swift.yaml ne déclare pas de canari `missing_symbol`."
     },
     {
+      "id": "j5-doctor-execute",
+      "title": "/stack doctor éprouve le profil en l'exécutant, dans une copie isolée du projet",
+      "verify": "pnpm vitest run --project workspace test/worktree.test.ts && pnpm vitest run --project desktop test/stack-command.test.ts",
+      "passes": true,
+      "notes": "`Repository.worktree()` ouvre une copie jetable au dernier commit, hors du projet — l'un des canaris ne compile pas volontairement, l'écrire chez l'utilisateur abîmerait son travail en cours. Les modifications non validées ne sont PAS reprises : éprouver le travail en cours donnerait des résultats changeant à chaque frappe. Le rapport ne dit plus « je n'ai rien exécuté » quand les canaris ont tourné, et un échec de mesure devient un PROBLÈME — sans quoi doctor conclurait « aucun problème » sur la foi d'une vérification avortée."
+    },
+    {
       "id": "canaris-contre-un-vrai-lanceur",
       "title": "Les canaris ont tourné contre un vrai lanceur de tests",
       "verify": "MANUEL : copier profiles/typescript.yaml dans un projet Vitest, lancer /stack doctor",
@@ -92,7 +99,7 @@
       "title": "Vérification statique d'un profil (une partie de /stack doctor, §8.6)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
       "passes": true,
-      "notes": "Partie statique de §8.6. Les canaris sont faits (j5-canaris). Manquent encore : proposition par un agent via `submit_stack_profile`, approbation des commandes avant exécution, `git worktree` fourni par l'application (runCanaries reçoit `sandboxRoot`, il ne le crée pas), réessai ciblé à budget, relance sur changement du verrou de dépendances."
+      "notes": "§8.6 : la vérification PAR EXÉCUTION est faite depuis le 25/09 — `/stack doctor` ouvre un git worktree et y lance les canaris. Manquent encore : proposition par un agent via `submit_stack_profile`, réessai ciblé à budget, relance sur changement du verrou de dépendances."
     },
     {
       "id": "extensions-sans-langage",
@@ -120,7 +127,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "939 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "955 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

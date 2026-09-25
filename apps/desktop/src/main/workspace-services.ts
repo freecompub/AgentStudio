@@ -32,9 +32,11 @@ import {
   type ProcessLauncher,
 } from "@agent-studio/extension-host";
 import {
+  createNodeProcessRunner,
   createProfileAdapter,
   diagnoseProfile,
   globToRegExp,
+  runCanaries,
   parseStackProfile,
   selectStackAdapter,
   type StackAdapter,
@@ -380,6 +382,20 @@ function stackCommandDeps(args: {
         /* pas de package.json lisible : on s'en tient aux fichiers */
       }
       return { fichiers: racine, dependances };
+    },
+
+    /**
+     * Éprouve le profil en l'exécutant, dans une copie isolée jetable (§8.6, point 4). Jamais
+     * dans le répertoire de l'utilisateur : l'un des canaris ne compile pas volontairement.
+     */
+    async canaris(profile) {
+      const copie = await workspace.repo.worktree();
+      try {
+        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: copie.root });
+        return constats;
+      } finally {
+        await copie.dispose();
+      }
     },
 
     async diagnostiquer(profile) {

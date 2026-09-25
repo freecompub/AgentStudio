@@ -56,8 +56,23 @@ export interface SyncResult {
 }
 
 /** Opérations Git simplifiées (D7). */
+/**
+ * Copie isolée et jetable du projet, au dernier commit. Ce qu'on y écrit ou y casse ne touche
+ * pas le répertoire de travail de l'utilisateur (§8.6).
+ */
+export interface Worktree {
+  readonly root: string;
+  /** Retire la copie et son enregistrement dans Git. Peut être appelé plusieurs fois. */
+  dispose(): Promise<void>;
+}
+
 export interface Repository {
   head(): Promise<string>;
+  /**
+   * Ouvre une copie isolée au dernier commit. Les modifications non validées n'y sont pas
+   * reprises : éprouver le travail en cours donnerait des résultats changeant à chaque frappe.
+   */
+  worktree(): Promise<Worktree>;
   /** Indexe tout (ou seulement `paths`) et commit ; `null` s'il n'y a rien à valider. */
   commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
   /** Avance rapide depuis l'amont puis push ; échoue en cas de divergence. */

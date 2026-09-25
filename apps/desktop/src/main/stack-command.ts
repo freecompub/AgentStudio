@@ -23,6 +23,12 @@ export interface StackCommandDeps {
   stackActive(): { id: string; declaree: boolean } | null;
   ecrireProfil(yaml: string): Promise<void>;
   diagnostiquer(profile: StackProfile): Promise<Constat[]>;
+  /**
+   * Éprouve le profil **en l'exécutant** : les canaris tournent dans une copie isolée du projet
+   * (§8.6). Absente, le diagnostic reste une relecture et le rapport le dit — c'est la
+   * différence entre un profil déclaré sain et un profil éprouvé.
+   */
+  canaris?(profile: StackProfile): Promise<Constat[]>;
   confirmer(req: { title: string; detail: string }): Promise<ConfirmAnswer>;
   post(markdown: string): void;
 }
@@ -86,7 +92,32 @@ async function doctor(deps: StackCommandDeps): Promise<string> {
   if ("error" in declare)
     return `**Le profil de stack est refusé**, il n'a donc pas été diagnostiqué : ${declare.error}\n\nCorrigez \`${deps.chemin}\` d'abord.`;
 
-  const constats = [...(await deps.diagnostiquer(declare.profile))].sort((a, b) => ORDRE[a.gravite] - ORDRE[b.gravite]);
+  const releve = await deps.diagnostiquer(declare.profile);
+
+  // Les canaris exécutent la suite de tests une fois par canari : plusieurs minutes, pendant
+  // lesquelles l'application semblerait figée si on ne disait rien.
+  let mesures: Constat[] | null = null;
+  if (deps.canaris) {
+    deps.post(
+      `Diagnostic de \`${declare.profile.id}\` en cours. Les canaris s'exécutent dans une **copie isolée** du projet ` +
+        `— votre travail en cours n'est pas touché —, et la suite de tests y est lancée une fois par canari : ` +
+        `cela peut durer plusieurs minutes.`,
+    );
+    try {
+      mesures = await deps.canaris(declare.profile);
+    } catch (err) {
+      // Une mesure qui échoue n'est pas une mesure favorable : elle devient un problème, sans
+      // quoi le rapport conclurait « aucun problème » sur la foi d'une vérification avortée.
+      mesures = [
+        {
+          gravite: "probleme",
+          message: `Les canaris n'ont pas pu être exécutés : ${err instanceof Error ? err.message : String(err)}. La classification des échecs reste donc inconnue.`,
+        },
+      ];
+    }
+  }
+
+  const constats = [...releve, ...(mesures ?? [])].sort((a, b) => ORDRE[a.gravite] - ORDRE[b.gravite]);
   const problemes = constats.filter((c) => c.gravite === "probleme").length;
 
   const lignes = [`# Diagnostic du profil \`${declare.profile.id}\``, ""];
@@ -98,17 +129,18 @@ async function doctor(deps: StackCommandDeps): Promise<string> {
   );
   for (const c of constats) lignes.push(`- ${PUCE[c.gravite]} ${c.message}`);
 
-  // Une porte qui ne mesure rien ne doit rien attester : ce rapport ne doit pas laisser croire
-  // que le profil a été éprouvé, alors qu'il n'a été que relu.
-  lignes.push(
-    "",
-    "---",
-    "",
-    "**Ce que ce diagnostic n'a pas vérifié.** Rien n'a été exécuté : les commandes n'ont pas été " +
-      "lancées, et les **canaris** — ces tests dont la bonne réponse est connue d'avance, qui seuls " +
-      "prouvent qu'une erreur de syntaxe ne passe pas pour une assertion — n'ont pas tourné. Un " +
-      "profil déclaré sain ici peut encore classer un échec de travers.",
-  );
+  // Une porte qui ne mesure rien ne doit rien attester : sans canaris, ce rapport ne doit pas
+  // laisser croire que le profil a été éprouvé, alors qu'il n'a été que relu.
+  if (mesures === null)
+    lignes.push(
+      "",
+      "---",
+      "",
+      "**Ce que ce diagnostic n'a pas vérifié.** Rien n'a été exécuté : les commandes n'ont pas été " +
+        "lancées, et les **canaris** — ces tests dont la bonne réponse est connue d'avance, qui seuls " +
+        "prouvent qu'une erreur de syntaxe ne passe pas pour une assertion — n'ont pas tourné. Un " +
+        "profil déclaré sain ici peut encore classer un échec de travers.",
+    );
   return lignes.join("\n");
 }
 

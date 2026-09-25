@@ -125,13 +125,53 @@ describe("/stack doctor — ce que vaut le profil déclaré", () => {
     expect(sans.postes[0]).toMatch(/aucun problème/i);
   });
 
-  it("dit ce qu'il n'a PAS vérifié : sans exécution, la classification des échecs reste inconnue", async () => {
+  it("sans moyen de lancer les canaris, dit ce qu'il n'a PAS vérifié", async () => {
     const h = harnais({ profilDeclare: async () => ({ profile: PROFIL_VALIDE }) });
     await h.lancer("doctor");
     // Une porte qui ne mesure rien ne doit rien attester : le rapport ne doit pas laisser
     // croire que le profil a été éprouvé par exécution.
-    expect(h.postes[0]).toMatch(/canari/i);
-    expect(h.postes[0]).toMatch(/pas .*(exécut|lancé)|sans .*exécution/i);
+    expect(h.postes.at(-1)).toMatch(/canari/i);
+    expect(h.postes.at(-1)).toMatch(/pas .*(exécut|lancé)|sans .*exécution/i);
+  });
+});
+
+describe("/stack doctor — vérification par exécution", () => {
+  const avecCanaris = (canaris: StackCommandDeps["canaris"]) =>
+    harnais({ profilDeclare: async () => ({ profile: PROFIL_VALIDE }), ...(canaris ? { canaris } : {}) });
+
+  it("prévient avant de lancer : le diagnostic exécute la suite de tests plusieurs fois", async () => {
+    const h = avecCanaris(async () => [{ gravite: "ok", message: "Canari `passed` : un test trivial passe." }]);
+    await h.lancer("doctor");
+    // Sans avertissement, l'utilisateur croit l'application figée pendant plusieurs minutes.
+    expect(h.postes[0]).toMatch(/copie isolée|worktree/i);
+    expect(h.postes[0]).toMatch(/plusieurs (fois|minutes)|peut durer/i);
+  });
+
+  it("verse les constats des canaris dans le rapport, avec ceux de la relecture", async () => {
+    const h = avecCanaris(async () => [{ gravite: "probleme", message: "Canari `syntax` : une erreur de syntaxe est classée `assertion`." }]);
+    await h.lancer("doctor");
+    const md = h.postes.at(-1)!;
+    expect(md).toMatch(/syntax/);
+    expect(md).toMatch(/tout va bien/); // le constat statique reste présent
+    expect(md).toMatch(/1 problème/);
+  });
+
+  it("une fois les canaris passés, le rapport ne dit plus qu'il n'a rien exécuté", async () => {
+    const h = avecCanaris(async () => [{ gravite: "ok", message: "Canari `syntax` : classée `other_error`." }]);
+    await h.lancer("doctor");
+    expect(h.postes.at(-1)).not.toMatch(/n'a pas vérifié|sans .*exécution/i);
+  });
+
+  it("des canaris qui échouent à s'exécuter sont un problème, pas un silence", async () => {
+    const h = avecCanaris(async () => {
+      throw new Error("git worktree indisponible");
+    });
+    await h.lancer("doctor");
+    const md = h.postes.at(-1)!;
+    expect(md).toMatch(/git worktree indisponible/);
+    expect(md).toMatch(/probl/i);
+    // Et surtout : le rapport ne doit pas conclure « aucun problème » après un échec de mesure.
+    expect(md).not.toMatch(/Aucun problème/);
   });
 
   it("un profil refusé ne se diagnostique pas : on corrige d'abord le YAML", async () => {
