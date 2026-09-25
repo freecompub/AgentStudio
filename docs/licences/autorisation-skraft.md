@@ -1,12 +1,13 @@
 # Autorisation de reprise de skraft-plugin — dossier
 
-> **Statut : PARTIELLEMENT RÉUNIE au 2026-09-25.** Conditions 1 et 3 remplies, condition 2 en
-> suspens. Une première reprise a été faite sous la licence appliquée par défaut ci-dessous
-> (GPL-3.0-or-later) ; elle est réversible tant que la condition 2 n'est pas tranchée.
+> **Statut : RÉUNIE au 2026-09-25**, à une réserve près. Les trois conditions sont remplies et la
+> reprise est faite. La réserve porte sur la nature de la trace : c'est la déclaration du
+> responsable du projet rapportant l'accord de l'auteur, non l'accord signé de l'auteur lui-même.
+> Verser cette pièce d'origine reste à faire (condition 1).
 
-skraft-plugin 1.5.2 est distribué sous **GPL-3.0-or-later**. ADR 0012 retient l'**option C** :
-l'auteur autorise la reprise. La décision est prise ; ce qui manque, ce sont les pièces qui la
-rendent opposable et matériellement applicable.
+skraft-plugin est distribué sous **GPL-3.0-or-later**. ADR 0012 retient l'**option C** : l'auteur
+autorise la reprise. La licence de redistribution est tranchée par l'**ADR 0023** : l'extension
+`skraft` reste sous GPL-3.0-or-later, le reste du dépôt est propriétaire.
 
 ## Condition 1 — la trace écrite
 
@@ -40,17 +41,20 @@ trancher, dans cet ordre :
 2. Celle de l'extension `skraft` après reprise — la même, ou GPL-3.0-or-later si l'auteur n'accorde
    qu'une dispense d'usage sans changement de licence.
 
-### Licence appliquée par défaut, en attendant
+### Tranché le 2026-09-25 (ADR 0023)
 
-**L'extension `skraft` est traitée comme GPL-3.0-or-later.** C'est le défaut que la licence
-d'origine impose à une œuvre dérivée, et l'autorisation recueillie porte sur l'usage de la branche,
-non sur un changement de licence — personne n'a dit le contraire, donc rien ne permet de supposer
-mieux. Ce défaut est tenable ici pour une raison de fait : `skraft` **n'est pas distribuée avec
-l'application** mais à part, en paquet `.asx` (ADR 0021), et elle s'exécute dans son propre
-processus derrière l'API `ctx`. C'est exactement l'isolation que l'option B de l'ADR 0012 décrivait.
+**Condition remplie.** Le dépôt est sous licence propriétaire — tous droits réservés —, à
+l'exception de `extensions/skraft/`, qui est sous **GPL-3.0-or-later**. C'est le défaut que la
+licence d'origine impose à une œuvre dérivée : l'autorisation recueillie porte sur l'usage de la
+branche, non sur un changement de licence, et rien ne permet de supposer mieux.
 
-Ce choix est réversible : il suffirait que l'auteur précise une autre licence. Tant qu'il tient,
-distribuer `skraft` oblige à en fournir les sources.
+Les deux licences coexistent parce que l'extension **n'est pas livrée avec l'application** : elle
+s'installe à part en `.asx` (ADR 0021) et s'exécute dans son propre processus derrière l'API `ctx`
+— l'isolation même que décrivait l'option B de l'ADR 0012. Cet argument tient sur un fait
+technique, et un test le défend (`extensions/skraft/test/licence.test.ts`) : il échoue si `skraft`
+devient une dépendance de l'application.
+
+Conséquence à retenir : **distribuer le `.asx` oblige à en fournir les sources.**
 
 ## Condition 3 — l'accès au dépôt source
 
@@ -98,8 +102,11 @@ Deux garde-fous à tenir pendant la reprise :
 - **Chaque artefact repris est identifié comme tel** dans le code, avec sa provenance et la licence
   sous laquelle il l'est — c'est ce qui permettra plus tard de savoir ce qui est à nous.
 
-## Quand ce dossier est-il complet ?
+## Ce qui reste
 
-Quand les trois conditions sont remplies et la pièce d'autorisation versée. Le critère
-`reprise-skraft` de `features.json` ne passe à `true` qu'à ce moment, et la reprise elle-même est un
-travail distinct, à mener ensuite.
+**Une seule chose : verser la pièce d'origine de l'autorisation** — le courriel, le message ou la
+licence par lesquels l'auteur l'a accordée. Ce dossier porte aujourd'hui la déclaration d'un tiers
+la rapportant, ce qui engage le responsable du projet mais ne serait opposable à personne d'autre.
+
+Tant qu'elle manque, le critère `reprise-skraft` de `features.json` reste à `false` — non parce que
+la reprise n'est pas faite, mais parce que sa justification écrite est incomplète.

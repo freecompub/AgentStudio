@@ -5,6 +5,43 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — Le dépôt a enfin une licence
+
+**Décidé (ADR 0023).** Propriétaire — tous droits réservés — sauf `extensions/skraft/`, en
+GPL-3.0-or-later. Le dépôt ne déclarait rien du tout : ni `LICENSE`, ni champ `license` dans
+aucun des quatorze `package.json`.
+
+**Pourquoi propriétaire.** Deux raisons, et la seconde est la vraie. D'abord c'est ce qui était
+**déjà vrai** : sans fichier `LICENSE`, le droit d'auteur s'applique par défaut, tous droits
+réservés — ce n'était pas un vide juridique mais l'état le plus fermé qui soit. Ensuite, le choix
+n'est réversible que dans un sens : on peut ouvrir plus tard, on ne reprend pas une licence ouverte
+une fois publiée. Rien n'obligeait à trancher dans l'urgence le sens le plus coûteux.
+
+**Ce qui fait coexister les deux licences.** L'extension n'est pas livrée avec l'application :
+`apps/desktop` ne dépend que de `ext-tdd`, et skraft s'installe à part en `.asx`, dans son propre
+processus derrière `ctx`. C'est l'isolation de l'option B de l'ADR 0012 — déjà en place, mais pour
+des raisons de sécurité, pas de licence.
+
+**Le point qui compte.** Cet argument tient sur **un fait technique, pas sur une intention**. Un
+`pnpm add` distrait suffirait à faire de skraft une dépendance de l'application : la frontière
+tomberait en silence, la GPL s'appliquerait à l'ensemble distribué, et **aucune erreur ne se
+manifesterait** puisque le code marcherait parfaitement. D'où `licence.test.ts`, qui échoue si
+`ext-skraft` apparaît dans les dépendances de l'application — dépendances de développement
+comprises, car c'est l'arbre installé qui est distribué, pas l'intention de qui l'a déclaré.
+→ Une frontière juridique qui repose sur un fait technique doit être défendue par un test, sinon
+elle n'est qu'un souvenir.
+
+**Ce que je n'ai pas prétendu faire.** L'ADR dit en toutes lettres qu'il ne constitue pas un avis
+juridique, et il note ce qui manquerait pour une diffusion large : la GPL veut une notice de
+licence **par fichier source**, et seuls `roles.ts` et `review.ts` portent aujourd'hui leur
+provenance.
+
+**Reste pour `reprise-skraft`** : une seule chose, non technique — verser la pièce d'origine de
+l'autorisation. Le dossier porte la déclaration du responsable la rapportant, ce qui l'engage lui
+mais ne serait opposable à personne d'autre.
+
+---
+
 ## 25/09 — `/stack` existe enfin
 
 **Fait.** Trois formes : `/stack` dit quelle stack le projet emploie et d'où elle vient,

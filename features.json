@@ -152,10 +152,10 @@
     },
     {
       "id": "licence-du-depot",
-      "title": "agent-studio déclare sa propre licence",
-      "verify": "test -f LICENSE && grep -q '\"license\"' package.json",
-      "passes": false,
-      "notes": "Trouvé le 25/09 en ouvrant le dossier skraft : aucun fichier LICENSE, aucun champ `license`. Préalable à la condition 2 de la reprise — on ne peut pas dire qu'une extension « reste sous la licence de l'application » quand l'application n'en déclare pas. Concerne aussi la distribution des paquets .asx et celle de l'application elle-même."
+      "title": "Le dépôt déclare sa licence, et la frontière avec skraft est défendue par un test",
+      "verify": "pnpm vitest run --project ext-skraft test/licence.test.ts",
+      "passes": true,
+      "notes": "ADR 0023. Propriétaire — tous droits réservés — sauf extensions/skraft/, en GPL-3.0-or-later. Propriétaire parce que c'est ce qui était DÉJÀ vrai (sans LICENSE, le droit d'auteur s'applique), et parce que le choix n'est réversible que dans un sens : on peut ouvrir plus tard, on ne reprend pas une licence ouverte publiée. Les deux coexistent parce que skraft n'est pas livrée avec l'application — fait technique, pas intention, et c'est pourquoi un test le défend : il échoue si ext-skraft devient une dépendance de apps/desktop, dépendances de développement comprises. Conséquence : distribuer le .asx oblige à en fournir les sources."
     },
     {
       "id": "skraft-synthese-ponderee",
@@ -167,9 +167,9 @@
     {
       "id": "reprise-skraft",
       "title": "La reprise du contenu de skraft-plugin est possible (O9 tranché, option C)",
-      "verify": "grep -q 'Statut : RÉUNIE' docs/licences/autorisation-skraft.md && test -f LICENSE && ! grep -rn 'prompts de SUBSTITUTION' extensions/skraft/src/roles.ts",
+      "verify": "grep -q 'Statut : RÉUNIE' docs/licences/autorisation-skraft.md && ls docs/licences/ | grep -vc '^autorisation-skraft.md$'",
       "passes": false,
-      "notes": "PARTIELLEMENT FAIT le 25/09. Conditions 1 et 3 remplies (dossier : docs/licences/autorisation-skraft.md) ; condition 2 en suspens — le dépôt ne déclare toujours aucune licence, voir licence-du-depot. Repris depuis la branche refactor/v1.6.0-tracking-substrate : la synthèse pondérée (skraft-synthese-ponderee), la quatrième lentille quality-gates, et la substance des prompts researcher/acceptance/test/dev. Écarté sciemment : lentilles .NET conditionnelles, Object Calisthenics (le linter en juge, ADR 0022), « supprime un test qui ne tue aucun mutant » (contredit la règle du test intouchable). L'extension est traitée comme GPL-3.0-or-later par défaut, ce qui tient parce qu'elle est distribuée à part en .asx."
+      "notes": "Reprise FAITE le 25/09 ; conditions 2 et 3 remplies (ADR 0023 pour la licence). Reste UNE chose, non technique : verser la pièce d'origine de l'autorisation — courriel, message ou licence de l'auteur. Le dossier porte aujourd'hui la déclaration du responsable du projet la rapportant, ce qui l'engage lui mais ne serait opposable à personne d'autre. Le critère reste false pour cette seule raison."
     },
     {
       "id": "stockage-sqlite",
