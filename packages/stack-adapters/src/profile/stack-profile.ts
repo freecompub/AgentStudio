@@ -26,6 +26,39 @@ const commande = z
   })
   .strict();
 
+/**
+ * Gabarits de canaris (§8.6) : des tests dont la bonne réponse est connue d'avance. Le code les
+ * écrit dans une copie isolée du projet, lance la commande déclarée, et vérifie que l'échec
+ * obtenu porte bien le classement attendu — sans demander l'avis d'un LLM.
+ */
+export const CANARY_KINDS = ["passed", "assertion", "missing_symbol", "syntax"] as const;
+export type CanaryKind = (typeof CANARY_KINDS)[number];
+
+/** Marque unique injectée par le code, qui permet de retrouver les résultats du canari. */
+export const JETON_MARQUE = "{marque}";
+
+const canari = z
+  .object({
+    kind: z.enum(CANARY_KINDS),
+    /**
+     * Où écrire le canari, relativement à la racine. Ce fichier est réellement créé sur le
+     * disque : un chemin absolu ou remontant écrirait hors de la copie isolée.
+     */
+    file: z
+      .string()
+      .min(1)
+      .refine((f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f), "`file` doit être un chemin relatif à la racine du projet.")
+      .refine((f) => !f.split(/[\\/]/).includes(".."), "`file` ne doit pas contenir `..` : un canari s'écrit dans le projet, jamais hors de lui."),
+    content: z.string().min(1),
+  })
+  .strict()
+  .refine(
+    (c) => c.kind === "syntax" || c.content.includes(JETON_MARQUE),
+    // Sans marque, les résultats du canari seraient confondus avec ceux du projet. Le canari de
+    // syntaxe y échappe : il ne produit souvent aucun résultat, la suite ne compilant pas.
+    `\`content\` doit contenir la marque ${JETON_MARQUE}, qui sert à reconnaître les résultats du canari.`,
+  );
+
 const schema = z
   .object({
     id: z.string().min(1),
@@ -43,6 +76,8 @@ const schema = z
       .strict(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
+    /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
+    canaries: z.array(canari).default([]),
   })
   .strict();
 

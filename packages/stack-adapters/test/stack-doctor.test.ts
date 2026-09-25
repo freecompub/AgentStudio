@@ -26,6 +26,17 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
     expect(proposeProfile({ fichiers: ["README.md"], dependances: [] })).toBeNull();
   });
 
+  it("ce qui est proposé déclare ses canaris : un profil non vérifiable ne vaut pas d'être écrit", () => {
+    for (const indices of [
+      { fichiers: ["pyproject.toml"], dependances: [] },
+      { fichiers: ["package.json"], dependances: ["vitest"] },
+    ]) {
+      const r = parseStackProfile(proposeProfile(indices)!, { allowedPrograms: AUTORISES });
+      if ("error" in r) throw new Error(r.error);
+      expect(r.profile.canaries.map((c) => c.kind).sort()).toEqual(["assertion", "missing_symbol", "passed", "syntax"]);
+    }
+  });
+
   it("ce qui est proposé est toujours un profil valide", () => {
     for (const indices of [
       { fichiers: ["Package.swift"], dependances: [] },
@@ -72,6 +83,12 @@ describe("diagnoseProfile — ce que /stack doctor rapporte", () => {
   it("un profil qui ne reconnaîtrait pas son propre projet est signalé", () => {
     const d = diagnoseProfile(BON, { programmeTrouvable: () => true, cheminExiste: () => true, fichiersDeDetectionPresents: false });
     expect(d.find((x) => x.gravite === "probleme")?.message).toMatch(/detect/);
+  });
+
+  it("un profil sans canari est signalé : c'est le classement des échecs qui ne sera pas vérifié", () => {
+    const sansCanari = { ...BON, canaries: [] };
+    const d = diagnoseProfile(sansCanari, { programmeTrouvable: () => true, cheminExiste: () => true, fichiersDeDetectionPresents: true });
+    expect(d.some((x) => x.gravite === "avertissement" && /canari/i.test(x.message))).toBe(true);
   });
 
   it("dit aussi ce qui va, pour que le rapport soit lisible", () => {

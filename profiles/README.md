@@ -13,6 +13,30 @@ Les programmes nommés doivent figurer dans la liste autorisée par l'administra
 D47/O12). La liste par défaut couvre les lanceurs de tests, linters et outils de mutation
 courants ; ni interpréteur, ni client réseau.
 
+## Les canaris
+
+La section `canaries` est ce qui rend un profil **vérifiable**. Ce sont des tests dont la bonne
+réponse est connue d'avance : le code les écrit un par un dans une copie isolée du projet, lance
+la commande de test déclarée, et contrôle que l'échec obtenu porte le classement attendu. Aucun
+LLM n'est consulté — l'oracle est dans le code.
+
+`{marque}` est remplacée par un identifiant unique, dans le nom du fichier comme dans son
+contenu. C'est elle qui permet de retrouver les résultats du canari parmi ceux du projet ; le
+schéma l'exige, sauf pour le canari `syntax`, qui ne produit souvent aucun résultat.
+
+Quatre genres, et la gravité d'un écart dépend d'une seule question : *la porte peut-elle encore
+juger ?* Les portes RED tiennent `assertion` et `missing_symbol` pour des rouges légitimes, et
+rejettent `other_error`.
+
+| Genre | Ce qu'on attend | Si c'est autre chose |
+| --- | --- | --- |
+| `passed` | le test passe | problème : la commande ou son rapport est en cause |
+| `assertion` | classé `assertion` | `missing_symbol` : avertissement — `other_error` : problème |
+| `missing_symbol` | classé `missing_symbol` | `assertion` : avertissement — `other_error` : problème |
+| `syntax` | **jamais** `assertion` ni `missing_symbol` | problème : du code qui ne compile pas franchirait la porte RED |
+
+Un canari par exécution : celui qui ne compile pas empêcherait les autres de s'exécuter.
+
 ## Ce qu'un profil ne sait pas encore exprimer
 
 Ces limites sont réelles : un profil est aujourd'hui **moins capable** qu'un adaptateur écrit à la
@@ -24,6 +48,11 @@ main. Elles sont inscrites dans `features.json`.
 - **L'analyse des imports n'a pas de section.** Avec un profil, `ctx.stack.architecture()` renvoie
   `null` : la règle de dépendance n'est pas vérifiée, et la porte de fin de scénario le dit au
   lieu d'inventer un résultat. L'adaptateur Swift sait le faire, un profil non.
+- **Un échec de compilation n'est pas lu.** Quand la commande de test ne produit aucun rapport,
+  un profil s'arrête sur une erreur ; l'adaptateur Swift écrit à la main, lui, lit les erreurs de
+  compilation et les classe. Conséquence sur un langage compilé : un symbole manquant arrête la
+  compilation, et le rouge légitime du cycle TDD n'atteint jamais la porte. C'est pourquoi
+  `swift.yaml` ne déclare pas de canari `missing_symbol`.
 - **La classification des échecs est générique.** Le lecteur `junit-xml` déduit la raison d'un
   rouge — assertion, symbole manquant, autre — de motifs communs à plusieurs langages. Les
   adaptateurs écrits à la main connaissent leur outil et sont plus précis.

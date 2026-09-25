@@ -23,3 +23,31 @@ layout:
   sources: ["Sources/**"]
 
 infrastructureModules: [Infrastructure, Interface, UI, API, SwiftUI, UIKit, AppKit]
+
+# Canaris de `/stack doctor` (voir `profiles/typescript.yaml` pour l'explication complète).
+#
+# Swift n'en déclare que trois. Le canari `missing_symbol` manque volontairement : dans un
+# langage compilé, un symbole absent arrête la compilation, `swift test` ne produit aucun
+# rapport, et un profil ne sait pas encore lire les erreurs de compilation. Le déclarer ferait
+# rapporter à `doctor` un problème réel mais hors de portée du profil — l'adaptateur Swift écrit
+# à la main, lui, classe ces erreurs. Voir `j5-profil-echec-de-compilation` dans features.json.
+canaries:
+  - kind: passed
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase {
+        func test{marque}() { XCTAssertEqual(1, 1) }
+      }
+  - kind: assertion
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase {
+        func test{marque}() { XCTAssertEqual(1, 2) }
+      }
+  - kind: syntax
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { :::

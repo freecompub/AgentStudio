@@ -3,12 +3,10 @@ import { access, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
-import type { LintReport, ProcessRunner, StackAdapter, TestResult } from "../protocols.js";
-import { parseXunit } from "../swift/swift-report.js";
-import { classifyFailure, parseVitestReport } from "../typescript/vitest-report.js";
-import { parseEslintReport } from "../typescript/eslint-report.js";
-import { parseSwiftLintReport } from "../swift/swiftlint-report.js";
+import type { LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
 import { parseMuterReport } from "../swift/muter-report.js";
+import { lireLint, lireTests } from "./read-report.js";
+import { substituer } from "./tokens.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
 
@@ -23,19 +21,6 @@ import type { StackProfile } from "./stack-profile.js";
 export interface ProfileAdapterDeps {
   runner?: ProcessRunner;
   defaultTimeoutMs?: number;
-}
-
-const JETON_RAPPORT = "{rapport}";
-const JETON_FICHIERS = "{fichiers}";
-
-/** Développe les jetons ; `{fichiers}` produit plusieurs arguments, les autres un seul. */
-function substituer(args: readonly string[], rapport: string, fichiers: readonly string[]): string[] {
-  const out: string[] = [];
-  for (const a of args) {
-    if (a === JETON_FICHIERS) out.push(...fichiers);
-    else out.push(a.replaceAll(JETON_RAPPORT, rapport));
-  }
-  return out;
 }
 
 const existe = (p: string) => access(p).then(() => true, () => false);
@@ -126,22 +111,3 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   };
 }
 
-function lireTests(reader: StackProfile["tests"]["report"], brut: string, root: string): TestResult[] {
-  if (reader === "junit-xml")
-    return parseXunit(brut).map((c) => ({
-      id: `${c.classname}.${c.name}`,
-      file: c.classname,
-      status: c.status,
-      // La porte RED distingue un rouge légitime — assertion, symbole manquant — d'une erreur
-      // de syntaxe. Sans classification, elle laisserait passer la seconde.
-      ...(c.status === "failed" ? { failureKind: classifyFailure(c.message ?? ""), ...(c.message ? { message: c.message } : {}) } : {}),
-    }));
-  if (reader === "vitest-json") return parseVitestReport(JSON.parse(brut), root);
-  throw new Error(`Le format « ${reader} » ne décrit pas des résultats de tests.`);
-}
-
-function lireLint(reader: NonNullable<StackProfile["lint"]>["report"], brut: unknown, root: string): LintReport {
-  if (reader === "eslint-json") return parseEslintReport(brut, root);
-  if (reader === "swiftlint-json") return parseSwiftLintReport(brut, root);
-  throw new Error(`Le format « ${reader} » ne décrit pas un rapport de linter.`);
-}

@@ -27,3 +27,29 @@ layout:
 
 # Ce qu'un domaine ne doit pas importer.
 infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+
+# Canaris de `/stack doctor` : des tests dont la bonne réponse est connue d'avance. Le code les
+# écrit un par un dans une copie isolée du projet, lance la commande ci-dessus, et vérifie que
+# l'échec obtenu porte le classement attendu. `{marque}` est remplacée par un identifiant unique,
+# qui permet de retrouver les résultats du canari parmi ceux du projet.
+canaries:
+  - kind: passed
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(1); });
+  - kind: assertion
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(2); });
+  - kind: missing_symbol
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { fonctionAbsente_{marque}(); });
+  - kind: syntax
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { :::

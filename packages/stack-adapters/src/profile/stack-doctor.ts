@@ -1,3 +1,4 @@
+import type { Constat } from "./constat.js";
 import type { StackProfile } from "./stack-profile.js";
 
 /**
@@ -24,11 +25,7 @@ export function proposeProfile(indices: IndicesDuProjet): string | null {
   return null;
 }
 
-export type Gravite = "ok" | "avertissement" | "probleme";
-export interface Constat {
-  gravite: Gravite;
-  message: string;
-}
+export type { Constat, Gravite } from "./constat.js";
 
 export interface DiagnosticDeps {
   /** Le programme est-il lançable (présent dans le PATH, ou installé localement) ? */
@@ -83,6 +80,12 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
 
   if (!profile.lint) constats.push({ gravite: "avertissement", message: "Aucun linter déclaré : la qualité de forme ne sera pas mesurée." });
   if (!profile.mutation) constats.push({ gravite: "avertissement", message: "Aucun outil de mutation déclaré : la porte de mutation ne sera pas disponible." });
+  if (profile.canaries.length === 0)
+    constats.push({
+      gravite: "avertissement",
+      message:
+        "Aucun canari déclaré : le classement des échecs ne sera pas vérifié. C'est de lui que dépendent les portes RED — sans canari, rien ne garantit qu'une erreur de syntaxe soit distinguée d'une assertion fausse.",
+    });
   if (profile.infrastructureModules.length === 0)
     constats.push({
       gravite: "avertissement",
@@ -107,6 +110,22 @@ layout:
   unitTests: ["Tests/**"]
   sources: ["Sources/**"]
 infrastructureModules: [Infrastructure, Interface, UI, API, SwiftUI, UIKit, AppKit]
+canaries:
+  - kind: passed
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { XCTAssertEqual(1, 1) } }
+  - kind: assertion
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { XCTAssertEqual(1, 2) } }
+  - kind: syntax
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { :::
 `,
   typescript: `id: typescript
 detect: [package.json]
@@ -121,6 +140,27 @@ layout:
   unitTests: ["tests/**", "src/**/*.test.ts"]
   sources: ["src/**"]
 infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+canaries:
+  - kind: passed
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(1); });
+  - kind: assertion
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(2); });
+  - kind: missing_symbol
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { fonctionAbsente_{marque}(); });
+  - kind: syntax
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { :::
 `,
   python: `id: python
 detect: [pyproject.toml]
@@ -135,5 +175,22 @@ layout:
   unitTests: ["tests/**"]
   sources: ["src/**"]
 infrastructureModules: [django, flask, sqlalchemy]
+canaries:
+  - kind: passed
+    file: tests/test_canari_{marque}.py
+    content: |
+      def test_{marque}(): assert True
+  - kind: assertion
+    file: tests/test_canari_{marque}.py
+    content: |
+      def test_{marque}(): assert 1 == 2
+  - kind: missing_symbol
+    file: tests/test_canari_{marque}.py
+    content: |
+      def test_{marque}(): fonction_absente_{marque}()
+  - kind: syntax
+    file: tests/test_canari_{marque}.py
+    content: |
+      def test_{marque}( :::
 `,
 } as const;

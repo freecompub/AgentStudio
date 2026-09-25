@@ -34,6 +34,15 @@ describe("Profils d'exemple livrés", () => {
     }
   });
 
+  it("chacun déclare des canaris, sans quoi `/stack doctor` ne vérifierait rien", () => {
+    for (const nom of ["typescript", "swift"]) {
+      const kinds = charger(nom).canaries.map((c) => c.kind);
+      // `passed`, `assertion` et `syntax` au minimum : le trio qui prouve que la porte RED
+      // distingue un rouge légitime d'un code qui ne compile pas.
+      expect(kinds, nom).toEqual(expect.arrayContaining(["passed", "assertion", "syntax"]));
+    }
+  });
+
   it("ce qu'un profil ne sait pas encore exprimer reste absent, plutôt que faux", () => {
     // L'analyse des imports n'a pas de section dans le schéma : avec un profil, la règle de
     // dépendance n'est pas vérifiée, et la porte le dit — elle n'invente pas un résultat.
