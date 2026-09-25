@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — J5 : l'outillage des profils (init et doctor)
+
+**Fait.** `proposeProfile` et `diagnoseProfile`, dans `stack-adapters`. Toutes deux **pures** :
+elles reçoivent ce qu'on a lu du disque — fichiers présents, dépendances déclarées — et rendent un
+texte ou des constats. Rien n'est exécuté depuis elles, conformément à la règle sur les politiques.
+
+**Choix.** *init ne devine pas* : sans marque reconnue, il ne propose rien plutôt qu'un modèle au
+hasard. *doctor distingue deux gravités* : un programme introuvable est un **problème** — la
+commande échouera —, un emplacement vide n'est qu'un **avertissement**, un projet pouvant n'avoir
+pas encore de tests d'acceptance. Les constats favorables sont inclus, sinon le rapport n'est
+qu'une liste de reproches.
+
+**Pas encore branché.** Aucune commande `/stack` n'existe : la logique est là, le câblage non.
+Il faudra l'enregistrer dans le registre de commandes, lister le disque, et écrire le fichier.
+Inscrit comme `j5-commande-stack`, pour ne pas croire le jalon plus avancé qu'il n'est.
+
+---
+
 ## 25/09 — J5, profils d'exemple : ce qui résiste
 
 **Fait.** `profiles/typescript.yaml` et `profiles/swift.yaml`, valides et testés. Un test les

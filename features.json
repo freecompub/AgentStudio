@@ -53,6 +53,13 @@
       "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
     },
     {
+      "id": "j5-commande-stack",
+      "title": "La commande /stack est disponible dans la conversation",
+      "verify": "pnpm vitest run --project desktop -t '/stack'",
+      "passes": false,
+      "notes": "La logique existe (j5-stack-init-doctor) ; reste à l'enregistrer dans le registre de commandes, à lister le disque et à écrire `.agent-studio/stack.yaml`."
+    },
+    {
       "id": "j5-lecteur-tap",
       "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
       "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
@@ -61,10 +68,10 @@
     },
     {
       "id": "j5-stack-init-doctor",
-      "title": "/stack init génère un profil et /stack doctor le vérifie",
-      "verify": "pnpm vitest run --project desktop -t 'stack init'",
-      "passes": false,
-      "notes": "doctor doit vérifier : programme trouvable, rapport lisible, chemins existants."
+      "title": "La logique de /stack init et /stack doctor existe et est testée",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
+      "passes": true,
+      "notes": "`proposeProfile` et `diagnoseProfile`, pures : elles reçoivent ce qu'on a lu du disque. init propose Swift, TypeScript ou Python, et rien plutôt que de deviner. doctor distingue problème (programme introuvable) et avertissement (emplacement vide, capacité non déclarée). PAS ENCORE BRANCHÉ sur une commande : voir j5-commande-stack."
     },
     {
       "id": "extensions-sans-langage",
@@ -92,7 +99,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "875 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "884 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",
