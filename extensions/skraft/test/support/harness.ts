@@ -169,7 +169,7 @@ export function simulatedAgents(
     "skraft-test": unitTestWriter(root),
     "skraft-dev": writer("Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n"),
     ...Object.fromEntries(
-      ["cold-reader", "test-integrity", "architecture"].map((l) => [
+      ["cold-reader", "test-integrity", "architecture", "quality-gates"].map((l) => [
         `skraft-lens-${l}`,
         (async (t) => void (await t.callTool("submit_lens_verdict", { lens: l, verdict: "APPROVED", defects: [] }))) as ScriptedBehavior,
       ]),

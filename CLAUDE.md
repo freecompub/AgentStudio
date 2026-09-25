@@ -74,7 +74,14 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 - TDD strict. Réducteurs et politiques : fonctions pures, testées sans LLM, sans Git, sans disque.
 - Toute nouvelle décision technique → ADR dans `docs/adr/NNNN-titre.md` (contexte, décision, conséquences, statut).
 - Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §16) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
-- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C : autorisation de l'auteur), mais la reprise reste interdite tant que trois conditions ne sont pas réunies : la trace écrite de l'autorisation versée au dépôt, la licence de redistribution précisée, et l'accès au dépôt source. Jusque-là, ne copier aucun prompt, skill ni code de skraft-plugin.
+- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C). La reprise a **commencé
+  le 2026-09-25** depuis `github.com/SebastienDegodez/skraft-plugin`, branche
+  `refactor/v1.6.0-tracking-substrate` ; le dossier est `docs/licences/autorisation-skraft.md`.
+  Trois règles tiennent pour la suite : tout artefact repris **porte sa provenance** en commentaire
+  (fichier source dans la branche) ; l'extension `skraft` est traitée comme **GPL-3.0-or-later**
+  tant que la licence de redistribution n'est pas précisée, ce qui oblige à en fournir les sources ;
+  et une reprise ne doit **jamais déplacer vers le LLM une décision que le code prend** — la
+  procédure du dépôt d'origine vit dans ses prompts, la nôtre dans nos portes.
 
 ## Architecture cible (vue d'ensemble)
 

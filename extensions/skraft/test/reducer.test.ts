@@ -33,7 +33,19 @@ const lens = (verdict: LensVerdict["verdict"], severities: ("blocker" | "major" 
   verdict,
   defects: severities.map((severity) => ({ severity, description: `défaut ${severity}`, file: "Sources/A.swift", line: 3 })),
 });
-const LENSES = (...l: LensVerdict[]): Ev => ({ type: "LENSES_DONE", lenses: l, reportPath: ".skraft/us-12/reviews/x.md" });
+/**
+ * Ces tests portent sur les transitions du réducteur, pas sur la couverture des questions de
+ * revue. Les lentilles non citées sont donc ajoutées sans défaut : sans elles, une question
+ * resterait sans réponse et la synthèse refuserait d'approuver quoi qu'il arrive — ce qui est
+ * vérifié à part, dans `review-synthesis.test.ts`.
+ */
+const LENSES = (...l: LensVerdict[]): Ev => {
+  const citees = new Set(l.map((x) => x.lens));
+  const completees = (["cold-reader", "test-integrity", "architecture", "quality-gates"] as const)
+    .filter((n) => !citees.has(n))
+    .map((n): LensVerdict => ({ lens: n, verdict: "APPROVED", defects: [] }));
+  return { type: "LENSES_DONE", lenses: [...l, ...completees], reportPath: ".skraft/us-12/reviews/x.md" };
+};
 
 function play(events: Ev[], input = { storyPath: "stories/us-12.md" }) {
   let state = initialState(input);
@@ -185,7 +197,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK]);
     expect(state.stage).toBe("REVIEW");
-    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture"], attempt: 1 }]);
+    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture", "quality-gates"], attempt: 1 }]);
   });
 
   it("GATE_FAIL avec budget → rollback au checkpoint de phase, relance ciblée avec les motifs", () => {
@@ -235,7 +247,10 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   it("REVIEW : APPROVED → COMMIT ; rapport consigné", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))]);
     expect(state.stage).toBe("COMMIT");
-    expect(state.reviews.DESIGN).toEqual([{ attempt: 1, lenses: [lens("APPROVED")], verdict: "APPROVED", reportPath: ".skraft/us-12/reviews/x.md" }]);
+    const consignees = LENSES(lens("APPROVED"));
+    expect(state.reviews.DESIGN).toEqual([
+      { attempt: 1, lenses: consignees.type === "LENSES_DONE" ? consignees.lenses : [], verdict: "APPROVED", reportPath: ".skraft/us-12/reviews/x.md" },
+    ]);
     expect(kinds(effects)).toEqual(["commitPhase"]);
   });
 
@@ -538,7 +553,7 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
         { kind: "rollback", to: "cp-DELIVER" },
         { kind: "planDeliver" },
       ]);
-      expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague)."] });
+      expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague) ; test-integrity : APPROVED ; architecture : APPROVED ; quality-gates : APPROVED."] });
       expect(r.state.deliver?.step).not.toBe("fix");
     });
   });

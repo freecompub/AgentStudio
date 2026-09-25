@@ -71,7 +71,7 @@ describe("skraft — critères de sortie de S1", () => {
     ]);
     // Rapports de revue générés par le code depuis les JSON des lentilles.
     const report = JSON.parse(await readFile(join(root, ".skraft/us-12/reviews/design-review-1.json"), "utf8"));
-    expect(report.map((l: { lens: string }) => l.lens)).toEqual(["cold-reader", "test-integrity", "architecture"]);
+    expect(report.map((l: { lens: string }) => l.lens)).toEqual(["cold-reader", "test-integrity", "architecture", "quality-gates"]);
     // DELIVER : un scénario moteur, les deux autres déjà verts ; constats transmis aux lentilles.
     expect(s.deliver?.scenarios.map((x) => [x.id, x.status])).toEqual([["ac-1", "done"], ["ac-2", "done"], ["ac-3", "done"]]);
     // Ce que la porte n'a pas pu mesurer est dit, jamais supposé conforme.
