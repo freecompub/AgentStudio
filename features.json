@@ -53,6 +53,27 @@
       "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
     },
     {
+      "id": "j5-canaris",
+      "title": "/stack doctor vérifie le profil par exécution, avec des canaris à oracle (§8.6, D46)",
+      "verify": "pnpm vitest run --project stack-adapters test/canaris.test.ts",
+      "passes": true,
+      "notes": "Oracle dans le code, aucun LLM. Un canari par exécution — celui qui ne compile pas empêcherait les autres de s'exécuter. Deux nuances qui comptent : confondre `assertion` et `missing_symbol` n'est qu'un avertissement (les portes acceptent les deux), tandis qu'une erreur de syntaxe classée dans l'une de ces deux catégories est un problème — c'est le trou du lecteur junit-xml trouvé le 25/09. Les canaris n'ont jamais tourné contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+    },
+    {
+      "id": "j5-profil-echec-de-compilation",
+      "title": "Un profil sait classer un échec de compilation, quand le lanceur ne produit aucun rapport",
+      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'compilation'",
+      "passes": false,
+      "notes": "Trouvé en écrivant les canaris. `createProfileAdapter.runTests` LÈVE une exception quand le rapport est absent ; l'adaptateur Swift écrit à la main, lui, lit les erreurs de compilation et les classe. Conséquence : sur un langage compilé, un profil ne peut pas produire le rouge légitime du cycle TDD — un symbole manquant arrête la compilation. C'est pourquoi profiles/swift.yaml ne déclare pas de canari `missing_symbol`."
+    },
+    {
+      "id": "canaris-contre-un-vrai-lanceur",
+      "title": "Les canaris ont tourné contre un vrai lanceur de tests",
+      "verify": "MANUEL : copier profiles/typescript.yaml dans un projet Vitest, lancer /stack doctor",
+      "passes": false,
+      "notes": "Les gabarits livrés (Vitest, XCTest, pytest) n'ont été vérifiés que par des lanceurs doublés : rien ne prouve que `vitest` découvre `src/canari_<marque>.test.ts`, ni que le canari de syntaxe produise bien ce qu'on attend. C'est justement ce que doctor est censé apprendre."
+    },
+    {
       "id": "j5-commande-stack",
       "title": "La commande /stack est disponible dans la conversation",
       "verify": "pnpm vitest run --project desktop -t '/stack'",
@@ -68,10 +89,10 @@
     },
     {
       "id": "j5-stack-init-doctor",
-      "title": "La logique de /stack init et /stack doctor existe et est testée",
+      "title": "Vérification statique d'un profil (une partie de /stack doctor, §8.6)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
       "passes": true,
-      "notes": "`proposeProfile` et `diagnoseProfile`, pures : elles reçoivent ce qu'on a lu du disque. init propose Swift, TypeScript ou Python, et rien plutôt que de deviner. doctor distingue problème (programme introuvable) et avertissement (emplacement vide, capacité non déclarée). PAS ENCORE BRANCHÉ sur une commande : voir j5-commande-stack."
+      "notes": "Partie statique de §8.6. Les canaris sont faits (j5-canaris). Manquent encore : proposition par un agent via `submit_stack_profile`, approbation des commandes avant exécution, `git worktree` fourni par l'application (runCanaries reçoit `sandboxRoot`, il ne le crée pas), réessai ciblé à budget, relance sur changement du verrou de dépendances."
     },
     {
       "id": "extensions-sans-langage",
@@ -130,11 +151,25 @@
       "notes": "Aujourd'hui issues d'agents simulés. Plus bloqué depuis la levée des blocages de J1."
     },
     {
+      "id": "licence-du-depot",
+      "title": "agent-studio déclare sa propre licence",
+      "verify": "test -f LICENSE && grep -q '\"license\"' package.json",
+      "passes": false,
+      "notes": "Trouvé le 25/09 en ouvrant le dossier skraft : aucun fichier LICENSE, aucun champ `license`. Préalable à la condition 2 de la reprise — on ne peut pas dire qu'une extension « reste sous la licence de l'application » quand l'application n'en déclare pas. Concerne aussi la distribution des paquets .asx et celle de l'application elle-même."
+    },
+    {
+      "id": "skraft-synthese-ponderee",
+      "title": "La revue pèse quatre questions et refuse d'approuver quand l'une reste sans réponse",
+      "verify": "pnpm vitest run --project ext-skraft test/review-synthesis.test.ts",
+      "passes": true,
+      "notes": "Repris de skraft-plugin (adversarial-review-lenses + software-engineer-reviewer). Deux familles de règles, et leur ordre compte : les contributions pondérées ÉCLAIRENT le verdict, les règles de gravité le DÉCIDENT — un calcul ne rattrape jamais une porte. Nouvelle règle bloquante : une question qu'aucune lentille ne traite interdit l'approbation. C'est elle qui a fait bouger une dizaine de tests : le jeu de lentilles doit désormais couvrir les quatre questions."
+    },
+    {
       "id": "reprise-skraft",
       "title": "La reprise du contenu de skraft-plugin est possible (O9 tranché, option C)",
-      "verify": "test -f docs/licences/autorisation-skraft.md",
+      "verify": "grep -q 'Statut : RÉUNIE' docs/licences/autorisation-skraft.md && test -f LICENSE && ! grep -rn 'prompts de SUBSTITUTION' extensions/skraft/src/roles.ts",
       "passes": false,
-      "notes": "BLOQUÉ, hors code : manquent la trace écrite de l'autorisation, la licence de redistribution, et l'accès au dépôt source. Ne copier aucun prompt avant."
+      "notes": "PARTIELLEMENT FAIT le 25/09. Conditions 1 et 3 remplies (dossier : docs/licences/autorisation-skraft.md) ; condition 2 en suspens — le dépôt ne déclare toujours aucune licence, voir licence-du-depot. Repris depuis la branche refactor/v1.6.0-tracking-substrate : la synthèse pondérée (skraft-synthese-ponderee), la quatrième lentille quality-gates, et la substance des prompts researcher/acceptance/test/dev. Écarté sciemment : lentilles .NET conditionnelles, Object Calisthenics (le linter en juge, ADR 0022), « supprime un test qui ne tue aucun mutant » (contredit la règle du test intouchable). L'extension est traitée comme GPL-3.0-or-later par défaut, ce qui tient parce qu'elle est distribuée à part en .asx."
     },
     {
       "id": "stockage-sqlite",

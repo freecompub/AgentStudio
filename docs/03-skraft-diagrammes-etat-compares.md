@@ -2,7 +2,21 @@
 
 22/09/2026 · Samir
 
-Dans skraft-plugin, c'est le LLM orchestrateur qui décide chaque transition, et les hooks censés le contrôler ne se déclenchent pas en conditions réelles. Dans notre approche, un réducteur déterministe décide les transitions et le LLM n'intervient que pour produire des artefacts et des verdicts, toujours vérifiés par du code avant d'avancer.
+Dans skraft-plugin, c'est le LLM orchestrateur qui décide chaque transition, encadré par des
+garde-fous déclenchés par les hooks du harnais. Dans notre approche, un réducteur déterministe
+décide les transitions et le LLM n'intervient que pour produire des artefacts et des verdicts,
+toujours vérifiés par du code avant d'avancer.
+
+> **Correction du 25/09/2026.** Ce document affirmait que les hooks de skraft « ne se déclenchent
+> pas en conditions réelles ». C'était exact de la 1.5.2 analysée le 22 septembre ; **ce ne l'est
+> plus** : sur la branche `refactor/v1.6.0-tracking-substrate`, la résolution du projet actif est
+> corrigée et les garde-fous se déclenchent (document 02, « Suivi au 25 septembre »).
+>
+> La comparaison qui suit garde tout son sens, mais son objet change : elle n'oppose plus un
+> mécanisme qui marche à un mécanisme en panne. Elle oppose **deux endroits où mettre la
+> décision** — chez eux un LLM qui décide sous surveillance de garde-fous, chez nous un réducteur
+> qui décide et un LLM qui propose. C'est une différence de conception, et c'est sur ce terrain
+> qu'elle doit se défendre.
 
 ## Lecture du document
 

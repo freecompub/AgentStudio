@@ -5,6 +5,172 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — Les documents d'audit disaient faux
+
+**Fait.** Documents 02, 03 et 04 mis à jour. Le 02 reçoit une section « Suivi au 25 septembre » qui
+fait foi ; les deux analyses antérieures sont gardées telles quelles, comme trace de ce qui a été
+observé à leur date — on ne réécrit pas un constat daté, on le date mieux.
+
+**Ce que j'ai trouvé.** La branche avait avancé de deux jours (`c82cbbb` → `6b2e7af`) et le plan de
+refonte y avait été appliqué. **Aucun des constats C1 à C7, N1 et N2 ne subsiste.** C1 est corrigé
+par un pointeur de pipeline actif que la CLI d'état écrit et que les hooks lisent — c'est
+exactement la recommandation 3 que notre propre document faisait. C2 par une projection
+(`projectDispatchState`) au-dessus d'un état unifié validé par schéma Draft 2020-12. C3 par un
+ordre de phases lu de la configuration, qui initialise en RESEARCH. `entryPoint` a purement disparu
+du dépôt, ce qui dissout N1.
+
+**Le vrai enjeu, et il touche nos propres textes.** Les documents 03 et 04 justifiaient notre
+conception par « leurs garde-fous ne se déclenchent pas ». Cet argument est mort. Je l'ai corrigé
+aux trois endroits : la comparaison n'oppose plus un mécanisme qui marche à un mécanisme en panne,
+elle oppose **deux endroits où mettre la décision**. → Ne jamais adosser une justification de
+conception au défaut passager d'un autre dépôt : le défaut se corrige, et la justification tombe
+avec lui. Notre réducteur déterministe a ses raisons propres, qui n'ont jamais eu besoin de ça.
+
+**Piège que j'ai failli commettre.** `pipeline-policy.mjs` lit `dispatchState.specialistDone` et
+`.reviewerVerdict`, deux champs absents du schéma d'état — qui, lui, interdit les propriétés
+supplémentaires. J'ai cru tenir un défaut sérieux. C'est une projection qui les calcule, une ligne
+plus haut dans le service. → Avant d'annoncer une incohérence entre deux fichiers, chercher la
+couche qui les relie.
+
+**Réserve assumée.** Tout ce suivi est établi **par lecture seule** : aucune CLI rejouée, aucune
+suite de tests lancée. Les constats d'origine distinguaient « vérifié » de « lu dans le code » ;
+j'ai respecté cette distinction et l'ai écrite en tête de section plutôt que de laisser croire à
+une reproduction.
+
+---
+
+## 25/09 — Reprise skraft : faite, pour l'essentiel
+
+**Le dépôt est arrivé** : `github.com/SebastienDegodez/skraft-plugin`, branche
+`refactor/v1.6.0-tracking-substrate`. Donc la **1.6.0 en cours**, pas la 1.5.2 qu'auditait
+`docs/02-analyse-technique-skraft-plugin.md` — l'audit ne décrit pas ce que j'ai repris, c'est la
+branche qui fait foi. Conditions 1 et 3 remplies ; la 2, la licence de redistribution, ne l'est
+toujours pas.
+
+**Repris.** La **synthèse pondérée** (`review.ts`) : quatre questions — complétude, adéquation
+métier, qualité, risque — avec leurs poids 0,30 / 0,30 / 0,15 / 0,25, la note au **minimum** des
+lentilles qui répondent à une même question, et l'arrêt sur question non couverte. La
+correspondance lentille → question vient telle quelle de `software-engineer-reviewer.md`. Puis la
+**quatrième lentille** `quality-gates`, et la substance des prompts `researcher`, `acceptance`,
+`test`, `dev`.
+
+**L'adaptation qui compte.** Chez eux la synthèse est faite par l'agent réviseur ; ici **le code la
+calcule**. C'est plus fort que l'original : la revue se rejoue à l'identique depuis son seul JSON,
+et un agent ne peut pas arrondir un verdict. Même logique pour les lentilles : leurs portes sont
+nommées dans le prompt là-bas (G4, G7, G11…), exécutées par le code ici.
+
+**Deux familles de règles, et leur ordre est tout.** Les contributions pondérées **éclairent** le
+verdict ; les règles de gravité le **décident**. Un calcul ne rattrape jamais une porte. Je l'ai
+écrit explicitement dans le code, parce que c'est exactement le genre de nuance qu'une relecture
+distraite inverse.
+
+**La règle qui a tout fait bouger.** « Une question non posée ne revient jamais propre » : si
+aucune lentille ne traite une question, l'approbation est refusée. Une dizaine de tests en
+dépendaient — ils n'employaient qu'une lentille `cold-reader`, qui ne couvre que deux questions
+sur quatre. Le banc d'essai devait aussi scripter la quatrième lentille, sans quoi le pipeline
+attendait une réponse qui ne venait jamais.
+
+**Écarté sciemment, et c'est le plus instructif.** Les lentilles `contract-fidelity` et
+`mock-fidelity` sont conditionnelles et écrites pour .NET — les reprendre aurait relié l'extension
+à une pile. Les Object Calisthenics : chez nous le linter du projet en juge (ADR 0022), deux
+autorités se contrediraient. Et surtout « un test qui ne tue aucun mutant, supprime-le », qui
+**contredit notre règle du test intouchable** : c'est la porte de mutation qui doit le dire, pas
+l'agent qui écrit le code et à qui ce test déplaît. → Une reprise n'est pas une transcription :
+chaque règle importée doit être confrontée aux règles déjà en place.
+
+**Piège de méthode, entièrement de mon fait.** J'ai lancé la suite complète pendant qu'une autre
+exécution de Vitest tournait encore en arrière-plan. Deux tests de reprise ont expiré et la suite
+a mis **31 minutes au lieu de 93 secondes**. J'ai d'abord cherché la cause dans mon code. →
+Vérifier `pgrep -f vitest` avant de conclure qu'une lenteur ou une expiration vient du code.
+
+**Toujours instable** : `app.test.tsx` « carte de tâche mise à jour en place » expire parfois à
+5 s sous charge, et passe 3 fois sur 3 isolément. Connu depuis le 24/09, toujours pas corrigé.
+
+---
+
+## 25/09 — Reprise skraft : le dossier, avant que le dépôt n'arrive
+
+**Demandé.** Faire la reprise du contenu de skraft-plugin, O9/D42 étant tranché (ADR 0012,
+option C : l'auteur autorise).
+
+**Pas faisable, et la raison est matérielle avant d'être juridique.** skraft-plugin n'est nulle
+part sur le poste, et le paquet n'existe pas sur le registre npm public. On ne reprend pas des
+prompts qu'on n'a pas. Reconstituer à partir de `docs/02-analyse-technique-skraft-plugin.md`
+serait reprendre l'œuvre par un détour — écarté explicitement dans le dossier, pour que personne
+n'y revienne en croyant avoir trouvé une astuce.
+
+**Trouvé en ouvrant le dossier, et c'est plus gênant que la reprise elle-même :** le dépôt
+**ne déclare aucune licence**. Pas de fichier `LICENSE`, pas de champ `license` dans les
+`package.json`. Or la condition 2 de l'ADR 0012 demande de dire si l'extension `skraft` « reste
+sous la licence de l'application » — la formule ne désigne rien. Ça dépasse skraft : ça concerne
+la distribution des paquets `.asx` et celle de l'application. Inscrit comme `licence-du-depot`.
+
+**Un critère qui mentait.** `reprise-skraft` se vérifiait par `test -f
+docs/licences/autorisation-skraft.md`. Autrement dit, **créer un fichier vide le faisait passer au
+vert** — et c'est précisément ce que j'allais faire en ouvrant le dossier. Le `verify` exige
+maintenant les trois conditions réunies *et* la disparition des prompts de substitution de
+`roles.ts`. → Un critère dont la vérification porte sur l'existence d'un fichier, et non sur son
+contenu, se satisfait tout seul.
+
+**Fait quand même, pour que la reprise soit un remplacement et non une enquête.**
+`docs/licences/autorisation-skraft.md` recense les trois artefacts concernés, et eux seuls :
+les 8 prompts de `ROLES`, les 3 lentilles de `LENS_FOCUS`, et la synthèse sans pondération de
+`review.ts`. Tout le reste de l'extension est notre conception et ne bouge pas. Deux garde-fous y
+sont posés : un prompt repris ne doit jamais déplacer une décision du code vers le LLM, et chaque
+artefact repris doit porter sa provenance dans le code.
+
+**Ce qu'il faut pour débloquer** — trois choses que seul le responsable du projet a : les sources
+de skraft-plugin 1.5.2, la pièce écrite de l'autorisation (qui, quoi, quand), et la licence sous
+laquelle redistribuer.
+
+---
+
+## 25/09 — J5 : les canaris de `/stack doctor`
+
+**Ce qui a déclenché ça.** J'ai relu §8.6 après coup et j'ai trouvé un écart sérieux : j'avais
+nommé une fonction `diagnoseProfile` comme si elle faisait le travail de `/stack doctor`, alors
+qu'elle n'en fait que la vérification statique. La spec décrit huit contrôles, **chacun avec son
+oracle**, dont des tests canaris. Et le canari `syntax` — « classé `syntax`, jamais `assertion` »
+— est exactement le garde-fou qui aurait attrapé le trou du lecteur `junit-xml` trouvé deux
+heures plus tôt. La spec avait prévu la parade ; je ne l'avais pas lue.
+
+**Fait.** `canaries.ts` : une section `canaries` dans le profil, un oracle pur (`jugerCanari`) et
+l'exécution (`runCanaries`), 24 tests. Le code écrit un canari, lance la commande déclarée, et
+vérifie le classement obtenu. Aucun LLM n'est consulté : la bonne réponse est connue d'avance.
+
+**Le raisonnement qui fixe les gravités.** Une seule question : *la porte peut-elle encore
+juger ?* Les portes RED acceptent `assertion` et `missing_symbol` comme des rouges légitimes, et
+rejettent `other_error`. Donc :
+
+- une erreur de syntaxe classée `assertion` **ou** `missing_symbol` est un **problème** — du code
+  qui ne compile pas franchirait la porte ;
+- un symbole manquant classé `other_error` est un **problème** aussi, en sens inverse : un cycle
+  TDD correct serait refusé ;
+- mais confondre `assertion` et `missing_symbol` n'est qu'un **avertissement** : les deux sont
+  acceptées, aucune porte n'est trompée, seuls les messages deviennent inexacts.
+
+**Un canari par exécution.** Sinon celui qui ne compile pas empêche les autres de s'exécuter.
+C'est cher — cinq lancements de la suite pour un `doctor` complet — et c'est le prix de l'oracle.
+Chaque canari porte une marque unique (`{marque}`), sans quoi ses résultats seraient confondus
+avec ceux du projet ; le schéma l'exige, sauf pour `syntax` qui n'en produit souvent aucun.
+
+**Le trou que les canaris ont révélé avant même de tourner.** En écrivant le gabarit Swift
+`missing_symbol`, j'ai buté : dans un langage compilé, un symbole absent arrête la compilation,
+`swift test` ne produit aucun rapport, et **`createProfileAdapter.runTests` lève une exception**
+dans ce cas. L'adaptateur Swift écrit à la main, lui, lit les erreurs de compilation et les
+classe. Donc un profil ne peut pas produire le rouge légitime du cycle TDD sur un langage
+compilé. Inscrit comme `j5-profil-echec-de-compilation`, et `profiles/swift.yaml` ne déclare pas
+ce canari en le disant franchement. → Même leçon qu'avant-hier : quand un chemin générique
+remplace un chemin spécifique, lister ce que le spécifique faisait **en plus**.
+
+**Ce qui n'est toujours pas fait**, et features.json le dit maintenant : la proposition par un
+agent (`submit_stack_profile`), l'approbation des commandes avant exécution, le `git worktree` —
+`runCanaries` reçoit un `sandboxRoot`, il ne le crée pas —, le réessai à budget, la relance sur
+changement du verrou de dépendances. Et les gabarits livrés n'ont jamais affronté un vrai
+lanceur : `canaris-contre-un-vrai-lanceur`.
+
+---
+
 ## 25/09 — J5 : l'outillage des profils (init et doctor)
 
 **Fait.** `proposeProfile` et `diagnoseProfile`, dans `stack-adapters`. Toutes deux **pures** :

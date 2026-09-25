@@ -4,6 +4,18 @@
 
 Ce document suit une même story à travers chaque étape du pipeline skraft, et montre pour chacune ce que fait skraft-plugin aujourd'hui, où il est fragile, et ce que notre approche change. La règle qui guide toutes les améliorations : le LLM produit, le code vérifie et décide de la suite.
 
+> **Correction du 25/09/2026.** Les fragilités décrites ici ont été observées sur la 1.5.2
+> (22 septembre) et revues sur la 1.6.0 du 23. Au 25 septembre, **la branche les a corrigées** :
+> G1, G4, G5 et G6 ne sont plus muets — les hooks résolvent le projet actif par un pointeur de
+> pipeline — et G7 ne se contourne plus par un interpréteur. Le détail est dans le document 02,
+> « Suivi au 25 septembre ».
+>
+> Les colonnes « fragilité » de ce document doivent donc se lire au passé. Ce qu'elles gardent
+> d'utile, c'est le **catalogue des pannes possibles** quand un LLM décide et que des garde-fous
+> externes le surveillent : un garde muet parce qu'il ignore de quel projet on parle, un garde
+> contourné par un outil non prévu, une prescription de prompt que le garde refuse. Ces pannes-là
+> sont de famille, pas d'exemplaire : elles peuvent revenir chez eux comme chez nous.
+
 ## Comment lire ce document
 
 ### Légende des organigrammes
@@ -48,7 +60,7 @@ Les exemples « skraft-plugin » de chaque étape décrivent la version 1.5.2. L
 | DISTILL | Rien : sortie toujours nommée en C# |
 | DELIVER | Nouvelle skill `quality-gates-javascript` (StrykerJS, TAP) ; toujours rien pour Swift ; preuves toujours écrites par l'agent |
 | Revue | Rien : vocabulaire des verdicts toujours divergent (C6) |
-| Hooks | G2, G3 et G7 fonctionnent ; G1, G4, G5 et G6 restent muets ; G7 se contourne par un interpréteur (N2) |
+| Hooks | Au 23/09 : G2, G3 et G7 fonctionnent ; G1, G4, G5 et G6 restent muets ; G7 se contourne par un interpréteur (N2). **Au 25/09 : les huit se déclenchent, et N2 est traité** (document 02) |
 
 Un plan de refonte (`.specs/plan_todo.md`, non implémenté) prévoit un état unifié, une projection calculée de la prochaine action et des commandes typées à la place des éditions directes. Il ne traite ni la résolution du projet actif par les hooks (C1), ni le contournement de G7 (N2).
 
@@ -92,7 +104,7 @@ flowchart LR
 
 Les deux pipelines ont les mêmes phases. La différence est dans ce qui les relie.
 
-- **skraft-plugin** : l'orchestrateur LLM enchaîne les phases selon son prompt. Les hooks sont censés le surveiller, mais en conditions réelles ils laissent tout passer (C1, C4, C5). Chaque phase est entièrement confiée à un agent, qui produit son travail et, souvent, sa propre preuve.
+- **skraft-plugin** : l'orchestrateur LLM enchaîne les phases selon son prompt, surveillé par les hooks. Aux dates analysées, ceux-ci laissaient passer beaucoup (C1, C4, C5) ; **au 25/09 ils se déclenchent**. La différence de fond demeure : chaque phase est entièrement confiée à un agent, qui produit son travail et, souvent, sa propre preuve.
 - **Notre approche** : un réducteur déterministe enchaîne les phases. Chaque phase est découpée en un travail de LLM encadré, suivi de portes vérifiées par le code. La ratification des ADR devient un état à part entière, bloquant.
 
 ### Position des hooks de contrôle dans skraft
@@ -153,7 +165,12 @@ flowchart TD
 | À la fin du sous-agent | `SubagentStop` | G3, G4, G5 | Bloquer si skill non lue, artefact absent ou verdict incohérent | Skills en fail-open (C7) ; G4 et G5 ignorés (C1) | Transcript du sous-agent lu (C7 corrigé) ; G4 et G5 toujours ignorés (C1) |
 | Au retour vers l'orchestrateur | `PostToolUse`, outil Agent | G6 | Indiquer l'agent suivant, une relance ou une escalade | Ignoré (C1) | Inchangé : ignoré (C1) |
 
-En 1.5.2, seul `SessionStart` remplissait son rôle. En 1.6.0, la traduction vers les harnais est réparée : G2, G3 et G7 fonctionnent. Les quatre gardes qui dépendent de l'état du pipeline (G1, G4, G5, G6) restent muets tant que les hooks ne savent pas retrouver le projet actif, et G8 reste en fail-open pour la même raison. Les points d'accroche sont bien placés : c'est la résolution du projet qui manque.
+En 1.5.2, seul `SessionStart` remplissait son rôle. En 1.6.0 au 23 septembre, la traduction vers les harnais est réparée : G2, G3 et G7 fonctionnent. Les quatre gardes qui dépendent de l'état du pipeline (G1, G4, G5, G6) restent muets tant que les hooks ne savent pas retrouver le projet actif, et G8 reste en fail-open pour la même raison. Les points d'accroche sont bien placés : c'est la résolution du projet qui manque.
+
+**Au 25 septembre, ce manque est comblé** : `cli/hook.mjs` résout le projet par un pointeur de
+pipeline actif écrit par la CLI d'état, et les huit gardes disposent enfin du slug dont ils
+dépendaient. Le diagnostic « les points d'accroche sont bien placés, c'est la résolution du projet
+qui manque » était donc juste, et c'est par là que la correction est venue.
 
 ### Structure commune d'une phase
 
