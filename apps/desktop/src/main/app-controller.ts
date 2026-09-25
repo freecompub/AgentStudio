@@ -130,6 +130,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
       runtime: ensureRuntime,
       onTask: (card) => deps.sink.emit("task:update", card),
       onInteractions: (pending) => deps.sink.emit("interactions:changed", { pending }),
+      // Même canal que l'arbitre de permissions : écrire un profil de stack élargit ce que
+      // l'application a le droit de lancer, et se confirme donc dans la fenêtre (§8.5).
+      confirmer,
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
         if (session) void session.record("notice", markdown, extensionId);

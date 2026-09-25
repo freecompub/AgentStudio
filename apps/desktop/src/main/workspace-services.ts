@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
+import { accessSync, constants as fsConstants } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import {
   createHookRegistry,
   createInteractionService,
@@ -30,10 +31,20 @@ import {
   type LoadedExtension,
   type ProcessLauncher,
 } from "@agent-studio/extension-host";
-import { createProfileAdapter, parseStackProfile, selectStackAdapter, type StackAdapter } from "@agent-studio/stack-adapters";
+import {
+  createProfileAdapter,
+  diagnoseProfile,
+  globToRegExp,
+  parseStackProfile,
+  selectStackAdapter,
+  type StackAdapter,
+} from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
+import type { Workspace } from "@agent-studio/workspace";
+import type { UserConfirmer } from "@agent-studio/core";
 import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
+import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 
 /** Extension à activer : dans le principal (tests, J2) ou dans son propre processus (J4). */
 export type ExtensionSource = ({ kind: "in-process" } & LoadedExtension) | ({ kind: "isolated" } & IsolatedExtension);
@@ -117,7 +128,7 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
 
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify }) => {
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer }) => {
     const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
     const manifests = sources.map((e) => e.manifest);
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
@@ -216,6 +227,20 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
 
     const evidence = cfg.evidenceStore ?? createJsonEvidenceStore(join(cfg.tasksDir, projectKey, "evidence"));
     const registry = createRegistry();
+
+    // `/stack` appartient au cœur, pas à une extension : elle décrit le projet lui-même, et
+    // doit rester disponible même quand aucune extension n'est installée.
+    if (confirmer)
+      registry.addCommand({
+        extensionId: "agent-studio",
+        name: "stack",
+        title: "Stack du projet",
+        description: "Affiche la stack employée ; `init` propose un profil à déclarer, `doctor` dit ce qu'il vaut.",
+        handler: createStackCommand(
+          stackCommandDeps({ workspace, allowedPrograms: cfg.allowedPrograms ?? [], stack, declaree: declare !== null, confirmer, onPost }),
+        ),
+      });
+
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of sources) {
@@ -289,23 +314,100 @@ const PROFIL_PROJET = ".agent-studio/stack.yaml";
  * détection habituelle reprend la main. Le fichier vient du dépôt, donc d'une source que
  * l'agent peut modifier : les programmes qu'il nomme sont soumis à la liste de l'administrateur.
  */
-async function lireProfilDuProjet(
-  root: string,
-  allowedPrograms: readonly string[],
-  onPost: (extensionId: string, markdown: string) => void,
-  logger?: Logger,
-): Promise<StackAdapter | null> {
+async function lireProfilDeclare(root: string, allowedPrograms: readonly string[]): Promise<ProfilDeclare> {
   let brut: string;
   try {
     brut = await readFile(join(root, PROFIL_PROJET), "utf8");
   } catch {
     return null; // pas de profil : la détection s'applique, sans rien dire
   }
-  const lu = parseStackProfile(brut, { allowedPrograms });
+  return parseStackProfile(brut, { allowedPrograms });
+}
+
+async function lireProfilDuProjet(
+  root: string,
+  allowedPrograms: readonly string[],
+  onPost: (extensionId: string, markdown: string) => void,
+  logger?: Logger,
+): Promise<StackAdapter | null> {
+  const lu = await lireProfilDeclare(root, allowedPrograms);
+  if (lu === null) return null;
   if ("error" in lu) {
     logger?.warn("profil de stack refusé", { root, error: lu.error });
     onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez \`${PROFIL_PROJET}\` puis rouvrez le projet.`);
     return null;
   }
   return createProfileAdapter(lu.profile);
+}
+
+/**
+ * Dépendances de `/stack`, toutes tirées du Workspace — seul service autorisé à toucher le
+ * disque. `programmeTrouvable` cherche dans le PATH sans rien exécuter : lancer un programme
+ * pour savoir s'il existe serait exactement ce que la liste blanche cherche à éviter.
+ */
+function stackCommandDeps(args: {
+  workspace: Workspace;
+  allowedPrograms: readonly string[];
+  stack: StackAdapter;
+  declaree: boolean;
+  confirmer: UserConfirmer;
+  onPost: (extensionId: string, markdown: string) => void;
+}): StackCommandDeps {
+  const { workspace, allowedPrograms, stack, declaree, confirmer, onPost } = args;
+  const fichiers = () => workspace.files.list();
+
+  return {
+    chemin: PROFIL_PROJET,
+    profilDeclare: () => lireProfilDeclare(workspace.root, allowedPrograms),
+    stackActive: () => ({ id: stack.id, declaree }),
+    post: (markdown) => onPost("agent-studio", markdown),
+    confirmer: (req) => confirmer.confirm(req),
+    ecrireProfil: (yaml) => workspace.files.write(PROFIL_PROJET, yaml),
+
+    async indices() {
+      const tous = await fichiers();
+      // Seule la racine intéresse la détection : un `pyproject.toml` enfoui dans un exemple ne
+      // dit rien de la stack du projet.
+      const racine = tous.filter((f) => !f.includes("/"));
+      let dependances: string[] = [];
+      try {
+        const pkg = JSON.parse(await workspace.files.read("package.json")) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        dependances = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})];
+      } catch {
+        /* pas de package.json lisible : on s'en tient aux fichiers */
+      }
+      return { fichiers: racine, dependances };
+    },
+
+    async diagnostiquer(profile) {
+      const tous = await fichiers();
+      return diagnoseProfile(profile, {
+        programmeTrouvable: (p) => dansLePath(p),
+        cheminExiste: (glob) => {
+          const re = globToRegExp(glob);
+          return tous.some((f) => re.test(f));
+        },
+        fichiersDeDetectionPresents: profile.detect.some((d) => tous.includes(d)),
+      });
+    },
+  };
+}
+
+/** Le programme est-il lançable ? Recherche dans le PATH, sans exécuter quoi que ce soit. */
+function dansLePath(programme: string): boolean {
+  const chemins = (process.env["PATH"] ?? "").split(delimiter).filter(Boolean);
+  const suffixes = process.platform === "win32" ? (process.env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";") : [""];
+  for (const base of chemins)
+    for (const suffixe of suffixes) {
+      try {
+        accessSync(join(base, `${programme}${suffixe}`), fsConstants.X_OK);
+        return true;
+      } catch {
+        /* pas ici : on continue */
+      }
+    }
+  return false;
 }

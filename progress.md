@@ -5,6 +5,41 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — `/stack` existe enfin
+
+**Fait.** Trois formes : `/stack` dit quelle stack le projet emploie et d'où elle vient,
+`/stack doctor` diagnostique le profil déclaré, `/stack init` en propose un, le fait approuver,
+puis l'écrit. Tout ce qui avait été construit depuis deux jours devient atteignable depuis la
+conversation — jusqu'ici c'étaient des fonctions que personne ne pouvait appeler.
+
+**Commande du cœur, pas d'une extension.** Elle décrit le projet lui-même, et doit rester
+disponible quand aucune extension n'est installée. Enregistrée dans le registre sous
+`extensionId: "agent-studio"`, le même identifiant que les messages système.
+
+**La règle qui gouverne tout le fichier.** Un profil est une liste de commandes exécutées sur la
+machine : l'écrire équivaut à élargir des permissions (§8.5). Donc le YAML **complet** est posté
+avant la demande — on approuve ce qu'on a lu, pas un résumé — et la confirmation **nomme les
+programmes** que le profil lancera, seule information qu'on ne devine pas d'un identifiant de
+stack. Sans confirmateur, la commande n'est pas enregistrée du tout : mieux vaut pas de commande
+qu'une commande qui écrirait sans accord.
+
+**Ce que doctor dit de lui-même.** Il conclut par ce qu'il n'a **pas** vérifié : rien n'a été
+exécuté, les canaris n'ont pas tourné, un profil déclaré sain ici peut encore classer un échec de
+travers. Sans ce paragraphe, un rapport tout vert laisserait croire que le profil a été éprouvé
+alors qu'il n'a été que relu. C'est la même règle que pour les portes : ne rien attester qu'on
+n'ait mesuré.
+
+**Deux détails qui auraient mordu.** `programmeTrouvable` cherche dans le `PATH` sans rien
+exécuter — lancer un programme pour savoir s'il existe serait exactement ce que la liste blanche
+cherche à éviter. Et `indices()` ne retient que les fichiers de la **racine** : un `pyproject.toml`
+enfoui dans un dossier d'exemples ne dit rien de la stack du projet.
+
+**Prochaine étape.** Brancher les canaris sur `doctor`, ce qui demande un `git worktree` —
+`runCanaries` reçoit un `sandboxRoot`, il ne le crée pas. Le paragraphe « ce que je n'ai pas
+vérifié » disparaîtra alors, remplacé par de vraies mesures.
+
+---
+
 ## 25/09 — Les documents d'audit disaient faux
 
 **Fait.** Documents 02, 03 et 04 mis à jour. Le 02 reçoit une section « Suivi au 25 septembre » qui

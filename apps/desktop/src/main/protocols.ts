@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing, Role, ToolCallGuard } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, Role, ToolCallGuard, UserConfirmer } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -72,6 +72,13 @@ export interface WorkspaceServicesArgs {
   onPost(extensionId: string, markdown: string): void;
   /** Notification système (jalons et alertes), si l'application est en arrière-plan (§7.2). */
   notify?(title: string, body: string): void;
+  /**
+   * Confirmation dans la fenêtre, pour les commandes du cœur qui élargissent ce que
+   * l'application a le droit de lancer — écrire un profil de stack, par exemple (§8.5).
+   * Absente, la commande `/stack` n'est pas enregistrée : mieux vaut pas de commande qu'une
+   * commande qui écrirait sans demander.
+   */
+  confirmer?: UserConfirmer;
 }
 
 export type WorkspaceServicesFactory = (args: WorkspaceServicesArgs) => Promise<WorkspaceServices>;

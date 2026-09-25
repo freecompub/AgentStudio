@@ -63,7 +63,7 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; allowedPrograms?: string[] }) {
+  async function ouvrir(opts: { profil?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
     if (opts.profil !== undefined) {
@@ -71,6 +71,7 @@ describe("Services d'un projet (J2)", () => {
       await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
     }
     const posts: string[] = [];
+    const ecrits: string[] = [];
     const services = await workspaceServicesFactory({
       extensions: [],
       stacks: [
@@ -92,13 +93,18 @@ describe("Services d'un projet (J2)", () => {
       clock: fixedClock(),
       ids: sequentialIds("id-"),
     })({
-      workspace: { ...fakeWorkspace(), root: racine },
+      workspace: {
+        ...fakeWorkspace(),
+        root: racine,
+        files: { ...fakeWorkspace().files, list: async () => opts.fichiers ?? [], write: async (rel, c) => void ecrits.push(`${rel}\n${c}`) },
+      },
       runtime: async () => new ScriptedRuntime(),
       onTask: () => {},
       onInteractions: () => {},
       onPost: (_e, md) => posts.push(md),
+      ...(opts.confirmer ? { confirmer: { confirm: async () => opts.confirmer! } } : {}),
     });
-    return { services, posts, racine, cleanup };
+    return { services, posts, ecrits, racine, cleanup };
   }
 
   const PROFIL_VALIDE = `
@@ -135,6 +141,47 @@ infrastructureModules: [django]
       await services.dispose();
       await cleanup();
     }
+  });
+
+  it("la commande /stack est routable dès qu'un projet est ouvert, sans aucune extension", async () => {
+    // Elle appartient au cœur : elle décrit le projet, pas le travail d'une extension.
+    const { services, posts, cleanup } = await ouvrir({ confirmer: "deny" });
+    expect(services.commands().map((c) => c.invocation)).toContain("stack");
+    expect(await services.route("/stack")).toEqual({ kind: "handled" });
+    expect(posts.at(-1)).toMatch(/typescript/);
+    await cleanup();
+  });
+
+  it("/stack doctor décrit le profil déclaré, et dit ce qu'il n'a pas vérifié", async () => {
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE, allowedPrograms: ["pytest"], confirmer: "deny" });
+    await services.route("/stack doctor");
+    expect(posts.at(-1)).toMatch(/Diagnostic du profil/);
+    expect(posts.at(-1)).toMatch(/canari/i);
+    await cleanup();
+  });
+
+  it("/stack init propose un profil puis n'écrit rien quand l'utilisateur refuse", async () => {
+    const { services, posts, ecrits, cleanup } = await ouvrir({ confirmer: "deny", fichiers: ["pyproject.toml", "tests/test_a.py"] });
+    await services.route("/stack init");
+    expect(posts.at(-2)).toMatch(/```yaml/);
+    expect(posts.at(-1)).toMatch(/rien n'a été écrit/i);
+    expect(ecrits).toEqual([]);
+    await cleanup();
+  });
+
+  it("/stack init écrit le profil après accord, à l'emplacement versionné", async () => {
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"] });
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    expect(ecrits[0]).toMatch(/^\.agent-studio\/stack\.yaml\n/);
+    expect(ecrits[0]).toMatch(/id: python/);
+    await cleanup();
+  });
+
+  it("sans confirmateur, /stack n'est pas enregistrée : mieux vaut pas de commande qu'une écriture sans accord", async () => {
+    const { services, cleanup } = await ouvrir({});
+    expect(services.commands().map((c) => c.invocation)).not.toContain("stack");
+    await cleanup();
   });
 
   it("sans profil, rien n'est dit et la détection s'applique", async () => {

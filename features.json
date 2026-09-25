@@ -76,9 +76,9 @@
     {
       "id": "j5-commande-stack",
       "title": "La commande /stack est disponible dans la conversation",
-      "verify": "pnpm vitest run --project desktop -t '/stack'",
-      "passes": false,
-      "notes": "La logique existe (j5-stack-init-doctor) ; reste à l'enregistrer dans le registre de commandes, à lister le disque et à écrire `.agent-studio/stack.yaml`."
+      "verify": "pnpm vitest run --project desktop test/stack-command.test.ts test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "Trois formes : `/stack` (état), `/stack doctor` (diagnostic statique), `/stack init` (proposition, confirmation, écriture). Commande du CŒUR, pas d'une extension : elle décrit le projet et reste disponible sans aucune extension installée. Rien n'est écrit sans que l'utilisateur ait vu le YAML complet et approuvé — la demande nomme les programmes que le profil lancera, seule information qu'on ne devine pas d'un identifiant de stack. Sans confirmateur, la commande n'est pas enregistrée. doctor dit ce qu'il n'a PAS vérifié : rien n'est exécuté, les canaris n'ont pas tourné."
     },
     {
       "id": "j5-lecteur-tap",
@@ -120,7 +120,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "884 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "939 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",
