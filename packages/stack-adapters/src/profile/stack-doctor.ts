@@ -27,6 +27,9 @@ export function proposeProfile(indices: IndicesDuProjet): string | null {
 
 export type { Constat, Gravite } from "./constat.js";
 
+/** Genres de canaris sans lesquels le diagnostic laisse un trou connu. */
+const ESSENTIELS = ["passed", "assertion", "syntax"] as const;
+
 export interface DiagnosticDeps {
   /** Le programme est-il lançable (présent dans le PATH, ou installé localement) ? */
   programmeTrouvable(programme: string): boolean;
@@ -80,11 +83,18 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
 
   if (!profile.lint) constats.push({ gravite: "avertissement", message: "Aucun linter déclaré : la qualité de forme ne sera pas mesurée." });
   if (!profile.mutation) constats.push({ gravite: "avertissement", message: "Aucun outil de mutation déclaré : la porte de mutation ne sera pas disponible." });
-  if (profile.canaries.length === 0)
+  // Le trio `passed` / `assertion` / `syntax` est le minimum utile : sans `syntax`, rien ne
+  // vérifie qu'une erreur de compilation ne passe pas pour un rouge légitime, et c'est de cette
+  // distinction que dépendent les portes RED. Se contenter de signaler une liste VIDE laisserait
+  // passer un profil qui ne déclare qu'un canari `passed`, dont doctor dirait « aucun problème ».
+  const manquants = ESSENTIELS.filter((k) => !profile.canaries.some((c) => c.kind === k));
+  if (manquants.length > 0)
     constats.push({
       gravite: "avertissement",
       message:
-        "Aucun canari déclaré : le classement des échecs ne sera pas vérifié. C'est de lui que dépendent les portes RED — sans canari, rien ne garantit qu'une erreur de syntaxe soit distinguée d'une assertion fausse.",
+        profile.canaries.length === 0
+          ? "Aucun canari déclaré : le classement des échecs ne sera pas vérifié, alors que les portes RED en dépendent."
+          : `Canaris manquants : ${manquants.map((k) => `\`${k}\``).join(", ")}. Sans eux, ce que ces genres éprouvent n'est pas vérifié — \`syntax\` en particulier est le seul à prouver qu'une erreur de compilation ne passe pas pour un rouge légitime.`,
     });
   if (profile.infrastructureModules.length === 0)
     constats.push({
@@ -167,9 +177,9 @@ detect: [pyproject.toml]
 tests:
   command: [pytest, "--junit-xml={rapport}"]
   report: junit-xml
-lint:
-  command: [ruff, check, --output-format=json, "--", "{fichiers}"]
-  report: eslint-json
+# Aucune section lint ici : ruff ne produit pas le format qu'attend le lecteur eslint-json, et
+# aucun lecteur ruff-json n'est encore écrit. La déclarer donnerait une porte qui ne mesure jamais
+# rien sans jamais le dire — n'annoncer un lecteur qu'une fois écrit.
 layout:
   acceptanceTests: ["tests/acceptance/**"]
   unitTests: ["tests/**"]

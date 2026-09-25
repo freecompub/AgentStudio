@@ -5,6 +5,53 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — La revue a trouvé treize défauts, dont deux exploitables
+
+Revue de `packages/stack-adapters` sur la PR #5. Treize constats, tous corrigés. Les quatre qui
+méritent d'être retenus.
+
+**Un lien symbolique du dépôt détournait l'écriture d'un canari.** Le contrôle de confinement
+était **purement textuel** — `resolve` puis `relative` —, et `resolve` ne suit pas les liens. Un
+dépôt portant `tests` → un dossier de l'utilisateur, reproduit fidèlement par `git worktree`, plus
+un profil déclarant `file: tests/x.py` : le chemin n'a aucun `..`, donc il passait, et l'écriture
+atterrissait dehors avec un contenu choisi par le profil, avant d'être supprimée. Écraser puis
+détruire un fichier de l'utilisateur. → `chemin-sur.ts` résout les liens. Et le plus rageant :
+`packages/core/src/guards/real-path.ts` existe **pour cette attaque exacte**, je l'ai écrit
+avant-hier, et `progress.md` porte déjà la phrase « tout chemin comparé doit passer par
+`realPath` ». Je ne l'ai pas appliquée à un chemin que j'**écris**.
+
+**Quatorze globstars figeaient l'application pendant 170 secondes.** `**/` devient `(?:.*/)?`, et
+deux `.*` qui se suivent font revenir le moteur sur ses pas de façon exponentielle. Mesuré :
+`170,4 s` pour **un seul** `test()`, dans le processus principal, sur un motif venu du `layout` du
+dépôt. Les suites de globstars sont maintenant repliées en une — même sens, plus d'explosion.
+
+**Un `testFilePattern` vide faisait de chaque fichier un fichier de test.** `[].join("|")` rend la
+chaîne vide, et `new RegExp("")` reconnaît tout. Dans l'extension, `isTestFile` renvoyait alors
+vrai partout : la garde qui interdit d'écrire du code de production en phase rouge n'interdisait
+plus rien, et l'adaptateur se contredisait lui-même. Le schéma exige désormais un emplacement de
+test, et le motif de repli est `(?!)`.
+
+**Je m'étais trompé sur ma propre porte.** J'avais écrit que la porte RED n'accepte que
+`assertion` et `missing_symbol`. Elle ne **rejette** que `other_error` : un échec **non classé la
+franchit**. Mon oracle notait ce cas en avertissement en affirmant l'inverse du vrai. La règle est
+maintenant écrite dans le sens du rejet, pas de l'acceptation — énumérer ce qui est accepté invite
+à oublier ce qui passe par défaut. Et l'oracle jugeait **le premier échec seulement**, alors que la
+porte s'arrête sur la première entrée qui l'arrange : il juge désormais tous les échecs, le pire
+l'emportant.
+
+**Trois autres du même genre**, tous « une porte atteste ce qu'elle n'a pas mesuré » : un rapport
+lisible mais **vide** compté comme favorable ; un canari `syntax` silencieusement ignoré par le
+lanceur ramené à un avertissement, alors que c'est le pire cas — une suite « verte » sur du code
+qui ne compile pas ; et le modèle Python qui routait `ruff` vers le lecteur `eslint-json`, dont le
+schéma ne peut rien lire : une porte de lint qui n'aurait **jamais** rien mesuré, sans jamais le
+dire. Section `lint` retirée du modèle.
+
+→ La leçon n'est pas neuve, elle est seulement plus précise : **je corrige ce défaut, puis je le
+réintroduis ailleurs dans la même semaine.** Trois fois le 24/09, quatre fois ici. Il ne suffit pas
+de le chercher là où on vient de le corriger.
+
+---
+
 ## 25/09 — `/stack doctor` exécute enfin ce qu'il diagnostique
 
 **Fait.** `Repository.worktree()` dans le paquet workspace, et les canaris branchés dessus. Le

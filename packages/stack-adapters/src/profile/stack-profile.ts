@@ -1,5 +1,6 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { JETON_RAPPORT } from "./tokens.js";
 
 /**
  * Profil de stack déclaratif (J5, O11) : un projet décrit sa chaîne au lieu qu'un adaptateur
@@ -17,6 +18,17 @@ import { z } from "zod";
  */
 export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "swiftlint-json", "muter-json"] as const;
 export type ReportReader = (typeof REPORT_READERS)[number];
+
+/**
+ * Quel lecteur va avec quelle section. Sans ce découpage, un profil pouvait déclarer
+ * `mutation: { report: vitest-json }` : le schéma l'acceptait, et l'adaptateur appelait de toute
+ * façon le lecteur de mutation — le lecteur annoncé n'était jamais honoré, et rien ne le disait.
+ */
+const LECTEURS_PAR_SECTION = {
+  tests: ["junit-xml", "vitest-json"],
+  lint: ["eslint-json", "swiftlint-json"],
+  mutation: ["muter-json"],
+} as const satisfies Record<"tests" | "lint" | "mutation", readonly ReportReader[]>;
 
 const commande = z
   .object({
@@ -48,7 +60,14 @@ const canari = z
       .string()
       .min(1)
       .refine((f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f), "`file` doit être un chemin relatif à la racine du projet.")
-      .refine((f) => !f.split(/[\\/]/).includes(".."), "`file` ne doit pas contenir `..` : un canari s'écrit dans le projet, jamais hors de lui."),
+      .refine((f) => !f.split(/[\\/]/).includes(".."), "`file` ne doit pas contenir `..` : un canari s'écrit dans le projet, jamais hors de lui.")
+      .refine(
+        (f) => f.includes(JETON_MARQUE),
+        // Sans marque dans le nom, `file: Tests/MesTests.swift` écraserait ce fichier pour la
+        // durée du diagnostic puis le supprimerait : les canaris suivants s'exécuteraient contre
+        // une suite amputée, et les constats décriraient un projet qui n'est pas celui de l'utilisateur.
+        `\`file\` doit contenir la marque ${JETON_MARQUE}, sans quoi le canari écraserait un fichier existant du projet.`,
+      ),
     content: z.string().min(1),
   })
   .strict()
@@ -73,7 +92,14 @@ const schema = z
         unitTests: z.array(z.string()).default([]),
         sources: z.array(z.string()).default([]),
       })
-      .strict(),
+      .strict()
+      // Sans aucun emplacement de test, rien ne distingue un test du code de production : la
+      // garde d'écriture de la phase rouge n'a plus de périmètre, et les portes TDD ne peuvent
+      // plus rien juger. Refuser vaut mieux que laisser un profil dont les portes sont creuses.
+      .refine(
+        (l) => l.unitTests.length > 0 || l.acceptanceTests.length > 0,
+        "`layout` doit déclarer au moins un emplacement de test (`unitTests` ou `acceptanceTests`) : sans lui, rien ne distingue un test du code de production.",
+      ),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -121,6 +147,22 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     const programme = c.command[0]!;
     if (!autorises.has(programme))
       return { error: `Profil de stack refusé : « ${programme} » (${section}) n'est pas un programme autorisé.` };
+
+    // Le lecteur doit décrire ce que la section produit. Sinon l'adaptateur appelait celui de la
+    // section quoi qu'il arrive, et le lecteur annoncé n'était jamais honoré.
+    const attendus: readonly ReportReader[] = LECTEURS_PAR_SECTION[section];
+    if (!attendus.includes(c.report))
+      return {
+        error: `Profil de stack refusé : ${section}.report — « ${c.report} » ne décrit pas ce que produit \`${section}\` ; attendu ${attendus.map((r) => `« ${r} »`).join(" ou ")}.`,
+      };
+
+    // Le lint est lu sur la sortie standard, jamais dans un fichier : `{rapport}` y devenait la
+    // chaîne vide, l'outil écrivait nulle part, et la porte disait « rien n'a été jugé » sans
+    // jamais dire pourquoi.
+    if (section === "lint" && c.command.some((a) => a.includes(JETON_RAPPORT)))
+      return {
+        error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` n'a pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
+      };
   }
 
   return { profile: parsed.data };

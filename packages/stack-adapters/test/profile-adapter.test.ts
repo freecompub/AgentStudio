@@ -52,6 +52,34 @@ beforeEach(async () => {
 });
 afterEach(() => rm(racine, { recursive: true, force: true }));
 
+describe("Un profil sans emplacement de test ne peut pas rendre tout le projet testable", () => {
+  const SANS_TESTS = `
+id: python
+detect: [pyproject.toml]
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+  report: junit-xml
+layout:
+  sources: ["src/**"]
+infrastructureModules: []
+`;
+
+  it("le profil est refusé : sans emplacement de test, la porte RED n'a plus de périmètre", () => {
+    const r = parseStackProfile(SANS_TESTS, { allowedPrograms: ["pytest"] });
+    expect("error" in r ? r.error : null).toMatch(/unitTests|acceptanceTests/);
+  });
+
+  it("et si un tel profil passait quand même, son motif ne doit RIEN reconnaître", () => {
+    // `[].join("|")` rend la chaîne vide, et `new RegExp("")` reconnaît TOUT : l'extension
+    // (extension-host/src/child/runtime.ts) reconstruit un RegExp depuis ce motif, si bien que
+    // `isTestFile` y renverrait vrai pour chaque fichier — la garde d'écriture de la phase rouge
+    // deviendrait inopérante, et l'adaptateur se contredirait lui-même.
+    const a = createProfileAdapter({ ...profil(), layout: { acceptanceTests: [], unitTests: [], sources: ["src/**"] } });
+    expect(new RegExp(a.testFilePattern).test("src/domaine.py")).toBe(false);
+    expect(a.isTestFile("src/domaine.py")).toBe(false);
+  });
+});
+
 describe("Adaptateur bâti sur un profil", () => {
   it("reprend l'identité, les emplacements et l'infrastructure déclarés", () => {
     const a = createProfileAdapter(profil(), { runner: runner(sortie()) });

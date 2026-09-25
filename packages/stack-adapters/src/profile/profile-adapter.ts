@@ -36,7 +36,12 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     id: profile.id as StackAdapter["id"],
     layout: profile.layout,
     infrastructureModules: profile.infrastructureModules,
-    testFilePattern: testGlobs.map((g) => globToRegExp(g).source).join("|"),
+    // `[].join("|")` rend la chaîne vide, et `new RegExp("")` reconnaît TOUT. L'extension
+    // reconstruit un RegExp depuis ce motif (extension-host) : un motif vide y ferait de chaque
+    // fichier un fichier de test, et la garde d'écriture de la phase rouge n'interdirait plus
+    // rien. `(?!)` ne reconnaît jamais rien, ce qui est le repli sûr et s'accorde avec
+    // `isTestFile` juste en dessous.
+    testFilePattern: testGlobs.length === 0 ? "(?!)" : testGlobs.map((g) => globToRegExp(g).source).join("|"),
     isTestFile: (p) => motifs(testGlobs).some((re) => re.test(p.replaceAll("\\", "/"))),
 
     async detect(root) {

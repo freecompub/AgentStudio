@@ -87,3 +87,22 @@ describe("parseVitestReport — racine passant par un lien symbolique", () => {
     }
   });
 });
+
+describe("Un plantage natif n'est pas une assertion", () => {
+  // Ces messages contiennent « Assertion … failed » sans être des assertions de test : ce sont
+  // des abandons de processus. Classés `assertion`, la porte RED les accepterait comme un rouge
+  // légitime et validerait un pas dont le test a tué le lanceur.
+  it.each([
+    "../src/node_file.cc:123: Assertion `(ptr) != nullptr' failed.",
+    "Assertion failed: (index < size), function at, file ring.c, line 42.",
+    "Aborted (core dumped)",
+    "Segmentation fault",
+  ])("« %s » → other_error", (message) => {
+    expect(classifyFailure(message)).toBe("other_error");
+  });
+
+  it("une vraie assertion de test reste classée `assertion`", () => {
+    expect(classifyFailure("AssertionError: expected 1 to be 2")).toBe("assertion");
+    expect(classifyFailure("XCTAssertEqual failed: (\"1\") is not equal to (\"2\")")).toBe("assertion");
+  });
+});

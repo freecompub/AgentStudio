@@ -113,7 +113,14 @@
       "title": "Une porte ne produit jamais de fait sur ce qu'elle n'a pas mesuré",
       "verify": "pnpm vitest run --project stack-adapters test/lint-adapters.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
       "passes": true,
-      "notes": "Régressé trois fois le 24/09 : repli `|| \"[]\"`, filtre severity SwiftLint, fichier ignoré par ESLint. Vérifier ce point à chaque ajout de capacité."
+      "notes": "Régressé trois fois le 24/09 (repli `|| \"[]\"`, filtre severity SwiftLint, fichier ignoré par ESLint), et la revue du 26/09 en a trouvé quatre de plus dans les canaris : rapport lisible mais VIDE compté comme favorable, canari `syntax` silencieusement ignoré ramené à un avertissement, échec des canaris qui ne devenait pas un problème, et modèle Python routant ruff vers le lecteur eslint-json — porte qui n'aurait jamais rien mesuré. Vérifier ce point à chaque ajout de capacité, c'est le défaut qui revient le plus."
+    },
+    {
+      "id": "profil-contenu-non-fiable",
+      "title": "Un profil de stack hostile ne peut ni écrire hors du projet ni figer l'application",
+      "verify": "pnpm vitest run --project stack-adapters test/glob.test.ts test/canaris.test.ts",
+      "passes": true,
+      "notes": "Deux attaques trouvées par la revue du 26/09, toutes deux exploitables par un fichier du dépôt. 1) Un lien symbolique dans le dépôt, reproduit par `git worktree`, détournait l'écriture d'un canari hors de la copie isolée — contenu choisi par le profil, puis supprimé. Le contrôle était purement textuel ; `chemin-sur.ts` résout désormais les liens. 2) Quatorze globstars dans `layout` prenaient 170 SECONDES pour un seul `test()` dans le processus principal ; les suites de globstars sont repliées. Un motif venu du dépôt suffisait à figer l'application."
     },
     {
       "id": "echecs-dans-la-conversation",
@@ -127,7 +134,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "955 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "979 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",
