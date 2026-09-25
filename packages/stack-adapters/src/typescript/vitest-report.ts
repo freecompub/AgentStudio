@@ -21,9 +21,15 @@ const reportSchema = z.object({
   ),
 });
 
+/**
+ * Motifs communs aux familles de lanceurs de tests. Ils servent aussi aux profils de stack
+ * (lecteur `junit-xml`), où l'outil n'est pas connu d'avance : un motif propre à Vitest y
+ * classerait tout échec en « mauvaise raison », et la porte RED refuserait des rouges légitimes.
+ */
 const MISSING_SYMBOL =
-  /is not defined|is not a function|is not a constructor|Cannot find module|Failed to load url|Failed to resolve import|does not provide an export named|has no exported member/;
-const ASSERTION = /AssertionError|expect\(.*\)\.|^\s*Expected:|expected .+ to /m;
+  /is not defined|is not a function|is not a constructor|Cannot find module|Failed to load url|Failed to resolve import|does not provide an export named|has no exported member|cannot find .+ in scope|use of unresolved identifier|NameError|ModuleNotFoundError|undefined reference/i;
+const ASSERTION =
+  /AssertionError|XCTAssert\w*|expect\(.*\)\.|^\s*Expected:|expected .+ to |assertion failed|assert\w*\(|Assert\.\w+/im;
 // Codes de couleur ANSI éventuellement présents dans les messages.
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 

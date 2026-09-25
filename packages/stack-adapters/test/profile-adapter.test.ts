@@ -89,6 +89,24 @@ describe("Adaptateur bâti sur un profil", () => {
     expect(r.results.map((x) => x.status)).toEqual(["passed", "failed"]);
   });
 
+  it("classe la raison de l'échec : la porte RED en dépend", async () => {
+    // `verifyUnitRed` refuse un rouge qui n'est ni une assertion ni un symbole manquant. Sans
+    // `failureKind`, sa condition `=== "other_error"` est fausse et une erreur de syntaxe passe
+    // pour un rouge valide : la porte devient aveugle.
+    const junit = `<?xml version="1.0"?><testsuites><testsuite name="s">
+      <testcase classname="C" name="assertion"><failure message="XCTAssertEqual failed: 1 is not equal to 2">x</failure></testcase>
+      <testcase classname="C" name="syntaxe"><failure message="expected declaration">y</failure></testcase>
+    </testsuite></testsuites>`;
+    const run = runner(async (_c, args) => {
+      const cible = args.find((x) => x.startsWith("--junit-xml="))!.slice("--junit-xml=".length);
+      await writeFile(cible, junit);
+      return sortie();
+    });
+    const r = await createProfileAdapter(profil(), { runner: run }).runTests({ root: racine });
+    expect(r.results.map((x) => x.failureKind)).toEqual(["assertion", "other_error"]);
+    expect(r.results[0]?.message).toMatch(/XCTAssertEqual/);
+  });
+
   it("le lint substitue les fichiers demandés", async () => {
     const run = runner(sortie({ stdout: "[]" }));
     const a = createProfileAdapter(profil(), { runner: run });

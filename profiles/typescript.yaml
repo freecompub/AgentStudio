@@ -1,0 +1,29 @@
+# Profil d'exemple — TypeScript avec Vitest.
+#
+# À copier dans `.agent-studio/stack.yaml` à la racine d'un projet, puis à ajuster.
+# Les programmes nommés doivent figurer dans la liste autorisée par l'administrateur (D47, O12).
+id: typescript
+
+# Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
+# existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
+detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
+
+tests:
+  command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
+  report: vitest-json
+
+lint:
+  command: [eslint, --format, json, "--", "{fichiers}"]
+  report: eslint-json
+
+mutation:
+  command: [stryker, run]
+  report: muter-json
+
+layout:
+  acceptanceTests: ["tests/acceptance/**"]
+  unitTests: ["tests/**", "src/**/*.test.ts"]
+  sources: ["src/**"]
+
+# Ce qu'un domaine ne doit pas importer.
+infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]

@@ -19,10 +19,10 @@
     },
     {
       "id": "j5-profils-exemple",
-      "title": "Les adaptateurs TypeScript et Swift sont réécrits en profils YAML d'exemple",
-      "verify": "test -f profiles/typescript.yaml -a -f profiles/swift.yaml && pnpm test",
-      "passes": false,
-      "notes": "Les deux adaptateurs restent écrits à la main. Objectif : qu'ils deviennent des profils, l'adaptateur générique les exécutant."
+      "title": "Des profils d'exemple existent pour TypeScript et Swift",
+      "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
+      "passes": true,
+      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Ils NE REMPLACENT PAS encore les adaptateurs écrits à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Limites documentées dans profiles/README.md."
     },
     {
       "id": "j5-chargement-profil",
@@ -37,6 +37,20 @@
       "verify": "pnpm vitest run --project desktop test/admin-config.test.ts",
       "passes": true,
       "notes": "Liste par défaut dans admin-config (O12) : lanceurs de tests, linters, outils de mutation. Ni interpréteur, ni client réseau. Le fichier de l'administrateur REMPLACE la liste — il doit pouvoir restreindre, pas seulement élargir. Un nom avec chemin est refusé, et une configuration refusée n'autorise rien. Reste à la passer à `parseStackProfile` : voir j5-chargement-profil."
+    },
+    {
+      "id": "j5-profil-detection-par-contenu",
+      "title": "Un profil peut détecter une stack au contenu d'un fichier, pas seulement à son existence",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts -t 'detect'",
+      "passes": false,
+      "notes": "L'adaptateur TypeScript vérifie que `vitest` figure dans les dépendances du package.json ; un profil ne sait dire que « ce fichier existe », ce qui est plus fragile."
+    },
+    {
+      "id": "j5-profil-architecture",
+      "title": "Un profil peut fournir l'analyse des imports (règle de dépendance)",
+      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'architecture'",
+      "passes": false,
+      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
     },
     {
       "id": "j5-lecteur-tap",
@@ -78,7 +92,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "870 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "875 tests au 25/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

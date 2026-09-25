@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 25/09 — J5, profils d'exemple : ce qui résiste
+
+**Fait.** `profiles/typescript.yaml` et `profiles/swift.yaml`, valides et testés. Un test les
+relit à chaque exécution, pour qu'un exemple faux ne se propage pas.
+
+**Le trou trouvé en chemin, et il était grave.** Mon lecteur `junit-xml` générique ne produisait
+pas de `failureKind`. Or `verifyUnitRed` teste `=== "other_error"` : avec `undefined`, la
+condition est fausse et **une erreur de syntaxe passait pour un rouge valide**. Un projet piloté
+par profil aurait eu une porte RED aveugle. `parseXunit` capture désormais le message de
+`<failure>`, et le lecteur classe l'échec. Les motifs d'assertion, écrits pour Vitest, ont dû être
+élargis : `XCTAssert…` n'était pas reconnu, tout échec Swift aurait été classé « mauvaise raison ».
+→ Même leçon qu'hier, sous une autre forme : quand un chemin générique remplace un chemin
+spécifique, lister ce que le spécifique faisait **en plus**, et le refaire ou le dire.
+
+**Deux limites assumées, inscrites dans features.json.** La détection ne regarde que l'existence
+de fichiers, jamais leur contenu — l'adaptateur TypeScript vérifie `vitest` dans le package.json,
+un profil ne sait pas. Et l'analyse des imports n'a pas de section : avec un profil,
+`ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié.
+
+**Donc les profils ne remplacent pas encore les deux adaptateurs**, et `profiles/README.md` le dit
+franchement. Ils montrent ce qu'un projet tiers peut déclarer aujourd'hui, ce qui est déjà l'essentiel.
+
+---
+
 ## 25/09 — J5, brique 4 : le profil est enfin lu par l'application
 
 **Fait.** `.agent-studio/stack.yaml` est lu à l'ouverture d'un projet et l'emporte sur la

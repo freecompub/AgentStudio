@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { LintReport, ProcessRunner, StackAdapter, TestResult } from "../protocols.js";
 import { parseXunit } from "../swift/swift-report.js";
-import { parseVitestReport } from "../typescript/vitest-report.js";
+import { classifyFailure, parseVitestReport } from "../typescript/vitest-report.js";
 import { parseEslintReport } from "../typescript/eslint-report.js";
 import { parseSwiftLintReport } from "../swift/swiftlint-report.js";
 import { parseMuterReport } from "../swift/muter-report.js";
@@ -128,7 +128,14 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
 
 function lireTests(reader: StackProfile["tests"]["report"], brut: string, root: string): TestResult[] {
   if (reader === "junit-xml")
-    return parseXunit(brut).map((c) => ({ id: `${c.classname}.${c.name}`, file: c.classname, status: c.status }));
+    return parseXunit(brut).map((c) => ({
+      id: `${c.classname}.${c.name}`,
+      file: c.classname,
+      status: c.status,
+      // La porte RED distingue un rouge légitime — assertion, symbole manquant — d'une erreur
+      // de syntaxe. Sans classification, elle laisserait passer la seconde.
+      ...(c.status === "failed" ? { failureKind: classifyFailure(c.message ?? ""), ...(c.message ? { message: c.message } : {}) } : {}),
+    }));
   if (reader === "vitest-json") return parseVitestReport(JSON.parse(brut), root);
   throw new Error(`Le format « ${reader} » ne décrit pas des résultats de tests.`);
 }
