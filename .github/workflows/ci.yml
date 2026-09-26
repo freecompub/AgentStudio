@@ -2,12 +2,17 @@
 # Aucun appel réel au LLM (§16) : les tests d'intégration utilisent un `AgentRuntime` scripté.
 name: CI
 
+# Le push sur une branche suffit : GitHub rattache ses vérifications à la pull request par le SHA,
+# si bien qu'une PR affiche bien ses deux checks. Le déclencheur `pull_request` a été RETIRÉ, parce
+# qu'il n'apportait rien ici : une PR interne est déjà couverte par le push de sa branche, et
+# l'éviter par une condition `if:` produisait deux checks « Skipped » à côté des deux verts — une
+# pipe qui a l'air en panne alors qu'elle passe.
+#
+# À restaurer le jour où le dépôt acceptera des contributions venues de FORKS externes : leurs
+# commits ne déclenchent pas de push ici, donc rien ne les vérifierait.
 on:
-  # Toutes les branches : le travail reste vérifié même hors pull request — une PR fusionnée
-  # cesse de déclencher la CI sur sa branche.
   push:
     branches: ["**"]
-  pull_request:
 
 # Une PR mise à jour annule le run précédent, encore en cours.
 concurrency:
@@ -20,9 +25,6 @@ permissions:
 jobs:
   verification:
     name: Types et tests
-    # Une PR interne est déjà couverte par le push sur sa branche : on ne la vérifie deux fois
-    # que si elle vient d'un dépôt externe, dont les commits n'ont pas déclenché de push ici.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -69,7 +71,6 @@ jobs:
   bout-en-bout:
     name: Essais de bout en bout (Electron)
     needs: verification
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
