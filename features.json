@@ -134,7 +134,14 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "1004 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "1011 tests au 26/09, plus 2 essais de bout en bout (`pnpm e2e`). La CI lance les deux à chaque poussée."
+    },
+    {
+      "id": "essais-bout-en-bout",
+      "title": "La vraie application Electron démarre et ouvre un projet, vérifié en CI",
+      "verify": "pnpm build && pnpm e2e",
+      "passes": true,
+      "notes": "Playwright pilote la VRAIE application : vrai processus principal, vrai préchargement, vrai IPC. Aucune requête à Copilot — le mode d'essai (`mode-essai.ts`) substitue un runtime scripté, et il est IMPOSSIBLE dans une application empaquetée (garde `!app.isPackaged`, testée). Job de CI séparé : il exige le binaire Electron que le job principal ne télécharge pas. Couvre la classe de défauts la plus coûteuse — les trois bugs de câblage du 24/09. Vérifie aussi que le profil utilisateur est jetable (`--user-data-dir`), sans quoi l'essai lirait et écraserait les réglages réels du développeur. PIÈGE ÉVITÉ : la première version affirmait `getByRole(\"textbox\")`, qui matchait un champ de l'écran PROJET — l'essai passait sans avoir ouvert le projet."
     },
     {
       "id": "lint-execute-en-vrai",
@@ -162,7 +169,7 @@
       "title": "Le paquet .asx de skraft s'installe depuis l'application",
       "verify": "MANUEL : pnpm ext:build && pnpm ext:pack, puis Extensions → Installer depuis un fichier",
       "passes": false,
-      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo)."
+      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo). Devient atteignable maintenant que les essais de bout en bout existent : `mode-essai.ts` expose déjà AGENT_STUDIO_ESSAI_PAQUET pour le sélecteur de fichier."
     },
     {
       "id": "mesures-reelles-s6",

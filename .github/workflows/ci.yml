@@ -56,3 +56,49 @@ jobs:
 
       - name: Construire l'application
         run: pnpm build
+
+  # Essais de bout en bout : la VRAIE application Electron, lancée depuis son build.
+  #
+  # Job séparé pour une raison concrète : il exige le binaire Electron (~250 Mo), que le job
+  # ci-dessus ne télécharge pas. Il ne part qu'une fois les types et la suite verts — inutile de
+  # payer ce téléchargement pour une branche qui ne compile pas.
+  #
+  # Aucune requête à Copilot : l'application démarre en mode d'essai, runtime scripté
+  # (apps/desktop/src/main/mode-essai.ts), et ce mode est impossible dans une application
+  # empaquetée.
+  bout-en-bout:
+    name: Essais de bout en bout (Electron)
+    needs: verification
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      # Sans ELECTRON_SKIP_BINARY_DOWNLOAD, contrairement au job précédent : ici le binaire sert.
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Construire l'application
+        run: pnpm build
+
+      # Aucun navigateur à installer : `_electron` de Playwright pilote l'Electron du projet.
+      # `xvfb-run` fournit l'affichage que le runner n'a pas.
+      - name: Lancer les essais
+        run: xvfb-run -a pnpm e2e
+
+      - name: Verser les traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: essais-bout-en-bout
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

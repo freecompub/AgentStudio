@@ -5,6 +5,49 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — La vraie application Electron tourne en CI, sans jamais appeler Copilot
+
+**Fait.** Playwright pilote l'application réelle : vrai processus principal, vrai préchargement,
+vrai IPC. Deux essais — démarrage jusqu'à l'écran projet, puis ouverture d'un projet jusqu'à la
+conversation — plus la vérification qu'**aucune erreur n'est écrite en console**. Job de CI séparé,
+parce qu'il exige le binaire Electron (~250 Mo) que le job principal ne télécharge pas.
+
+**Aucune requête à Copilot, c'était la consigne.** `mode-essai.ts` substitue un runtime scripté,
+une session GitHub feinte et un sélecteur de dossier sans boîte native. Le port `AgentRuntime`
+rend cela possible sans rien simuler d'autre : **seul l'adaptateur change**, tout le câblage est
+celui de production.
+
+**La garde, et c'est le point sensible.** Ce mode désactive l'authentification. Une variable
+d'environnement ne protège rien — c'est la chose la plus facile à poser. La vraie condition est
+`!app.isPackaged` : un binaire distribué ne peut pas être basculé dans ce mode, quoi qu'on mette
+dans son environnement. Sept tests verrouillent la garde, dont un qui vérifie qu'une application
+empaquetée refuse même avec la variable posée.
+
+**Deux pièges, et le second m'a eu.**
+
+*Le profil utilisateur.* Sans `--user-data-dir` vers un dossier jetable, l'essai lirait les
+réglages **réels** du développeur — dont `lastWorkspace`, qui lui ferait ouvrir un projet au
+hasard — et les écraserait. Vu avant de le subir, pour une fois.
+
+*L'assertion creuse.* Ma première version affirmait `getByRole("textbox").first()` après le clic.
+Ça passait en 1,2 s… en matchant un champ de l'écran **projet**, sans avoir jamais ouvert le
+projet. En resserrant, l'essai a échoué — et c'est là qu'il a commencé à valoir quelque chose.
+→ Deuxième fois aujourd'hui que l'assertion faible d'un essai coûteux me piège : elle passe, elle
+rassure, et elle ne dit rien. Sur ce genre d'essai, **écrire d'abord l'assertion qui échoue**.
+
+**Ce que la capture Playwright a révélé en passant.** Le titre « Que voulez-vous faire… » ne
+s'affiche que sur une conversation **vide**, et elle ne l'était pas : le dépôt jetable n'étant
+reconnu par aucun adaptateur, l'application avait posté son avertissement. Autrement dit le
+mécanisme de mise en attente des messages du 24/09 — postés avant qu'une conversation existe —
+**fonctionne dans la vraie application**, et c'est la première fois qu'on le voit. L'essai
+l'affirme désormais explicitement.
+
+**Reste à faire avant de distribuer** : `mode-essai.ts` est compilé dans le paquet, inerte mais
+présent. La garde protège l'exécution, pas la taille ni la surface de lecture. C'est écrit en tête
+du module.
+
+---
+
 ## 26/09 — Le vrai ESLint a trouvé un défaut en une seule exécution
 
 **Fait.** `test/fixtures/projet-eslint`, un vrai projet ESLint, et le lint de

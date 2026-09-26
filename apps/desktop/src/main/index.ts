@@ -7,6 +7,7 @@ import { createJsonConversationStore, createJsonLogger, createJsonPermissionRule
 import { API_VERSION } from "@agent-studio/extension-api";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
+import { fabriquesDEssai, modeEssaiActif } from "./mode-essai.js";
 import { createSwiftAdapter, createTypeScriptAdapter, findLocalSwiftToolchain } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studio/workspace";
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
@@ -153,12 +154,20 @@ async function createController(): Promise<AppController> {
   const settings = createJsonSettingsStore(join(userData, "settings.json"));
   // L'hôte retenu (github.com ou une instance Enterprise) est relu avant toute interrogation (D4).
   const authHostname = (await settings.load()).authHostname;
+
+  // Essais de bout en bout : runtime scripté, session feinte, sélecteur sans boîte native.
+  // Impossible dans une application empaquetée, quelle que soit la variable d'environnement.
+  const essai = modeEssaiActif(app) ? fabriquesDEssai() : null;
+  if (essai) logger.warn("mode d'essai actif : aucune requête ne sera envoyée à Copilot");
+
   const controller = createAppController({
-    auth: createGhAuth({
-      runner: createNodeCommandRunner(),
-      spawner: createNodeProcessSpawner(),
-      ...(authHostname ? { hostname: authHostname } : {}),
-    }),
+    auth:
+      essai?.auth ??
+      createGhAuth({
+        runner: createNodeCommandRunner(),
+        spawner: createNodeProcessSpawner(),
+        ...(authHostname ? { hostname: authHostname } : {}),
+      }),
     workspaces: {
       open: (path) => openWorkspace(path, { git }),
       clone: (url, dest) => cloneWorkspace(url, dest, { git }),
@@ -185,14 +194,16 @@ async function createController(): Promise<AppController> {
       ids: { next: () => randomUUID() },
       logger,
     }),
-    runtimeFactory: (token) =>
-      createCopilotRuntime({
-        client: createCopilotClient({ gitHubToken: token, baseDirectory: join(userData, "copilot") }),
-        logger: logger.child({ component: "runtime" }),
-      }),
+    runtimeFactory:
+      essai?.runtimeFactory ??
+      ((token) =>
+        createCopilotRuntime({
+          client: createCopilotClient({ gitHubToken: token, baseDirectory: join(userData, "copilot") }),
+          logger: logger.child({ component: "runtime" }),
+        })),
     conversations: createJsonConversationStore(join(userData, "conversations")),
     settings,
-    folderPicker: {
+    folderPicker: essai?.folderPicker ?? {
       async pick() {
         const r = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
         return r.canceled ? null : (r.filePaths[0] ?? null);

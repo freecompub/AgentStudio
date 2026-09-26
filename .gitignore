@@ -6,3 +6,7 @@ coverage/
 .DS_Store
 graphify-out/cache/
 graphify-out/.graphify_*
+
+# Traces des essais de bout en bout (Playwright).
+test-results/
+playwright-report/
