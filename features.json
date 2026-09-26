@@ -75,10 +75,10 @@
     },
     {
       "id": "canaris-contre-un-vrai-lanceur",
-      "title": "Les canaris ont tourné contre un vrai lanceur de tests",
-      "verify": "MANUEL : copier profiles/typescript.yaml dans un projet Vitest, lancer /stack doctor",
-      "passes": false,
-      "notes": "Les gabarits livrés (Vitest, XCTest, pytest) n'ont été vérifiés que par des lanceurs doublés : rien ne prouve que `vitest` découvre `src/canari_<marque>.test.ts`, ni que le canari de syntaxe produise bien ce qu'on attend. C'est justement ce que doctor est censé apprendre."
+      "title": "Les canaris tournent contre un vrai lanceur de tests, en CI",
+      "verify": "pnpm vitest run --project stack-adapters test/canaris-en-vrai.test.ts",
+      "passes": true,
+      "notes": "N'est plus manuel : `test/fixtures/projet-vitest` est un vrai projet Vitest minimal, et les canaris de `profiles/typescript.yaml` — le profil LIVRÉ, pas une copie — y sont exécutés pour de vrai. Les quatre genres ressortent `ok`, dont celui qui compte : une syntaxe cassée sort en `other_error` et non en `assertion`. Cinq exécutions de Vitest en ~5 s, aucun LLM, aucun réseau : la CI le lance à chaque poussée. Deux ajustements nécessaires et instructifs : exposer `node_modules/.bin` dans le PATH (le témoin est copié hors du dépôt), et VIDER les variables `VITEST_*`, sans quoi le Vitest fils se croit dans un worker du père."
     },
     {
       "id": "j5-commande-stack",
@@ -134,7 +134,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "992 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "994 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

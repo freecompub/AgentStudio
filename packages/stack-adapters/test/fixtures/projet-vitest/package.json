@@ -1,0 +1,7 @@
+{
+  "name": "projet-temoin-vitest",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "_pourquoi": "Projet-témoin : un vrai projet Vitest, minimal, contre lequel les canaris de /stack doctor sont exécutés pour de vrai. Hors des globs de pnpm-workspace.yaml, donc jamais installé comme paquet du dépôt."
+}

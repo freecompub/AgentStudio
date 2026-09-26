@@ -5,6 +5,40 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — Les canaris affrontent enfin un vrai lanceur, et en CI
+
+**Ce que ça change.** Tous les tests des canaris jusqu'ici employaient des lanceurs doublés : ils
+éprouvaient l'oracle, jamais les gabarits. Rien ne prouvait que `vitest` découvre
+`src/canari_<marque>.test.ts`, ni qu'un `fonctionAbsente()` produise un message que nos motifs
+reconnaissent, ni — le point crucial — qu'une syntaxe cassée ressorte en `other_error` plutôt qu'en
+`assertion`.
+
+**Fait.** `test/fixtures/projet-vitest`, un vrai projet Vitest minimal, et les canaris de
+`profiles/typescript.yaml` — **le profil livré, pas une copie** — exécutés dedans pour de vrai.
+Résultat : **les quatre genres ressortent `ok`**, y compris celui qui protège la porte RED. Cinq
+exécutions de Vitest en ~5 secondes, aucun LLM, aucun réseau : la CI le lance à chaque poussée sans
+qu'il ait fallu toucher au workflow.
+
+**Deux pièges, et ils ne s'inventent pas.** Le témoin est copié hors du dépôt, donc `vitest` n'y est
+pas installé : il faut exposer `node_modules/.bin` dans le `PATH`, comme le ferait un script pnpm.
+Et nous sommes nous-mêmes dans Vitest, qui pose des `VITEST_*` dans l'environnement : héritées, le
+Vitest fils se croit dans un worker du père. Il faut les **vider** — `ProcessOptions.env` ne sait que
+surcharger, pas supprimer.
+
+**L'assertion a été resserrée en cours de route.** Je m'étais d'abord contenté de « aucun problème ».
+Ça aurait laissé passer quatre avertissements, c'est-à-dire un classement inexact partout. Le test
+exige maintenant `ok` pour chaque genre. → Sur un test d'intégration coûteux, l'assertion faible est
+la tentation : elle passe, elle rassure, et elle ne dit rien.
+
+**Le témoin est hors des globs de `pnpm-workspace.yaml`** (`packages/*`), donc jamais installé comme
+paquet du dépôt — vérifié, pas supposé.
+
+**Prochaine étape, décidée avec le responsable.** Même traitement pour `lint-execute-en-vrai`, qui
+demande d'ajouter un vrai ESLint au dépôt (absent aujourd'hui). Puis un job Electron avec Playwright,
+**runtime d'agent moqué** : aucune requête Copilot réelle en CI, c'est une consigne explicite.
+
+---
+
 ## 26/09 — Un profil sait enfin lire une erreur de compilation
 
 **Ce que ça débloque.** Sur un langage compilé, le rouge le plus courant du cycle TDD — « la
