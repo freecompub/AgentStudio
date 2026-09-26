@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
 import { parseMuterReport } from "../swift/muter-report.js";
+import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { lireLint, lireTests } from "./read-report.js";
 import { substituer } from "./tokens.js";
 import { globToRegExp } from "../glob.js";
@@ -24,6 +25,13 @@ export interface ProfileAdapterDeps {
 }
 
 const existe = (p: string) => access(p).then(() => true, () => false);
+
+/** Erreurs de compilation, si le profil dit comment les lire. Le motif est déjà validé à la lecture. */
+function erreursDeCompilation(profile: StackProfile, sortie: string, root: string) {
+  if (!profile.buildErrors) return [];
+  const compile = compileBuildErrorSpec(profile.buildErrors);
+  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
+}
 
 export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapterDeps = {}): StackAdapter {
   const runner = deps.runner ?? createNodeProcessRunner();
@@ -62,8 +70,17 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
         const output = `${r.stdout}${r.stderr}`.slice(-20_000);
         if (r.timedOut) return { results: [], exitCode: r.exitCode, timedOut: true, output, durationMs: r.durationMs };
         const brut = await readFile(rapport, "utf8").catch(() => null);
-        if (brut === null)
-          throw new Error(`Rapport de tests absent (code ${r.exitCode}) : la commande déclarée écrit-elle bien dans {rapport} ?\n${output.slice(-2000)}`);
+        if (brut === null) {
+          // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent — la
+          // compilation s'arrête avant d'exécuter quoi que ce soit. Le profil dit comment lire ces
+          // erreurs ; sans cette section, le rouge légitime du pas RED n'atteindrait pas la porte.
+          const erreurs = erreursDeCompilation(profile, output, opts.root);
+          if (erreurs.length > 0) return { results: erreurs, exitCode: r.exitCode, timedOut: false, output, durationMs: r.durationMs };
+          throw new Error(
+            `Rapport de tests absent (code ${r.exitCode}) : la commande déclarée écrit-elle bien dans {rapport} ?` +
+              `${profile.buildErrors ? "" : " Si ce projet est compilé, déclarez `buildErrors` pour que les erreurs de compilation soient lues."}\n${output.slice(-2000)}`,
+          );
+        }
         return { results: lireTests(profile.tests.report, brut, opts.root), exitCode: r.exitCode, timedOut: false, output, durationMs: r.durationMs };
       } finally {
         await rm(rapport, { force: true });

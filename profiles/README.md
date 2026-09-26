@@ -37,6 +37,35 @@ rejettent `other_error`.
 
 Un canari par exécution : celui qui ne compile pas empêcherait les autres de s'exécuter.
 
+## Les erreurs de compilation
+
+Sur un langage compilé, un symbole absent **arrête la compilation** : la commande de test ne
+produit alors aucun rapport, et c'est pourtant le rouge le plus courant du cycle TDD — « la
+fonction que je viens d'appeler n'existe pas encore ». La section `buildErrors` dit comment lire
+ces erreurs, sans quoi ce rouge légitime n'atteint jamais la porte.
+
+```yaml
+buildErrors:
+  pattern: '^(?<file>[^\s:]+\.swift):\d+:\d+: error: (?<message>.*)$'
+  missingSymbol: ["cannot find", "no such module"]
+```
+
+Le motif est appliqué **ligne à ligne**, et les groupes nommés `file` et `message` sont
+obligatoires. `missingSymbol` liste des **sous-chaînes**, pas des expressions régulières : ce sont
+les messages qui désignent le seul échec de compilation légitime. Tout le reste — syntaxe, types,
+configuration — est classé `other_error` et rejeté par la porte RED. En cas de doute le classement
+est `other_error` : refuser un rouge correct fait perdre un tour, l'accepter à tort laisse passer
+du code qui ne compile pas.
+
+Ce motif vient du dépôt du projet, donc d'une source non fiable. Il est refusé s'il porte un
+quantificateur imbriqué (`(…+)+`, la forme qui fait exploser le moteur) ou s'il dépasse
+300 caractères, et son application est bornée en nombre de lignes comme en longueur de ligne. Un
+moteur d'expressions régulières ne s'interrompt pas : la seule protection est de ne jamais lui
+donner de quoi s'emballer.
+
+Un projet interprété n'a pas besoin de cette section : le lanceur produit un rapport même quand un
+symbole manque.
+
 ## Ce qu'un profil ne sait pas encore exprimer
 
 Ces limites sont réelles : un profil est aujourd'hui **moins capable** qu'un adaptateur écrit à la
@@ -48,11 +77,6 @@ main. Elles sont inscrites dans `features.json`.
 - **L'analyse des imports n'a pas de section.** Avec un profil, `ctx.stack.architecture()` renvoie
   `null` : la règle de dépendance n'est pas vérifiée, et la porte de fin de scénario le dit au
   lieu d'inventer un résultat. L'adaptateur Swift sait le faire, un profil non.
-- **Un échec de compilation n'est pas lu.** Quand la commande de test ne produit aucun rapport,
-  un profil s'arrête sur une erreur ; l'adaptateur Swift écrit à la main, lui, lit les erreurs de
-  compilation et les classe. Conséquence sur un langage compilé : un symbole manquant arrête la
-  compilation, et le rouge légitime du cycle TDD n'atteint jamais la porte. C'est pourquoi
-  `swift.yaml` ne déclare pas de canari `missing_symbol`.
 - **La classification des échecs est générique.** Le lecteur `junit-xml` déduit la raison d'un
   rouge — assertion, symbole manquant, autre — de motifs communs à plusieurs langages. Les
   adaptateurs écrits à la main connaissent leur outil et sont plus précis.

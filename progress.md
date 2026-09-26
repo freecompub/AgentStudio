@@ -5,6 +5,38 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — Un profil sait enfin lire une erreur de compilation
+
+**Ce que ça débloque.** Sur un langage compilé, le rouge le plus courant du cycle TDD — « la
+fonction que je viens d'appeler n'existe pas encore » — **arrête la compilation**. Le lanceur ne
+produit alors aucun rapport de tests, et l'adaptateur générique n'avait qu'une exception à offrir :
+le rouge légitime n'atteignait jamais la porte. Autrement dit les profils étaient inutilisables sur
+Swift, C#, Java, Rust — la moitié de l'intérêt du jalon.
+
+**Fait.** Section `buildErrors` : un motif appliqué **ligne à ligne**, groupes nommés `file` et
+`message` obligatoires, plus une liste de **sous-chaînes** désignant un symbole absent. Branché sur
+l'adaptateur (rapport absent → erreurs lues et classées) et sur les canaris, ce qui rend le canari
+`missing_symbol` éprouvable : `profiles/swift.yaml` déclare maintenant ses quatre genres.
+
+**Le choix qui compte.** En cas de doute, le classement est `other_error`. Refuser un rouge correct
+fait perdre un tour ; l'accepter à tort laisse passer du code qui ne compile pas. Les deux erreurs
+ne coûtent pas la même chose, donc le doute ne penche pas des deux côtés.
+
+**Des sous-chaînes, pas des expressions régulières, pour `missingSymbol`.** Deux raisons : un auteur
+de profil écrit `cannot find` sans se tromper, là où une expression régulière est un piège ; et une
+expression de plus serait une surface d'attaque de plus. Le motif de `pattern`, lui, est
+indispensable — mais borné.
+
+**La leçon de ce matin appliquée tout de suite.** Le motif vient du dépôt du projet, donc d'une
+source non fiable, et j'avais été pris ce matin même par l'explosion des globs. Donc : les
+quantificateurs imbriqués (`(…+)+`) sont refusés à la lecture, le motif est plafonné à 300
+caractères, et l'application est bornée — 20 000 lignes, 1 000 caractères par ligne, 200 fichiers
+rapportés. Un moteur d'expressions régulières ne s'interrompt pas : la seule protection est de ne
+jamais lui donner de quoi s'emballer. L'heuristique des quantificateurs imbriqués est **imparfaite
+et le commentaire le dit** — ce sont les bornes qui rattrapent ce qu'elle laisse passer.
+
+---
+
 ## 26/09 — La revue a trouvé treize défauts, dont deux exploitables
 
 Revue de `packages/stack-adapters` sur la PR #5. Treize constats, tous corrigés. Les quatre qui

@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { FailureKind, ProcessRunner, TestResult } from "../protocols.js";
+import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { cheminSous } from "./chemin-sur.js";
 import type { Constat } from "./constat.js";
 import { lireTests } from "./read-report.js";
@@ -53,9 +54,9 @@ export function jugerCanari(o: CanaryObservation): Constat {
     return {
       gravite: "probleme",
       message:
-        `${prefixe} : la commande n'a produit aucun rapport, donc aucun résultat à classer. ` +
-        `Dans un langage compilé, c'est attendu — un symbole manquant empêche la compilation — mais un profil ne sait pas encore lire les erreurs de compilation : ` +
-        `la porte RED ne verra jamais ce rouge pourtant légitime.`,
+        `${prefixe} : la commande n'a produit aucun rapport, et aucune erreur de compilation n'a pu être lue. ` +
+        `Sur un langage compilé, c'est attendu — un symbole absent arrête la compilation — mais il faut alors déclarer \`buildErrors\` ` +
+        `pour que ces erreurs soient lues ; sans quoi la porte RED ne verra jamais ce rouge pourtant légitime.`,
     };
   }
 
@@ -226,6 +227,12 @@ export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps):
   return { constats, observations };
 }
 
+/** Le motif est validé à la lecture du profil ; un refus ici ne peut donc venir que d'un profil forgé. */
+function lireErreurs(spec: NonNullable<StackProfile["buildErrors"]>, sortie: string, root: string): TestResult[] {
+  const compile = compileBuildErrorSpec(spec);
+  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
+}
+
 interface Lancement {
   rapportLu: boolean;
   results: TestResult[];
@@ -244,7 +251,14 @@ async function lancer(profile: StackProfile, deps: RunCanariesDeps): Promise<Lan
     });
     const sortie = `${r.stdout}${r.stderr}`.slice(-20_000);
     const brut = r.timedOut ? null : await readFile(rapport, "utf8").catch(() => null);
-    if (brut === null) return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
+    if (brut === null) {
+      // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent. Si le
+      // profil dit comment lire les erreurs de compilation, ces erreurs SONT le résultat — et le
+      // canari `missing_symbol` devient éprouvable là où il ne l'était pas.
+      const erreurs = profile.buildErrors ? lireErreurs(profile.buildErrors, sortie, deps.sandboxRoot) : [];
+      if (erreurs.length > 0) return { rapportLu: true, results: erreurs, exitCode: r.exitCode, sortie };
+      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
+    }
     try {
       return { rapportLu: true, results: lireTests(profile.tests.report, brut, deps.sandboxRoot), exitCode: r.exitCode, sortie };
     } catch {

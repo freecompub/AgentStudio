@@ -22,7 +22,7 @@
       "title": "Des profils d'exemple existent pour TypeScript et Swift",
       "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
       "passes": true,
-      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Ils NE REMPLACENT PAS encore les adaptateurs écrits à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Limites documentées dans profiles/README.md."
+      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Swift déclare ses quatre canaris depuis que `buildErrors` existe. Reste en dessous des adaptateurs écrits à la main sur deux points : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
     },
     {
       "id": "j5-chargement-profil",
@@ -62,9 +62,9 @@
     {
       "id": "j5-profil-echec-de-compilation",
       "title": "Un profil sait classer un échec de compilation, quand le lanceur ne produit aucun rapport",
-      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'compilation'",
-      "passes": false,
-      "notes": "Trouvé en écrivant les canaris. `createProfileAdapter.runTests` LÈVE une exception quand le rapport est absent ; l'adaptateur Swift écrit à la main, lui, lit les erreurs de compilation et les classe. Conséquence : sur un langage compilé, un profil ne peut pas produire le rouge légitime du cycle TDD — un symbole manquant arrête la compilation. C'est pourquoi profiles/swift.yaml ne déclare pas de canari `missing_symbol`."
+      "verify": "pnpm vitest run --project stack-adapters test/build-errors.test.ts",
+      "passes": true,
+      "notes": "Section `buildErrors` : un motif appliqué ligne à ligne (groupes nommés `file` et `message`) et une liste de sous-chaînes désignant un symbole absent. C'est ce qui rend les profils utilisables sur un langage compilé : le rouge le plus courant du cycle TDD — la fonction appelée n'existe pas encore — arrête la compilation, donc ne produit aucun rapport de tests. En cas de doute le classement est `other_error` : refuser un rouge correct fait perdre un tour, l'accepter à tort laisse passer du code qui ne compile pas. Le motif vient du dépôt, donc non fiable : quantificateurs imbriqués refusés, motif plafonné à 300 caractères, application bornée en lignes et en longueur de ligne. `profiles/swift.yaml` déclare désormais ses quatre canaris, `missing_symbol` compris."
     },
     {
       "id": "j5-doctor-execute",
@@ -134,7 +134,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "979 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "992 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",

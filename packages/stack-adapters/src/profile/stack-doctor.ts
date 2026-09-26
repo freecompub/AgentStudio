@@ -120,6 +120,9 @@ layout:
   unitTests: ["Tests/**"]
   sources: ["Sources/**"]
 infrastructureModules: [Infrastructure, Interface, UI, API, SwiftUI, UIKit, AppKit]
+buildErrors:
+  pattern: '^(?<file>[^\\s:]+\\.swift):\\d+:\\d+: error: (?<message>.*)$'
+  missingSymbol: ["cannot find", "no such module", "has no member", "missing argument for parameter", "extra argument"]
 canaries:
   - kind: passed
     file: Tests/Canari{marque}Tests.swift
@@ -131,6 +134,11 @@ canaries:
     content: |
       import XCTest
       final class Canari{marque}Tests: XCTestCase { func test{marque}() { XCTAssertEqual(1, 2) } }
+  - kind: missing_symbol
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { fonctionAbsente{marque}() } }
   - kind: syntax
     file: Tests/Canari{marque}Tests.swift
     content: |

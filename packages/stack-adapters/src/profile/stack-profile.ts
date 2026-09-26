@@ -1,5 +1,6 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { compileBuildErrorSpec } from "./build-errors.js";
 import { JETON_RAPPORT } from "./tokens.js";
 
 /**
@@ -100,6 +101,20 @@ const schema = z
         (l) => l.unitTests.length > 0 || l.acceptanceTests.length > 0,
         "`layout` doit déclarer au moins un emplacement de test (`unitTests` ou `acceptanceTests`) : sans lui, rien ne distingue un test du code de production.",
       ),
+    /**
+     * Comment lire les erreurs de compilation, quand la commande de test ne produit aucun
+     * rapport. Indispensable sur un langage compilé : un symbole absent y empêche la compilation,
+     * et sans cette section le rouge légitime du pas RED n'atteint jamais la porte.
+     */
+    buildErrors: z
+      .object({
+        /** Appliqué ligne à ligne ; groupes nommés `file` et `message` obligatoires. */
+        pattern: z.string().min(1),
+        /** Sous-chaînes désignant un symbole absent — le seul échec de compilation légitime. */
+        missingSymbol: z.array(z.string().min(1)).default([]),
+      })
+      .strict()
+      .optional(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -163,6 +178,13 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
       return {
         error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` n'a pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
       };
+  }
+
+  // Le motif est compilé dès la lecture, pour que son refus soit expliqué à l'auteur du profil
+  // plutôt que découvert au milieu d'une porte.
+  if (parsed.data.buildErrors) {
+    const compile = compileBuildErrorSpec(parsed.data.buildErrors);
+    if ("error" in compile) return { error: `Profil de stack refusé : ${compile.error}` };
   }
 
   return { profile: parsed.data };
