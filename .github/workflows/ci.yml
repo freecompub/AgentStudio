@@ -2,12 +2,17 @@
 # Aucun appel réel au LLM (§16) : les tests d'intégration utilisent un `AgentRuntime` scripté.
 name: CI
 
+# Le push sur une branche suffit : GitHub rattache ses vérifications à la pull request par le SHA,
+# si bien qu'une PR affiche bien ses deux checks. Le déclencheur `pull_request` a été RETIRÉ, parce
+# qu'il n'apportait rien ici : une PR interne est déjà couverte par le push de sa branche, et
+# l'éviter par une condition `if:` produisait deux checks « Skipped » à côté des deux verts — une
+# pipe qui a l'air en panne alors qu'elle passe.
+#
+# À restaurer le jour où le dépôt acceptera des contributions venues de FORKS externes : leurs
+# commits ne déclenchent pas de push ici, donc rien ne les vérifierait.
 on:
-  # Toutes les branches : le travail reste vérifié même hors pull request — une PR fusionnée
-  # cesse de déclencher la CI sur sa branche.
   push:
     branches: ["**"]
-  pull_request:
 
 # Une PR mise à jour annule le run précédent, encore en cours.
 concurrency:
@@ -20,9 +25,6 @@ permissions:
 jobs:
   verification:
     name: Types et tests
-    # Une PR interne est déjà couverte par le push sur sa branche : on ne la vérifie deux fois
-    # que si elle vient d'un dépôt externe, dont les commits n'ont pas déclenché de push ici.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -56,3 +58,61 @@ jobs:
 
       - name: Construire l'application
         run: pnpm build
+
+  # Essais de bout en bout : la VRAIE application Electron, lancée depuis son build.
+  #
+  # Job séparé pour une raison concrète : il exige le binaire Electron (~250 Mo), que le job
+  # ci-dessus ne télécharge pas. Il ne part qu'une fois les types et la suite verts — inutile de
+  # payer ce téléchargement pour une branche qui ne compile pas.
+  #
+  # Aucune requête à Copilot : l'application démarre en mode d'essai, runtime scripté
+  # (apps/desktop/src/main/mode-essai.ts), et ce mode est impossible dans une application
+  # empaquetée.
+  bout-en-bout:
+    name: Essais de bout en bout (Electron)
+    needs: verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      # Sans ELECTRON_SKIP_BINARY_DOWNLOAD, contrairement au job précédent : ici le binaire sert.
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      # Electron 44 télécharge son binaire PARESSEUSEMENT, au premier `require` : c'est
+      # `node_modules/electron/index.js` qui imprime « Downloading Electron binary... ». Le cache
+      # pnpm étant partagé avec le job précédent, qui installe en sautant ce téléchargement, il se
+      # produisait ici pendant un essai — un réseau lent aurait fait échouer un test au lieu d'une
+      # étape d'installation, désignant le mauvais coupable. Ce `require` emprunte exactement le
+      # même chemin de code, mais dans une étape à lui.
+      #
+      # (Une première tentative avec `pnpm rebuild electron` n'a rien fait : electron est déclaré
+      # dans `apps/desktop`, pas à la racine, et la commande était muette sans échouer.)
+      - name: S'assurer du binaire Electron
+        working-directory: apps/desktop
+        run: node -e "console.log('binaire Electron :', require('electron'))"
+
+      - name: Construire l'application
+        run: pnpm build
+
+      # Aucun navigateur à installer : `_electron` de Playwright pilote l'Electron du projet.
+      # `xvfb-run` fournit l'affichage que le runner n'a pas.
+      - name: Lancer les essais
+        run: xvfb-run -a pnpm e2e
+
+      - name: Verser les traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: essais-bout-en-bout
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

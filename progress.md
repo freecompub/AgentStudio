@@ -5,6 +5,117 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — La vraie application Electron tourne en CI, sans jamais appeler Copilot
+
+**Fait.** Playwright pilote l'application réelle : vrai processus principal, vrai préchargement,
+vrai IPC. Deux essais — démarrage jusqu'à l'écran projet, puis ouverture d'un projet jusqu'à la
+conversation — plus la vérification qu'**aucune erreur n'est écrite en console**. Job de CI séparé,
+parce qu'il exige le binaire Electron (~250 Mo) que le job principal ne télécharge pas.
+
+**Aucune requête à Copilot, c'était la consigne.** `mode-essai.ts` substitue un runtime scripté,
+une session GitHub feinte et un sélecteur de dossier sans boîte native. Le port `AgentRuntime`
+rend cela possible sans rien simuler d'autre : **seul l'adaptateur change**, tout le câblage est
+celui de production.
+
+**La garde, et c'est le point sensible.** Ce mode désactive l'authentification. Une variable
+d'environnement ne protège rien — c'est la chose la plus facile à poser. La vraie condition est
+`!app.isPackaged` : un binaire distribué ne peut pas être basculé dans ce mode, quoi qu'on mette
+dans son environnement. Sept tests verrouillent la garde, dont un qui vérifie qu'une application
+empaquetée refuse même avec la variable posée.
+
+**Deux pièges, et le second m'a eu.**
+
+*Le profil utilisateur.* Sans `--user-data-dir` vers un dossier jetable, l'essai lirait les
+réglages **réels** du développeur — dont `lastWorkspace`, qui lui ferait ouvrir un projet au
+hasard — et les écraserait. Vu avant de le subir, pour une fois.
+
+*L'assertion creuse.* Ma première version affirmait `getByRole("textbox").first()` après le clic.
+Ça passait en 1,2 s… en matchant un champ de l'écran **projet**, sans avoir jamais ouvert le
+projet. En resserrant, l'essai a échoué — et c'est là qu'il a commencé à valoir quelque chose.
+→ Deuxième fois aujourd'hui que l'assertion faible d'un essai coûteux me piège : elle passe, elle
+rassure, et elle ne dit rien. Sur ce genre d'essai, **écrire d'abord l'assertion qui échoue**.
+
+**Ce que la capture Playwright a révélé en passant.** Le titre « Que voulez-vous faire… » ne
+s'affiche que sur une conversation **vide**, et elle ne l'était pas : le dépôt jetable n'étant
+reconnu par aucun adaptateur, l'application avait posté son avertissement. Autrement dit le
+mécanisme de mise en attente des messages du 24/09 — postés avant qu'une conversation existe —
+**fonctionne dans la vraie application**, et c'est la première fois qu'on le voit. L'essai
+l'affirme désormais explicitement.
+
+**Reste à faire avant de distribuer** : `mode-essai.ts` est compilé dans le paquet, inerte mais
+présent. La garde protège l'exécution, pas la taille ni la surface de lecture. C'est écrit en tête
+du module.
+
+---
+
+## 26/09 — Le vrai ESLint a trouvé un défaut en une seule exécution
+
+**Fait.** `test/fixtures/projet-eslint`, un vrai projet ESLint, et le lint de
+`profiles/typescript.yaml` qui y tourne pour de vrai. ESLint a été ajouté au dépôt pour cela
+(`pnpm add -w -D eslint`), avec l'accord du responsable — il n'y était pas.
+
+**Et dès le premier lancement, trois tests sur cinq ont échoué — pour une bonne raison.** Les
+outils rapportent des chemins **réels**, et sous macOS `tmpdir()` passe par `/var`, lien vers
+`/private/var`. Sans résoudre la racine, `relative()` rendait
+`../../../../private/var/…/src/a.js` au lieu de `src/a.js`. Or les portes rapprochent `analyzed`
+des fichiers qu'elles ont demandés : plus rien ne correspondait, et **la porte concluait « rien
+n'a été jugé » alors que le linter avait parfaitement travaillé.**
+
+**Trois lecteurs sur quatre avaient le défaut.** Seul `parseVitestReport` résolvait la racine —
+et je l'y avais mis exprès, avec un commentaire expliquant pourquoi. Les trois autres répétaient
+le même calcul sans la résolution. `relatifDepuis` est désormais partagé par les quatre.
+
+→ C'est la **troisième fois cette semaine** que le lien symbolique de `/var` mord : les tests de
+J1 le 24, l'écriture des canaris le 26 au matin, la lecture des rapports le 26 au soir. Chaque
+fois un endroit différent, chaque fois la même cause. Le bon réflexe n'est pas « attention aux
+liens » mais « **tout chemin qui traverse une frontière de processus passe par un helper
+commun** ».
+
+**Ce que ce témoin prouve exactement.** Un fichier propre, un fichier fautif, et un fichier
+**ignoré par la configuration** : ce dernier doit être absent d'`analyzed`, ce qui éprouve contre
+le vrai outil le défaut du 24/09. Plus un fichier inexistant, pour vérifier qu'une sortie vide ne
+se conclut pas en « aucune erreur ».
+
+**Deux limites assumées.** Les fichiers du témoin sont en JavaScript : l'analyseur par défaut
+d'ESLint ne lit pas les annotations de type, et ajouter `typescript-eslint` pour un témoin serait
+disproportionné. Et **SwiftLint reste non couvert** — il exigerait un runner macOS en CI.
+
+---
+
+## 26/09 — Les canaris affrontent enfin un vrai lanceur, et en CI
+
+**Ce que ça change.** Tous les tests des canaris jusqu'ici employaient des lanceurs doublés : ils
+éprouvaient l'oracle, jamais les gabarits. Rien ne prouvait que `vitest` découvre
+`src/canari_<marque>.test.ts`, ni qu'un `fonctionAbsente()` produise un message que nos motifs
+reconnaissent, ni — le point crucial — qu'une syntaxe cassée ressorte en `other_error` plutôt qu'en
+`assertion`.
+
+**Fait.** `test/fixtures/projet-vitest`, un vrai projet Vitest minimal, et les canaris de
+`profiles/typescript.yaml` — **le profil livré, pas une copie** — exécutés dedans pour de vrai.
+Résultat : **les quatre genres ressortent `ok`**, y compris celui qui protège la porte RED. Cinq
+exécutions de Vitest en ~5 secondes, aucun LLM, aucun réseau : la CI le lance à chaque poussée sans
+qu'il ait fallu toucher au workflow.
+
+**Deux pièges, et ils ne s'inventent pas.** Le témoin est copié hors du dépôt, donc `vitest` n'y est
+pas installé : il faut exposer `node_modules/.bin` dans le `PATH`, comme le ferait un script pnpm.
+Et nous sommes nous-mêmes dans Vitest, qui pose des `VITEST_*` dans l'environnement : héritées, le
+Vitest fils se croit dans un worker du père. Il faut les **vider** — `ProcessOptions.env` ne sait que
+surcharger, pas supprimer.
+
+**L'assertion a été resserrée en cours de route.** Je m'étais d'abord contenté de « aucun problème ».
+Ça aurait laissé passer quatre avertissements, c'est-à-dire un classement inexact partout. Le test
+exige maintenant `ok` pour chaque genre. → Sur un test d'intégration coûteux, l'assertion faible est
+la tentation : elle passe, elle rassure, et elle ne dit rien.
+
+**Le témoin est hors des globs de `pnpm-workspace.yaml`** (`packages/*`), donc jamais installé comme
+paquet du dépôt — vérifié, pas supposé.
+
+**Prochaine étape, décidée avec le responsable.** Même traitement pour `lint-execute-en-vrai`, qui
+demande d'ajouter un vrai ESLint au dépôt (absent aujourd'hui). Puis un job Electron avec Playwright,
+**runtime d'agent moqué** : aucune requête Copilot réelle en CI, c'est une consigne explicite.
+
+---
+
 ## 26/09 — Un profil sait enfin lire une erreur de compilation
 
 **Ce que ça débloque.** Sur un langage compilé, le rouge le plus courant du cycle TDD — « la

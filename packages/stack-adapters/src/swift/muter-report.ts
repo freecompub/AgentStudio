@@ -1,5 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import { z } from "zod";
+import { relatifDepuis } from "../chemin-relatif.js";
 import type { MutationReport } from "../protocols.js";
 
 /**
@@ -29,7 +30,7 @@ export function parseMuterReport(raw: unknown, root: string): MutationReport {
   return {
     score: r.data.globalMutationScore,
     files: r.data.fileReports.map((f) => ({
-      file: f.path ? (isAbsolute(f.path) ? relative(root, f.path) : f.path).replaceAll("\\", "/") : f.fileName,
+      file: f.path ? relatifDepuis(root, f.path) : f.fileName,
       score: f.mutationScore,
       // Un mutant survit quand la suite reste verte malgré la mutation.
       survived: f.appliedOperators

@@ -1,4 +1,4 @@
-import { isAbsolute, relative } from "node:path";
+import { relatifDepuis } from "../chemin-relatif.js";
 import type { FailureKind } from "../protocols.js";
 
 export interface XunitCase {
@@ -33,7 +33,7 @@ export function parseXunit(xml: string): XunitCase[] {
   return cases;
 }
 
-const rel = (root: string, file: string) => (isAbsolute(file) ? relative(root, file) : file).replaceAll("\\", "/");
+const rel = relatifDepuis;
 
 /**
  * Échecs XCTest dans la sortie standard : `<fichier>:<ligne>: error: <Classe>.<méthode> : <message>`.

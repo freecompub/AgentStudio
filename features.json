@@ -75,10 +75,10 @@
     },
     {
       "id": "canaris-contre-un-vrai-lanceur",
-      "title": "Les canaris ont tourné contre un vrai lanceur de tests",
-      "verify": "MANUEL : copier profiles/typescript.yaml dans un projet Vitest, lancer /stack doctor",
-      "passes": false,
-      "notes": "Les gabarits livrés (Vitest, XCTest, pytest) n'ont été vérifiés que par des lanceurs doublés : rien ne prouve que `vitest` découvre `src/canari_<marque>.test.ts`, ni que le canari de syntaxe produise bien ce qu'on attend. C'est justement ce que doctor est censé apprendre."
+      "title": "Les canaris tournent contre un vrai lanceur de tests, en CI",
+      "verify": "pnpm vitest run --project stack-adapters test/canaris-en-vrai.test.ts",
+      "passes": true,
+      "notes": "N'est plus manuel : `test/fixtures/projet-vitest` est un vrai projet Vitest minimal, et les canaris de `profiles/typescript.yaml` — le profil LIVRÉ, pas une copie — y sont exécutés pour de vrai. Les quatre genres ressortent `ok`, dont celui qui compte : une syntaxe cassée sort en `other_error` et non en `assertion`. Cinq exécutions de Vitest en ~5 s, aucun LLM, aucun réseau : la CI le lance à chaque poussée. Deux ajustements nécessaires et instructifs : exposer `node_modules/.bin` dans le PATH (le témoin est copié hors du dépôt), et VIDER les variables `VITEST_*`, sans quoi le Vitest fils se croit dans un worker du père."
     },
     {
       "id": "j5-commande-stack",
@@ -134,14 +134,28 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "992 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "1011 tests au 26/09, plus 2 essais de bout en bout (`pnpm e2e`). La CI lance les deux à chaque poussée."
+    },
+    {
+      "id": "essais-bout-en-bout",
+      "title": "La vraie application Electron démarre et ouvre un projet, vérifié en CI",
+      "verify": "pnpm build && pnpm e2e",
+      "passes": true,
+      "notes": "Playwright pilote la VRAIE application : vrai processus principal, vrai préchargement, vrai IPC. Aucune requête à Copilot — le mode d'essai (`mode-essai.ts`) substitue un runtime scripté, et il est IMPOSSIBLE dans une application empaquetée (garde `!app.isPackaged`, testée). Job de CI séparé : il exige le binaire Electron que le job principal ne télécharge pas. Couvre la classe de défauts la plus coûteuse — les trois bugs de câblage du 24/09. Vérifie aussi que le profil utilisateur est jetable (`--user-data-dir`), sans quoi l'essai lirait et écraserait les réglages réels du développeur. PIÈGE ÉVITÉ : la première version affirmait `getByRole(\"textbox\")`, qui matchait un champ de l'écran PROJET — l'essai passait sans avoir ouvert le projet."
     },
     {
       "id": "lint-execute-en-vrai",
-      "title": "ESLint et SwiftLint ont réellement tourné, pas seulement leurs rapports",
-      "verify": "MANUEL : lancer /skraft sur un projet doté d'un linter et vérifier le fait « Lint (…) sans erreur »",
-      "passes": false,
-      "notes": "Couverts par des tests de lecture de rapport et un lanceur doublé. Ce dépôt n'a pas d'ESLint configuré : un run y dirait « Qualité de forme non mesurée »."
+      "title": "ESLint a réellement tourné, pas seulement son rapport, et en CI",
+      "verify": "pnpm vitest run --project stack-adapters test/lint-en-vrai.test.ts",
+      "passes": true,
+      "notes": "N'est plus manuel : `test/fixtures/projet-eslint` est un vrai projet ESLint, et le lint de `profiles/typescript.yaml` y tourne pour de vrai. Le témoin porte un fichier propre, un fichier fautif et un fichier IGNORÉ par la configuration — ce dernier doit être absent d'`analyzed`, c'est le défaut du 24/09 éprouvé contre le vrai outil. Fichiers en JS et non en TS : l'analyseur par défaut d'ESLint ne lit pas les annotations de type, et ajouter typescript-eslint pour un témoin serait disproportionné. SwiftLint reste non couvert : il exigerait un runner macOS. CE TEST A TROUVÉ UN VRAI DÉFAUT dès sa première exécution : voir chemins-relatifs-resolus."
+    },
+    {
+      "id": "chemins-relatifs-resolus",
+      "title": "Les chemins rapportés par les outils sont ramenés à la racine, liens symboliques résolus",
+      "verify": "pnpm vitest run --project stack-adapters test/chemin-relatif.test.ts",
+      "passes": true,
+      "notes": "Trouvé le 26/09 par le premier lancement d'un VRAI ESLint. Les outils rapportent des chemins réels ; sous macOS tmpdir() passe par /var, lien vers /private/var. Sans résoudre la racine, `relative()` rendait `../../../../private/var/…/src/a.js` au lieu de `src/a.js`, et comme les portes rapprochent `analyzed` des fichiers demandés, plus rien ne correspondait : la porte concluait « rien n'a été jugé » alors que le linter avait parfaitement travaillé. Trois lecteurs sur quatre avaient le défaut ; seul parseVitestReport résolvait. `relatifDepuis` est maintenant partagé par les quatre."
     },
     {
       "id": "tdd-avec-vrai-copilot",
@@ -155,7 +169,7 @@
       "title": "Le paquet .asx de skraft s'installe depuis l'application",
       "verify": "MANUEL : pnpm ext:build && pnpm ext:pack, puis Extensions → Installer depuis un fichier",
       "passes": false,
-      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo)."
+      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo). Devient atteignable maintenant que les essais de bout en bout existent : `mode-essai.ts` expose déjà AGENT_STUDIO_ESSAI_PAQUET pour le sélecteur de fichier."
     },
     {
       "id": "mesures-reelles-s6",
