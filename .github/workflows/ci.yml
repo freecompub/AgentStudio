@@ -86,6 +86,14 @@ jobs:
       - name: Installer les dépendances
         run: pnpm install --frozen-lockfile
 
+      # Le cache pnpm est partagé avec le job précédent, qui installe en sautant le binaire. pnpm
+      # y retient qu'electron est « construit », donc son script d'installation ne se rejoue pas
+      # ici : le binaire se téléchargeait alors au premier `require`, c'est-à-dire PENDANT un essai.
+      # Un réseau lent faisait ainsi échouer un test au lieu d'une étape d'installation, ce qui
+      # désigne le mauvais coupable. Cette étape rend le téléchargement explicite et attribuable.
+      - name: S'assurer du binaire Electron
+        run: pnpm rebuild electron
+
       - name: Construire l'application
         run: pnpm build
 
