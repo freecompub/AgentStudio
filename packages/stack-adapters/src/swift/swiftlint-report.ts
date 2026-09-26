@@ -1,5 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import { z } from "zod";
+import { relatifDepuis } from "../chemin-relatif.js";
 import type { LintReport } from "../protocols.js";
 
 /** Une violation SwiftLint. Les entrées mal formées sont écartées une à une, pas en bloc. */
@@ -29,7 +30,7 @@ export function parseSwiftLintReport(raw: unknown, root: string): LintReport {
     const v = entree.safeParse(brut);
     if (!v.success) continue; // violation non rattachée à un fichier, ou champ manquant
     violations.push({
-      file: (isAbsolute(v.data.file) ? relative(root, v.data.file) : v.data.file).replaceAll("\\", "/"),
+      file: relatifDepuis(root, v.data.file),
       ...(v.data.line !== undefined ? { line: v.data.line } : {}),
       rule: v.data.rule_id,
       message: v.data.reason,

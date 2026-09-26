@@ -5,6 +5,40 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 26/09 — Le vrai ESLint a trouvé un défaut en une seule exécution
+
+**Fait.** `test/fixtures/projet-eslint`, un vrai projet ESLint, et le lint de
+`profiles/typescript.yaml` qui y tourne pour de vrai. ESLint a été ajouté au dépôt pour cela
+(`pnpm add -w -D eslint`), avec l'accord du responsable — il n'y était pas.
+
+**Et dès le premier lancement, trois tests sur cinq ont échoué — pour une bonne raison.** Les
+outils rapportent des chemins **réels**, et sous macOS `tmpdir()` passe par `/var`, lien vers
+`/private/var`. Sans résoudre la racine, `relative()` rendait
+`../../../../private/var/…/src/a.js` au lieu de `src/a.js`. Or les portes rapprochent `analyzed`
+des fichiers qu'elles ont demandés : plus rien ne correspondait, et **la porte concluait « rien
+n'a été jugé » alors que le linter avait parfaitement travaillé.**
+
+**Trois lecteurs sur quatre avaient le défaut.** Seul `parseVitestReport` résolvait la racine —
+et je l'y avais mis exprès, avec un commentaire expliquant pourquoi. Les trois autres répétaient
+le même calcul sans la résolution. `relatifDepuis` est désormais partagé par les quatre.
+
+→ C'est la **troisième fois cette semaine** que le lien symbolique de `/var` mord : les tests de
+J1 le 24, l'écriture des canaris le 26 au matin, la lecture des rapports le 26 au soir. Chaque
+fois un endroit différent, chaque fois la même cause. Le bon réflexe n'est pas « attention aux
+liens » mais « **tout chemin qui traverse une frontière de processus passe par un helper
+commun** ».
+
+**Ce que ce témoin prouve exactement.** Un fichier propre, un fichier fautif, et un fichier
+**ignoré par la configuration** : ce dernier doit être absent d'`analyzed`, ce qui éprouve contre
+le vrai outil le défaut du 24/09. Plus un fichier inexistant, pour vérifier qu'une sortie vide ne
+se conclut pas en « aucune erreur ».
+
+**Deux limites assumées.** Les fichiers du témoin sont en JavaScript : l'analyseur par défaut
+d'ESLint ne lit pas les annotations de type, et ajouter `typescript-eslint` pour un témoin serait
+disproportionné. Et **SwiftLint reste non couvert** — il exigerait un runner macOS en CI.
+
+---
+
 ## 26/09 — Les canaris affrontent enfin un vrai lanceur, et en CI
 
 **Ce que ça change.** Tous les tests des canaris jusqu'ici employaient des lanceurs doublés : ils

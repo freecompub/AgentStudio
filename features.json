@@ -134,14 +134,21 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "994 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+      "notes": "1004 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
     },
     {
       "id": "lint-execute-en-vrai",
-      "title": "ESLint et SwiftLint ont réellement tourné, pas seulement leurs rapports",
-      "verify": "MANUEL : lancer /skraft sur un projet doté d'un linter et vérifier le fait « Lint (…) sans erreur »",
-      "passes": false,
-      "notes": "Couverts par des tests de lecture de rapport et un lanceur doublé. Ce dépôt n'a pas d'ESLint configuré : un run y dirait « Qualité de forme non mesurée »."
+      "title": "ESLint a réellement tourné, pas seulement son rapport, et en CI",
+      "verify": "pnpm vitest run --project stack-adapters test/lint-en-vrai.test.ts",
+      "passes": true,
+      "notes": "N'est plus manuel : `test/fixtures/projet-eslint` est un vrai projet ESLint, et le lint de `profiles/typescript.yaml` y tourne pour de vrai. Le témoin porte un fichier propre, un fichier fautif et un fichier IGNORÉ par la configuration — ce dernier doit être absent d'`analyzed`, c'est le défaut du 24/09 éprouvé contre le vrai outil. Fichiers en JS et non en TS : l'analyseur par défaut d'ESLint ne lit pas les annotations de type, et ajouter typescript-eslint pour un témoin serait disproportionné. SwiftLint reste non couvert : il exigerait un runner macOS. CE TEST A TROUVÉ UN VRAI DÉFAUT dès sa première exécution : voir chemins-relatifs-resolus."
+    },
+    {
+      "id": "chemins-relatifs-resolus",
+      "title": "Les chemins rapportés par les outils sont ramenés à la racine, liens symboliques résolus",
+      "verify": "pnpm vitest run --project stack-adapters test/chemin-relatif.test.ts",
+      "passes": true,
+      "notes": "Trouvé le 26/09 par le premier lancement d'un VRAI ESLint. Les outils rapportent des chemins réels ; sous macOS tmpdir() passe par /var, lien vers /private/var. Sans résoudre la racine, `relative()` rendait `../../../../private/var/…/src/a.js` au lieu de `src/a.js`, et comme les portes rapprochent `analyzed` des fichiers demandés, plus rien ne correspondait : la porte concluait « rien n'a été jugé » alors que le linter avait parfaitement travaillé. Trois lecteurs sur quatre avaient le défaut ; seul parseVitestReport résolvait. `relatifDepuis` est maintenant partagé par les quatre."
     },
     {
       "id": "tdd-avec-vrai-copilot",

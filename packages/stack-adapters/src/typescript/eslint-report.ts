@@ -1,5 +1,5 @@
-import { isAbsolute, relative } from "node:path";
 import { z } from "zod";
+import { relatifDepuis } from "../chemin-relatif.js";
 import type { LintReport } from "../protocols.js";
 
 /** Rapport JSON d'ESLint : un objet par fichier examiné. */
@@ -30,7 +30,7 @@ export function parseEslintReport(raw: unknown, root: string): LintReport {
   const violations: LintReport["violations"] = [];
   const analyzed: string[] = [];
   for (const fichier of parsed.data) {
-    const file = (isAbsolute(fichier.filePath) ? relative(root, fichier.filePath) : fichier.filePath).replaceAll("\\", "/");
+    const file = relatifDepuis(root, fichier.filePath);
     // Fichier ignoré par la configuration, ou que le parser ne sait pas lire : il n'a pas été
     // examiné. Le compter comme propre attesterait une conformité que personne n'a vérifiée ;
     // en faire un motif de rejet demanderait à l'agent de réparer une configuration qui ne lui

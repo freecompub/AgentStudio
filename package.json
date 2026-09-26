@@ -26,6 +26,7 @@
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "@types/node": "^22.19.0",
+    "eslint": "^10.11.0",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
