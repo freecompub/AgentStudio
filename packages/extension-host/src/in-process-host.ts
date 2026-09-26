@@ -183,6 +183,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
       layout: deps.stack.layout,
+      infrastructureModules: deps.stack.infrastructureModules,
       async mutation(opts) {
         perm.require("shell:test");
         if (!deps.stack.mutation) return null;

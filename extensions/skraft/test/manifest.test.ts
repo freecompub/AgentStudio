@@ -18,6 +18,7 @@ describe("Manifeste et commande skraft", () => {
       "skraft-dev",
       "skraft-lens-architecture",
       "skraft-lens-cold-reader",
+      "skraft-lens-quality-gates",
       "skraft-lens-test-integrity",
       "skraft-researcher",
       "skraft-test",

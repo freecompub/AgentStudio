@@ -1,0 +1,28 @@
+Copyright (c) 2026 Samir Alili. Tous droits réservés.
+
+Ce logiciel et son code source sont la propriété de leur auteur. Aucune licence
+n'est accordée : la reproduction, la modification, la distribution ou l'usage de
+tout ou partie de ce dépôt requièrent une autorisation écrite préalable.
+
+L'absence de licence ouverte est un choix, non un oubli (ADR 0023). Il est
+réversible dans un sens seulement : ce dépôt pourra être ouvert plus tard, alors
+qu'une licence ouverte, une fois publiée, ne se reprend pas.
+
+## Exception : l'extension skraft
+
+`extensions/skraft/` n'est PAS couvert par la présente notice. Cette extension
+contient du matériel dérivé de skraft-plugin (Sébastien Degodez) et se distribue
+sous **GPL-3.0-or-later** ; son texte de licence est dans
+`extensions/skraft/LICENSE`, et le dossier d'autorisation dans
+`docs/licences/autorisation-skraft.md`.
+
+Les deux licences coexistent parce que l'extension n'est pas livrée avec
+l'application : elle s'installe séparément, en paquet `.asx`, et s'exécute dans
+son propre processus derrière l'API `ctx`. Cette séparation est un fait
+technique, vérifié par un test (`extensions/skraft/test/licence.test.ts`) — ce
+n'est pas une intention, et elle ne doit jamais le devenir.
+
+## Dépendances
+
+Les bibliothèques tierces employées par ce dépôt restent sous leurs licences
+respectives, que rien ici ne modifie.

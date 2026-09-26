@@ -49,6 +49,9 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 
 ## Documents de référence (à lire avant de coder)
 
+- `features.json` — où en est le travail : critères vérifiables et leur statut.
+- `progress.md` — journal pour celui qui reprend : décisions, pièges, prochaine étape.
+
 - `docs/specs/SPEC.md` — **document faisant autorité** pour le cœur. Lire en entier, en particulier §0 (consignes), §3 (registre des décisions D1–D42), §15 (feuille de route J1–J6, S1–S6), §16 (points SDK à vérifier), §17 (conventions).
 - `docs/specs/SPEC-skraft.md` — fait autorité pour l'extension `skraft` ; suppose `SPEC.md` lu et les jalons J2–J4 terminés.
 - `docs/reference/tdd-orchestrator.ts` — prototype de la machine à états TDD (réducteur pur + runner d'effets).
@@ -58,13 +61,27 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 
 ## Règles de travail imposées par la spec
 
+- **Tenir `features.json` et `progress.md` à jour à chaque tâche terminée.** Lire les deux avant de
+  commencer : ils disent où en est le travail et ce qui a déjà piégé. `features.json` liste des
+  critères vérifiables — ne passer un `passes` à `true` qu'après avoir lancé son `verify`, jamais
+  sur intention ; un critère qu'on cesse de satisfaire repasse à `false`. `progress.md` est écrit
+  pour le prochain qui reprendra : ce qui a été fait, les décisions et leur raison, les pièges
+  rencontrés, et la prochaine étape. Ces deux fichiers font partie de la tâche, pas de sa mise au
+  propre : les mettre à jour dans le même commit que le code.
 - Décisions `DÉCIDÉ` : ne pas les rediscuter. Si l'une semble bloquante, s'arrêter et demander.
 - Décisions `OUVERT` : ne pas trancher silencieusement ; implémenter derrière une interface/option et signaler le choix provisoire.
 - Suivre les jalons dans l'ordre en commençant par **J1** ; ne passer au suivant qu'une fois tous ses critères de sortie remplis.
 - TDD strict. Réducteurs et politiques : fonctions pures, testées sans LLM, sans Git, sans disque.
 - Toute nouvelle décision technique → ADR dans `docs/adr/NNNN-titre.md` (contexte, décision, conséquences, statut).
 - Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §16) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
-- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C : autorisation de l'auteur), mais la reprise reste interdite tant que trois conditions ne sont pas réunies : la trace écrite de l'autorisation versée au dépôt, la licence de redistribution précisée, et l'accès au dépôt source. Jusque-là, ne copier aucun prompt, skill ni code de skraft-plugin.
+- **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C). La reprise a **commencé
+  le 2026-09-25** depuis `github.com/SebastienDegodez/skraft-plugin`, branche
+  `refactor/v1.6.0-tracking-substrate` ; le dossier est `docs/licences/autorisation-skraft.md`.
+  Trois règles tiennent pour la suite : tout artefact repris **porte sa provenance** en commentaire
+  (fichier source dans la branche) ; l'extension `skraft` est traitée comme **GPL-3.0-or-later**
+  tant que la licence de redistribution n'est pas précisée, ce qui oblige à en fournir les sources ;
+  et une reprise ne doit **jamais déplacer vers le LLM une décision que le code prend** — la
+  procédure du dépôt d'origine vit dans ses prompts, la nôtre dans nos portes.
 
 ## Architecture cible (vue d'ensemble)
 

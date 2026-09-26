@@ -5,6 +5,8 @@ export interface XunitCase {
   classname: string;
   name: string;
   status: "passed" | "failed" | "skipped";
+  /** Message porté par `<failure>` ou `<error>` : sans lui, la raison de l'échec est inconnue. */
+  message?: string;
 }
 
 const decode = (s: string) =>
@@ -23,7 +25,10 @@ export function parseXunit(xml: string): XunitCase[] {
     const tag = m[1] ?? "";
     const body = m[3] ?? "";
     const status: XunitCase["status"] = /<(failure|error)\b/.test(body) ? "failed" : /<skipped\b/.test(body) ? "skipped" : "passed";
-    cases.push({ classname: attr(` ${tag}`, "classname"), name: attr(` ${tag}`, "name"), status });
+    // Le message vit dans l'attribut `message`, sinon dans le contenu de la balise.
+    const balise = /<(?:failure|error)\b([^>]*)(?:\/>|>([\s\S]*?)<\/(?:failure|error)>)/.exec(body);
+    const message = balise ? attr(` ${balise[1] ?? ""}`, "message") || decode((balise[2] ?? "").trim()) : "";
+    cases.push({ classname: attr(` ${tag}`, "classname"), name: attr(` ${tag}`, "name"), status, ...(message ? { message } : {}) });
   }
   return cases;
 }

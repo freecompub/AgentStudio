@@ -2,11 +2,13 @@
   "name": "@agent-studio/stack-adapters",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "yaml": "^2.9.1",
     "zod": "^4.6.5"
   }
 }

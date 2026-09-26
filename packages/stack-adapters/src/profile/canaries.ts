@@ -1,0 +1,271 @@
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import type { FailureKind, ProcessRunner, TestResult } from "../protocols.js";
+import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
+import { cheminSous } from "./chemin-sur.js";
+import type { Constat } from "./constat.js";
+import { lireTests } from "./read-report.js";
+import { JETON_MARQUE, type CanaryKind, type StackProfile } from "./stack-profile.js";
+import { substituer } from "./tokens.js";
+
+/**
+ * Canaris de `/stack doctor` (§8.6). Le code écrit un test dont il connaît d'avance la bonne
+ * réponse, lance la commande que le profil déclare, et vérifie que l'échec obtenu porte le
+ * classement attendu. Aucun LLM n'intervient : l'oracle est ici.
+ *
+ * Ce que ces canaris protègent tient en une phrase. Les portes RED tiennent `assertion` et
+ * `missing_symbol` pour des rouges légitimes, et `other_error` pour un échec à rejeter. Si le
+ * lecteur d'un projet range une erreur de syntaxe dans l'une des deux premières, **du code qui
+ * ne compile pas franchit la porte** ; s'il range un symbole manquant dans la troisième, un
+ * cycle TDD correct est refusé. Les deux erreurs sont silencieuses sans canari.
+ */
+
+export interface CanaryObservation {
+  kind: CanaryKind;
+  /** Le lanceur a-t-il produit un rapport lisible ? Faux quand la suite n'a même pas compilé. */
+  rapportLu: boolean;
+  /** Résultats portant la marque du canari, et eux seuls. */
+  results: readonly TestResult[];
+}
+
+/**
+ * Ce que la porte RED fait d'un classement. Elle ne **rejette** que `other_error`
+ * (`extensions/tdd/src/effects.ts`) : tout le reste franchit la porte, **y compris un échec non
+ * classé**. Écrire la règle dans ce sens-là, et non en énumérant les classements acceptés, évite
+ * de croire qu'un `undefined` serait refusé — il ne l'est pas.
+ */
+const REJETE_PAR_LA_PORTE_RED = (k: FailureKind | undefined) => k === "other_error";
+const FRANCHIT_LA_PORTE_RED = (k: FailureKind | undefined) => !REJETE_PAR_LA_PORTE_RED(k);
+
+const nomme = (k: FailureKind | undefined) => k ?? "non classé";
+const liste = (ks: Iterable<FailureKind | undefined>) => [...new Set([...ks].map(nomme))].map((k) => `\`${k}\``).join(", ");
+
+export function jugerCanari(o: CanaryObservation): Constat {
+  const prefixe = `Canari \`${o.kind}\``;
+
+  if (!o.rapportLu) {
+    if (o.kind === "syntax")
+      return {
+        gravite: "ok",
+        message: `${prefixe} : la suite n'a pas compilé et aucun rapport n'a été produit. C'est le comportement sûr — rien n'a pu être classé à tort.`,
+      };
+    return {
+      gravite: "probleme",
+      message:
+        `${prefixe} : la commande n'a produit aucun rapport, et aucune erreur de compilation n'a pu être lue. ` +
+        `Sur un langage compilé, c'est attendu — un symbole absent arrête la compilation — mais il faut alors déclarer \`buildErrors\` ` +
+        `pour que ces erreurs soient lues ; sans quoi la porte RED ne verra jamais ce rouge pourtant légitime.`,
+    };
+  }
+
+  if (o.results.length === 0) {
+    // Le rapport est complet et ne mentionne pas le canari. Pour `syntax`, c'est le cas le plus
+    // dangereux de tous : le lanceur a rendu une suite verte alors qu'un fichier ne compile pas,
+    // et la porte GREEN, qui ne regarde que `failed === 0`, attesterait un vert sur du code qui
+    // ne se construit pas. Que la cause soit un emplacement non découvert ou un fichier
+    // silencieusement ignoré, on ne peut pas les distinguer — et l'une des deux est grave.
+    if (o.kind === "syntax")
+      return {
+        gravite: "probleme",
+        message: `${prefixe} : le rapport est complet et ne mentionne pas ce canari, alors qu'il ne compile pas. Soit le lanceur ignore silencieusement un fichier cassé — et une suite « verte » ne prouverait alors plus rien —, soit l'emplacement déclaré n'est pas découvert. Les deux demandent correction.`,
+      };
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : le lanceur ne l'a pas vu. Le fichier écrit ne correspond à rien de ce que la commande découvre — vérifiez son emplacement dans \`canaries\`, et les motifs de \`layout\`.`,
+    };
+  }
+
+  if (o.kind === "passed") {
+    const rates = o.results.filter((r) => r.status !== "passed");
+    return rates.length === 0
+      ? { gravite: "ok", message: `${prefixe} : un test trivial passe, et le rapport le dit.` }
+      : {
+          gravite: "probleme",
+          message: `${prefixe} : un test qui ne fait qu'affirmer le vrai ne passe pas (${rates.map((r) => r.status).join(", ")}). La commande déclarée ou son rapport est en cause, avant toute question de classement.`,
+        };
+  }
+
+  const echecs = o.results.filter((r) => r.status === "failed");
+  if (echecs.length === 0)
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : ce canari doit échouer, et il passe. Le rapport ne reflète pas ce que la commande a exécuté.`,
+    };
+
+  // TOUS les échecs portant la marque sont jugés, et le pire l'emporte. Ne regarder que le
+  // premier laisserait passer le cas qui compte : un rapport dont la première entrée est un
+  // `other_error` de chargement et la seconde une `assertion` serait déclaré sain, alors que la
+  // porte s'arrête sur la première entrée qui l'arrange.
+  const classes = new Set(echecs.map((e) => e.failureKind));
+
+  if (o.kind === "syntax") {
+    const dangereux = [...classes].filter(FRANCHIT_LA_PORTE_RED);
+    if (dangereux.length > 0)
+      return {
+        gravite: "probleme",
+        message:
+          `${prefixe} : une erreur de syntaxe ressort classée ${liste(dangereux)}. La porte RED ne rejette que \`other_error\` : ` +
+          `ce classement la franchit, donc du code qui ne compile pas passerait pour un rouge légitime. Resserrez les motifs du lecteur.`,
+      };
+    return { gravite: "ok", message: `${prefixe} : une erreur de syntaxe est classée \`other_error\`, donc rejetée par la porte RED.` };
+  }
+
+  // Un classement que la porte rejette est un problème en sens inverse : le rouge est légitime,
+  // et le cycle TDD se trouverait bloqué.
+  const rejetes = [...classes].filter(REJETE_PAR_LA_PORTE_RED);
+  if (rejetes.length > 0)
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : classé ${liste(rejetes)} au lieu de \`${o.kind}\`. La porte RED refuse ce classement : un rouge légitime serait rejeté et le cycle TDD bloqué.`,
+    };
+
+  // Un échec non classé franchit la porte, mais le lecteur n'a alors rien reconnu : la
+  // classification qu'on cherchait à éprouver n'a pas eu lieu.
+  if (classes.has(undefined))
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : l'échec n'est pas classé du tout. Le lecteur n'a reconnu ni assertion ni symbole manquant, et la porte RED l'acceptera sans savoir pourquoi.`,
+    };
+
+  if (classes.size === 1 && classes.has(o.kind)) return { gravite: "ok", message: `${prefixe} : classé \`${o.kind}\`, comme attendu.` };
+
+  // Reste la confusion entre les deux classements que la porte accepte tous deux : inexact, sans
+  // conséquence pour les portes.
+  return {
+    gravite: "avertissement",
+    message: `${prefixe} : classé ${liste(classes)} au lieu de \`${o.kind}\`. Sans conséquence pour les portes, qui acceptent ces classements comme un rouge légitime, mais les messages d'échec seront trompeurs.`,
+  };
+}
+
+export interface RunCanariesDeps {
+  runner: ProcessRunner;
+  /**
+   * Racine d'une **copie isolée** du projet — un `git worktree` temporaire (§8.6, point 4).
+   * Jamais le répertoire du projet : les canaris y sont écrits, et l'un d'eux ne compile pas.
+   */
+  sandboxRoot: string;
+  timeoutMs?: number;
+  onOutput?: (chunk: string) => void;
+}
+
+export interface CanaryRun {
+  constats: Constat[];
+  observations: CanaryObservation[];
+}
+
+/**
+ * Vérifie un profil en l'exécutant : un relevé initial, puis un canari à la fois. Un seul canari
+ * est présent par exécution — sinon celui qui ne compile pas empêcherait les autres de s'exécuter.
+ */
+export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps): Promise<CanaryRun> {
+  const constats: Constat[] = [];
+  const observations: CanaryObservation[] = [];
+
+  const initial = await lancer(profile, deps);
+  if (!initial.rapportLu) {
+    constats.push({
+      gravite: "probleme",
+      message: `La commande de test ne produit aucun rapport lisible (code ${initial.exitCode}). Tant qu'il manque, aucune porte ne peut juger quoi que ce soit ; les canaris n'ont pas été lancés.${initial.sortie ? `\n\n\`\`\`\n${initial.sortie.slice(-1500)}\n\`\`\`` : ""}`,
+    });
+    return { constats, observations };
+  }
+  // Un rapport lisible mais vide n'est pas un bon résultat : la commande n'a rien trouvé à
+  // exécuter — mauvaise configuration, mauvais répertoire, motif de découverte à côté. Le compter
+  // comme favorable laisserait doctor conclure « aucun problème » sans avoir rien mesuré.
+  constats.push(
+    initial.results.length === 0
+      ? {
+          gravite: "avertissement",
+          message:
+            "La commande de test s'exécute et son rapport est lisible, mais **il ne contient aucun test**. La commande ne découvre rien : vérifiez sa configuration et le répertoire depuis lequel elle est lancée.",
+        }
+      : { gravite: "ok", message: `La commande de test s'exécute et son rapport est lisible : ${initial.results.length} test(s) relevé(s).` },
+  );
+
+  if (profile.canaries.length === 0) {
+    constats.push({
+      gravite: "avertissement",
+      message:
+        "Aucun canari déclaré : le classement des échecs n'est pas vérifié. Sans lui, rien ne garantit qu'une erreur de syntaxe sera distinguée d'une assertion fausse — c'est de cette distinction que dépendent les portes RED.",
+    });
+    return { constats, observations };
+  }
+
+  for (const gabarit of profile.canaries) {
+    const marque = `c${randomBytes(4).toString("hex")}`;
+    const relatif = gabarit.file.replaceAll(JETON_MARQUE, marque);
+    // Résolution des liens symboliques, et pas seulement du texte du chemin : le dépôt peut
+    // porter un lien que `git worktree` reproduit, et `tests/x.py` n'a alors aucun `..` tout en
+    // désignant un fichier de l'utilisateur. Voir `chemin-sur.ts`.
+    const chemin = await cheminSous(deps.sandboxRoot, relatif);
+    if (chemin === null) {
+      constats.push({
+        gravite: "probleme",
+        message: `Canari \`${gabarit.kind}\` : \`${gabarit.file}\` sort de la copie isolée une fois les liens symboliques résolus ; il n'a pas été écrit. Un lien du dépôt détourne-t-il cet emplacement ?`,
+      });
+      continue;
+    }
+
+    await mkdir(dirname(chemin), { recursive: true });
+    await writeFile(chemin, gabarit.content.replaceAll(JETON_MARQUE, marque));
+    try {
+      const run = await lancer(profile, deps);
+      const observation: CanaryObservation = {
+        kind: gabarit.kind,
+        rapportLu: run.rapportLu,
+        results: run.results.filter((r) => r.id.includes(marque) || r.file.includes(marque)),
+      };
+      observations.push(observation);
+      constats.push(jugerCanari(observation));
+    } finally {
+      await rm(chemin, { force: true });
+    }
+  }
+
+  return { constats, observations };
+}
+
+/** Le motif est validé à la lecture du profil ; un refus ici ne peut donc venir que d'un profil forgé. */
+function lireErreurs(spec: NonNullable<StackProfile["buildErrors"]>, sortie: string, root: string): TestResult[] {
+  const compile = compileBuildErrorSpec(spec);
+  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
+}
+
+interface Lancement {
+  rapportLu: boolean;
+  results: TestResult[];
+  exitCode: number | null;
+  sortie: string;
+}
+
+async function lancer(profile: StackProfile, deps: RunCanariesDeps): Promise<Lancement> {
+  // Le rapport est écrit hors de la copie isolée : il ne doit pas se retrouver dans le diff.
+  const rapport = join(tmpdir(), `agent-studio-canari-${randomBytes(6).toString("hex")}.${profile.tests.report === "junit-xml" ? "xml" : "json"}`);
+  try {
+    const r = await deps.runner.run(profile.tests.command[0]!, substituer(profile.tests.command.slice(1), rapport, []), {
+      cwd: deps.sandboxRoot,
+      timeoutMs: deps.timeoutMs ?? 5 * 60_000,
+      ...(deps.onOutput ? { onOutput: deps.onOutput } : {}),
+    });
+    const sortie = `${r.stdout}${r.stderr}`.slice(-20_000);
+    const brut = r.timedOut ? null : await readFile(rapport, "utf8").catch(() => null);
+    if (brut === null) {
+      // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent. Si le
+      // profil dit comment lire les erreurs de compilation, ces erreurs SONT le résultat — et le
+      // canari `missing_symbol` devient éprouvable là où il ne l'était pas.
+      const erreurs = profile.buildErrors ? lireErreurs(profile.buildErrors, sortie, deps.sandboxRoot) : [];
+      if (erreurs.length > 0) return { rapportLu: true, results: erreurs, exitCode: r.exitCode, sortie };
+      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
+    }
+    try {
+      return { rapportLu: true, results: lireTests(profile.tests.report, brut, deps.sandboxRoot), exitCode: r.exitCode, sortie };
+    } catch {
+      // Un rapport présent mais illisible vaut un rapport absent : rien n'en est tiré.
+      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
+    }
+  } finally {
+    await rm(rapport, { force: true });
+  }
+}

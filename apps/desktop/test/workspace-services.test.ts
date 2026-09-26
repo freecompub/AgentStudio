@@ -2,7 +2,7 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, ScriptedRuntim
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
@@ -21,7 +21,10 @@ function fakeWorkspace(): Workspace {
       diff: async () => ({ files: [], patch: "" }),
       rollback: async () => {},
     },
-    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+    repo: {
+      // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
+      worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
+      head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 
@@ -38,7 +41,7 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
   const notifications: string[] = [];
   const services = await workspaceServicesFactory({
     extensions: [{ kind: "in-process", manifest: tddManifest, module: tddExtension }],
-    stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] },  detect: async () => true, isTestFile: (p) => p.startsWith("tests/"), testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+    stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"],  detect: async () => true, isTestFile: (p) => p.startsWith("tests/"), testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
     tasksDir: "/inutile",
     taskStore: store,
     evidenceStore: new MemoryEvidenceStore(),
@@ -63,6 +66,170 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
+  async function ouvrir(opts: { profil?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
+    const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
+    const cleanup = () => rm(racine, { recursive: true, force: true });
+    if (opts.profil !== undefined) {
+      await mkdir(join(racine, ".agent-studio"), { recursive: true });
+      await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
+    }
+    const posts: string[] = [];
+    const ecrits: string[] = [];
+    const services = await workspaceServicesFactory({
+      extensions: [],
+      stacks: [
+        {
+          id: "typescript",
+          layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] },
+          infrastructureModules: ["Infrastructure"],
+          detect: async () => true,
+          isTestFile: () => false,
+          testFilePattern: "^tests/",
+          runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }),
+        },
+      ],
+      ...(opts.allowedPrograms ? { allowedPrograms: opts.allowedPrograms } : {}),
+      tasksDir: "/inutile",
+      taskStore: new MemoryTaskStore(),
+      evidenceStore: new MemoryEvidenceStore(),
+      interactionStore: new MemoryInteractionStore(),
+      clock: fixedClock(),
+      ids: sequentialIds("id-"),
+    })({
+      workspace: {
+        ...fakeWorkspace(),
+        root: racine,
+        files: { ...fakeWorkspace().files, list: async () => opts.fichiers ?? [], write: async (rel, c) => void ecrits.push(`${rel}\n${c}`) },
+      },
+      runtime: async () => new ScriptedRuntime(),
+      onTask: () => {},
+      onInteractions: () => {},
+      onPost: (_e, md) => posts.push(md),
+      ...(opts.confirmer ? { confirmer: { confirm: async () => opts.confirmer! } } : {}),
+    });
+    return { services, posts, ecrits, racine, cleanup };
+  }
+
+  const PROFIL_VALIDE = `
+id: python
+detect: [pyproject.toml]
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+  report: junit-xml
+layout:
+  unitTests: ["tests/**"]
+  sources: ["src/**"]
+infrastructureModules: [django]
+`;
+
+  it("un profil déclaré par le projet l'emporte sur la détection", async () => {
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE, allowedPrograms: ["pytest"] });
+    try {
+      // La stack est celle du profil, pas l'adaptateur TypeScript qui prétendait reconnaître.
+      expect(posts.join("\n")).toMatch(/profil/i);
+      expect(posts.join("\n")).toMatch(/python/);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
+  it("un profil refusé est expliqué dans la conversation, et la détection reprend la main", async () => {
+    // Le champ et la valeur fautive doivent être nommés : l'auteur du profil doit savoir quoi corriger.
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE.replace("pytest", "curl"), allowedPrograms: ["pytest"] });
+    try {
+      expect(posts.join("\n")).toMatch(/curl/);
+      expect(posts.join("\n")).toMatch(/refus/i);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
+  it("la commande /stack est routable dès qu'un projet est ouvert, sans aucune extension", async () => {
+    // Elle appartient au cœur : elle décrit le projet, pas le travail d'une extension.
+    const { services, posts, cleanup } = await ouvrir({ confirmer: "deny" });
+    expect(services.commands().map((c) => c.invocation)).toContain("stack");
+    expect(await services.route("/stack")).toEqual({ kind: "handled" });
+    expect(posts.at(-1)).toMatch(/typescript/);
+    await cleanup();
+  });
+
+  it("/stack doctor décrit le profil déclaré, et dit ce qu'il n'a pas vérifié", async () => {
+    const { services, posts, cleanup } = await ouvrir({ profil: PROFIL_VALIDE, allowedPrograms: ["pytest"], confirmer: "deny" });
+    await services.route("/stack doctor");
+    expect(posts.at(-1)).toMatch(/Diagnostic du profil/);
+    expect(posts.at(-1)).toMatch(/canari/i);
+    await cleanup();
+  });
+
+  it("/stack init propose un profil puis n'écrit rien quand l'utilisateur refuse", async () => {
+    const { services, posts, ecrits, cleanup } = await ouvrir({ confirmer: "deny", fichiers: ["pyproject.toml", "tests/test_a.py"] });
+    await services.route("/stack init");
+    expect(posts.at(-2)).toMatch(/```yaml/);
+    expect(posts.at(-1)).toMatch(/rien n'a été écrit/i);
+    expect(ecrits).toEqual([]);
+    await cleanup();
+  });
+
+  it("/stack init écrit le profil après accord, à l'emplacement versionné", async () => {
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"] });
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    expect(ecrits[0]).toMatch(/^\.agent-studio\/stack\.yaml\n/);
+    expect(ecrits[0]).toMatch(/id: python/);
+    await cleanup();
+  });
+
+  it("sans confirmateur, /stack n'est pas enregistrée : mieux vaut pas de commande qu'une écriture sans accord", async () => {
+    const { services, cleanup } = await ouvrir({});
+    expect(services.commands().map((c) => c.invocation)).not.toContain("stack");
+    await cleanup();
+  });
+
+  it("sans profil, rien n'est dit et la détection s'applique", async () => {
+    const { services, posts, cleanup } = await ouvrir({});
+    try {
+      expect(posts.join("\n")).not.toMatch(/profil/i);
+    } finally {
+      await services.dispose();
+      await cleanup();
+    }
+  });
+
+  it("stack non reconnue : l'utilisateur en est averti dans la conversation, pas seulement dans le journal", async () => {
+    // Le repli change ce que font les portes et les commandes : le taire laisserait
+    // l'utilisateur devant des résultats inexplicables.
+    const posts: string[] = [];
+    await workspaceServicesFactory({
+      extensions: [],
+      stacks: [
+        {
+          id: "typescript",
+          layout: { acceptanceTests: [], unitTests: [], sources: [] },
+          infrastructureModules: [],
+          detect: async () => false, // aucun adaptateur ne reconnaît ce projet
+          isTestFile: () => false,
+          testFilePattern: "^tests/",
+          runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }),
+        },
+      ],
+      tasksDir: "/inutile",
+      taskStore: new MemoryTaskStore(),
+      evidenceStore: new MemoryEvidenceStore(),
+      interactionStore: new MemoryInteractionStore(),
+      clock: fixedClock(),
+      ids: sequentialIds("id-"),
+    })({
+      workspace: fakeWorkspace(),
+      runtime: async () => new ScriptedRuntime(),
+      onTask: () => {},
+      onInteractions: () => {},
+      onPost: (ext, md) => posts.push(`${ext}: ${md}`),
+    });
+    expect(posts.join("\n")).toMatch(/reconnu par aucun adaptateur/i);
+  });
+
   it("expose la commande /tdd de l'extension ; le texte libre part vers la session principale", async () => {
     const { services, getLoads } = await setup();
     expect(services.commands().map((c) => c.invocation)).toEqual(["tdd"]);

@@ -1,0 +1,196 @@
+{
+  "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
+  "updated": "2026-09-25",
+  "branch": "feat/j5-profils-de-stack",
+  "items": [
+    {
+      "id": "j5-profil-schema",
+      "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts",
+      "passes": true,
+      "notes": "Refuse un lecteur inconnu et un programme hors liste. Branché sur admin.json depuis le 25/09."
+    },
+    {
+      "id": "j5-adaptateur-generique",
+      "title": "Un StackAdapter complet se construit à partir d'un profil, sans code par langage",
+      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts",
+      "passes": true,
+      "notes": "Jetons {rapport} et {fichiers} uniquement. Une capacité non déclarée est `undefined`, pas une méthode qui échoue."
+    },
+    {
+      "id": "j5-profils-exemple",
+      "title": "Des profils d'exemple existent pour TypeScript et Swift",
+      "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
+      "passes": true,
+      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Swift déclare ses quatre canaris depuis que `buildErrors` existe. Reste en dessous des adaptateurs écrits à la main sur deux points : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+    },
+    {
+      "id": "j5-chargement-profil",
+      "title": "L'application charge le profil du projet et signale son refus dans la conversation",
+      "verify": "pnpm vitest run --project desktop test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "`.agent-studio/stack.yaml` l'emporte sur la détection. Un profil refusé n'interrompt pas l'ouverture : il est expliqué dans la conversation — champ et valeur fautive nommés — et la détection reprend la main. `allowedPrograms` vient d'admin.json (index.ts). Jamais essayé sur un vrai projet : voir j5-profils-exemple."
+    },
+    {
+      "id": "j5-programmes-autorises",
+      "title": "Seuls les programmes autorisés par l'administrateur peuvent être lancés (D47, O12)",
+      "verify": "pnpm vitest run --project desktop test/admin-config.test.ts",
+      "passes": true,
+      "notes": "Liste par défaut dans admin-config (O12) : lanceurs de tests, linters, outils de mutation. Ni interpréteur, ni client réseau. Le fichier de l'administrateur REMPLACE la liste — il doit pouvoir restreindre, pas seulement élargir. Un nom avec chemin est refusé, et une configuration refusée n'autorise rien. Reste à la passer à `parseStackProfile` : voir j5-chargement-profil."
+    },
+    {
+      "id": "j5-profil-detection-par-contenu",
+      "title": "Un profil peut détecter une stack au contenu d'un fichier, pas seulement à son existence",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts -t 'detect'",
+      "passes": false,
+      "notes": "L'adaptateur TypeScript vérifie que `vitest` figure dans les dépendances du package.json ; un profil ne sait dire que « ce fichier existe », ce qui est plus fragile."
+    },
+    {
+      "id": "j5-profil-architecture",
+      "title": "Un profil peut fournir l'analyse des imports (règle de dépendance)",
+      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'architecture'",
+      "passes": false,
+      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
+    },
+    {
+      "id": "j5-canaris",
+      "title": "/stack doctor vérifie le profil par exécution, avec des canaris à oracle (§8.6, D46)",
+      "verify": "pnpm vitest run --project stack-adapters test/canaris.test.ts",
+      "passes": true,
+      "notes": "Oracle dans le code, aucun LLM. Un canari par exécution — celui qui ne compile pas empêcherait les autres de s'exécuter. Deux nuances qui comptent : confondre `assertion` et `missing_symbol` n'est qu'un avertissement (les portes acceptent les deux), tandis qu'une erreur de syntaxe classée dans l'une de ces deux catégories est un problème — c'est le trou du lecteur junit-xml trouvé le 25/09. Les canaris n'ont jamais tourné contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+    },
+    {
+      "id": "j5-profil-echec-de-compilation",
+      "title": "Un profil sait classer un échec de compilation, quand le lanceur ne produit aucun rapport",
+      "verify": "pnpm vitest run --project stack-adapters test/build-errors.test.ts",
+      "passes": true,
+      "notes": "Section `buildErrors` : un motif appliqué ligne à ligne (groupes nommés `file` et `message`) et une liste de sous-chaînes désignant un symbole absent. C'est ce qui rend les profils utilisables sur un langage compilé : le rouge le plus courant du cycle TDD — la fonction appelée n'existe pas encore — arrête la compilation, donc ne produit aucun rapport de tests. En cas de doute le classement est `other_error` : refuser un rouge correct fait perdre un tour, l'accepter à tort laisse passer du code qui ne compile pas. Le motif vient du dépôt, donc non fiable : quantificateurs imbriqués refusés, motif plafonné à 300 caractères, application bornée en lignes et en longueur de ligne. `profiles/swift.yaml` déclare désormais ses quatre canaris, `missing_symbol` compris."
+    },
+    {
+      "id": "j5-doctor-execute",
+      "title": "/stack doctor éprouve le profil en l'exécutant, dans une copie isolée du projet",
+      "verify": "pnpm vitest run --project workspace test/worktree.test.ts && pnpm vitest run --project desktop test/stack-command.test.ts",
+      "passes": true,
+      "notes": "`Repository.worktree()` ouvre une copie jetable au dernier commit, hors du projet — l'un des canaris ne compile pas volontairement, l'écrire chez l'utilisateur abîmerait son travail en cours. Les modifications non validées ne sont PAS reprises : éprouver le travail en cours donnerait des résultats changeant à chaque frappe. Le rapport ne dit plus « je n'ai rien exécuté » quand les canaris ont tourné, et un échec de mesure devient un PROBLÈME — sans quoi doctor conclurait « aucun problème » sur la foi d'une vérification avortée."
+    },
+    {
+      "id": "canaris-contre-un-vrai-lanceur",
+      "title": "Les canaris ont tourné contre un vrai lanceur de tests",
+      "verify": "MANUEL : copier profiles/typescript.yaml dans un projet Vitest, lancer /stack doctor",
+      "passes": false,
+      "notes": "Les gabarits livrés (Vitest, XCTest, pytest) n'ont été vérifiés que par des lanceurs doublés : rien ne prouve que `vitest` découvre `src/canari_<marque>.test.ts`, ni que le canari de syntaxe produise bien ce qu'on attend. C'est justement ce que doctor est censé apprendre."
+    },
+    {
+      "id": "j5-commande-stack",
+      "title": "La commande /stack est disponible dans la conversation",
+      "verify": "pnpm vitest run --project desktop test/stack-command.test.ts test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "Trois formes : `/stack` (état), `/stack doctor` (diagnostic statique), `/stack init` (proposition, confirmation, écriture). Commande du CŒUR, pas d'une extension : elle décrit le projet et reste disponible sans aucune extension installée. Rien n'est écrit sans que l'utilisateur ait vu le YAML complet et approuvé — la demande nomme les programmes que le profil lancera, seule information qu'on ne devine pas d'un identifiant de stack. Sans confirmateur, la commande n'est pas enregistrée. doctor dit ce qu'il n'a PAS vérifié : rien n'est exécuté, les canaris n'ont pas tourné."
+    },
+    {
+      "id": "j5-lecteur-tap",
+      "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
+      "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
+      "passes": false,
+      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, swiftlint-json, muter-json. N'annoncer un format qu'une fois son lecteur écrit."
+    },
+    {
+      "id": "j5-stack-init-doctor",
+      "title": "Vérification statique d'un profil (une partie de /stack doctor, §8.6)",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
+      "passes": true,
+      "notes": "§8.6 : la vérification PAR EXÉCUTION est faite depuis le 25/09 — `/stack doctor` ouvre un git worktree et y lance les canaris. Manquent encore : proposition par un agent via `submit_stack_profile`, réessai ciblé à budget, relance sur changement du verrou de dépendances."
+    },
+    {
+      "id": "extensions-sans-langage",
+      "title": "Aucune extension ne mentionne un langage dans son code",
+      "verify": "! grep -rniE 'swift|typescript|vitest|xctest|react|uikit' extensions/*/src/*.ts | grep -v '^\\S*: *[*/]'",
+      "passes": true,
+      "notes": "Obtenu en déléguant à ctx.stack : lint, mutation, architecture, infrastructureModules."
+    },
+    {
+      "id": "portes-n-attestent-que-du-mesure",
+      "title": "Une porte ne produit jamais de fait sur ce qu'elle n'a pas mesuré",
+      "verify": "pnpm vitest run --project stack-adapters test/lint-adapters.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
+      "passes": true,
+      "notes": "Régressé trois fois le 24/09 (repli `|| \"[]\"`, filtre severity SwiftLint, fichier ignoré par ESLint), et la revue du 26/09 en a trouvé quatre de plus dans les canaris : rapport lisible mais VIDE compté comme favorable, canari `syntax` silencieusement ignoré ramené à un avertissement, échec des canaris qui ne devenait pas un problème, et modèle Python routant ruff vers le lecteur eslint-json — porte qui n'aurait jamais rien mesuré. Vérifier ce point à chaque ajout de capacité, c'est le défaut qui revient le plus."
+    },
+    {
+      "id": "profil-contenu-non-fiable",
+      "title": "Un profil de stack hostile ne peut ni écrire hors du projet ni figer l'application",
+      "verify": "pnpm vitest run --project stack-adapters test/glob.test.ts test/canaris.test.ts",
+      "passes": true,
+      "notes": "Deux attaques trouvées par la revue du 26/09, toutes deux exploitables par un fichier du dépôt. 1) Un lien symbolique dans le dépôt, reproduit par `git worktree`, détournait l'écriture d'un canari hors de la copie isolée — contenu choisi par le profil, puis supprimé. Le contrôle était purement textuel ; `chemin-sur.ts` résout désormais les liens. 2) Quatorze globstars dans `layout` prenaient 170 SECONDES pour un seul `test()` dans le processus principal ; les suites de globstars sont repliées. Un motif venu du dépôt suffisait à figer l'application."
+    },
+    {
+      "id": "echecs-dans-la-conversation",
+      "title": "Un échec constaté à l'ouverture d'un projet est visible dans la conversation",
+      "verify": "pnpm vitest run --project desktop test/app-controller.test.ts -t 'avant la conversation'",
+      "passes": true,
+      "notes": "Les messages postés hors session sont mis en attente et versés au démarrage, une seule fois."
+    },
+    {
+      "id": "suite-verte",
+      "title": "La suite complète passe sans échec",
+      "verify": "pnpm typecheck && pnpm test",
+      "passes": true,
+      "notes": "992 tests au 26/09. La CI lance ceci à chaque poussée, sur toutes les branches."
+    },
+    {
+      "id": "lint-execute-en-vrai",
+      "title": "ESLint et SwiftLint ont réellement tourné, pas seulement leurs rapports",
+      "verify": "MANUEL : lancer /skraft sur un projet doté d'un linter et vérifier le fait « Lint (…) sans erreur »",
+      "passes": false,
+      "notes": "Couverts par des tests de lecture de rapport et un lanceur doublé. Ce dépôt n'a pas d'ESLint configuré : un run y dirait « Qualité de forme non mesurée »."
+    },
+    {
+      "id": "tdd-avec-vrai-copilot",
+      "title": "/tdd déroule un cycle complet avec le vrai Copilot, depuis l'application",
+      "verify": "MANUEL : /tdd sur un projet TypeScript avec Vitest",
+      "passes": false,
+      "notes": "N'a tourné qu'avec des agents scriptés. Le jeton OAuth fonctionne depuis le 24/09 (pnpm smoke:copilot)."
+    },
+    {
+      "id": "skraft-installee-depuis-un-fichier",
+      "title": "Le paquet .asx de skraft s'installe depuis l'application",
+      "verify": "MANUEL : pnpm ext:build && pnpm ext:pack, puis Extensions → Installer depuis un fichier",
+      "passes": false,
+      "notes": "Couvert par 4 tests, jamais fait à l'écran. Exige le mode développeur (admin.json, emplacement système : sudo)."
+    },
+    {
+      "id": "mesures-reelles-s6",
+      "title": "Les mesures d'usage de S6 viennent d'un run Copilot réel",
+      "verify": "MANUEL : US-7, US-12 et US-15, comparer les usages par état",
+      "passes": false,
+      "notes": "Aujourd'hui issues d'agents simulés. Plus bloqué depuis la levée des blocages de J1."
+    },
+    {
+      "id": "licence-du-depot",
+      "title": "Le dépôt déclare sa licence, et la frontière avec skraft est défendue par un test",
+      "verify": "pnpm vitest run --project ext-skraft test/licence.test.ts",
+      "passes": true,
+      "notes": "ADR 0023. Propriétaire — tous droits réservés — sauf extensions/skraft/, en GPL-3.0-or-later. Propriétaire parce que c'est ce qui était DÉJÀ vrai (sans LICENSE, le droit d'auteur s'applique), et parce que le choix n'est réversible que dans un sens : on peut ouvrir plus tard, on ne reprend pas une licence ouverte publiée. Les deux coexistent parce que skraft n'est pas livrée avec l'application — fait technique, pas intention, et c'est pourquoi un test le défend : il échoue si ext-skraft devient une dépendance de apps/desktop, dépendances de développement comprises. Conséquence : distribuer le .asx oblige à en fournir les sources."
+    },
+    {
+      "id": "skraft-synthese-ponderee",
+      "title": "La revue pèse quatre questions et refuse d'approuver quand l'une reste sans réponse",
+      "verify": "pnpm vitest run --project ext-skraft test/review-synthesis.test.ts",
+      "passes": true,
+      "notes": "Repris de skraft-plugin (adversarial-review-lenses + software-engineer-reviewer). Deux familles de règles, et leur ordre compte : les contributions pondérées ÉCLAIRENT le verdict, les règles de gravité le DÉCIDENT — un calcul ne rattrape jamais une porte. Nouvelle règle bloquante : une question qu'aucune lentille ne traite interdit l'approbation. C'est elle qui a fait bouger une dizaine de tests : le jeu de lentilles doit désormais couvrir les quatre questions."
+    },
+    {
+      "id": "reprise-skraft",
+      "title": "La reprise du contenu de skraft-plugin est possible (O9 tranché, option C)",
+      "verify": "grep -q 'Statut : RÉUNIE' docs/licences/autorisation-skraft.md && ls docs/licences/ | grep -vc '^autorisation-skraft.md$'",
+      "passes": false,
+      "notes": "Reprise FAITE le 25/09 ; conditions 2 et 3 remplies (ADR 0023 pour la licence). Reste UNE chose, non technique : verser la pièce d'origine de l'autorisation — courriel, message ou licence de l'auteur. Le dossier porte aujourd'hui la déclaration du responsable du projet la rapportant, ce qui l'engage lui mais ne serait opposable à personne d'autre. Le critère reste false pour cette seule raison."
+    },
+    {
+      "id": "stockage-sqlite",
+      "title": "L'état interne est en SQLite dans le profil utilisateur (O6, ADR 0019)",
+      "verify": "pnpm vitest run --project core -t 'sqlite'",
+      "passes": false,
+      "notes": "Décidé, pas implémenté. `node:sqlite` vérifié fonctionnel dans Electron 44 (Node 24.21) : pas de module natif à recompiler."
+    }
+  ]
+}

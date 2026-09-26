@@ -79,6 +79,15 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
       lines.push(...list("ADR ratifiés :", adrs), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...factBlock);
       break;
     }
+    case "quality-gates":
+      // Observatrice : elle ne reçoit ni code ni tests, seulement les faits et les livrables.
+      // Lui donner le code l'inviterait à rejuger ce que les portes ont déjà mesuré.
+      lines.push(
+        "Tu n'exécutes rien. Les faits ci-dessous sont établis par le code et font foi : vérifie que les livrables leur sont fidèles, et signale ce qu'ils passent sous silence.",
+        ...factBlock,
+        ...list("Livrables :", files.artifacts),
+      );
+      break;
   }
   return lines.join("\n");
 }

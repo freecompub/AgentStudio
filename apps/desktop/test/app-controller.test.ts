@@ -28,7 +28,10 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
         rolledBack.push(id);
       },
     },
-    repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 1, pushed: 0 }), switchBranch: async () => {} },
+    repo: {
+      // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
+      worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
+      head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 1, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 
@@ -398,6 +401,30 @@ describe("AppController — conversation", () => {
 
     await controller["chat:start"]({});
     expect(tokens).toHaveLength(1);
+  });
+
+  it("un message posté avant la conversation n'est pas perdu : il y apparaît à l'ouverture", async () => {
+    // Les échecs constatés à l'ouverture d'un projet — stack non reconnue, profil refusé —
+    // arrivent avant que la conversation existe. Les journaliser ne les montre à personne.
+    const ctx = setup();
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    ctx.getServicesArgs()!.onPost("agent-studio", "Aucun adaptateur ne reconnaît ce projet.");
+
+    const messages = await ctx.controller["chat:start"]({});
+
+    expect(messages.map((m) => [m.role, m.text])).toContainEqual(["notice", "Aucun adaptateur ne reconnaît ce projet."]);
+    // Et une seule fois : la file est vidée, pas rejouée à chaque démarrage.
+    expect((await ctx.controller["chat:start"]({})).filter((m) => m.role === "notice")).toHaveLength(1);
+  });
+
+  it("les messages en attente suivent le projet : clôturer les oublie", async () => {
+    const ctx = setup();
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    ctx.getServicesArgs()!.onPost("agent-studio", "message du projet précédent");
+    await ctx.controller["workspace:close"]({});
+
+    await ctx.controller["workspace:open"]({ path: "/projets/autre" });
+    expect((await ctx.controller["chat:start"]({})).filter((m) => m.role === "notice")).toEqual([]);
   });
 
   it("deux canaux concurrents ne démarrent qu'un seul runtime", async () => {

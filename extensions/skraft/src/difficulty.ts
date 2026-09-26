@@ -2,7 +2,7 @@ import type { Story } from "./story.js";
 
 /** Classification de difficulté (SPEC-skraft §8) : indicateurs calculés par le code, grille explicite. */
 export type Difficulty = "simple" | "medium" | "medium-hard" | "challenging";
-export type LensName = "cold-reader" | "test-integrity" | "architecture";
+export type LensName = "cold-reader" | "test-integrity" | "architecture" | "quality-gates";
 
 export interface DifficultyIndicators {
   acceptanceCriteria: number;
@@ -86,7 +86,10 @@ export interface LevelEffects {
 
 /** Effets du niveau (§8.3) : les moyens changent, jamais la logique de contrôle. */
 export function levelEffects(level: Difficulty): LevelEffects {
-  const all: LensName[] = ["cold-reader", "test-integrity", "architecture"];
+  // Quel que soit le niveau, le jeu retenu doit couvrir les quatre questions de `review.ts` :
+  // une question laissée sans lentille interdit l'approbation. En `simple`, `cold-reader` et
+  // `test-integrity` y suffisent à elles deux.
+  const all: LensName[] = ["cold-reader", "test-integrity", "architecture", "quality-gates"];
   switch (level) {
     case "simple":
       return { skipResearch: true, granularity: "turn-per-scenario", lenses: ["cold-reader", "test-integrity"], maxAttempts: 2 };

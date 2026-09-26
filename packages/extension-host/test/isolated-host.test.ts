@@ -38,10 +38,13 @@ function deps() {
     root: "/projets/demo",
     files: { read: async () => "", write: async () => {}, list: async () => ["a.ts", "b.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-    repo: { head: async () => "h", commit: async () => "sha", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+    repo: {
+      // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
+      worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
+      head: async () => "h", commit: async () => "sha", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
   const stack: StackAdapter = {
-    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, 
+    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"], 
     detect: async () => true,
     isTestFile: (p) => p.startsWith("tests/"),
     testFilePattern: "^tests/",

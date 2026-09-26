@@ -23,10 +23,12 @@ Test Case 'CapTests.testOverCap' failed (0.001 seconds)
 `;
 
 describe("Rapport Swift", () => {
-  it("JUnit : identifiants module.classe/méthode, statuts", () => {
+  it("JUnit : identifiants module.classe/méthode, statuts, message de l'échec", () => {
+    // Le message porte la raison de l'échec : les profils de stack s'en servent pour distinguer
+    // un rouge légitime d'une erreur de syntaxe (lecteur `junit-xml`).
     expect(parseXunit(XUNIT)).toEqual([
       { classname: "CapTests.CapTests", name: "testUnderCap", status: "passed" },
-      { classname: "CapTests.CapTests", name: "testOverCap", status: "failed" },
+      { classname: "CapTests.CapTests", name: "testOverCap", status: "failed", message: expect.any(String) },
       { classname: "CapTests.CapTests", name: "testLater", status: "skipped" },
     ]);
   });

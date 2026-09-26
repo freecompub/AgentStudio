@@ -53,7 +53,7 @@ describe("Grille de difficulté (SPEC-skraft §8.2)", () => {
 
   it("effets du niveau (§8.3)", () => {
     expect(levelEffects("simple")).toEqual({ skipResearch: true, granularity: "turn-per-scenario", lenses: ["cold-reader", "test-integrity"], maxAttempts: 2 });
-    expect(levelEffects("medium")).toMatchObject({ skipResearch: true, maxAttempts: 3, lenses: ["cold-reader", "test-integrity", "architecture"] });
+    expect(levelEffects("medium")).toMatchObject({ skipResearch: true, maxAttempts: 3, lenses: ["cold-reader", "test-integrity", "architecture", "quality-gates"] });
     expect(levelEffects("medium-hard")).toMatchObject({ skipResearch: false, granularity: "turn-per-scenario" });
     expect(levelEffects("challenging")).toMatchObject({ skipResearch: false, granularity: "session-per-step" });
   });

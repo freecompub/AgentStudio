@@ -9,7 +9,9 @@ import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 export const API_VERSION = "0.1.0";
 
 // Erreurs et utilitaires utilisables sans dépendre du cœur (D10). Voir `errors.ts`.
-export { EnvFailureError, TurnTimeoutError, WorkDefectError, globToRegExp, matchesAny } from "./errors.js";
+export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "./errors.js";
+// Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
+export { globToRegExp, matchesAny } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { ArchitectureReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
@@ -145,6 +147,11 @@ export interface GitApi {
 export interface StackApi {
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources). */
   readonly layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
+  /**
+   * Modules et frameworks que la stack tient pour de l'infrastructure ou de l'interface. Une
+   * extension ne peut pas les connaître sans devenir spécifique à un langage : elle les demande.
+   */
+  readonly infrastructureModules: string[];
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;

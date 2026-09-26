@@ -70,14 +70,17 @@ describe("Extension tierce installée depuis un fichier (J6)", () => {
       root: join(dir, "projet"),
       files: { read: async () => "", write: async () => {}, list: async () => ["src/a.ts", "src/b.ts", "README.md"] },
       checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-      repo: { head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+      repo: {
+      // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
+      worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
+      head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
     };
     await mkdir(workspace.root, { recursive: true });
     services = await workspaceServicesFactory({
       extensions: async () =>
         (await installer.active()).map((a) => ({ kind: "isolated" as const, manifest: a.manifest, directory: a.directory, entry: join(a.directory, a.manifest.main!) })),
       isolation: { launcher: createNodeLauncher(), runtimeEntry },
-      stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] },  detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+      stacks: [{ id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"],  detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
       tasksDir: join(dir, "taches"),
       taskStore: new MemoryTaskStore(),
       evidenceStore: new MemoryEvidenceStore(),

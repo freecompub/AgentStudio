@@ -1,0 +1,55 @@
+# Profil d'exemple — TypeScript avec Vitest.
+#
+# À copier dans `.agent-studio/stack.yaml` à la racine d'un projet, puis à ajuster.
+# Les programmes nommés doivent figurer dans la liste autorisée par l'administrateur (D47, O12).
+id: typescript
+
+# Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
+# existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
+detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
+
+tests:
+  command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
+  report: vitest-json
+
+lint:
+  command: [eslint, --format, json, "--", "{fichiers}"]
+  report: eslint-json
+
+mutation:
+  command: [stryker, run]
+  report: muter-json
+
+layout:
+  acceptanceTests: ["tests/acceptance/**"]
+  unitTests: ["tests/**", "src/**/*.test.ts"]
+  sources: ["src/**"]
+
+# Ce qu'un domaine ne doit pas importer.
+infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+
+# Canaris de `/stack doctor` : des tests dont la bonne réponse est connue d'avance. Le code les
+# écrit un par un dans une copie isolée du projet, lance la commande ci-dessus, et vérifie que
+# l'échec obtenu porte le classement attendu. `{marque}` est remplacée par un identifiant unique,
+# qui permet de retrouver les résultats du canari parmi ceux du projet.
+canaries:
+  - kind: passed
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(1); });
+  - kind: assertion
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { expect, test } from "vitest";
+      test("canari {marque}", () => { expect(1).toBe(2); });
+  - kind: missing_symbol
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { fonctionAbsente_{marque}(); });
+  - kind: syntax
+    file: src/canari_{marque}.test.ts
+    content: |
+      import { test } from "vitest";
+      test("canari {marque}", () => { :::

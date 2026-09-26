@@ -1,7 +1,7 @@
 import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, parseQualityBar, planScenarios } from "./deliver.js";
+import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
 import { featureScenarios } from "./distill.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
@@ -206,12 +206,18 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
       if (omis.length > 0) notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
     }
   }
-  const architecture = await ctx.stack.architecture(bar.dependencyRules);
-  if (architecture) {
-    const found = checkDependencies(architecture);
-    reasons.push(...found);
-    if (!found.length) facts.push(`Règle de dépendance respectée : ${bar.dependencyRules.map((r) => `${r.module} n'importe ni ${r.forbidden.join(", ni ")}`).join(" ; ")}.`);
-  } else notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
+  // Les règles du projet l'emportent ; à défaut, celles que la stack déduit de son écosystème.
+  const regles = bar.dependencyRules.length ? bar.dependencyRules : defaultDependencyRules(ctx.stack.infrastructureModules);
+  if (regles.length === 0) {
+    notes.push("Règle de dépendance non vérifiée : aucune règle déclarée, et la stack du projet n'en propose pas.");
+  } else {
+    const architecture = await ctx.stack.architecture(regles);
+    if (architecture) {
+      const found = checkDependencies(architecture);
+      reasons.push(...found);
+      if (!found.length) facts.push(`Règle de dépendance respectée : ${regles.map((r) => `${r.module} n'importe ni ${r.forbidden.join(", ni ")}`).join(" ; ")}.`);
+    } else notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
+  }
 
   if (reasons.length) return { type: "SCENARIO_FAIL", reasons };
   return { type: "SCENARIO_OK", notes, facts };

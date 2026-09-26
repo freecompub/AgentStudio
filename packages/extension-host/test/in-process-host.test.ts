@@ -32,7 +32,10 @@ function fakeWorkspace(): Workspace {
       diff: async () => ({ files: [{ path: "tests/a.test.ts", status: "modified" }], patch: "" }),
       rollback: async () => {},
     },
-    repo: { head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+    repo: {
+      // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
+      worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
+      head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   };
 }
 
@@ -47,7 +50,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   const posted: string[] = [];
   const stack: StackAdapter = {
-    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, 
+    id: "typescript", layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: ["Infrastructure"], 
     detect: async () => true,
     runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1 }),
     isTestFile: (p) => p.startsWith("tests/"),

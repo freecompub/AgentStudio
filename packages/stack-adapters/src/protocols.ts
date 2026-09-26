@@ -79,6 +79,13 @@ export interface StackLayout {
 export interface StackAdapter {
   readonly id: "typescript" | "swift" | "dotnet";
   readonly layout: StackLayout;
+  /**
+   * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
+   * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `SwiftUI` ne veut
+   * rien dire en Python — donc elle vit ici, et non dans une extension, qui doit rester
+   * indépendante des langages (D10).
+   */
+  readonly infrastructureModules: string[];
   /** Vrai si l'adaptateur reconnaît le projet. */
   detect(root: string): Promise<boolean>;
   runTests(opts: RunTestsOptions): Promise<TestRun>;

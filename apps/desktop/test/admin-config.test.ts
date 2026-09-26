@@ -16,6 +16,39 @@ describe("Configuration administrateur (D6, O5)", () => {
     expect(c).toMatchObject({ source: "défaut", profile: { role: "developpeur", defaultMode: "advanced", permissionPolicy: "souple" }, trustedPublishers: [], developerMode: false, revocation: null });
   });
 
+  it("programmes autorisés par défaut : lanceurs de tests, linters et outils de mutation courants (O12)", async () => {
+    const c = await loadAdminConfig(join(dir, "absent.json"));
+    // Ce sont ceux qu'un profil de stack peut nommer sans que l'administrateur intervienne.
+    expect(c.allowedPrograms).toEqual(expect.arrayContaining(["pytest", "eslint", "swiftlint", "muter"]));
+    // Et jamais de quoi sortir du projet ou atteindre le réseau.
+    for (const interdit of ["curl", "wget", "rm", "bash", "sh", "ssh", "node", "npm"])
+      expect(c.allowedPrograms, interdit).not.toContain(interdit);
+  });
+
+  it("l'administrateur remplace la liste, il ne s'y ajoute pas", async () => {
+    // Remplacer plutôt que compléter : un poste administré doit pouvoir restreindre, et non
+    // seulement élargir ce que nous avons jugé raisonnable.
+    const file = join(dir, "admin.json");
+    await writeFile(file, JSON.stringify({ allowedPrograms: ["pytest"] }));
+    const c = await loadAdminConfig(file);
+    expect(c.allowedPrograms).toEqual(["pytest"]);
+  });
+
+  it("une liste vide interdit tout profil de stack, et c'est un choix valide", async () => {
+    const file = join(dir, "admin.json");
+    await writeFile(file, JSON.stringify({ allowedPrograms: [] }));
+    expect((await loadAdminConfig(file)).allowedPrograms).toEqual([]);
+  });
+
+  it("un programme déclaré avec un chemin est refusé : seul un nom de commande est accepté", async () => {
+    // `/usr/bin/../../tmp/piege` ou `./script` échapperaient à la liste par le chemin.
+    const file = join(dir, "admin.json");
+    await writeFile(file, JSON.stringify({ allowedPrograms: ["/usr/local/bin/pytest"] }));
+    const c = await loadAdminConfig(file);
+    expect(c.error).toMatch(/allowedPrograms/);
+    expect(c.allowedPrograms).toEqual([]); // configuration refusée : on n'autorise rien
+  });
+
   it("profil attribué par l'administrateur, avec surcharges ; éditeurs approuvés ; révocation", async () => {
     const file = join(dir, "admin.json");
     await writeFile(

@@ -21,9 +21,26 @@ const reportSchema = z.object({
   ),
 });
 
+/**
+ * Motifs communs aux familles de lanceurs de tests. Ils servent aussi aux profils de stack
+ * (lecteur `junit-xml`), où l'outil n'est pas connu d'avance : un motif propre à Vitest y
+ * classerait tout échec en « mauvaise raison », et la porte RED refuserait des rouges légitimes.
+ */
 const MISSING_SYMBOL =
-  /is not defined|is not a function|is not a constructor|Cannot find module|Failed to load url|Failed to resolve import|does not provide an export named|has no exported member/;
-const ASSERTION = /AssertionError|expect\(.*\)\.|^\s*Expected:|expected .+ to /m;
+  /is not defined|is not a function|is not a constructor|Cannot find module|Failed to load url|Failed to resolve import|does not provide an export named|has no exported member|cannot find .+ in scope|use of unresolved identifier|NameError|ModuleNotFoundError|undefined reference/i;
+/**
+ * Un plantage natif tue le lanceur : ce n'est pas un rouge légitime, et la porte RED doit le
+ * rejeter. Or son message contient « Assertion … failed », donc il l'emportait sur tout le reste.
+ * Testé **avant** `ASSERTION`, et rendant `other_error`.
+ *
+ * Les deux formes rencontrées : celle de V8/Node (`../src/x.cc:123: Assertion '…' failed.`) et
+ * celle de la libc (`Assertion failed: (x), function f, file y.c`). Toutes deux citent un fichier
+ * source natif ou une fonction C, ce qu'une assertion de test ne fait jamais.
+ */
+const PLANTAGE_NATIF = /Assertion\s+failed:\s*\(|\.(?:cc|cpp|c|h)(?::\d+)?:\s*Assertion\b|\bcore dumped\b|\bSIGABRT\b|\bsegmentation fault\b/i;
+
+const ASSERTION =
+  /AssertionError|XCTAssert\w*|expect\(.*\)\.|^\s*Expected:|expected .+ to |assertion failed|assert\w*\(|Assert\.\w+/im;
 // Codes de couleur ANSI éventuellement présents dans les messages.
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
@@ -33,6 +50,9 @@ const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
  */
 export function classifyFailure(message: string): FailureKind {
   const m = message.replace(ANSI, "");
+  // En premier : un plantage natif contient « Assertion failed » sans être une assertion de test.
+  // Le classer `assertion` ferait accepter par la porte RED un test qui a tué le lanceur.
+  if (PLANTAGE_NATIF.test(m)) return "other_error";
   if (MISSING_SYMBOL.test(m)) return "missing_symbol";
   if (ASSERTION.test(m)) return "assertion";
   return "other_error";

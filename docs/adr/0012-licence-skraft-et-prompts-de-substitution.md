@@ -50,9 +50,24 @@ rédigés à partir de la spécification et non du dépôt.
 
 ## Reste à faire
 
-- Verser la trace écrite de l'autorisation et préciser la licence de redistribution.
-- Obtenir le dépôt skraft-plugin 1.5.2.
-- Appliquer ensuite le plan de reprise (SPEC-skraft §4) : remplacer les prompts de substitution de
+Le dossier est ouvert dans **`docs/licences/autorisation-skraft.md`** : il porte l'état des trois
+conditions, les champs à remplir, et le recensement exact des artefacts que la reprise remplacera.
+
+**La reprise a commencé le 2026-09-25**, depuis la branche `refactor/v1.6.0-tracking-substrate` —
+donc la 1.6.0 en cours, et non la 1.5.2 auditée. Sont repris : la synthèse pondérée des lentilles,
+la lentille `quality-gates`, et la substance des prompts `researcher`, `acceptance`, `test`, `dev`.
+Chaque artefact porte sa provenance en commentaire. En l'absence de précision sur la licence de
+redistribution, l'extension `skraft` est traitée comme **GPL-3.0-or-later** : c'est tenable parce
+qu'elle se distribue à part, en `.asx`, dans son propre processus (ADR 0021) — l'isolation même que
+décrivait l'option B.
+
+- ~~Obtenir le dépôt source.~~ Fait le 2026-09-25.
+- ~~Verser la trace écrite de l'autorisation.~~ Faite, sous la forme d'une déclaration du
+  responsable du projet — pas d'un accord signé de l'auteur ; la pièce d'origine reste à verser.
+- Préciser la licence de redistribution. **Constaté le 2026-09-25 :** le dépôt ne déclare aucune
+  licence (pas de `LICENSE`, pas de champ `license`), donc « la licence de l'application » ne
+  désigne rien tant que ce point n'est pas tranché.
+- Achever le plan de reprise (SPEC-skraft §4) : remplacer les prompts de substitution de
   `extensions/skraft/src/roles.ts` et la table de pondération des lentilles
   (`extensions/skraft/src/review.ts`, aujourd'hui des règles minimales).
 

@@ -1,0 +1,76 @@
+# Profil d'exemple — Swift avec SwiftPM et XCTest.
+#
+# À copier dans `.agent-studio/stack.yaml` à la racine d'un projet, puis à ajuster.
+id: swift
+
+detect: [Package.swift]
+
+tests:
+  command: [swift, test, --parallel, "--xunit-output={rapport}"]
+  report: junit-xml
+
+lint:
+  command: [swiftlint, lint, --quiet, --reporter, json, "--", "{fichiers}"]
+  report: swiftlint-json
+
+mutation:
+  command: [muter, run, --skip-coverage, --format, json, "--output", "{rapport}"]
+  report: muter-json
+
+layout:
+  acceptanceTests: ["Tests/AcceptanceTests/**"]
+  unitTests: ["Tests/**"]
+  sources: ["Sources/**"]
+
+infrastructureModules: [Infrastructure, Interface, UI, API, SwiftUI, UIKit, AppKit]
+
+# Erreurs de compilation. Indispensable sur un langage compilé : un symbole absent y arrête la
+# compilation, `swift test` ne produit alors AUCUN rapport de tests, et sans cette section le rouge
+# légitime du pas RED — « la fonction que je viens d'appeler n'existe pas encore » — n'atteindrait
+# jamais la porte.
+#
+# Le motif est appliqué ligne à ligne ; les groupes nommés `file` et `message` sont obligatoires.
+# `missingSymbol` liste des sous-chaînes, pas des expressions régulières : ce sont les messages qui
+# désignent le seul échec de compilation légitime. Tout le reste — syntaxe, types, configuration —
+# est classé `other_error` et rejeté par la porte RED.
+buildErrors:
+  pattern: '^(?<file>[^\s:]+\.swift):\d+:\d+: error: (?<message>.*)$'
+  missingSymbol:
+    - "cannot find"
+    - "no such module"
+    - "has no member"
+    - "missing argument for parameter"
+    - "extra argument"
+
+# Canaris de `/stack doctor` (voir `profiles/typescript.yaml` pour l'explication complète).
+#
+# Les quatre genres sont déclarés, `missing_symbol` compris : il est éprouvable depuis que
+# `buildErrors` ci-dessus dit comment lire les erreurs de compilation. C'est lui qui vérifie
+# qu'un symbole absent produit bien le rouge que la porte RED accepte.
+canaries:
+  - kind: passed
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase {
+        func test{marque}() { XCTAssertEqual(1, 1) }
+      }
+  - kind: assertion
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase {
+        func test{marque}() { XCTAssertEqual(1, 2) }
+      }
+  - kind: missing_symbol
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase {
+        func test{marque}() { fonctionAbsente{marque}() }
+      }
+  - kind: syntax
+    file: Tests/Canari{marque}Tests.swift
+    content: |
+      import XCTest
+      final class Canari{marque}Tests: XCTestCase { func test{marque}() { :::

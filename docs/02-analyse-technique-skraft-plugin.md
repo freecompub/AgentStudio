@@ -10,6 +10,12 @@ Constat principal : les 787 tests passent, mais le contrat entre le harnais et l
 
 Les sections suivantes décrivent la version 1.5.2 (branche `main`, clonée le 22 septembre 2026). La réanalyse de la branche `refactor/v1.6.0-tracking-substrate` (23 septembre) montre que la traduction entre hooks et harnais est corrigée (C4, C5, C7), que l'état, l'ordre des phases et la résolution du projet ne le sont pas encore (C1, C2, C3, C6), et qu'un conflit nouveau empêche d'enregistrer la ratification des ADR : voir la section « Réanalyse de la branche 1.6.0 ».
 
+> **Ces constats sont périmés depuis le 25 septembre 2026.** La branche a avancé de deux jours et
+> le plan de refonte y a été appliqué : **aucun des constats C1 à C7, N1 et N2 ne subsiste**. Voir
+> « Suivi au 25 septembre » en fin de document ; c'est cette section qui fait foi. Les deux
+> sections antérieures sont conservées telles quelles, comme trace de ce qui a été observé à leur
+> date.
+
 ## Structure du dépôt
 
 Environ 1 050 fichiers, dont 60 fichiers JavaScript (4 100 lignes) constituent le seul code exécuté. Le reste est du contenu destiné au LLM ou de l'outillage du dépôt.
@@ -248,11 +254,65 @@ node $H PreToolUse Bash <<'EOF'
 EOF
 ```
 
+## Suivi au 25 septembre
+
+Branche `refactor/v1.6.0-tracking-substrate`, commit `6b2e7af` du 25 septembre 2026 — deux jours
+après le `c82cbbb` de la réanalyse. C'est désormais la **source autorisée** de la reprise dans
+`agent-studio` (dossier : `docs/licences/autorisation-skraft.md`), ce qui donne à ce suivi un
+statut différent des précédents : il ne juge plus un dépôt tiers de l'extérieur, il décrit le code
+dont nous reprenons une partie.
+
+**Réserve de méthode, à lire avant le tableau.** Ce passage est établi **par lecture du code
+seulement**. Aucune CLI n'a été rejouée, aucune suite de tests exécutée. Les constats antérieurs
+distinguaient « vérifié » (reproduit par exécution) de « lu dans le code » ; tout ce qui suit
+relève de la seconde catégorie, et mérite d'être rejoué avant d'être tenu pour acquis.
+
+### Ce qui a changé dans le dépôt
+
+| Élément | 1.6.0 au 23/09 | 1.6.0 au 25/09 |
+| --- | --- | --- |
+| Skills | 38 | 37 |
+| Agents | `com.github.copilot/agents/` (31) | Deux surfaces de 31 agents chacune, `com.github.copilot/` et `com.anthropic.claude-code/` |
+| Runtime | 60 fichiers `.mjs` en 1.5.2 | 115 fichiers `.mjs` |
+| Schéma d'état | Annoncé dans le plan | `src/domain/state.schema.json`, Draft 2020-12, `additionalProperties: false` |
+
+### Statut des constats
+
+| # | Statut au 25/09 | Ce qui l'établit |
+| --- | --- | --- |
+| C1 | **Corrigé** | `cli/hook.mjs:98` résout le projet par `firstValidProjectSlug(payload, SKRAFT_PROJECT_SLUG, createActiveSlugStore(trackingRoot).read())` — un pointeur de pipeline actif écrit par la CLI d'état. G1, G4, G5 et G6 ont enfin un slug, donc peuvent se déclencher. |
+| C2 | **Corrigé** | L'état durable est unifié et validé par schéma ; les champs que G1 refusait (`specialistDone`, `reviewerVerdict`, `retries`, `skipPhases`) n'y figurent plus. `pre-tool-use-service.mjs:45` les **calcule** par `projectDispatchState(raw)` avant de les passer à la politique. |
+| C3 | **Corrigé** | `domain/state-machine.mjs:9` : `DEFAULT_PHASE_ORDER = ['RESEARCH','DESIGN','DISTILL','DELIVER']`, `cli/state.mjs:40` lit `phaseOrder` de la configuration publiée, et `state-service.mjs:14` initialise `currentPhase` à `phaseOrder[0]`. L'état ne naît plus en DISCOVER. |
+| C4, C5, C7 | Corrigés | Déjà au 23/09. |
+| C6 | **Sans objet** | Ce n'était pas une incohérence mais une frontière, désormais explicite : `phase-gate-policy.mjs:42-45` documente la traduction — les revues disent `NEEDS_REWORK`/`REJECTED`, l'état enregistre `APPROVED`/`CHANGES_REQUESTED`. |
+| N1 | **Dissous** | `entryPoint` a **disparu du dépôt** — ni dans `src/`, ni dans les prompts, ni dans les skills. Et `adrRatification` a sa commande typée : `orchestrator-metadata-policy.mjs:9`, `SETTABLE_METADATA_FIELDS`. |
+| N2 | **Corrigé** | `session-guard-policy.mjs:68` : « An inline script naming a target (node -e, python -c…) may write it: refuse ». Le contournement par interpréteur est traité. |
+
+### Ce qu'il faut en retenir
+
+Le plan `.specs/plan_todo.md` a été appliqué entre le 23 et le 25 septembre, et il a couvert les
+deux points que la réanalyse lui reprochait d'omettre : la résolution du projet actif (C1) et le
+contournement de G7 (N2) — la première par un pointeur de pipeline actif, qui est exactement la
+recommandation 3 de ce document.
+
+**Conséquence pour nos propres documents.** L'argument « les garde-fous de skraft ne se déclenchent
+pas en conditions réelles » ne tient plus. Il servait de justification à notre conception dans les
+documents 03 et 04 ; il y est désormais corrigé. Notre choix — un réducteur déterministe plutôt
+qu'un orchestrateur LLM — garde ses raisons propres, qui n'ont jamais eu besoin des défauts d'un
+autre dépôt : c'est une différence de conception, pas la correction d'un bogue.
+
 ## Méthode et sources
 
 Version 1.5.2 : dépôt cloné (`git clone --depth 1`, branche `main`), lecture intégrale du runtime `src/`, des trois manifestes de hooks, de la configuration générée et du prompt de l'orchestrateur. Suite de tests exécutée avec `node --test tests/skraft-framework/*.test.mjs` : 787 tests, 786 réussis, 1 ignoré. Les constats C1 à C4 ont été reproduits en exécutant les CLI. C5 compare la sortie du plugin aux types de hooks du Copilot SDK (`@github/copilot-sdk`) et au format documenté de Claude Code.
 
 Version 1.6.0 : branche `refactor/v1.6.0-tracking-substrate` clonée le 23 septembre 2026, lecture des adaptateurs de hooks, des services, de la machine à états, du prompt de l'orchestrateur Copilot et du plan `.specs/plan_todo.md`. Suite de tests exécutée hors tests de bout en bout et d'évaluation : 1 517 tests. C1 à C5, N1 et N2 reproduits en exécutant les CLI ; C6, C7 et le « commit vérifié » établis par lecture du code.
+
+Suivi du 25 septembre : branche `refactor/v1.6.0-tracking-substrate` au commit `6b2e7af`, clonée le
+25 septembre 2026. **Lecture du code uniquement** — ni exécution des CLI, ni suite de tests. Fichiers
+lus : `cli/hook.mjs`, `cli/state.mjs`, `application/{pre-tool-use,state}-service.mjs`,
+`domain/{state-machine,pipeline-policy,phase-gate-policy,session-guard-policy,orchestrator-metadata-policy}.mjs`,
+`domain/state.schema.json`, `skraft-framework.config.json`, et les agents de revue. Les décomptes
+de fichiers viennent de `ls` et `find` sur le clone.
 
 - [skraft-plugin sur GitHub](https://github.com/SebastienDegodez/skraft-plugin)
 - [README du framework skraft-framework](https://github.com/SebastienDegodez/skraft-plugin/blob/main/plugins/skraft-framework/README.md)
