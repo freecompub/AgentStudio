@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createHeartbeat, runTurn, TurnBudgetError, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
+import { createHeartbeat, runTurn, TurnBudgetError, TurnCostError, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
 import { ScriptedSession } from "../src/testing/scripted-session.js";
 
 describe("runTurn — watchdog d'inactivité (D30)", () => {
@@ -168,5 +168,86 @@ describe("runTurn — plafond de durée du tour (ADR 0026)", () => {
     }
     await caught;
     expect(s.listenerCount).toBe(0);
+  });
+});
+
+describe("runTurn — plafond de coût du tour (ADR 0027)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** Un appel au modèle : le contexte entier est renvoyé, donc facturé, à chaque fois. */
+  const appel = (s: ScriptedSession, inputTokens: number) => s.emit({ type: "usage", inputTokens, outputTokens: 500 });
+
+  it("coupe le tour quand le cumul des tokens d'entrée dépasse le plafond", async () => {
+    // DESIGN du 28/09 : 4 230 824 tokens d'entrée cumulés. Chaque appel renvoie tout le contexte,
+    // donc un tour de N appels coûte en O(N²). Rien ne bornait N.
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "boucle", { idleMs: 60_000, maxInputTokens: 100_000 });
+    const caught = turn.catch((e: unknown) => e);
+    for (let i = 0; i < 12; i++) {
+      appel(s, 10_000);
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    const err = await caught;
+    expect(err).toBeInstanceOf(TurnCostError);
+    expect((err as TurnCostError).inputTokens).toBeGreaterThanOrEqual(100_000);
+    expect(s.aborted).toBe(true);
+  });
+
+  it("le cumul ne décroît jamais : c'est ce qui a été payé, pas ce qui est en mémoire", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxInputTokens: 30_000 });
+    const caught = turn.catch((e: unknown) => e);
+    // Des appels de plus en plus PETITS : si l'on regardait le dernier appel au lieu du cumul,
+    // on ne couperait jamais.
+    for (const n of [12_000, 9_000, 6_000, 4_000, 3_000]) {
+      appel(s, n);
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    expect(await caught).toBeInstanceOf(TurnCostError);
+  });
+
+  it("un tour sobre n'est jamais coupé, même long", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxInputTokens: 1_000_000 });
+    for (let i = 0; i < 20; i++) {
+      appel(s, 15_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+    expect(s.aborted).toBe(false);
+  });
+
+  it("distingue le coût du temps et du silence : trois causes, trois motifs", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxInputTokens: 10_000 });
+    const caught = turn.catch((e: unknown) => e);
+    appel(s, 20_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const err = await caught;
+    expect(err).not.toBeInstanceOf(TurnTimeoutError);
+    expect(err).not.toBeInstanceOf(TurnBudgetError);
+    expect((err as Error).message).toMatch(/tokens/i);
+  });
+
+  it("un événement usage sans tokens ne compte rien, et ne fait pas planter le cumul", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxInputTokens: 10_000 });
+    s.emit({ type: "usage", multiplier: 1 });
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+  });
+
+  it("le plafond par défaut existe : aucun tour n'est illimité en coût", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxMs: 60 * 60_000 });
+    const caught = turn.catch((e: unknown) => e);
+    // Le rythme réel de DESIGN, par paliers de 100 k.
+    for (let i = 0; i < 60; i++) {
+      appel(s, 100_000);
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    expect(await caught).toBeInstanceOf(TurnCostError);
   });
 });

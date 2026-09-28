@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — La durée ne dit rien du coût (ADR 0027)
+
+**Le chiffre.** DESIGN : 4 230 824 tokens d'entrée, 529 k par tour. Les lentilles de revue, sur le
+même run : 83 k. Un facteur six.
+
+**La cause est structurelle, pas accidentelle.** Chaque appel au modèle renvoie tout le contexte,
+donc le repaie : un tour de N appels d'outil coûte en **O(N²)**, et rien ne bornait N. L'architecte
+lisait le dépôt, appelait un outil, relisait — chaque aller-retour emportant tout ce qui précédait.
+
+**Le signal était déjà là.** L'événement `usage` du runtime porte `inputTokens`, et
+`task-agent-runner.ts` ne s'en servait que pour *compter après coup*. Le lire en direct dans
+`runTurn` suffit à couper. Le piège que j'ai mis sous test : **le cumul ne décroît jamais** — c'est
+ce qui a été payé, pas ce qui tient en mémoire. Regarder la taille du dernier appel ne couperait
+rien, parce que les appels rétrécissent souvent pendant que la facture monte.
+
+**Ce que ça ne corrige pas, et il faut le dire.** C'est un coupe-circuit. Le contexte croît
+exactement pareil ; on cesse seulement de payer au-delà de 1 M. Le vrai correctif n'est pas dans le
+cœur : c'est de donner moins à lire à l'agent — un dossier de passation construit par le code
+plutôt qu'un dépôt à explorer. Et la dépense reste **invisible pendant** la tâche : elle est écrite
+dans `tasks/<id>/usage/<taskId>.json` et ne remonte pas à l'écran. Le responsable a découvert les
+4,2 M en lisant un fichier.
+
+---
+
 ## 28/09 — Un tour d'agent a duré 1 h 55, et rien ne le bornait (ADR 0026)
 
 **Ce qui s'est passé.** Premier vrai run de `skraft-pipeline` sur US-2 du projet d'essai .NET.

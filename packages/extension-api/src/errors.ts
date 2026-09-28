@@ -45,6 +45,23 @@ export class TurnBudgetError extends WorkDefectError {
   }
 }
 
+/**
+ * Plafond de **coût** du tour atteint (ADR 0027) : le cumul des tokens d'entrée facturés.
+ *
+ * Chaque appel au modèle renvoie tout le contexte, donc le paie à nouveau : un tour de N appels
+ * coûte en O(N²). Le cumul ne décroît jamais — c'est ce qui a été payé, pas ce qui tient en
+ * mémoire. Distincte de `TurnBudgetError` : un tour peut être bref et ruineux, ou long et sobre.
+ */
+export class TurnCostError extends WorkDefectError {
+  constructor(
+    readonly maxInputTokens: number,
+    readonly inputTokens: number,
+  ) {
+    super(`Le tour a dépassé son plafond de ${Math.round(maxInputTokens / 1000)} k tokens d'entrée (cumul : ${Math.round(inputTokens / 1000)} k)`);
+    this.name = "TurnCostError";
+  }
+}
+
 /** Défaut d'environnement (runtime, quota, API) : escalade immédiate (D25). */
 export class EnvFailureError extends Error {
   constructor(message: string, options?: ErrorOptions) {

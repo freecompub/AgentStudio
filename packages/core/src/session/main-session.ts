@@ -7,7 +7,7 @@ import type {
   IdGenerator,
   TurnCheckpoints,
 } from "../protocols/conversation.js";
-import { EnvFailureError, runTurn, TurnBudgetError, TurnTimeoutError } from "../turns/run-turn.js";
+import { EnvFailureError, runTurn, TurnBudgetError, TurnCostError, TurnTimeoutError } from "../turns/run-turn.js";
 
 export interface MainSessionDeps {
   runtime: AgentRuntime;
@@ -24,6 +24,8 @@ export interface MainSessionDeps {
   idleMs?: number;
   /** Plafond de durée totale d'un tour (ADR 0026). */
   maxMs?: number;
+  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027). */
+  maxInputTokens?: number;
 }
 
 export type MainSessionEvent =
@@ -147,6 +149,7 @@ export function createMainSession(deps: MainSessionDeps): MainSession {
           await runTurn(s, note + prompt, {
             ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
             ...(deps.maxMs !== undefined ? { maxMs: deps.maxMs } : {}),
+            ...(deps.maxInputTokens !== undefined ? { maxInputTokens: deps.maxInputTokens } : {}),
             onEvent: (event) => {
               emit({ type: "agent", event });
               if (event.type === "message" && event.text.trim()) {
@@ -156,7 +159,9 @@ export function createMainSession(deps: MainSessionDeps): MainSession {
             },
           });
         } catch (err) {
-          if (err instanceof TurnBudgetError)
+          if (err instanceof TurnCostError)
+            append("notice", `Le tour a dépassé son plafond de ${Math.round(err.maxInputTokens / 1000)} k tokens d'entrée et a été interrompu. Découpez la demande : chaque appel renvoie tout le contexte, donc la facture monte au carré.`);
+          else if (err instanceof TurnBudgetError)
             append("notice", `L'agent travaillait encore, mais le tour a dépassé son plafond de ${Math.round(err.maxMs / 60_000)} min : il a été interrompu. Reformulez en demandant moins à la fois.`);
           else if (err instanceof TurnTimeoutError)
             append("notice", "L'agent ne répond plus : le tour a été interrompu. Vous pouvez reformuler ou annuler ce tour.");

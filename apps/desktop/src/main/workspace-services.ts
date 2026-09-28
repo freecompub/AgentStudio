@@ -75,6 +75,8 @@ export interface WorkspaceServicesConfig {
   agentIdleMs?: number;
   /** Plafond de durée totale d'un tour d'agent (ADR 0026). */
   agentMaxTurnMs?: number;
+  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027). */
+  agentMaxInputTokens?: number;
 }
 
 /** Construit la carte de tâche (§7.2) à partir de l'état persisté et des libellés du manifeste. */
@@ -256,6 +258,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           root: workspace.root,
           ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
           ...(cfg.agentMaxTurnMs !== undefined ? { maxMs: cfg.agentMaxTurnMs } : {}),
+          ...(cfg.agentMaxInputTokens !== undefined ? { maxInputTokens: cfg.agentMaxInputTokens } : {}),
           ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
         workspace,

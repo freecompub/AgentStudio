@@ -256,6 +256,13 @@
       "notes": "Mesuré sur un vrai run, pas supposé : le 28/09, un tour de `skraft-architect-model` sur US-2 du projet d'essai .NET a duré 1 h 55 min 41 s (10:13:59 → 12:09:40 dans main.log). Le chronomètre d'inactivité n'a rien vu — chaque événement le réarmait — et ne s'est déclenché qu'une fois l'agent muet. DESIGN : 4 230 824 tokens d'entrée pour 8 requêtes, résultat rejoué depuis le checkpoint à l'annulation. L'activité n'est pas la progression. Défaut 30 min, `TurnBudgetError` distincte de `TurnTimeoutError` pour que le motif lu par l'humain dise lequel des deux s'est produit. Ne borne PAS le coût : un tour sous 30 min peut consommer 500 k tokens — borner le contexte d'une session reste à faire."
     },
     {
+      "id": "plafond-cout-tour",
+      "title": "Un tour d'agent a un plafond de coût : le cumul des tokens d'entrée, lu en direct (ADR 0027)",
+      "verify": "pnpm vitest run --project core test/run-turn.test.ts",
+      "passes": true,
+      "notes": "La durée ne dit rien du coût : sur le run du 28/09, DESIGN a dépensé 4 230 824 tokens d'entrée (529 k par tour) contre 83 k pour les lentilles. Cause structurelle : chaque appel au modèle renvoie tout le contexte, donc un tour de N appels coûte en O(N²), et rien ne bornait N. Le signal existait — l'événement `usage` porte `inputTokens` — mais ne servait qu'à compter après coup. Le cumul ne décroît jamais : c'est ce qui a été payé, et regarder le dernier appel ne couperait rien (les appels rétrécissent pendant que la facture monte) ; un test le défend avec des appels décroissants. Défaut 1 M, `TurnCostError` distincte de `TurnBudgetError` et `TurnTimeoutError` : trois causes, trois motifs. COUPE-CIRCUIT, pas réduction du contexte — le vrai correctif est de donner moins à lire à l'agent, et la dépense reste invisible pendant la tâche."
+    },
+    {
       "id": "skraft-agents-skills-md",
       "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
       "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",

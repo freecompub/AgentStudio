@@ -415,6 +415,8 @@ Pas de `sendAndWait` avec délai fixe. Le tour est lancé avec `send()` ; tout �
 
 Au-dessus de ce chronomètre, un **plafond de durée totale** du tour (défaut 30 min, ADR 0026), que **rien ne réarme** et qui lève `TurnBudgetError`. Le chronomètre d'inactivité ne voit pas un agent qui parle sans avancer : le 28/09, un tour a duré 1 h 55 avant que le silence ne finisse par le trahir. L'activité n'est pas la progression.
 
+Et un **plafond de coût** (défaut 1 M tokens d'entrée cumulés, ADR 0027), lu en direct sur l'événement `usage`, qui lève `TurnCostError`. Chaque appel renvoie tout le contexte : un tour de N appels coûte en O(N²). Durée et coût sont indépendants — un tour peut être bref et ruineux.
+
 ```ts
 async function runTurn(session: AgentSession, prompt: string, idleMs = 5 * 60_000) {
   return new Promise<void>((resolve, reject) => {

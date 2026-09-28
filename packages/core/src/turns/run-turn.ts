@@ -4,8 +4,8 @@ import type { AgentEvent, AgentSession } from "../protocols/agent-runtime.js";
  * Ces erreurs sont définies dans `@agent-studio/extension-api` : une extension doit pouvoir les
  * lever sans dépendre du cœur (D10). Réexportées ici pour tout le reste du cœur.
  */
-export { EnvFailureError, TurnBudgetError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
-import { EnvFailureError, TurnBudgetError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
+export { EnvFailureError, TurnBudgetError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
+import { EnvFailureError, TurnBudgetError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
 
 /** Signe de vie émis hors session (sortie d'un outil long exécuté par notre code, §6.4). */
 export interface Heartbeat {
@@ -33,6 +33,11 @@ export interface RunTurnOptions {
    * par rien : c'est un plafond, pas un chronomètre.
    */
   maxMs?: number;
+  /**
+   * Plafond du **cumul** des tokens d'entrée facturés sur le tour ; défaut 1 M. Chaque appel au
+   * modèle renvoie tout le contexte : un tour de N appels coûte en O(N²), et rien d'autre ne borne N.
+   */
+  maxInputTokens?: number;
   onEvent?: (e: AgentEvent) => void;
 }
 
@@ -50,7 +55,9 @@ export interface RunTurnOptions {
 export function runTurn(session: AgentSession, prompt: string, opts: RunTurnOptions = {}): Promise<void> {
   const idleMs = opts.idleMs ?? 5 * 60_000;
   const maxMs = opts.maxMs ?? 30 * 60_000;
+  const maxInputTokens = opts.maxInputTokens ?? 1_000_000;
   const debut = Date.now();
+  let tokensEntree = 0;
   return new Promise<void>((resolve, reject) => {
     let settled = false;
     let timer = setTimeout(onSilence, idleMs);
@@ -62,6 +69,10 @@ export function runTurn(session: AgentSession, prompt: string, opts: RunTurnOpti
       clearTimeout(timer);
       timer = setTimeout(onSilence, idleMs);
       opts.onEvent?.(ev);
+      // Le cumul ne décroît jamais : c'est ce qui a été payé. Regarder le dernier appel ne
+      // couperait rien — les appels rétrécissent souvent alors que la facture monte.
+      if (ev.type === "usage") tokensEntree += ev.inputTokens ?? 0;
+      if (tokensEntree >= maxInputTokens) return arreter(() => new TurnCostError(maxInputTokens, tokensEntree));
       if (ev.type === "idle") finish(() => resolve());
       else if (ev.type === "error") finish(() => reject(new EnvFailureError(ev.message)));
     });

@@ -20,7 +20,7 @@ export class RpcClosedError extends EnvFailureError {
 /** Reconstruit la nature d'une erreur distante, pour que le moteur la traite correctement (D25). */
 function reviveError(e: { name: string; message: string }): Error {
   let err: Error;
-  if (e.name === "WorkDefectError" || e.name === "TurnTimeoutError" || e.name === "TurnBudgetError") err = new WorkDefectError(e.message);
+  if (e.name === "WorkDefectError" || e.name === "TurnTimeoutError" || e.name === "TurnBudgetError" || e.name === "TurnCostError") err = new WorkDefectError(e.message);
   else if (e.name === "EnvFailureError" || e.name === "RpcClosedError") err = new EnvFailureError(e.message);
   else err = new Error(e.message);
   err.name = e.name;
