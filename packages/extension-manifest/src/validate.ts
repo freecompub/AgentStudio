@@ -5,6 +5,13 @@ import { satisfies } from "./semver.js";
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;
 const PERMISSION = /^(fs:read|fs:write:[^\s]+|shell:test|shell:[a-z0-9_.,-]+|git:(commit|branch|revert)|copilot:sessions|net:[a-z0-9.,*-]+)$/;
 const text = (max: number) => z.string().trim().min(1).max(max);
+/** Chemin d'un fichier ou dossier de l'extension : relatif, sans « .. » ni segment vide. */
+const innerPath = z
+  .string()
+  .min(1)
+  .refine((p) => !p.startsWith("/") && !/^[A-Za-z]:/.test(p) && p.split(/[\\/]/).every((s) => s !== ".." && s !== "." && s !== ""), "chemin relatif au dossier de l'extension, sans « .. »");
+/** Référence à une skill : `nom`, ou `nom#Titre de section`. */
+const SKILL_REF = /^([a-z][a-z0-9-]{0,39})(#.+)?$/;
 
 const schema = z.object({
   id: z.string().regex(/^[a-z0-9-]+\.[a-z0-9-]+$/, "attendu « éditeur.nom » en minuscules"),
@@ -23,13 +30,16 @@ const schema = z.object({
         z.object({
           name: z.string().regex(NAME),
           title: text(80),
-          role: text(20_000),
+          prompt: innerPath.refine((p) => p.endsWith(".md"), "fichier .md attendu").optional(),
+          role: text(20_000).optional(),
+          skills: z.object({ mandatory: z.array(z.string().regex(SKILL_REF)).optional(), onDemand: z.array(z.string().regex(SKILL_REF)).optional() }).optional(),
           output: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"]),
           write: z.array(z.string().min(1)).optional(),
           tools: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)).optional(),
         }),
       )
       .optional(),
+    skills: z.array(z.object({ name: z.string().regex(NAME), path: innerPath })).optional(),
     tools: z.array(z.object({ name: z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), description: text(500) })).optional(),
     tasks: z
       .array(
@@ -62,7 +72,13 @@ export function validateManifest(raw: unknown, app: { appApi: string }): Manifes
   for (const p of m.permissions) if (!PERMISSION.test(p)) errors.push(`permissions : permission inconnue : ${p}`);
 
   const writeGlobs = new Set(m.permissions.filter((p) => p.startsWith("fs:write:")).map((p) => p.slice(9)));
+  const skills = new Set((m.contributes.skills ?? []).map((s) => s.name));
   for (const a of m.contributes.agents ?? []) {
+    if (!a.prompt && !a.role) errors.push(`agents.${a.name} : ni fichier de rôle (prompt) ni consignes (role)`);
+    for (const ref of [...(a.skills?.mandatory ?? []), ...(a.skills?.onDemand ?? [])]) {
+      const name = SKILL_REF.exec(ref)![1]!;
+      if (!skills.has(name)) errors.push(`agents.${a.name} : skill non déclarée dans contributes.skills : ${name}`);
+    }
     for (const g of a.write ?? []) if (!writeGlobs.has(g)) errors.push(`agents.${a.name} : écrit dans ${g} sans la permission fs:write:${g}`);
     if (a.tools?.includes("run_tests") && !m.permissions.includes("shell:test")) errors.push(`agents.${a.name} : run_tests exige la permission shell:test`);
     const own = new Set((m.contributes.tools ?? []).map((t) => t.name));
@@ -77,6 +93,7 @@ export function validateManifest(raw: unknown, app: { appApi: string }): Manifes
     ["agents", m.contributes.agents ?? []],
     ["tasks", m.contributes.tasks ?? []],
     ["tools", m.contributes.tools ?? []],
+    ["skills", m.contributes.skills ?? []],
   ] as const) {
     const seen = new Set<string>();
     for (const c of list) {

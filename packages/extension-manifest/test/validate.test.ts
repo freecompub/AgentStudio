@@ -69,3 +69,39 @@ describe("Validation du manifeste (§5.1, D11, D13)", () => {
     expect(errorsOf(m)).toEqual([expect.stringMatching(/INCONNU/)]);
   });
 });
+
+describe("Agents en fichiers Markdown et skills (D12, D26)", () => {
+  const withAgent = (agent: Record<string, unknown>, skills?: unknown) => {
+    const m = base();
+    m.contributes.agents = [{ name: "dev", title: "Dév", output: "report_phase", ...agent }];
+    if (skills !== undefined) m.contributes.skills = skills;
+    return m;
+  };
+
+  it("rôle en fichier, consignes facultatives, skills déclarées et référencées (avec section)", () => {
+    const m = withAgent(
+      { prompt: "agents/dev.agent.md", skills: { mandatory: ["outside-in-tdd#RED"], onDemand: ["craft-discipline"] } },
+      [
+        { name: "outside-in-tdd", path: "skills/outside-in-tdd" },
+        { name: "craft-discipline", path: "skills/craft-discipline/SKILL.md" },
+      ],
+    );
+    expect(errorsOf(m)).toEqual([]);
+  });
+
+  it("ni fichier ni consignes : refusé", () => {
+    expect(errorsOf(withAgent({}))).toEqual(["agents.dev : ni fichier de rôle (prompt) ni consignes (role)"]);
+  });
+
+  it("chemins hors du dossier de l'extension, ou qui ne sont pas des .md : refusés", () => {
+    for (const prompt of ["../x.md", "/etc/x.md", "agents/../../x.md", "agents/./x.md", "C:/x.md"])
+      expect(errorsOf(withAgent({ prompt })), prompt).toEqual([expect.stringMatching(/^contributes\.agents\.0\.prompt : chemin relatif/)]);
+    expect(errorsOf(withAgent({ prompt: "agents/dev.txt" }))).toEqual([expect.stringMatching(/fichier \.md attendu/)]);
+    expect(errorsOf(withAgent({ role: "r" }, [{ name: "s", path: "../s" }]))).toEqual([expect.stringMatching(/^contributes\.skills\.0\.path : chemin relatif/)]);
+  });
+
+  it("skill référencée mais non déclarée, ou déclarée deux fois : refusé", () => {
+    expect(errorsOf(withAgent({ role: "r", skills: { onDemand: ["inconnue#A"] } }, []))).toEqual(["agents.dev : skill non déclarée dans contributes.skills : inconnue"]);
+    expect(errorsOf(withAgent({ role: "r" }, [{ name: "s", path: "a" }, { name: "s", path: "b" }]))).toEqual(["skills : nom en double : s"]);
+  });
+});
