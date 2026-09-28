@@ -579,6 +579,18 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   });
 });
 
+describe("Skills chargées à la demande (D26)", () => {
+  it("chaque AGENT_REPORTED qui porte des skills est tracé avec sa phase et son rôle, sans changer la suite", () => {
+    const base = [...toFirstPhase(), CP("RESEARCH")];
+    const traced = play([...base, { ...REPORTED, skills: ["architecture-patterns"] } as Ev]);
+    const plain = play([...base, REPORTED]);
+    expect(traced.state.skillsLoaded).toEqual([{ phase: "RESEARCH", role: "skraft-researcher", skills: ["architecture-patterns"] }]);
+    expect(traced.effects).toEqual(plain.effects);
+    expect(plain.state.skillsLoaded).toBeUndefined();
+    expect(validateState(traced.state)).toEqual({ ok: true });
+  });
+});
+
 describe("Invariants (§5.3)", () => {
   /** Générateur pseudo-aléatoire déterministe : suites d'événements plausibles et absurdes. */
   function* randomRuns(n: number): Generator<Ev[]> {

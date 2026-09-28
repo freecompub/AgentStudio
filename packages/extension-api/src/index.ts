@@ -14,7 +14,7 @@ export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "./errors.js"
 export { globToRegExp, matchesAny } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
-export type { ArchitectureReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
+export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
 export type { TaskEvent, EffectContext } from "@agent-studio/task-engine";
 
 // ---------- Manifeste (§5.1) ------------------------------------------------------
@@ -39,8 +39,18 @@ export interface ManifestCommand {
 export interface ManifestAgent {
   name: string;
   title: string;
-  /** Prompt de rôle (texte). */
-  role: string;
+  /**
+   * Fichier Markdown du rôle, relatif au dossier de l'extension (ex. `agents/dev.agent.md`) : le
+   * **contenu**, partageable avec d'autres harnais (Copilot CLI, Claude Code). Le frontmatter est ignoré.
+   */
+  prompt?: string;
+  /**
+   * Consignes propres à agent-studio (orchestration), ajoutées au contenu. Au moins l'un de
+   * `prompt` ou `role` est requis.
+   */
+  role?: string;
+  /** Skills du rôle : injectées dans la session, ou chargées à la demande par `load_skill` (D26). `nom#Titre` = une section. */
+  skills?: { mandatory?: string[]; onDemand?: string[] };
   output: TerminalToolName;
   /** Périmètre d'écriture (globs, ou `@stack:acceptanceTests|unitTests|sources`) ; absent = lecture seule. */
   write?: string[];
@@ -49,6 +59,12 @@ export interface ManifestAgent {
    * `shell:test`) ou outils de l'extension déclarés dans `contributes.tools`.
    */
   tools?: string[];
+}
+
+/** Skill : dossier contenant `SKILL.md` (ou fichier `.md`), relatif au dossier de l'extension. */
+export interface ManifestSkill {
+  name: string;
+  path: string;
 }
 
 export interface ManifestTool {
@@ -76,6 +92,7 @@ export interface ExtensionManifest {
   contributes: {
     commands?: ManifestCommand[];
     agents?: ManifestAgent[];
+    skills?: ManifestSkill[];
     tools?: ManifestTool[];
     tasks?: ManifestTask[];
   };
@@ -113,8 +130,8 @@ export interface AgentRunOptions {
 
 /** Sortie structurée du rôle, ou question bloquante (`report_blocker`, si le rôle le déclare). */
 export type AgentRunResult<N extends TerminalToolName> =
-  | { output: TerminalOutput<N>; blocker?: undefined }
-  | { output?: undefined; blocker: { question: string; choices: string[] } };
+  | { output: TerminalOutput<N>; blocker?: undefined; skillsLoaded?: string[] }
+  | { output?: undefined; blocker: { question: string; choices: string[] }; skillsLoaded?: string[] };
 
 export interface AgentsApi {
   /** Lance un agent déclaré par l'extension ; ne renvoie qu'un résultat sérialisé. */

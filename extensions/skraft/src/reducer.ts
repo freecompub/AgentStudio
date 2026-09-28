@@ -62,9 +62,12 @@ export const phaseOf = (s: SkraftState): string =>
  * Réducteur du pipeline (SPEC-skraft §5.2). PUR : aucune I/O. Le LLM ne choisit jamais la
  * transition suivante (D16) ; l'ordre des phases, le budget et la ratification sont imposés ici.
  */
-export function transition(s: SkraftState, e: Ev): Out {
+export function transition(s0: SkraftState, e: Ev): Out {
+  if (isTerminal(s0)) return { state: s0, effects: [] };
+  // Chaque chargement de skill facultative est tracé dans l'état, quelle que soit la suite (D26).
+  const s: SkraftState =
+    e.type === "AGENT_REPORTED" && e.skills?.length ? { ...s0, skillsLoaded: [...(s0.skillsLoaded ?? []), { phase: s0.phase, role: e.role, skills: [...e.skills] }] } : s0;
   const same: Out = { state: s, effects: [] };
-  if (isTerminal(s)) return same;
   if (e.type === "ABORT") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (e.type === "RESUMED") return same;
   if (e.type === "ENV_FAILURE") return escalate(s, e.reason);

@@ -1,6 +1,6 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 const bar = (raw: string | null = null): QualityBar => {
   const r = parseQualityBar(raw);
@@ -129,5 +129,48 @@ describe("Qualité de forme : le linter du projet, pas un analyseur maison", () 
   it("sans linter, rien n'est reproché : la porte ne juge pas ce qu'elle n'a pas mesuré", () => {
     expect(checkLint({ available: false, violations: [] })).toEqual([]);
     expect(checkLint(null)).toEqual([]);
+  });
+});
+
+/**
+ * Couverture de lignes (§7.4). Elle n'est pas redondante avec la mutation : elle en est le
+ * **plancher**. La mutation juge si un test sert à quelque chose, la couverture seulement si le
+ * code est atteint — mais elle est peu coûteuse et presque toujours disponible, là où un outil de
+ * mutation manque souvent. Sans elle, un projet sans mutation n'a aucune mesure du tout.
+ */
+describe("Seuils de couverture", () => {
+  const bar = (over: Record<string, unknown> = {}) => {
+    const r = parseQualityBar(JSON.stringify({ coverage: { core: 90, edge: 70 }, ...over }));
+    if ("error" in r) throw new Error(r.error);
+    return r.bar;
+  };
+  const rapport = (files: { file: string; score: number }[]) => ({ files: files.map((f) => ({ ...f, covered: 1, total: 1 })) });
+
+  it("un fichier du cœur sous son seuil est refusé, avec les deux nombres", () => {
+    const r = checkCoverage(rapport([{ file: "src/Domain/Panier.cs", score: 80 }]), ["src/Domain/Panier.cs"], bar());
+    expect(r[0]).toMatch(/80/);
+    expect(r[0]).toMatch(/90/);
+  });
+
+  it("le seuil des bords est plus bas que celui du cœur", () => {
+    const fichiers = ["src/Infrastructure/Sql.cs"];
+    expect(checkCoverage(rapport([{ file: "src/Infrastructure/Sql.cs", score: 80 }]), fichiers, bar())).toEqual([]);
+  });
+
+  it("un fichier absent du rapport n'est pas reproché : il n'a pas été mesuré", () => {
+    // Le compter à 0 % ferait échouer la porte sur un fichier que l'outil n'a pas vu — c'est
+    // attester d'une mesure qui n'a pas eu lieu, en sens inverse.
+    expect(checkCoverage(rapport([]), ["src/Domain/Panier.cs"], bar())).toEqual([]);
+  });
+
+  it("seuls les fichiers du scénario sont jugés, pas tout le rapport", () => {
+    const r = checkCoverage(rapport([{ file: "src/Domain/Autre.cs", score: 10 }]), ["src/Domain/Panier.cs"], bar());
+    expect(r).toEqual([]);
+  });
+
+  it("par défaut, aucun seuil : la couverture est rapportée, pas exigée", () => {
+    const defaut = parseQualityBar(null);
+    if ("error" in defaut) throw new Error(defaut.error);
+    expect(checkCoverage(rapport([{ file: "src/Domain/Panier.cs", score: 5 }]), ["src/Domain/Panier.cs"], defaut.bar)).toEqual([]);
   });
 });

@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { access, readFile, rm } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
 import { parseMuterReport } from "../swift/muter-report.js";
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
+import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
 import { substituer } from "./tokens.js";
 import { globToRegExp } from "../glob.js";
@@ -25,6 +26,28 @@ export interface ProfileAdapterDeps {
 }
 
 const existe = (p: string) => access(p).then(() => true, () => false);
+
+/**
+ * Couverture, si le profil déclare un lecteur. Un rapport absent ou illisible rend `undefined` :
+ * la porte doit pouvoir dire « non mesurée » plutôt que de conclure à une couverture nulle.
+ */
+async function lireCouverture(profile: StackProfile, dossier: string, root: string) {
+  if (!profile.tests.coverage || !dossier) return undefined;
+  // Le rapport est cherché dans l'arborescence : `dotnet test` le range sous un sous-dossier dont
+  // il choisit le nom, `vitest` l'écrit à plat. Le premier fichier lisible fait foi.
+  for (const chemin of await fichiersXml(dossier)) {
+    const brut = await readFile(chemin, "utf8").catch(() => null);
+    const lu = brut === null ? null : parseCoberturaReport(brut, root);
+    if (lu) return lu;
+  }
+  return undefined;
+}
+
+/** Fichiers `.xml` du dossier, récursivement. Vide si le dossier n'existe pas : rien n'a été écrit. */
+async function fichiersXml(dossier: string): Promise<string[]> {
+  const entrees = await readdir(dossier, { withFileTypes: true, recursive: true }).catch(() => []);
+  return entrees.filter((e) => e.isFile() && e.name.endsWith(".xml")).map((e) => join(e.parentPath, e.name));
+}
 
 /** Erreurs de compilation, si le profil dit comment les lire. Le motif est déjà validé à la lecture. */
 function erreursDeCompilation(profile: StackProfile, sortie: string, root: string) {
@@ -59,7 +82,11 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
 
     async runTests(opts) {
       const rapport = fichierTemporaire(profile.tests.report === "junit-xml" ? "xml" : "json");
-      const args = substituer(profile.tests.command.slice(1), rapport, []);
+      // Même exécution pour les deux : mesurer la couverture ne doit pas coûter un second passage
+      // de toute la suite. L'outil écrit où le profil le lui dit, via `{couverture}`.
+      const couverture = profile.tests.coverage ? fichierTemporaire("couverture") : "";
+      if (couverture) await mkdir(couverture, { recursive: true });
+      const args = substituer(profile.tests.command.slice(1), rapport, [], couverture);
       try {
         const r = await runner.run(profile.tests.command[0]!, args, {
           cwd: opts.root,
@@ -81,9 +108,18 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
               `${profile.buildErrors ? "" : " Si ce projet est compilé, déclarez `buildErrors` pour que les erreurs de compilation soient lues."}\n${output.slice(-2000)}`,
           );
         }
-        return { results: lireTests(profile.tests.report, brut, opts.root), exitCode: r.exitCode, timedOut: false, output, durationMs: r.durationMs };
+        const lu = await lireCouverture(profile, couverture, opts.root);
+        return {
+          results: lireTests(profile.tests.report, brut, opts.root),
+          exitCode: r.exitCode,
+          timedOut: false,
+          output,
+          durationMs: r.durationMs,
+          ...(lu ? { coverage: lu } : {}),
+        };
       } finally {
         await rm(rapport, { force: true });
+        if (couverture) await rm(couverture, { recursive: true, force: true });
       }
     },
 

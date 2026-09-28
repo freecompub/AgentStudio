@@ -10,6 +10,7 @@ import { checkResearch } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign } from "./design.js";
 import { checkAcceptanceRed, checkValues } from "./distill.js";
+import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
@@ -110,7 +111,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-      return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files };
+      return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
     }
 
     case "runGate":
@@ -300,6 +301,12 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
   const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];
+
+  // Porte `gherkin` AVANT la porte `valeurs` : un scénario couplé à un détail technique doit être
+  // refusé même s'il contient les bonnes valeurs, et surtout avant le gel des tests d'acceptance —
+  // passé ce point, plus personne ne peut le réécrire.
+  const gherkinReasons = checkGherkin(features);
+  if (gherkinReasons.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: gherkinReasons };
 
   const valueReasons = checkValues({ criteria, features, acceptanceTests });
   if (valueReasons.length) return { type: "GATE_FAIL", gate: "valeurs", reasons: valueReasons };

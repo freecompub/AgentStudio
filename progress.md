@@ -5,6 +5,200 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Aucune skill n'était inutilisée ; deux fichiers l'étaient
+
+**Demandé :** supprimer les skills qu'on n'utilise pas. **Mesuré d'abord :** les douze skills
+déclarées sont toutes affectées à au moins un rôle — sept obligatoires, cinq à la demande. Aucune
+n'était supprimable. Il ne faut pas confondre « à la demande » et « inutilisée » : les trois
+critères de revue et les deux catalogues ne sont lus que si un agent appelle `load_skill`, mais les
+retirer priverait les lentilles de leur grille.
+
+**Supprimé :** `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs`.
+Rien ne les nommait — ni corps de skill, ni `references/`, ni agent — et ils voyageaient **signés**
+dans le `.asx`. C'étaient les seuls artefacts .NET du contenu livré.
+
+**Pourquoi cet écart avec l'amont et pas l'autre.** L'ADR 0024 §6 dit « reprises telles quelles »,
+et j'ai refusé la veille de retoucher le texte de `craft-discipline` pour cette raison. La
+différence tient en une phrase : **supprimer un fichier que personne ne nomme ne change rien à ce
+qu'un agent lit** ; modifier un texte injecté, si. Le premier est de l'emballage, le second du
+contenu.
+
+**Le garde-fou vaut mieux que la suppression.** Le critère ne vérifiait que `assets/`. Le test le
+remplace et couvre tout fichier livré sous `skills/` : un `references/*.md` que plus aucun corps ne
+cite tombera aussi. Écrit en RED d'abord — il a nommé les deux fichiers avant que je les efface.
+
+---
+
+## 28/09 — `run_lint` : le linter arrive avant le refus, pas après (ADR 0025)
+
+**Fait.** Un outil `run_lint` fourni par le cœur (`packages/extension-host/src/lint-tool.ts`),
+donné à `skraft-test` et `skraft-dev`. Il appelle le **même** `StackAdapter.lint()` que la porte
+`deliver` — même mesure, même source de vérité — mais pendant le travail de l'agent.
+
+**Le défaut corrigé.** C4 de `craft-discipline` demande de vérifier que le linter ne signale rien,
+sans donner aucun moyen de le savoir, et sans même citer de commande. L'agent découvrait l'avis du
+linter quand la porte le recalait : une phase entière consommée pour une violation de forme que
+l'outil signale en quelques secondes.
+
+**Ce qui compte plus que l'outil : le résumé sépare trois états.** Pas de linter configuré ;
+linter qui a tourné et **n'a examiné aucun fichier** (exclusion ESLint, filtre de sévérité
+SwiftLint) ; fichiers examinés sans violation. Seul le troisième vaut conformité. C'est
+exactement le défaut réintroduit trois fois en S6, par trois chemins différents — je l'ai écrit
+dans le texte que l'agent lit, parce que c'est le seul endroit où il ne se reperdra pas.
+
+**Pas de preuve enregistrée.** La porte relance le linter elle-même. Si cette exécution-ci valait
+preuve, l'agent choisirait le moment de la mesure — il pourrait linter avant d'écrire le code
+fautif. Même raison que pour `run_tests`, retournée : là c'est la preuve qui compte, ici c'est
+l'information.
+
+**Pas de `run_build`, et c'est délibéré.** `runTests` compile déjà dans les trois piles, et
+`buildErrors` du profil sait nommer les erreurs de compilation. Un second outil d'attestation,
+indépendant des tests, laisserait l'agent conclure « ça compile » sans qu'un test ait tourné.
+Si le besoin revient, ce sera une décision à part : il faudra dire ce qu'on a le droit d'en
+conclure.
+
+---
+
+## 28/09 — Le contrat retire la commande, il ne se contente pas d'en proposer une autre
+
+**Fait.** Le contrat du cœur interdit désormais à l'agent d'exécuter lui-même toute commande de
+compilation ou de test (`packages/extension-host/src/agent-prompts.ts`, `contractBlock`).
+
+**Le piège.** Les douze skills sont reprises **telles quelles** (ADR 0024 §6) — je l'ai vérifié,
+elles sont octet pour octet identiques à `v1.6.1`. Elles viennent d'un cadre .NET et font lancer
+`dotnet test`, `dotnet build`, `[Theory]`. Je croyais le problème réglé parce que le contrat disait
+déjà « lance les tests uniquement avec `run_tests` ». **Il ne l'était pas** : cette phrase couvre
+les tests et laisse la compilation à l'agent — qui lit `dotnet build` dans `craft-discipline` C3 et
+l'exécute, sur un projet Swift ou TypeScript où la commande n'existe pas. Une consigne qui
+*propose une alternative* ne *retire* pas l'instruction concurrente ; il faut la retirer
+explicitement. C'est le même motif que les portes : **ce qu'on n'a pas interdit, on l'a permis.**
+
+**Pourquoi dans le contrat et pas dans la skill.** Modifier `craft-discipline` aurait été plus
+direct, mais c'était rediscuter l'ADR 0024 §6, qui est `décidé`, et ouvrir un écart à maintenir
+avec l'amont GPL. Le §3 prévoit exactement ce cas : le contrat vient en dernier et prime. Une ligne
+dans `contractBlock` couvre en plus toutes les skills reprises ensuite, sans y toucher.
+
+**Ce qui reste ouvert.** C4 — l'analyse statique — n'a toujours aucun outil : `StackAdapter.lint()`
+existe et la porte `deliver` s'en sert (`deliver-effects.ts:204`), mais **après coup**. L'agent dev
+n'a que `run_tests` et `report_blocker` : il découvre le refus du linter quand la porte le recale.
+Un outil `run_lint` sur le même `adapter.lint()` corrigerait ça — même mesure, disponible plus tôt.
+Pas de `run_build` en revanche : `runTests` compile déjà, et un second outil d'attestation
+indépendant des tests est exactement le défaut qu'on traque.
+
+---
+
+## 28/09 — Agents et skills en Markdown : un contenu, deux usages (ADR 0024)
+
+**Fait.** Branche `feat/skraft-agents-skills-md`, partie de `main`, **rien poussé sur main**
+(consigne du responsable).
+- Une extension déclare désormais ses agents par fichier (`agents/<nom>.agent.md`) et ses skills
+  (`skills/<nom>/SKILL.md`).
+- Le cœur compose le prompt dans cet ordre : contenu du rôle, skills obligatoires (ou une seule
+  section, `nom#Titre`), consignes du manifeste, puis le **contrat d'exécution** en dernier. Le
+  contrat couvre l'outil de fin, `run_tests`, `report_blocker`, `load_skill` et l'interdiction de
+  Git, et il prime explicitement sur le reste.
+- `load_skill` trace chaque chargement jusque dans l'état de la tâche (D26).
+- skraft livre ainsi ses onze rôles et douze skills reprises du tag `v1.6.1`, que le responsable a
+  déclaré autorisé le 28/09.
+
+**Pourquoi séparer contenu et contrat.** Le responsable voulait que les mêmes fichiers servent à
+agent-studio et à Copilot CLI / Claude Code. Or une même phrase ne peut pas être vraie dans les
+deux modes : « lance les tests et commite » est juste ailleurs, faux chez nous. D'où la règle : les
+`.md` ne nomment **aucun** outil d'agent-studio, et un test le vérifie. Tout ce qui n'a de sens que
+sous l'orchestrateur va dans `roles.ts` ou dans le contrat du cœur.
+
+**Piège attrapé par le test du frontmatter.** Mon premier lecteur de frontmatter ne gérait que les
+valeurs sur une ligne. `adr-eligibility-gate` écrit sa description en bloc replié YAML
+(`description: >` puis des lignes indentées) : description vide, donc liste `load_skill` des
+lentilles sans explication. Corrigé (`>` et `|`) et testé. Leçon : sur du contenu repris d'un
+tiers, écrire le test sur **tous** les fichiers réels, pas sur un exemple fabriqué.
+
+**Conflit repéré entre skills reprises et nos décisions.** La skill `craft-discipline` impose ses
+seuils d'Object Calisthenics, alors que l'ADR 0022 fait du linter du projet la seule autorité. Et
+`outside-in-tdd` fait commiter l'agent. Je n'ai **pas** modifié les skills : elles restent
+identiques à la source, ce qui garde la reprise traçable. La consigne d'orchestration des rôles
+concernés tranche (« le linter fait foi », « ne fais pas les commits ni les portes »), et un test
+vérifie qu'elle vient après les skills.
+
+**Reste à faire.**
+- Éprouver le dossier comme plugin dans Copilot CLI et Claude Code (critère
+  `skraft-plugin-autonome`, manuel). Le format Copilot est repris de skraft-plugin sans avoir été
+  essayé.
+- Verser la pièce d'origine de l'autorisation, qui porte maintenant aussi sur `v1.6.1`
+  (critère `reprise-skraft`).
+
+---
+
+## 28/09 — La couverture est enfin mesurée, et non plus supposée
+
+**Le défaut corrigé.** Le prompt de la lentille `quality-gates` affirmait que la couverture faisait
+partie des faits établis par le code — alors qu'aucun fait de couverture n'était jamais produit. La
+lentille recevait l'assurance qu'une catégorie de faits existait, avec consigne de ne pas la
+revérifier, et cette catégorie était toujours vide.
+
+**Cobertura comme format pivot.** `dotnet test --collect`, `vitest --coverage.reporter=cobertura`,
+`pytest --cov-report=xml` et les convertisseurs JaCoCo le produisent tous. **Un lecteur pour quatre
+écosystèmes**, au lieu d'un lecteur par outil. C'est le même raisonnement que pour `junit-xml`.
+
+**Le jeton `{couverture}` est un DOSSIER, pas un fichier.** Je l'avais d'abord écrit comme un
+fichier, et le vrai `dotnet test` m'a détrompé : son collecteur range le rapport sous un
+sous-dossier nommé par un **GUID qu'il choisit lui-même**. Imposer un nom de fichier aurait exclu
+.NET. L'adaptateur cherche donc le rapport dans l'arborescence.
+
+**La séparation que j'ai tenue malgré la demande.** Il m'était proposé de mettre l'objectif de
+couverture dans l'adaptateur. Je l'ai mis dans `.skraft/quality.json`, où vivent déjà les seuils de
+mutation : **le profil dit COMMENT lancer, la barre dit CE QUI est exigé.** Deux endroits qui
+décideraient la politique finiraient par se contredire, et personne ne saurait lequel fait foi.
+
+**Aucun seuil par défaut.** Sans déclaration du projet, la couverture est rapportée comme un fait,
+jamais exigée. Un seuil imposé d'en haut ferait échouer des projets qui n'ont rien demandé, et
+pousserait à écrire des tests qui couvrent sans juger — exactement ce que la mutation existe pour
+attraper.
+
+**Le piège du projet .NET.** `--collect "XPlat Code Coverage"` a d'abord répondu « datacollector
+introuvable » : il vient du paquet `coverlet.collector`, absent de mon `.csproj` écrit à la main.
+Et la suite **passait quand même** — les tests étaient verts, la mesure silencieusement absente.
+→ Un outil de mesure manquant ne fait pas rougir la suite ; seule la porte peut le dire.
+
+**Vérifié en réel** : 5 fichiers mesurés dans la même exécution que les 5 tests, de 66,7 % à 100 %.
+
+---
+
+## 28/09 — Ce qui est mécanisable dans les skills devient du code
+
+**Contexte.** La branche apporte douze skills reprises telles quelles. Une skill est une consigne :
+elle améliore les chances qu'un agent fasse bien, elle ne garantit rien. La question posée était
+donc : **qu'est-ce qui, là-dedans, peut devenir une porte ?**
+
+**Inventaire.** Sur les douze, deux seulement portent des règles reconnaissables sans
+interprétation : `bdd-methodology` (motifs d'étape interdits, granularité, tags) et, pour deux
+règles, `architecture-review-criteria` et `adr-eligibility-gate`. Les autres sont du jugement — et
+c'est bien qu'elles restent des skills.
+
+**Porte `gherkin`, placée avant le gel.** C'est tout l'argument : les tests d'acceptance sont gelés
+à la sortie de DISTILL. Un scénario qui dit « Quand j'appelle POST /api/panier » ne devient pas
+seulement médiocre, il devient **la spécification** que toute la livraison doit satisfaire, et plus
+personne ne peut le réécrire. Ailleurs une faiblesse de méthode coûte un réessai ; ici elle se
+fige. La porte refuse donc AVANT la porte `valeurs` et avant le gel.
+
+**Le bug que le français a révélé.** `\b` de JavaScript ne connaît que `[A-Za-z0-9_]`. Après
+« donné » ou avant « ça », il ne voit aucune transition : **la porte ne reconnaissait rien** sur du
+Gherkin français. Quatre tests sont tombés là-dessus. → Toute frontière de mot dans ce dépôt doit
+s'écrire `(?<![A-Za-zÀ-ÿ0-9])`, jamais `\b`.
+
+**Deux règles d'ADR pour DESIGN**, notre phase la plus faible — la seule où nous n'avons ni méthode
+ni porte : le verdict dans le nom de fichier (leur G14) et l'ADR de « bonne pratique » (leur Q2).
+Peu de code, et ça atterrit là où il n'y avait rien.
+
+**Une porte que je n'ai PAS écrite, et pourquoi.** J'avais proposé une porte « matrice » exigeant
+que `impl-plan.md` couvre tous les scénarios — leur G6. Vérification faite avant d'écrire :
+`planScenarios` tire les scénarios des **tests réellement trouvés**, et n'utilise le plan que pour
+l'ordre. Un plan incomplet ne fait donc perdre aucun scénario. Leur porte garde contre un risque
+que notre structure a déjà éliminé. → Vérifier la prémisse d'une porte avant de l'écrire : celle-ci
+aurait été du zèle.
+
+---
+
 ## 26/09 — La vraie application Electron tourne en CI, sans jamais appeler Copilot
 
 **Fait.** Playwright pilote l'application réelle : vrai processus principal, vrai préchargement,

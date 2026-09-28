@@ -36,7 +36,7 @@ pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (rende
 pnpm dev                        # Electron en développement (electron-vite)
 pnpm build                      # build Electron dans apps/desktop/out
 pnpm smoke:copilot              # essai réel contre Copilot (hors CI, consomme des requêtes)
-pnpm ext:build <src> <sortie>   # compile une extension du dépôt (entrée + manifest.json)
+pnpm ext:build <src> <sortie>   # compile une extension du dépôt (entrée, manifest.json, agents/ et skills/ déclarés, LICENSE)
 pnpm ext:keys / pnpm ext:pack   # clés d'éditeur, puis paquet .asx (non signé sans clé)
 ```
 
@@ -44,6 +44,11 @@ Les paquets internes exportent directement `src/index.ts` (pas d'étape de build
 Chaque paquet décrit ses capacités dans `src/protocols.ts` (ou `src/protocols/`) ; les implémentations
 sont des fabriques `createX(deps)` injectables. Les doubles de test du cœur sont exportés par
 `@agent-studio/core/testing` (`ScriptedRuntime`, `ScriptedSession`…).
+
+Les agents d'une extension se déclarent en fichiers Markdown (`agents/<nom>.agent.md`, skills dans
+`skills/<nom>/SKILL.md`) : le **contenu**, partageable avec Copilot CLI et Claude Code, ne nomme
+aucun outil d'agent-studio ; l'orchestration est dans le manifeste, et le cœur ajoute en dernier
+le contrat d'exécution (ADR 0024, `packages/extension-host/src/agent-prompts.ts`).
 
 Toute la documentation est en français ; écrire les ADR, messages et libellés en français.
 
@@ -76,7 +81,8 @@ Toute la documentation est en français ; écrire les ADR, messages et libellés
 - Vérifier les API des SDK sur la version installée (points `À VÉRIFIER`, §16) : ex. `sendAndWait` a un délai de 60 s, une exception de hook retombe sur le comportement par défaut, les noms d'outils intégrés du CLI varient selon la version.
 - **skraft est GPL-3.0-or-later.** O9/D42 est tranché (ADR 0012, option C). La reprise a **commencé
   le 2026-09-25** depuis `github.com/SebastienDegodez/skraft-plugin`, branche
-  `refactor/v1.6.0-tracking-substrate` ; le dossier est `docs/licences/autorisation-skraft.md`.
+  `refactor/v1.6.0-tracking-substrate`, puis du tag `v1.6.1` (skills, 2026-09-28) ; le dossier est
+  `docs/licences/autorisation-skraft.md`.
   Trois règles tiennent pour la suite : tout artefact repris **porte sa provenance** en commentaire
   (fichier source dans la branche) ; l'extension `skraft` est traitée comme **GPL-3.0-or-later**
   tant que la licence de redistribution n'est pas précisée, ce qui oblige à en fournir les sources ;

@@ -21,6 +21,16 @@ export interface TestRun {
   /** Sortie brute (tronquée), pour les preuves et le diagnostic. */
   output: string;
   durationMs: number;
+  /**
+   * Couverture, quand le profil déclare comment la lire. Absente si le projet ne la produit pas :
+   * une porte doit pouvoir distinguer « non mesurée » de « nulle ».
+   */
+  coverage?: CoverageReport;
+}
+
+/** Couverture de lignes, par fichier. Produite par la même exécution que les tests (§9.7). */
+export interface CoverageReport {
+  files: { file: string; covered: number; total: number; score: number }[];
 }
 
 export interface RunTestsOptions {

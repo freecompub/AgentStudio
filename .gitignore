@@ -2,7 +2,10 @@ node_modules/
 dist/
 out/
 *.tsbuildinfo
-coverage/
+# Rapports de couverture produits par les outils. Ancré à la racine : sans le `/` initial, la
+# règle avalait aussi `packages/*/src/coverage/`, du code source — le fichier restait sur le disque
+# et la CI seule voyait qu'il manquait.
+/coverage/
 .DS_Store
 graphify-out/cache/
 graphify-out/.graphify_*

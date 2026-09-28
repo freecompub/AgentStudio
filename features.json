@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-09-25",
-  "branch": "feat/j5-profils-de-stack",
+  "updated": "2026-09-28",
+  "branch": "feat/skraft-agents-skills-md",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -109,6 +109,27 @@
       "notes": "Obtenu en déléguant à ctx.stack : lint, mutation, architecture, infrastructureModules."
     },
     {
+      "id": "paquet-sans-orphelin",
+      "title": "Aucun fichier empaqueté n'est orphelin : tout ce qui voyage est atteignable",
+      "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts",
+      "passes": true,
+      "notes": "Trouvé le 28/09, corrigé le 28/09. `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs` étaient empaquetés et signés sans que RIEN ne les référence — ni corps de skill, ni fichier de références, ni agent. Supprimés : c'étaient les seuls artefacts .NET du contenu livré, et un paquet signé ne doit pas transporter du poids mort qu'on ne distingue plus du contenu réellement repris. Seul écart assumé avec l'amont v1.6.1 (ADR 0024 §6) : il ne change rien à ce qu'un agent lit, contrairement à une modification de texte. La vérification ne porte plus seulement sur `assets/` mais sur tout fichier livré sous `skills/` : un `references/*.md` que plus aucun corps ne cite tomberait aussi."
+    },
+    {
+      "id": "skills-portees-en-code",
+      "title": "Ce qui est mécanisable dans les skills reprises est exécuté par le code, pas espéré d'un agent",
+      "verify": "pnpm vitest run --project ext-skraft test/gherkin.test.ts test/design-gate.test.ts",
+      "passes": true,
+      "notes": "Porte `gherkin` (de `bdd-methodology`) : vocabulaire de couche, un seul déclencheur, assertion observable, sept étapes, tags de comportement. Placée AVANT la porte `valeurs` et avant le GEL des tests d'acceptance — passé ce point plus personne ne peut réécrire un scénario. Deux anti-patrons d'ADR (de `architecture-review-criteria` G14 et `adr-eligibility-gate` Q2) ajoutés à la porte DESIGN, notre phase la plus faible. PIÈGE : `\\b` de JavaScript ignore les accents — la porte ne reconnaissait RIEN sur du Gherkin français avant correction. Voir docs/portes-comparees-skraft-plugin.md pour ce qui reste du jugement."
+    },
+    {
+      "id": "couverture-mesuree",
+      "title": "La couverture de lignes est mesurée, dans la même exécution que les tests",
+      "verify": "pnpm vitest run --project stack-adapters test/cobertura-report.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t couverture",
+      "passes": true,
+      "notes": "Corrige un défaut trouvé le 28/09 : le prompt de la lentille quality-gates affirmait que la couverture faisait partie des faits établis par le code, alors qu'aucun fait n'était jamais produit. Format Cobertura, choisi comme PIVOT : dotnet, vitest, pytest et les convertisseurs JaCoCo savent tous le produire — un lecteur pour quatre écosystèmes. Le jeton `{couverture}` est un DOSSIER et non un fichier : `dotnet test --collect` écrit sous un sous-dossier nommé par un GUID qu'il choisit lui-même. Séparation tenue : la MESURE est dans le profil de stack, l'OBJECTIF dans .skraft/quality.json — deux endroits qui décideraient la politique finiraient par se contredire. Aucun seuil par défaut : sans déclaration du projet, la couverture est un fait, pas une exigence. Vérifié en réel sur le projet .NET : 5 fichiers mesurés dans la même exécution que les 5 tests."
+    },
+    {
       "id": "portes-n-attestent-que-du-mesure",
       "title": "Une porte ne produit jamais de fait sur ce qu'elle n'a pas mesuré",
       "verify": "pnpm vitest run --project stack-adapters test/lint-adapters.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
@@ -134,7 +155,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "1011 tests au 26/09, plus 2 essais de bout en bout (`pnpm e2e`). La CI lance les deux à chaque poussée."
+      "notes": "1080 tests au 28/09, plus 2 essais de bout en bout. La CI lance les deux à chaque poussée."
     },
     {
       "id": "essais-bout-en-bout",
@@ -205,6 +226,41 @@
       "verify": "pnpm vitest run --project core -t 'sqlite'",
       "passes": false,
       "notes": "Décidé, pas implémenté. `node:sqlite` vérifié fonctionnel dans Electron 44 (Node 24.21) : pas de module natif à recompiler."
+    },
+    {
+      "id": "agents-en-markdown",
+      "title": "Une extension déclare ses agents en fichiers Markdown ; le cœur compose contenu, skills et contrat (D12, ADR 0024)",
+      "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts test/in-process-host.test.ts && pnpm vitest run --project extension-manifest",
+      "passes": true,
+      "notes": "Rôle dans `agents/<nom>.agent.md`, orchestration dans le manifeste, contrat d'exécution ajouté en dernier par le cœur et qui prime. Fichiers lus par l'hôte, confinés au dossier de l'extension (liens symboliques résolus). Frontmatter : blocs YAML `>` et `|` gérés — une skill reprise en utilise un."
+    },
+    {
+      "id": "skills-injectees-et-load-skill",
+      "title": "Skills obligatoires injectées (ou une section), skills facultatives par load_skill, chaque chargement tracé dans l'état (D26)",
+      "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts && pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/reducer.test.ts",
+      "passes": true,
+      "notes": "`nom#Titre` injecte une seule section (outside-in-tdd#RED pour l'agent test, #SYNTHESIZE-GREEN pour le dev). load_skill ne rend que les skills du rôle ; AgentRunResult.skillsLoaded remonte à l'extension, skraft l'accumule dans `skillsLoaded`. Le contrat neutralise aussi les commandes de pile que citent les skills reprises (`dotnet test`, `dotnet build`…) : l'agent n'exécute aucune compilation ni test lui-même."
+    },
+    {
+      "id": "run-lint",
+      "title": "L'agent consulte le linter du projet pendant son travail, et ne peut rien conclure de ce qui n'a pas été mesuré (ADR 0025)",
+      "verify": "pnpm vitest run --project extension-host test/lint-tool.test.ts test/agent-prompts.test.ts && pnpm vitest run --project extension-manifest && pnpm vitest run --project ext-skraft test/manifest.test.ts",
+      "passes": true,
+      "notes": "C4 de `craft-discipline` demandait de vérifier le linter sans donner aucun moyen de le faire : l'agent découvrait le refus quand la porte `deliver` le recalait, une phase entière plus tard. `run_lint` appelle le même `StackAdapter.lint()` que la porte — même mesure, plus tôt — et n'enregistre aucune preuve, sinon l'agent choisirait le moment de la mesure. Le résumé sépare trois états : pas de linter, linter qui n'a examiné aucun fichier, et fichiers examinés sans violation ; seul le troisième vaut conformité. Donné à skraft-test et skraft-dev, pas aux lentilles. Pas de `run_build` : `runTests` compile déjà, et un second outil d'attestation indépendant des tests est le défaut qu'on traque."
+    },
+    {
+      "id": "skraft-agents-skills-md",
+      "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
+      "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",
+      "passes": true,
+      "notes": "Le contenu partagé ne nomme aucun outil d'agent-studio (testé). Les skills sont reprises telles quelles ; leurs conflits avec nos décisions (Object Calisthenics vs linter, ADR 0022 ; commits et portes faits par le code) sont tranchés par les consignes d'orchestration du rôle, pas en modifiant la skill."
+    },
+    {
+      "id": "skraft-plugin-autonome",
+      "title": "Le dossier extensions/skraft se charge tel quel comme plugin dans Copilot CLI et Claude Code",
+      "verify": "MANUEL : charger extensions/skraft comme plugin dans Claude Code (.claude-plugin/plugin.json) et dans Copilot CLI (plugin.json), vérifier que les agents skraft-* et les skills apparaissent",
+      "passes": false,
+      "notes": "Manifestes écrits d'après la structure de skraft-plugin, jamais éprouvés sur les versions installées (point À VÉRIFIER de l'ADR 0024). Sans agent-studio, aucune garantie : ni porte, ni preuve, ni test gelé."
     }
   ]
 }

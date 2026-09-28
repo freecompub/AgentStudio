@@ -68,6 +68,16 @@ La structure diffère de celle que l'ADR 0012 supposait : les agents sont sous
 `plugins/skraft-framework/skills/` (37, et non 36), et la configuration des phases dans
 `skraft-framework.config.json`.
 
+### Source étendue le 2026-09-28 : le tag `v1.6.1`
+
+Le responsable du projet a déclaré, le 2026-09-28, que l'autorisation porte aussi sur le **tag
+par défaut `v1.6.1`** du même dépôt (`github.com/SebastienDegodez/skraft-plugin/tree/v1.6.1`).
+Même nature de trace que la condition 1 : une déclaration rapportée, pas la pièce d'origine.
+
+Les skills de `extensions/skraft/skills/` sont reprises de ce tag (commit `6d092bd`,
+`chore(release): 1.6.1`), sans modification, depuis `plugins/skraft-framework/skills/`. Voir
+l'ADR 0024 pour la manière dont elles sont livrées et arbitrées.
+
 ## Ce que la reprise touchera, exactement
 
 Recensé pour que le jour venu le travail soit un remplacement, et non une enquête. Tout le reste du
@@ -78,6 +88,8 @@ code de `skraft` est notre propre conception (SPEC-skraft §5 à §11) et n'est 
 | `review.ts` → `REVIEW_QUESTIONS`, `assessQuestions`, `synthesize` | Quatre questions pondérées, note au minimum, arrêt sur question non couverte, aucun score total | `skills/adversarial-review-lenses/SKILL.md` ; correspondance lentille → question reprise telle quelle de `agents/software-engineer-reviewer.md` |
 | `roles.ts` → `LENS_FOCUS` | Quatre lentilles (ajout de `quality-gates`), substance de chacune | `agents/{cold-reader,test-integrity,architecture-boundaries,quality-gates}-lens.md` |
 | `roles.ts` → `ROLES` | Substance de `researcher`, `acceptance`, `test`, `dev` et du bloc commun | `agents/{solution-researcher,acceptance-designer,software-engineer}.md` |
+| `agents/*.agent.md` (2026-09-28) | Le contenu de `ROLES` et `LENS_FOCUS` ci-dessus, déplacé en fichiers Markdown partageables ; `roles.ts` ne garde que l'orchestration (ADR 0024) | idem |
+| `skills/` (2026-09-28) | Douze skills reprises telles quelles : `architecture-patterns`, `architecture-decisions`, `adr-eligibility-gate`, `bdd-methodology`, `test-design-mandates`, `outside-in-tdd`, `craft-discipline`, `test-refactoring-catalog`, `clean-architecture-testing`, `adversarial-review-lenses`, `acceptance-review-criteria`, `architecture-review-criteria` | tag `v1.6.1`, `plugins/skraft-framework/skills/` |
 
 Ce qui a été **écarté sciemment**, et pourquoi :
 

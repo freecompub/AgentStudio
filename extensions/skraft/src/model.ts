@@ -153,6 +153,8 @@ export interface SkraftState {
   regressions: string[];
   /** Granularité imposée par réglage, sinon choisie selon la difficulté. */
   granularitySetting: Granularity | null;
+  /** Skills chargées à la demande par `load_skill`, tracées par rôle et par phase (D26) ; absent d'un état antérieur. */
+  skillsLoaded?: { phase: Phase | null; role: Role; skills: string[] }[];
   /** Réessais par phase (mesures d'usage, §12) ; absent d'un état persisté avant S6. */
   retries?: Record<string, number>;
 }
@@ -169,7 +171,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[] }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
@@ -260,6 +262,7 @@ const stateSchema = z.object({
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),
+  skillsLoaded: z.array(z.object({ phase: phase.nullable(), role: z.string(), skills: z.array(z.string()) })).optional(),
   deliver: z
     .object({
       scenarios: z.array(z.object({ id: z.string(), ac: z.number(), acceptanceTestId: z.string(), role: z.enum(["driver", "regression"]), status: z.enum(["pending", "in_progress", "done"]) })),

@@ -18,6 +18,14 @@ import { JETON_RAPPORT } from "./tokens.js";
  * N'y figurent que les formats réellement lus — en ajouter un demande d'écrire son lecteur.
  */
 export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "swiftlint-json", "muter-json"] as const;
+
+/**
+ * Lecteurs de couverture. Cobertura seul pour l'instant, et c'est un choix : `dotnet test`,
+ * `vitest`, `pytest` et les convertisseurs JaCoCo savent tous le produire. Un format pivot vaut
+ * mieux que quatre lecteurs à maintenir.
+ */
+export const COVERAGE_READERS = ["cobertura-xml"] as const;
+export type CoverageReader = (typeof COVERAGE_READERS)[number];
 export type ReportReader = (typeof REPORT_READERS)[number];
 
 /**
@@ -36,6 +44,11 @@ const commande = z
     /** Programme puis arguments, jamais une ligne de shell : aucune interpolation possible. */
     command: z.array(z.string().min(1)).min(1, "`command` doit nommer un programme et ses arguments."),
     report: z.enum(REPORT_READERS),
+    /**
+     * Lecteur du rapport de couverture, quand la commande de test en produit un. La commande doit
+     * alors placer `{couverture}` là où l'outil attend le chemin de sortie.
+     */
+    coverage: z.enum(COVERAGE_READERS).optional(),
   })
   .strict();
 

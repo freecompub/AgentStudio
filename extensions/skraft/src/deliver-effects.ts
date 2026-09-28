@@ -1,7 +1,7 @@
 import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
 import { featureScenarios } from "./distill.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
@@ -85,7 +85,7 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
   const readOnly = e.step === "test" ? ["@stack:acceptanceTests"] : ["@stack:acceptanceTests", "@stack:unitTests"];
   const r = await ctx.agents.run<"report_phase">(role, lines.join("\n"), { signal, readOnly, evidence: { taskId, phase: "DELIVER", stepId: sc.id } });
   if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files };
+  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
 }
 
 /** Porte RED d'un pas (SPEC.md §8.3) : un seul nouveau test unitaire, rouge pour une bonne raison, aucun test gelé touché. */
@@ -190,6 +190,15 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
       for (const f of mutation.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
         facts.push(`Mutation (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
     } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
+
+    // Couverture : plancher de la mutation, produite par la même exécution de la suite. Sans
+    // rapport, on le DIT — c'est ce que la lentille `quality-gates` croyait acquis alors qu'aucun
+    // fait n'était jamais produit.
+    if (run.coverage) {
+      reasons.push(...checkCoverage(run.coverage, sources, bar));
+      for (const f of run.coverage.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
+        facts.push(`Couverture (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.covered} ligne(s) sur ${f.total}.`);
+    } else notes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
     // Qualité de forme : le linter du projet, avec ses propres règles. Sans linter, on le dit
     // au lieu de produire un fait — une porte qui n'a rien mesuré n'atteste de rien.
     const lint = await ctx.stack.lint({ files: sources, ...(signal ? { signal } : {}) });
