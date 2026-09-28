@@ -17,6 +17,7 @@ import type { Workspace } from "@agent-studio/workspace";
 import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
+import { runLintTool } from "./lint-tool.js";
 import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -96,8 +97,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       .filter((t): t is NonNullable<typeof t> => !!t)
       .map((t) => ({ name: t.name, description: t.description, parameters: t.parameters, handler: (args: unknown) => t.handler(args) }));
   for (const a of declared.agents.values())
-    if (a.tools?.includes("run_tests") && !perm.has("shell:test"))
-      throw new Error(`L'agent ${a.name} utilise run_tests sans la permission shell:test`);
+    for (const t of ["run_tests", "run_lint"] as const)
+      if (a.tools?.includes(t) && !perm.has("shell:test")) throw new Error(`L'agent ${a.name} utilise ${t} sans la permission shell:test`);
 
   const ctx: ExtensionContext = {
     extensionId: manifest.id,
@@ -140,6 +141,25 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                         if (opts?.freezeTestsAfterRed && run.results.some((t) => t.status === "failed")) frozen = true;
                       },
                     }),
+                  ]
+                : []),
+              // `run_lint` n'enregistre aucune preuve : la porte relance le linter elle-même, sinon
+              // l'agent choisirait le moment de la mesure. Ici il ne fait que s'informer.
+              ...(a.tools?.includes("run_lint")
+                ? [
+                    runLintTool(
+                      {
+                        lint: async (o) =>
+                          deps.stack.lint
+                            ? deps.stack.lint({
+                                root: deps.workspace.root,
+                                ...(o.files ? { files: o.files } : {}),
+                                ...(opts?.signal ? { signal: opts.signal } : {}),
+                              })
+                            : null,
+                      },
+                      { beat },
+                    ),
                   ]
                 : []),
               // Skills facultatives : chaque chargement est rendu à l'extension, qui le trace dans l'état de sa tâche (D26).

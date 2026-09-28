@@ -128,6 +128,13 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
     expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] })).not.toContain("dotnet test");
   });
 
+  it("contrat : `run_lint` annoncé avec la réserve qui va avec — rien mesuré ne vaut pas conforme", () => {
+    const dev = contractBlock({ output: "report_phase", tools: ["run_tests", "run_lint"], writes: true, onDemand: [] });
+    expect(dev).toContain("`run_lint`");
+    expect(dev).toMatch(/n'a rien mesuré/);
+    expect(contractBlock({ output: "report_phase", tools: ["run_tests"], writes: true, onDemand: [] })).not.toContain("run_lint");
+  });
+
   it("agent sans fichier (consignes seules) : consignes puis contrat", () => {
     const p = composeAgentPrompt({ name: "a", title: "A", role: "Tu testes.", output: "report_phase" }, null, new Map()).systemPrompt;
     expect(p.startsWith("Tu testes.\n\n## Fonctionnement dans agent-studio")).toBe(true);

@@ -92,7 +92,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.test,
         output: "report_phase",
         write: [UNIT_TESTS],
-        tools: ["run_tests", "report_blocker"],
+        tools: ["run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.test),
       },
       {
@@ -102,7 +102,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.dev,
         output: "report_phase",
         write: [SOURCES],
-        tools: ["run_tests", "report_blocker"],
+        tools: ["run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.dev),
       },
       ...(Object.keys(LENS_FOCUS) as (keyof typeof LENS_FOCUS)[]).map((name) => ({

@@ -105,6 +105,10 @@ export function contractBlock(a: { output: string; tools: readonly string[]; wri
       "- N'exécute aucune commande de compilation ou de test toi-même. Celles que citent les skills (`dotnet test`, `dotnet build`, `swift build`…) illustrent d'autres projets et ne valent pas forcément ici : `run_tests` connaît celle de la pile.",
     );
   }
+  if (a.tools.includes("run_lint"))
+    lines.push(
+      "- Pour l'analyse statique, appelle `run_lint` : il lance le linter du projet, avec les règles du projet. S'il répond qu'il n'a rien mesuré, ne te prévaux d'aucune conformité.",
+    );
   if (a.tools.includes("report_blocker"))
     lines.push("- S'il te manque une information que tu ne peux pas trouver, appelle `report_blocker` avec ta question et les réponses possibles, au lieu de deviner.");
   if (a.onDemand.length) {

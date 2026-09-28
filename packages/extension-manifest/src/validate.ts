@@ -3,6 +3,9 @@ import { z } from "zod";
 import { satisfies } from "./semver.js";
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;
+/** Outils fournis par le cœur : leur handler est notre code, jamais celui de l'extension. */
+const STANDARD_TOOLS = new Set(["run_tests", "run_lint", "report_blocker"]);
+
 const PERMISSION = /^(fs:read|fs:write:[^\s]+|shell:test|shell:[a-z0-9_.,-]+|git:(commit|branch|revert)|copilot:sessions|net:[a-z0-9.,*-]+)$/;
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** Chemin d'un fichier ou dossier de l'extension : relatif, sans « .. » ni segment vide. */
@@ -80,10 +83,12 @@ export function validateManifest(raw: unknown, app: { appApi: string }): Manifes
       if (!skills.has(name)) errors.push(`agents.${a.name} : skill non déclarée dans contributes.skills : ${name}`);
     }
     for (const g of a.write ?? []) if (!writeGlobs.has(g)) errors.push(`agents.${a.name} : écrit dans ${g} sans la permission fs:write:${g}`);
-    if (a.tools?.includes("run_tests") && !m.permissions.includes("shell:test")) errors.push(`agents.${a.name} : run_tests exige la permission shell:test`);
+    // `run_lint` lance le linter du projet : un programme du projet, comme le lanceur de tests.
+    for (const t of ["run_tests", "run_lint"] as const)
+      if (a.tools?.includes(t) && !m.permissions.includes("shell:test")) errors.push(`agents.${a.name} : ${t} exige la permission shell:test`);
     const own = new Set((m.contributes.tools ?? []).map((t) => t.name));
     for (const t of a.tools ?? [])
-      if (t !== "run_tests" && t !== "report_blocker" && !own.has(t)) errors.push(`agents.${a.name} : outil inconnu ${t} (ni standard, ni déclaré dans contributes.tools)`);
+      if (!STANDARD_TOOLS.has(t) && !own.has(t)) errors.push(`agents.${a.name} : outil inconnu ${t} (ni standard, ni déclaré dans contributes.tools)`);
   }
   if ((m.contributes.agents ?? []).length && !m.permissions.includes("copilot:sessions"))
     errors.push("permissions : des agents sont déclarés sans la permission copilot:sessions");

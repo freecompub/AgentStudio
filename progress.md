@@ -5,6 +5,36 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — `run_lint` : le linter arrive avant le refus, pas après (ADR 0025)
+
+**Fait.** Un outil `run_lint` fourni par le cœur (`packages/extension-host/src/lint-tool.ts`),
+donné à `skraft-test` et `skraft-dev`. Il appelle le **même** `StackAdapter.lint()` que la porte
+`deliver` — même mesure, même source de vérité — mais pendant le travail de l'agent.
+
+**Le défaut corrigé.** C4 de `craft-discipline` demande de vérifier que le linter ne signale rien,
+sans donner aucun moyen de le savoir, et sans même citer de commande. L'agent découvrait l'avis du
+linter quand la porte le recalait : une phase entière consommée pour une violation de forme que
+l'outil signale en quelques secondes.
+
+**Ce qui compte plus que l'outil : le résumé sépare trois états.** Pas de linter configuré ;
+linter qui a tourné et **n'a examiné aucun fichier** (exclusion ESLint, filtre de sévérité
+SwiftLint) ; fichiers examinés sans violation. Seul le troisième vaut conformité. C'est
+exactement le défaut réintroduit trois fois en S6, par trois chemins différents — je l'ai écrit
+dans le texte que l'agent lit, parce que c'est le seul endroit où il ne se reperdra pas.
+
+**Pas de preuve enregistrée.** La porte relance le linter elle-même. Si cette exécution-ci valait
+preuve, l'agent choisirait le moment de la mesure — il pourrait linter avant d'écrire le code
+fautif. Même raison que pour `run_tests`, retournée : là c'est la preuve qui compte, ici c'est
+l'information.
+
+**Pas de `run_build`, et c'est délibéré.** `runTests` compile déjà dans les trois piles, et
+`buildErrors` du profil sait nommer les erreurs de compilation. Un second outil d'attestation,
+indépendant des tests, laisserait l'agent conclure « ça compile » sans qu'un test ait tourné.
+Si le besoin revient, ce sera une décision à part : il faudra dire ce qu'on a le droit d'en
+conclure.
+
+---
+
 ## 28/09 — Le contrat retire la commande, il ne se contente pas d'en proposer une autre
 
 **Fait.** Le contrat du cœur interdit désormais à l'agent d'exécuter lui-même toute commande de
