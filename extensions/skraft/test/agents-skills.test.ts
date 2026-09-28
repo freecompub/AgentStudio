@@ -19,6 +19,22 @@ describe("Rôles de skraft en fichiers Markdown", () => {
     expect((await agentFiles()).map((f) => `agents/${f}`)).toEqual(declared);
   });
 
+  it("aucun fichier livré que rien ne cite : le paquet est signé, le poids mort y est signé aussi", async () => {
+    // Les fichiers annexes d'une skill (`references/`, `assets/`) ne sont lus que si un corps les
+    // nomme. Ceux que personne ne nomme voyagent quand même dans le `.asx` et passent sous la
+    // signature : ils ne peuvent plus être distingués du contenu qu'on a vraiment repris.
+    const racine = join(EXTENSION_DIR, "skills");
+    const tous = (await readdir(racine, { recursive: true, withFileTypes: true })).filter((e) => e.isFile());
+    const corps = await Promise.all(
+      tous.filter((e) => e.name.endsWith(".md")).map((e) => readFile(join(e.parentPath, e.name), "utf8")),
+    );
+    const orphelins = tous
+      .filter((e) => e.name !== "SKILL.md")
+      .filter((e) => !corps.some((c) => c.includes(e.name)))
+      .map((e) => join(e.parentPath, e.name).slice(racine.length + 1));
+    expect(orphelins).toEqual([]);
+  });
+
   it("frontmatter lisible par les autres harnais : nom égal au nom de l'agent, description non vide", async () => {
     for (const a of manifest.contributes.agents ?? []) {
       const doc = parseMarkdownDoc(await readFile(join(EXTENSION_DIR, a.prompt!), "utf8"));

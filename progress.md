@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Aucune skill n'était inutilisée ; deux fichiers l'étaient
+
+**Demandé :** supprimer les skills qu'on n'utilise pas. **Mesuré d'abord :** les douze skills
+déclarées sont toutes affectées à au moins un rôle — sept obligatoires, cinq à la demande. Aucune
+n'était supprimable. Il ne faut pas confondre « à la demande » et « inutilisée » : les trois
+critères de revue et les deux catalogues ne sont lus que si un agent appelle `load_skill`, mais les
+retirer priverait les lentilles de leur grille.
+
+**Supprimé :** `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs`.
+Rien ne les nommait — ni corps de skill, ni `references/`, ni agent — et ils voyageaient **signés**
+dans le `.asx`. C'étaient les seuls artefacts .NET du contenu livré.
+
+**Pourquoi cet écart avec l'amont et pas l'autre.** L'ADR 0024 §6 dit « reprises telles quelles »,
+et j'ai refusé la veille de retoucher le texte de `craft-discipline` pour cette raison. La
+différence tient en une phrase : **supprimer un fichier que personne ne nomme ne change rien à ce
+qu'un agent lit** ; modifier un texte injecté, si. Le premier est de l'emballage, le second du
+contenu.
+
+**Le garde-fou vaut mieux que la suppression.** Le critère ne vérifiait que `assets/`. Le test le
+remplace et couvre tout fichier livré sous `skills/` : un `references/*.md` que plus aucun corps ne
+cite tombera aussi. Écrit en RED d'abord — il a nommé les deux fichiers avant que je les efface.
+
+---
+
 ## 28/09 — `run_lint` : le linter arrive avant le refus, pas après (ADR 0025)
 
 **Fait.** Un outil `run_lint` fourni par le cœur (`packages/extension-host/src/lint-tool.ts`),

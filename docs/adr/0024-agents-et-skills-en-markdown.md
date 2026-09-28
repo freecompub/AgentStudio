@@ -70,6 +70,12 @@ pas être vraie dans les deux modes.
   « critères de revue » de SPEC-skraft §4.2, réparties par rôle selon §6.4. Les skills devenues du
   code ne sont pas reprises : `quality-gates-*`, `quality-gates-evidence-contract`,
   `skraft-quality-bar` et `resolving-stack-commands`.
+- Un seul écart assumé avec l'amont : `outside-in-tdd/assets/{CommandHandlerTestTemplate,
+  QueryHandlerTestTemplate}.cs` sont **supprimés**. Rien ne les référençait — ni corps de skill, ni
+  fichier de `references/`, ni agent — et ils voyageaient signés dans le `.asx`, seuls artefacts
+  .NET du contenu livré. Supprimer un fichier que personne ne nomme ne change rien à ce qu'un agent
+  lit, contrairement à une modification de texte : c'est pourquoi cet écart-là est pris et pas
+  l'autre. Un test refuse désormais tout fichier livré sous `skills/` qu'aucun corps ne cite.
 - Les skills reprises viennent d'un cadre .NET et citent des commandes de pile (`dotnet test`,
   `dotnet build`) ainsi que des attributs xUnit (`[Theory]`). Dire à l'agent de passer par
   `run_tests` ne suffisait pas : ça couvre les tests et lui laisse la compilation, avec une commande
