@@ -291,6 +291,27 @@
       "notes": "L'ADR 0027 coupait à 1 M de tokens d'entrée cumulés. Deux runs réels ont montré que c'était faux deux fois. Le seuil : DESIGN a épuisé ses trois essais uniquement sur ce plafond (1023/1048/1049 k) sans qu'aucune lentille n'ait siégé — un tour normal d'architecte sur un projet réel FAIT un million. La grandeur : le cumul compte ce qui a transité, cache de prompt compris, et ne décroît jamais, même quand le runtime compacte ; Copilot facture d'ailleurs en requêtes. `session.usage_info` donnait depuis le début `currentTokens` et `tokenLimit` — on ne l'écoutait pas. Plafond à 0,9 de la fenêtre, `TurnContextError` ; la DERNIÈRE mesure compte, pas la plus haute atteinte, sinon on réinvente un compteur qui ne redescend pas. `maxInputTokens` désactivé par défaut, pas supprimé. `totalNanoAiu` remonté : seule grandeur de coût réel PAR APPEL. NON VÉRIFIÉ : la part servie par le cache — les compteurs ne sont rendus qu'au résumé de fin de session. PAS AFFICHÉ : le pourcentage existe dans le cœur, `chat:agent` ne le transporte pas."
     },
     {
+      "id": "budget-de-questions",
+      "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
+      "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",
+      "passes": false,
+      "notes": "Mesuré le 29/09, run 3 sur US-2 : sept questions en DESIGN, huit sessions neuves, et l'état affichait toujours « essai 1 ». `BLOCKED` → `HUMAN_DECISION` relance le spécialiste sans toucher à `attempts` (reducer.ts, case BLOCKED). Rien ne borne donc la boucle. Sur un vrai run l'humain répond, ce qui la masque derrière son temps de réponse ; au banc, qui répond en une seconde, elle se voit. Coût mesuré : 9 min 08 de phase pour une conception qui en demandait deux ou trois."
+    },
+    {
+      "id": "reponses-humaines-citables",
+      "title": "Les réponses humaines sont écrites dans le dépôt, donc citables par la porte `citations`",
+      "verify": "MANUEL : lancer skraft sur une story à questions ouvertes, vérifier que .skraft/<slug>/passation.md existe et que l'agent le cite",
+      "passes": false,
+      "notes": "Cause racine de la boucle ci-dessus, observée le 29/09. Cinq des sept questions de DESIGN étaient la MÊME : l'agent ne peut pas citer un `fichier:lignes` pour des clarifications qui n'arrivent que par le prompt. Il est pris entre notre porte `citations` — tout ce que tu affirmes doit citer une source — et le fait que les réponses de passation ne sont écrites nulle part. Sa dernière question demandait littéralement qu'on les mette dans un fichier. Le code les a déjà dans `state.answers` : les écrire dans `.skraft/<slug>/passation.md` suffirait."
+    },
+    {
+      "id": "retour-de-revue-cumulatif",
+      "title": "Le retour donné à l'agent après un rejet de revue conserve les demandes des rejets précédents",
+      "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'rejet'",
+      "passes": false,
+      "notes": "Observé le 29/09, run 3 : essai 1 recalé par la lentille `architecture` (modélisation en commande/événement pour un calcul pur), essai 2 par `cold-reader` (la grille n'a ni source ni cycle de vie). L'agent corrige l'un et attire l'autre. `lastRejection` n'en garde qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois essais, une phase peut épuiser son budget en satisfaisant chaque critique à son tour sans jamais les satisfaire ensemble — le budget devient une loterie. C'est le plus sérieux des trois défauts du run."
+    },
+    {
       "id": "skraft-agents-skills-md",
       "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
       "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",

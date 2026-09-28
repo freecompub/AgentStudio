@@ -5,6 +5,56 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Le premier run qui atteint une revue, et ce qu'il montre
+
+**Trois runs réels sur US-2, et seul le troisième dépasse DESIGN.**
+
+| | 28/09 | run 2 | run 3 |
+| --- | --- | --- | --- |
+| RESEARCH | 4 questions | 1 question | 1 essai, sans rejeu |
+| DESIGN atteint la revue | oui | **non** — mon plafond | **oui, deux fois** |
+| Cause des rejeux | `quality-gates` hors mandat | plafond de tokens | critiques d'architecture justes |
+
+Les correctifs de la veille tiennent. Ce qui reste bloquant est ailleurs, et c'est nouveau.
+
+**Un piège du banc, à ne pas reproduire.** La configuration du projet d'essai (couverture, barre de
+qualité, `coverlet`) vivait sur la branche `skraft/us-2`, pas sur `main`. Or le banc clone puis se
+place sur `main`. Les runs 1 et 2 ont donc tourné **sans** elle, et je m'apprêtais à en présenter
+les résultats DISTILL/DELIVER comme valides. Vérifier la branche que le banc utilise, pas celle
+qu'on a sous les yeux.
+
+### Trois défauts, par gravité croissante
+
+**1. Rien ne borne les questions d'un agent.** Sept questions en DESIGN, huit sessions neuves, et
+l'état affiche toujours « essai 1 » : `BLOCKED` → `HUMAN_DECISION` relance le spécialiste sans
+toucher à `attempts`. Sur un vrai run, le temps de réponse de l'humain masque la boucle ; au banc,
+qui répond en une seconde, elle saute aux yeux.
+
+**2. Les réponses humaines sont incitables — c'est la cause de la boucle.** Cinq de ces sept
+questions étaient la même. L'agent est pris entre notre porte `citations`, qui exige une source
+pour tout ce qu'il affirme, et le fait que les clarifications qu'on vient de lui donner n'existent
+que dans son prompt. Sa dernière question demandait littéralement qu'on les écrive dans un fichier.
+Le code les a pourtant dans `state.answers`.
+
+**3. Le retour de revue ne porte que sur le dernier rejet.** Essai 1 recalé par `architecture`,
+essai 2 par `cold-reader`. L'agent corrige l'un et attire l'autre : `lastRejection` n'en garde
+qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois
+essais, **le budget devient une loterie** — on peut satisfaire chaque critique à son tour sans
+jamais les satisfaire ensemble. C'est le plus sérieux.
+
+### Deux observations qui n'entrent pas dans les trois
+
+**Le modèle a émis un chemin en caractères gujaratis** : `.શ્કraft/us-2/design/domain-model.md`,
+qui *ressemble* à `.skraft/` sans en être. La garde l'a refusé, parce qu'elle compare des chemins
+résolus et non des apparences. Ce n'était pas une attaque, juste un modèle qui déraille — mais une
+garde qui « normaliserait » l'Unicode par confort laisserait passer la même chose.
+
+**La règle de synthèse fonctionne comme écrite** : deux lentilles APPROVED et une
+CHANGES_REQUESTED donnent CHANGES_REQUESTED. La note la plus basse l'emporte, une lentille
+satisfaite n'en rattrape pas une inquiète.
+
+---
+
 ## 29/09 — Mon plafond de coût mesurait la mauvaise chose (ADR 0031)
 
 **Ce que le run a dit.** Second run réel sur US-2 : DESIGN a épuisé ses trois essais **uniquement**
