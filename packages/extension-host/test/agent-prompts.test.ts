@@ -114,6 +114,20 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
     expect(lens).toContain("Tu n'écris aucun fichier.");
   });
 
+  it("contrat : les commandes de pile citées par les skills sont neutralisées, pas seulement contredites", () => {
+    // Les skills sont reprises telles quelles (ADR 0024 §6) et viennent d'un cadre .NET :
+    // `craft-discipline` fait lancer `dotnet test` et `dotnet build`, `test-design-mandates`
+    // cite `[Theory]`. Sur un projet Swift ou TypeScript ces commandes sont fausses. Dire
+    // « passe par run_tests » ne suffit pas : ça couvre les tests et laisse la compilation
+    // à l'agent, avec une commande qui n'existe pas chez lui. Le contrat, qui prime (§3),
+    // doit donc retirer la commande, pas seulement en proposer une autre.
+    const full = contractBlock({ output: "report_phase", tools: ["run_tests"], writes: true, onDemand: [] });
+    expect(full).toContain("N'exécute aucune commande de compilation ou de test toi-même");
+    expect(full).toContain("dotnet test");
+    // Un agent qui ne lance pas de tests n'a pas à recevoir cette consigne.
+    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] })).not.toContain("dotnet test");
+  });
+
   it("agent sans fichier (consignes seules) : consignes puis contrat", () => {
     const p = composeAgentPrompt({ name: "a", title: "A", role: "Tu testes.", output: "report_phase" }, null, new Map()).systemPrompt;
     expect(p.startsWith("Tu testes.\n\n## Fonctionnement dans agent-studio")).toBe(true);

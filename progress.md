@@ -5,6 +5,34 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Le contrat retire la commande, il ne se contente pas d'en proposer une autre
+
+**Fait.** Le contrat du cœur interdit désormais à l'agent d'exécuter lui-même toute commande de
+compilation ou de test (`packages/extension-host/src/agent-prompts.ts`, `contractBlock`).
+
+**Le piège.** Les douze skills sont reprises **telles quelles** (ADR 0024 §6) — je l'ai vérifié,
+elles sont octet pour octet identiques à `v1.6.1`. Elles viennent d'un cadre .NET et font lancer
+`dotnet test`, `dotnet build`, `[Theory]`. Je croyais le problème réglé parce que le contrat disait
+déjà « lance les tests uniquement avec `run_tests` ». **Il ne l'était pas** : cette phrase couvre
+les tests et laisse la compilation à l'agent — qui lit `dotnet build` dans `craft-discipline` C3 et
+l'exécute, sur un projet Swift ou TypeScript où la commande n'existe pas. Une consigne qui
+*propose une alternative* ne *retire* pas l'instruction concurrente ; il faut la retirer
+explicitement. C'est le même motif que les portes : **ce qu'on n'a pas interdit, on l'a permis.**
+
+**Pourquoi dans le contrat et pas dans la skill.** Modifier `craft-discipline` aurait été plus
+direct, mais c'était rediscuter l'ADR 0024 §6, qui est `décidé`, et ouvrir un écart à maintenir
+avec l'amont GPL. Le §3 prévoit exactement ce cas : le contrat vient en dernier et prime. Une ligne
+dans `contractBlock` couvre en plus toutes les skills reprises ensuite, sans y toucher.
+
+**Ce qui reste ouvert.** C4 — l'analyse statique — n'a toujours aucun outil : `StackAdapter.lint()`
+existe et la porte `deliver` s'en sert (`deliver-effects.ts:204`), mais **après coup**. L'agent dev
+n'a que `run_tests` et `report_blocker` : il découvre le refus du linter quand la porte le recale.
+Un outil `run_lint` sur le même `adapter.lint()` corrigerait ça — même mesure, disponible plus tôt.
+Pas de `run_build` en revanche : `runTests` compile déjà, et un second outil d'attestation
+indépendant des tests est exactement le défaut qu'on traque.
+
+---
+
 ## 28/09 — Agents et skills en Markdown : un contenu, deux usages (ADR 0024)
 
 **Fait.** Branche `feat/skraft-agents-skills-md`, partie de `main`, **rien poussé sur main**

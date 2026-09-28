@@ -70,6 +70,12 @@ pas être vraie dans les deux modes.
   « critères de revue » de SPEC-skraft §4.2, réparties par rôle selon §6.4. Les skills devenues du
   code ne sont pas reprises : `quality-gates-*`, `quality-gates-evidence-contract`,
   `skraft-quality-bar` et `resolving-stack-commands`.
+- Les skills reprises viennent d'un cadre .NET et citent des commandes de pile (`dotnet test`,
+  `dotnet build`) ainsi que des attributs xUnit (`[Theory]`). Dire à l'agent de passer par
+  `run_tests` ne suffisait pas : ça couvre les tests et lui laisse la compilation, avec une commande
+  qui n'existe pas sur un projet Swift ou TypeScript. Le contrat lui **interdit donc d'exécuter
+  lui-même toute commande de compilation ou de test**. Les fichiers repris restent identiques à
+  l'amont, conformément au point 6 : la correction est dans le contrat, qui prime (point 3).
 - Les prompts s'allongent (skills injectées). Injecter une section plutôt qu'une skill entière
   reste le levier d'économie (`outside-in-tdd#RED` pour l'agent test, `#SYNTHESIZE-GREEN` pour
   l'agent dev).

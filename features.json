@@ -113,7 +113,7 @@
       "title": "Aucun fichier empaqueté n'est orphelin : tout ce qui voyage est atteignable",
       "verify": "cd extensions/skraft && for f in $(find skills -path '*/assets/*' -type f); do grep -rq --include='*.md' -- \"$(basename $f)\" skills agents || { echo \"orphelin : $f\"; exit 1; }; done",
       "passes": false,
-      "notes": "Trouvé le 28/09. `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs` sont empaquetés et signés, et RIEN ne les référence — ni corps de skill, ni références, ni agent. Poids mort, pas fuite de pile : vérifié, aucun corps de skill injecté ne contient de bloc C#, donc un agent qui charge outside-in-tdd n'en reçoit pas. J'avais d'abord affirmé le contraire, en déduisant l'usage de la seule présence du fichier dans le paquet — c'était faux. Deux issues : les retirer, ou les câbler en assumant qu'une skill porte des exemples par écosystème, ce qui est une décision d'architecture à part entière. Résidu de pile réel et distinct : craft-discipline lignes 23/31/39 (`dotnet test`, `dotnet build`), déjà neutralisé par le contrat du cœur qui impose `run_tests`."
+      "notes": "Trouvé le 28/09. `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs` sont empaquetés et signés, et RIEN ne les référence — ni corps de skill, ni références, ni agent. Poids mort, pas fuite de pile : vérifié, aucun corps de skill injecté ne contient de bloc C#, donc un agent qui charge outside-in-tdd n'en reçoit pas. J'avais d'abord affirmé le contraire, en déduisant l'usage de la seule présence du fichier dans le paquet — c'était faux. Deux issues : les retirer, ou les câbler en assumant qu'une skill porte des exemples par écosystème, ce qui est une décision d'architecture à part entière. Résidu de pile réel et distinct : craft-discipline lignes 23/31/39 (`dotnet test`, `dotnet build`), test-design-mandates et test-refactoring-catalog (`[Theory]`). `run_tests` ne couvrait que les tests et laissait la compilation à l'agent, avec une commande fausse sur Swift ou TypeScript ; le contrat lui interdit désormais d'exécuter lui-même toute commande de compilation ou de test. Les skills restent identiques à l'amont (ADR 0024 §6) : le correctif est dans le contrat, qui prime (§3), pas dans le Markdown repris."
     },
     {
       "id": "skills-portees-en-code",
@@ -239,7 +239,7 @@
       "title": "Skills obligatoires injectées (ou une section), skills facultatives par load_skill, chaque chargement tracé dans l'état (D26)",
       "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts && pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/reducer.test.ts",
       "passes": true,
-      "notes": "`nom#Titre` injecte une seule section (outside-in-tdd#RED pour l'agent test, #SYNTHESIZE-GREEN pour le dev). load_skill ne rend que les skills du rôle ; AgentRunResult.skillsLoaded remonte à l'extension, skraft l'accumule dans `skillsLoaded`."
+      "notes": "`nom#Titre` injecte une seule section (outside-in-tdd#RED pour l'agent test, #SYNTHESIZE-GREEN pour le dev). load_skill ne rend que les skills du rôle ; AgentRunResult.skillsLoaded remonte à l'extension, skraft l'accumule dans `skillsLoaded`. Le contrat neutralise aussi les commandes de pile que citent les skills reprises (`dotnet test`, `dotnet build`…) : l'agent n'exécute aucune compilation ni test lui-même."
     },
     {
       "id": "skraft-agents-skills-md",
