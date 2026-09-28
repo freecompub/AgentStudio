@@ -109,6 +109,13 @@
       "notes": "Obtenu en déléguant à ctx.stack : lint, mutation, architecture, infrastructureModules."
     },
     {
+      "id": "paquet-sans-orphelin",
+      "title": "Aucun fichier empaqueté n'est orphelin : tout ce qui voyage est atteignable",
+      "verify": "cd extensions/skraft && for f in $(find skills -path '*/assets/*' -type f); do grep -rq --include='*.md' -- \"$(basename $f)\" skills agents || { echo \"orphelin : $f\"; exit 1; }; done",
+      "passes": false,
+      "notes": "Trouvé le 28/09. `outside-in-tdd/assets/{CommandHandlerTestTemplate,QueryHandlerTestTemplate}.cs` sont empaquetés et signés, et RIEN ne les référence — ni corps de skill, ni références, ni agent. Poids mort, pas fuite de pile : vérifié, aucun corps de skill injecté ne contient de bloc C#, donc un agent qui charge outside-in-tdd n'en reçoit pas. J'avais d'abord affirmé le contraire, en déduisant l'usage de la seule présence du fichier dans le paquet — c'était faux. Deux issues : les retirer, ou les câbler en assumant qu'une skill porte des exemples par écosystème, ce qui est une décision d'architecture à part entière. Résidu de pile réel et distinct : craft-discipline lignes 23/31/39 (`dotnet test`, `dotnet build`), déjà neutralisé par le contrat du cœur qui impose `run_tests`."
+    },
+    {
       "id": "skills-portees-en-code",
       "title": "Ce qui est mécanisable dans les skills reprises est exécuté par le code, pas espéré d'un agent",
       "verify": "pnpm vitest run --project ext-skraft test/gherkin.test.ts test/design-gate.test.ts",
