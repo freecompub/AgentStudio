@@ -109,6 +109,13 @@
       "notes": "Obtenu en déléguant à ctx.stack : lint, mutation, architecture, infrastructureModules."
     },
     {
+      "id": "skills-portees-en-code",
+      "title": "Ce qui est mécanisable dans les skills reprises est exécuté par le code, pas espéré d'un agent",
+      "verify": "pnpm vitest run --project ext-skraft test/gherkin.test.ts test/design-gate.test.ts",
+      "passes": true,
+      "notes": "Porte `gherkin` (de `bdd-methodology`) : vocabulaire de couche, un seul déclencheur, assertion observable, sept étapes, tags de comportement. Placée AVANT la porte `valeurs` et avant le GEL des tests d'acceptance — passé ce point plus personne ne peut réécrire un scénario. Deux anti-patrons d'ADR (de `architecture-review-criteria` G14 et `adr-eligibility-gate` Q2) ajoutés à la porte DESIGN, notre phase la plus faible. PIÈGE : `\\b` de JavaScript ignore les accents — la porte ne reconnaissait RIEN sur du Gherkin français avant correction. Voir docs/portes-comparees-skraft-plugin.md pour ce qui reste du jugement."
+    },
+    {
       "id": "portes-n-attestent-que-du-mesure",
       "title": "Une porte ne produit jamais de fait sur ce qu'elle n'a pas mesuré",
       "verify": "pnpm vitest run --project stack-adapters test/lint-adapters.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
@@ -134,7 +141,7 @@
       "title": "La suite complète passe sans échec",
       "verify": "pnpm typecheck && pnpm test",
       "passes": true,
-      "notes": "1011 tests au 26/09, plus 2 essais de bout en bout (`pnpm e2e`). La CI lance les deux à chaque poussée."
+      "notes": "1068 tests au 28/09, plus 2 essais de bout en bout. La CI lance les deux à chaque poussée."
     },
     {
       "id": "essais-bout-en-bout",

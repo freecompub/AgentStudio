@@ -37,6 +37,24 @@ export function checkDesign(i: DesignInput): string[] {
     if (!a.adr.id) reasons.push(`${a.path} : titre « # ADR-NNN — titre » absent.`);
     for (const m of a.adr.missing) reasons.push(`${a.path} : section manquante « ${m} ».`);
     if (a.adr.status && a.adr.status !== "Proposed") reasons.push(`${a.path} : statut ${a.adr.status}, Proposed attendu.`);
+
+    // Le nom de fichier nomme le SUJET ; le verdict vit dans `Statut`, et lui seul change quand la
+    // décision évolue. Un verdict dans le nom oblige à renommer le fichier — donc à casser tous les
+    // liens qui le citent. Suffixe seulement : « rejet-des-paiements » est un sujet légitime.
+    const suffixe = /-(rejected|accepted|deprecated|superseded|rejete|rejeté|accepte|accepté)\.md$/i.exec(a.path);
+    if (suffixe)
+      reasons.push(
+        `${a.path} : le nom de fichier porte un verdict (« ${suffixe[1]} »). Il doit nommer le sujet ; le verdict appartient au champ « Statut ».`,
+      );
+
+    // Un ADR justifie un choix entre options ; « éviter X », « toujours Y » n'en est pas un — c'est
+    // une bonne pratique, qui relève du linter, d'une skill ou d'une convention, pas d'une décision
+    // d'architecture à ratifier.
+    const pratique = /^\s*(?:ne pas |éviter |eviter |toujours |jamais |avoid |always |never |no(?:t)? )/i.exec(a.adr.title ?? "");
+    if (pratique)
+      reasons.push(
+        `${a.path} : « ${a.adr.title} » énonce une bonne pratique, pas une décision entre options. Un ADR arbitre un choix ; une règle de ce genre relève d'une convention ou du linter.`,
+      );
   }
 
   const numbers = parsed.map((a) => a.adr.number).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);

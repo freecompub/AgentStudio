@@ -10,6 +10,7 @@ import { checkResearch } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign } from "./design.js";
 import { checkAcceptanceRed, checkValues } from "./distill.js";
+import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
@@ -300,6 +301,12 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
   const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];
+
+  // Porte `gherkin` AVANT la porte `valeurs` : un scénario couplé à un détail technique doit être
+  // refusé même s'il contient les bonnes valeurs, et surtout avant le gel des tests d'acceptance —
+  // passé ce point, plus personne ne peut le réécrire.
+  const gherkinReasons = checkGherkin(features);
+  if (gherkinReasons.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: gherkinReasons };
 
   const valueReasons = checkValues({ criteria, features, acceptanceTests });
   if (valueReasons.length) return { type: "GATE_FAIL", gate: "valeurs", reasons: valueReasons };

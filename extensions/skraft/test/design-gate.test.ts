@@ -92,3 +92,48 @@ describe("Porte cohérence (SPEC-skraft §7.2, fixtures §13.2)", () => {
     ]);
   });
 });
+
+/**
+ * Deux anti-patrons d'ADR portés en code depuis les skills reprises : le verdict inscrit dans le
+ * nom de fichier (`architecture-review-criteria` G14) et l'ADR de « bonne pratique »
+ * (`adr-eligibility-gate`, Q2). Ils sont reconnaissables sans interprétation ; le reste de ces
+ * skills reste du jugement, et appartient aux lentilles.
+ *
+ * DESIGN est la phase où nous avons le moins de portes : chaque règle mécanisable y compte double.
+ */
+describe("Anti-patrons d'ADR reconnaissables sans interprétation", () => {
+  const avecAdr = (path: string, titre: string) =>
+    checkDesign(input({ adrs: [{ path, md: adr(1, { title: titre }), isNew: true }] }));
+
+  it.each(["docs/adr/adr-001-event-sourcing-rejected.md", "docs/adr/adr-001-cqrs-accepted.md", "docs/adr/adr-001-saga-deprecated.md", "docs/adr/adr-001-x-superseded.md"])(
+    "le verdict dans le nom de fichier est refusé : %s",
+    (path) => {
+      const r = avecAdr(path, "Event Sourcing");
+      expect(r.join(" ")).toMatch(/nom de fichier|verdict/i);
+      // Le motif doit dire où le verdict a sa place, sinon l'agent renomme au hasard.
+      expect(r.join(" ")).toMatch(/Statut/);
+    },
+  );
+
+  it("un nom de fichier qui décrit le sujet passe", () => {
+    expect(avecAdr("docs/adr/adr-001-event-sourcing.md", "Event Sourcing")).toEqual([]);
+  });
+
+  it("un sujet qui contient un mot proche du verdict n'est pas refusé", () => {
+    // « rejet » est ici le sujet de la décision, pas son verdict.
+    expect(avecAdr("docs/adr/adr-001-rejet-des-paiements.md", "Rejet des paiements")).toEqual([]);
+  });
+
+  it.each(["Ne pas utiliser de variables globales", "Éviter le couplage fort", "Toujours valider aux frontières", "Avoid hardcoded values", "No hardcoded phase names"])(
+    "un ADR de « bonne pratique » est refusé : %s",
+    (titre) => {
+      const r = avecAdr("docs/adr/adr-001-sujet.md", titre);
+      expect(r.join(" ")).toMatch(/bonne pratique|décision/i);
+    },
+  );
+
+  it("un titre qui nomme une décision passe", () => {
+    for (const titre of ["Event Sourcing pour le journal des paiements", "Découpage domaine / application", "Résultat typé plutôt qu'exception"])
+      expect(avecAdr("docs/adr/adr-001-sujet.md", titre), titre).toEqual([]);
+  });
+});

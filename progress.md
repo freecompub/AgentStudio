@@ -47,6 +47,41 @@ vérifie qu'elle vient après les skills.
 
 ---
 
+## 28/09 — Ce qui est mécanisable dans les skills devient du code
+
+**Contexte.** La branche apporte douze skills reprises telles quelles. Une skill est une consigne :
+elle améliore les chances qu'un agent fasse bien, elle ne garantit rien. La question posée était
+donc : **qu'est-ce qui, là-dedans, peut devenir une porte ?**
+
+**Inventaire.** Sur les douze, deux seulement portent des règles reconnaissables sans
+interprétation : `bdd-methodology` (motifs d'étape interdits, granularité, tags) et, pour deux
+règles, `architecture-review-criteria` et `adr-eligibility-gate`. Les autres sont du jugement — et
+c'est bien qu'elles restent des skills.
+
+**Porte `gherkin`, placée avant le gel.** C'est tout l'argument : les tests d'acceptance sont gelés
+à la sortie de DISTILL. Un scénario qui dit « Quand j'appelle POST /api/panier » ne devient pas
+seulement médiocre, il devient **la spécification** que toute la livraison doit satisfaire, et plus
+personne ne peut le réécrire. Ailleurs une faiblesse de méthode coûte un réessai ; ici elle se
+fige. La porte refuse donc AVANT la porte `valeurs` et avant le gel.
+
+**Le bug que le français a révélé.** `\b` de JavaScript ne connaît que `[A-Za-z0-9_]`. Après
+« donné » ou avant « ça », il ne voit aucune transition : **la porte ne reconnaissait rien** sur du
+Gherkin français. Quatre tests sont tombés là-dessus. → Toute frontière de mot dans ce dépôt doit
+s'écrire `(?<![A-Za-zÀ-ÿ0-9])`, jamais `\b`.
+
+**Deux règles d'ADR pour DESIGN**, notre phase la plus faible — la seule où nous n'avons ni méthode
+ni porte : le verdict dans le nom de fichier (leur G14) et l'ADR de « bonne pratique » (leur Q2).
+Peu de code, et ça atterrit là où il n'y avait rien.
+
+**Une porte que je n'ai PAS écrite, et pourquoi.** J'avais proposé une porte « matrice » exigeant
+que `impl-plan.md` couvre tous les scénarios — leur G6. Vérification faite avant d'écrire :
+`planScenarios` tire les scénarios des **tests réellement trouvés**, et n'utilise le plan que pour
+l'ordre. Un plan incomplet ne fait donc perdre aucun scénario. Leur porte garde contre un risque
+que notre structure a déjà éliminé. → Vérifier la prémisse d'une porte avant de l'écrire : celle-ci
+aurait été du zèle.
+
+---
+
 ## 26/09 — La vraie application Electron tourne en CI, sans jamais appeler Copilot
 
 **Fait.** Playwright pilote l'application réelle : vrai processus principal, vrai préchargement,
