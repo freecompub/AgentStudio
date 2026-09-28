@@ -16,7 +16,7 @@ import {
   createUsageRecorder,
 } from "@agent-studio/core";
 import { sequentialIds, type ScriptedBehavior, type ScriptedRuntime } from "@agent-studio/core/testing";
-import { activateInProcess, activateIsolated, bundle, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
+import { activateInProcess, activateIsolated, bundle, copyDeclaredFiles, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
 import type { StackAdapter } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord } from "@agent-studio/task-engine";
 import { openWorkspace, type Workspace } from "@agent-studio/workspace";
@@ -203,6 +203,9 @@ function withHang(ws: Workspace, hang: HangPoint | undefined): Workspace {
   };
 }
 
+/** Dossier source de l'extension : ses fichiers de rôle (`agents/`) et ses skills (`skills/`). */
+export const EXTENSION_DIR = resolve(import.meta.dirname, "../..");
+
 let artifacts: Promise<{ runtimeEntry: string; extDir: string }> | undefined;
 function isolatedArtifacts() {
   artifacts ??= (async () => {
@@ -211,6 +214,8 @@ function isolatedArtifacts() {
     const extDir = join(dir, "skraft");
     await bundle(resolve(import.meta.dirname, "../../../../packages/extension-host/src/child/entry.ts"), runtimeEntry);
     await bundle(resolve(import.meta.dirname, "../../src/entry.ts"), join(extDir, "dist/index.mjs"));
+    // Fichiers de rôle et skills livrés avec l'extension, comme dans le paquet .asx (ADR 0024).
+    await copyDeclaredFiles(manifest, EXTENSION_DIR, extDir);
     return { runtimeEntry, extDir };
   })();
   return artifacts;
@@ -298,7 +303,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
   if (opts.isolated) {
     const { runtimeEntry, extDir } = await isolatedArtifacts();
     handles.push(await activateIsolated({ manifest, directory: extDir, entry: join(extDir, "dist/index.mjs") }, hostDeps, { launcher: createNodeLauncher(), runtimeEntry }));
-  } else handles.push(await activateInProcess({ manifest, module: skraftExtension }, hostDeps));
+  } else handles.push(await activateInProcess({ manifest, module: skraftExtension, directory: EXTENSION_DIR }, hostDeps));
   return { engine, interactions, registry, posted, workspace, usage };
 }
 

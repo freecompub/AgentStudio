@@ -85,7 +85,7 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
   const readOnly = e.step === "test" ? ["@stack:acceptanceTests"] : ["@stack:acceptanceTests", "@stack:unitTests"];
   const r = await ctx.agents.run<"report_phase">(role, lines.join("\n"), { signal, readOnly, evidence: { taskId, phase: "DELIVER", stepId: sc.id } });
   if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files };
+  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
 }
 
 /** Porte RED d'un pas (SPEC.md §8.3) : un seul nouveau test unitaire, rouge pour une bonne raison, aucun test gelé touché. */

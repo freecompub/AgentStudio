@@ -110,7 +110,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-      return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files };
+      return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
     }
 
     case "runGate":

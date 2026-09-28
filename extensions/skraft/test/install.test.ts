@@ -8,9 +8,9 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bundle } from "@agent-studio/extension-host";
+import { bundle, copyDeclaredFiles, extensionFileReader, loadAgentPrompts } from "@agent-studio/extension-host";
 import { createExtensionInstaller, type ConsentRequest } from "@agent-studio/extension-installer";
-import { packExtension } from "@agent-studio/extension-packaging";
+import { filesFromDirectory, packExtension } from "@agent-studio/extension-packaging";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { manifest } from "../src/manifest.js";
 
@@ -23,18 +23,13 @@ const ENTREE: string = manifest.main;
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-asx-"));
   // Côté éditeur : compilation puis empaquetage, sans signature.
-  const built = join(dir, "build", ENTREE);
-  await bundle(join(import.meta.dirname, "../src/entry.ts"), built);
+  // Comme `pnpm ext:build` : entrée compilée, manifeste, fichiers de rôle et skills (ADR 0024).
+  const build = join(dir, "build");
+  await bundle(join(import.meta.dirname, "../src/entry.ts"), join(build, ENTREE));
+  await writeFile(join(build, "manifest.json"), JSON.stringify(manifest));
+  await copyDeclaredFiles(manifest, join(import.meta.dirname, ".."), build);
   asx = join(dir, `${manifest.id}-${manifest.version}.asx`);
-  await writeFile(
-    asx,
-    packExtension(
-      new Map([
-        ["manifest.json", new TextEncoder().encode(JSON.stringify(manifest))],
-        [ENTREE, new Uint8Array(await readFile(built))],
-      ]),
-    ),
-  );
+  await writeFile(asx, packExtension(await filesFromDirectory(build)));
 }, 120_000);
 
 afterAll(() => rm(dir, { recursive: true, force: true }));
@@ -83,6 +78,11 @@ describe("skraft distribuée en paquet .asx", () => {
     expect(demandes[0]?.signed).toBe(false);
 
     expect((await inst.list()).map((e) => e.id)).toContain(manifest.id);
+    const installed = (await inst.active()).find((e) => e.manifest.id === manifest.id);
+    expect(installed).toBeDefined();
+    // Les rôles et les skills sont livrés dans le paquet : chaque agent se compose depuis le dossier installé.
+    const composed = await loadAgentPrompts(manifest, extensionFileReader(installed!.directory));
+    expect(composed.get("skraft-dev")?.systemPrompt).toContain("### Skill outside-in-tdd#SYNTHESIZE-GREEN");
   });
 
   it("refuser l'accord n'installe rien", async () => {

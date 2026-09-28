@@ -5,6 +5,48 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Agents et skills en Markdown : un contenu, deux usages (ADR 0024)
+
+**Fait.** Branche `feat/skraft-agents-skills-md`, partie de `main`, **rien poussé sur main**
+(consigne du responsable).
+- Une extension déclare désormais ses agents par fichier (`agents/<nom>.agent.md`) et ses skills
+  (`skills/<nom>/SKILL.md`).
+- Le cœur compose le prompt dans cet ordre : contenu du rôle, skills obligatoires (ou une seule
+  section, `nom#Titre`), consignes du manifeste, puis le **contrat d'exécution** en dernier. Le
+  contrat couvre l'outil de fin, `run_tests`, `report_blocker`, `load_skill` et l'interdiction de
+  Git, et il prime explicitement sur le reste.
+- `load_skill` trace chaque chargement jusque dans l'état de la tâche (D26).
+- skraft livre ainsi ses onze rôles et douze skills reprises du tag `v1.6.1`, que le responsable a
+  déclaré autorisé le 28/09.
+
+**Pourquoi séparer contenu et contrat.** Le responsable voulait que les mêmes fichiers servent à
+agent-studio et à Copilot CLI / Claude Code. Or une même phrase ne peut pas être vraie dans les
+deux modes : « lance les tests et commite » est juste ailleurs, faux chez nous. D'où la règle : les
+`.md` ne nomment **aucun** outil d'agent-studio, et un test le vérifie. Tout ce qui n'a de sens que
+sous l'orchestrateur va dans `roles.ts` ou dans le contrat du cœur.
+
+**Piège attrapé par le test du frontmatter.** Mon premier lecteur de frontmatter ne gérait que les
+valeurs sur une ligne. `adr-eligibility-gate` écrit sa description en bloc replié YAML
+(`description: >` puis des lignes indentées) : description vide, donc liste `load_skill` des
+lentilles sans explication. Corrigé (`>` et `|`) et testé. Leçon : sur du contenu repris d'un
+tiers, écrire le test sur **tous** les fichiers réels, pas sur un exemple fabriqué.
+
+**Conflit repéré entre skills reprises et nos décisions.** La skill `craft-discipline` impose ses
+seuils d'Object Calisthenics, alors que l'ADR 0022 fait du linter du projet la seule autorité. Et
+`outside-in-tdd` fait commiter l'agent. Je n'ai **pas** modifié les skills : elles restent
+identiques à la source, ce qui garde la reprise traçable. La consigne d'orchestration des rôles
+concernés tranche (« le linter fait foi », « ne fais pas les commits ni les portes »), et un test
+vérifie qu'elle vient après les skills.
+
+**Reste à faire.**
+- Éprouver le dossier comme plugin dans Copilot CLI et Claude Code (critère
+  `skraft-plugin-autonome`, manuel). Le format Copilot est repris de skraft-plugin sans avoir été
+  essayé.
+- Verser la pièce d'origine de l'autorisation, qui porte maintenant aussi sur `v1.6.1`
+  (critère `reprise-skraft`).
+
+---
+
 ## 26/09 — La vraie application Electron tourne en CI, sans jamais appeler Copilot
 
 **Fait.** Playwright pilote l'application réelle : vrai processus principal, vrai préchargement,

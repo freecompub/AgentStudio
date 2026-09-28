@@ -1,0 +1,9 @@
+{
+  "name": "skraft-agent-studio",
+  "description": "Rôles et skills du pipeline skraft (RESEARCH → DESIGN → DISTILL → DELIVER, revue à lentilles), utilisables sans agent-studio. Sous agent-studio, le même contenu est orchestré par le code : portes, preuves et tests gelés.",
+  "version": "0.1.0",
+  "author": { "name": "agent-studio" },
+  "license": "GPL-3.0-or-later",
+  "agents": "./agents/",
+  "skills": "./skills/"
+}

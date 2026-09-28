@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-09-25",
-  "branch": "feat/j5-profils-de-stack",
+  "updated": "2026-09-28",
+  "branch": "feat/skraft-agents-skills-md",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -205,6 +205,34 @@
       "verify": "pnpm vitest run --project core -t 'sqlite'",
       "passes": false,
       "notes": "Décidé, pas implémenté. `node:sqlite` vérifié fonctionnel dans Electron 44 (Node 24.21) : pas de module natif à recompiler."
+    },
+    {
+      "id": "agents-en-markdown",
+      "title": "Une extension déclare ses agents en fichiers Markdown ; le cœur compose contenu, skills et contrat (D12, ADR 0024)",
+      "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts test/in-process-host.test.ts && pnpm vitest run --project extension-manifest",
+      "passes": true,
+      "notes": "Rôle dans `agents/<nom>.agent.md`, orchestration dans le manifeste, contrat d'exécution ajouté en dernier par le cœur et qui prime. Fichiers lus par l'hôte, confinés au dossier de l'extension (liens symboliques résolus). Frontmatter : blocs YAML `>` et `|` gérés — une skill reprise en utilise un."
+    },
+    {
+      "id": "skills-injectees-et-load-skill",
+      "title": "Skills obligatoires injectées (ou une section), skills facultatives par load_skill, chaque chargement tracé dans l'état (D26)",
+      "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts && pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/reducer.test.ts",
+      "passes": true,
+      "notes": "`nom#Titre` injecte une seule section (outside-in-tdd#RED pour l'agent test, #SYNTHESIZE-GREEN pour le dev). load_skill ne rend que les skills du rôle ; AgentRunResult.skillsLoaded remonte à l'extension, skraft l'accumule dans `skillsLoaded`."
+    },
+    {
+      "id": "skraft-agents-skills-md",
+      "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
+      "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",
+      "passes": true,
+      "notes": "Le contenu partagé ne nomme aucun outil d'agent-studio (testé). Les skills sont reprises telles quelles ; leurs conflits avec nos décisions (Object Calisthenics vs linter, ADR 0022 ; commits et portes faits par le code) sont tranchés par les consignes d'orchestration du rôle, pas en modifiant la skill."
+    },
+    {
+      "id": "skraft-plugin-autonome",
+      "title": "Le dossier extensions/skraft se charge tel quel comme plugin dans Copilot CLI et Claude Code",
+      "verify": "MANUEL : charger extensions/skraft comme plugin dans Claude Code (.claude-plugin/plugin.json) et dans Copilot CLI (plugin.json), vérifier que les agents skraft-* et les skills apparaissent",
+      "passes": false,
+      "notes": "Manifestes écrits d'après la structure de skraft-plugin, jamais éprouvés sur les versions installées (point À VÉRIFIER de l'ADR 0024). Sans agent-studio, aucune garantie : ni porte, ni preuve, ni test gelé."
     }
   ]
 }

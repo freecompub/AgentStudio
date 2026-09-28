@@ -1,6 +1,14 @@
 import type { ExtensionManifest } from "@agent-studio/extension-api";
 import { STAGE_LABELS } from "./model.js";
-import { LENS_FOCUS, ROLES } from "./roles.js";
+import { LENS_FOCUS, ROLE_SKILLS, ROLES, SKILLS } from "./roles.js";
+
+/** Fichier de rôle d'un agent, relatif au dossier de l'extension. */
+const agentFile = (name: string) => `agents/${name}.agent.md`;
+/** Skills d'un rôle, en tableaux modifiables pour le type du manifeste. */
+const skillsOf = (s: { readonly mandatory?: readonly string[]; readonly onDemand?: readonly string[] }) => ({
+  ...(s.mandatory ? { mandatory: [...s.mandatory] } : {}),
+  ...(s.onDemand ? { onDemand: [...s.onDemand] } : {}),
+});
 
 const SKRAFT_DIR = ".skraft/**";
 /** Emplacements fournis par l'adaptateur de stack du projet, résolus à l'ouverture de session (§10). */
@@ -33,22 +41,80 @@ export const manifest: ExtensionManifest = {
       { name: "skraft", title: "Livrer une story avec skraft", description: "Mène une story de la recherche à la livraison : conception, scénarios d'acceptance, code en TDD, revues." },
       { name: "skraft-status", title: "État du pipeline skraft", description: "Affiche la phase, la difficulté et les décisions en attente des pipelines skraft." },
     ],
+    // Contenu des rôles dans agents/*.agent.md (partagé avec Copilot CLI et Claude Code) ; ici,
+    // l'orchestration propre à agent-studio : consignes, outil de fin, périmètre, outils, skills (ADR 0024).
     agents: [
-      { name: "skraft-classifier", title: "Évaluation de la difficulté", role: ROLES.classifier, output: "submit_difficulty" },
-      { name: "skraft-researcher", title: "Chercheur", role: ROLES.researcher, output: "report_phase", write: [SKRAFT_DIR], tools: ["report_blocker"] },
-      { name: "skraft-architect-model", title: "Architecte (modélisation)", role: ROLES.architectModel, output: "report_phase", write: [SKRAFT_DIR], tools: ["report_blocker"] },
+      { name: "skraft-classifier", title: "Évaluation de la difficulté", prompt: agentFile("skraft-classifier"), role: ROLES.classifier, output: "submit_difficulty" },
+      {
+        name: "skraft-researcher",
+        title: "Chercheur",
+        prompt: agentFile("skraft-researcher"),
+        role: ROLES.researcher,
+        output: "report_phase",
+        write: [SKRAFT_DIR],
+        tools: ["report_blocker"],
+      },
+      {
+        name: "skraft-architect-model",
+        title: "Architecte (modélisation)",
+        prompt: agentFile("skraft-architect-model"),
+        role: ROLES.architectModel,
+        output: "report_phase",
+        write: [SKRAFT_DIR],
+        tools: ["report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.architectModel),
+      },
       // Aucun droit d'écriture direct dans docs/adr : seul render_adr y écrit (§6.3).
-      { name: "skraft-architect-decide", title: "Architecte (décisions)", role: ROLES.architectDecide, output: "report_phase", write: [SKRAFT_DIR], tools: ["render_adr", "report_blocker"] },
-      { name: "skraft-acceptance", title: "Scénarios d'acceptance", role: ROLES.acceptance, output: "report_phase", write: [SKRAFT_DIR, ACCEPTANCE, SOURCES], tools: ["run_tests", "report_blocker"] },
-      { name: "skraft-test", title: "Tests unitaires", role: ROLES.test, output: "report_phase", write: [UNIT_TESTS], tools: ["run_tests", "report_blocker"] },
-      { name: "skraft-dev", title: "Développement", role: ROLES.dev, output: "report_phase", write: [SOURCES], tools: ["run_tests", "report_blocker"] },
-      ...(Object.entries(LENS_FOCUS) as [keyof typeof LENS_FOCUS, string][]).map(([name, focus]) => ({
+      {
+        name: "skraft-architect-decide",
+        title: "Architecte (décisions)",
+        prompt: agentFile("skraft-architect-decide"),
+        role: ROLES.architectDecide,
+        output: "report_phase",
+        write: [SKRAFT_DIR],
+        tools: ["render_adr", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.architectDecide),
+      },
+      {
+        name: "skraft-acceptance",
+        title: "Scénarios d'acceptance",
+        prompt: agentFile("skraft-acceptance"),
+        role: ROLES.acceptance,
+        output: "report_phase",
+        write: [SKRAFT_DIR, ACCEPTANCE, SOURCES],
+        tools: ["run_tests", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.acceptance),
+      },
+      {
+        name: "skraft-test",
+        title: "Tests unitaires",
+        prompt: agentFile("skraft-test"),
+        role: ROLES.test,
+        output: "report_phase",
+        write: [UNIT_TESTS],
+        tools: ["run_tests", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.test),
+      },
+      {
+        name: "skraft-dev",
+        title: "Développement",
+        prompt: agentFile("skraft-dev"),
+        role: ROLES.dev,
+        output: "report_phase",
+        write: [SOURCES],
+        tools: ["run_tests", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.dev),
+      },
+      ...(Object.keys(LENS_FOCUS) as (keyof typeof LENS_FOCUS)[]).map((name) => ({
         name: `skraft-lens-${name}`,
         title: `Lentille ${name}`,
-        role: ROLES.lens(name, focus),
+        prompt: agentFile(`skraft-lens-${name}`),
+        role: ROLES.lens,
         output: "submit_lens_verdict" as const,
+        skills: skillsOf(ROLE_SKILLS.lens),
       })),
     ],
+    skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
     tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],
     tasks: [
       {
