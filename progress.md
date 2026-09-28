@@ -5,6 +5,40 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Une lentille sans rien à mesurer invente un grief (ADR 0028)
+
+**Le symptôme.** La revue de DESIGN sur US-2 a été refusée **deux fois de suite**, par la même
+lentille, sur le même motif : les documents de conception « présentent le flux cible comme
+l'implémentation actuelle » et citent `CalculDuPanier.cs:15-22` qui ne contient pas ce flux.
+
+**Pourquoi c'était sans issue.** Un document de conception décrit ce qui n'existe pas encore ;
+c'est sa fonction. À chaque essai l'architecte réécrit, à chaque essai la lentille retrouve le même
+écart. Le budget s'épuise, la tâche escalade.
+
+**La cause.** `quality-gates` confronte les livrables aux faits **mesurés**. En DESIGN il n'y en a
+aucun : pas un test n'existe. Mais `reviewFacts` lui servait quand même des lignes « Livrable X :
+porte validée à l'essai 1 (sha256 …) » sous l'intitulé *« Faits établis par le code (acquis : ne
+les revérifie pas) »*. L'existence d'un fichier n'est pas une mesure. Sommée de juger sans matière,
+elle est allée chercher ailleurs.
+
+**C'est notre défaut habituel, retourné.** On répète qu'une porte ne doit jamais attester ce
+qu'elle n'a pas mesuré. Il faut lire aussi : elle ne doit pas le **reprocher**.
+
+**Ce qui rend le retrait légitime, et que j'ai mis sous test.** Écarter une lentille pourrait
+laisser une des quatre questions de `review.ts` sans réponse — et la synthèse refuse alors
+d'approuver, ce qui ferait tourner la revue en rond *autrement*. Le test parcourt les **douze**
+couples (niveau, phase) et exige la couverture. Sans ce test, le correctif serait une nouvelle
+impasse déguisée.
+
+**Deux tests existants affirmaient l'ancienne règle.** Je les ai corrigés délibérément — intitulé
+réécrit, renvoi à l'ADR — et non pour les faire redevenir verts.
+
+**Ce que ça ne corrige pas.** Rien, dans le code, n'empêche une lentille de rendre un défaut hors
+de son mandat. Les verdicts sont à schéma, mais le *contenu* d'un défaut n'est pas contraint, et ne
+peut probablement pas l'être. À surveiller sur les prochains runs réels.
+
+---
+
 ## 28/09 — La durée ne dit rien du coût (ADR 0027)
 
 **Le chiffre.** DESIGN : 4 230 824 tokens d'entrée, 529 k par tour. Les lentilles de revue, sur le

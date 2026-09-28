@@ -1,3 +1,4 @@
+import type { Phase } from "./model.js";
 import type { Story } from "./story.js";
 
 /** Classification de difficulté (SPEC-skraft §8) : indicateurs calculés par le code, grille explicite. */
@@ -82,6 +83,24 @@ export interface LevelEffects {
   granularity: "turn-per-scenario" | "session-per-step";
   lenses: LensName[];
   maxAttempts: number;
+}
+
+/**
+ * Lentilles que la phase peut réellement occuper (ADR 0028).
+ *
+ * `quality-gates` confronte les livrables aux faits **mesurés** par le code — tests, couverture,
+ * mutation, lint. En DESIGN, rien de tout cela n'existe : aucun test n'a encore été écrit. Sommée
+ * de rendre un verdict sans matière, elle invente un grief dans une catégorie voisine : le 28/09
+ * elle a reproché deux fois de suite à des documents de conception de décrire la cible plutôt que
+ * l'existant — reproche qu'un document de conception ne peut structurellement pas satisfaire.
+ *
+ * Une porte ne doit pas attester ce qu'elle n'a pas mesuré ; elle ne doit pas non plus le
+ * **reprocher**. Le retrait est légitime parce que les trois autres lentilles couvrent à elles
+ * seules les quatre questions de `review.ts` — un test le vérifie pour chaque couple
+ * (niveau, phase), sans quoi écarter une lentille interdirait l'approbation.
+ */
+export function lensesForPhase(lenses: readonly LensName[], phase: Phase): LensName[] {
+  return phase === "DESIGN" ? lenses.filter((l) => l !== "quality-gates") : [...lenses];
 }
 
 /** Effets du niveau (§8.3) : les moyens changent, jamais la logique de contrôle. */

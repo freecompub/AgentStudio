@@ -82,11 +82,19 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
     case "quality-gates":
       // Observatrice : elle ne reçoit ni code ni tests, seulement les faits et les livrables.
       // Lui donner le code l'inviterait à rejuger ce que les portes ont déjà mesuré.
-      lines.push(
-        "Tu n'exécutes rien. Les faits ci-dessous sont établis par le code et font foi : vérifie que les livrables leur sont fidèles, et signale ce qu'ils passent sous silence.",
-        ...factBlock,
-        ...list("Livrables :", files.artifacts),
-      );
+      lines.push("Tu n'exécutes rien.");
+      if (facts.length)
+        lines.push("Les faits ci-dessous sont établis par le code et font foi : vérifie que les livrables leur sont fidèles, et signale ce qu'ils passent sous silence.", ...factBlock);
+      // Filet (ADR 0028) : une stack sans outil de couverture, un DISTILL sans exécution de tests.
+      // Sans cette phrase, la lentille cherche de la matière ailleurs et invente un grief hors de
+      // son mandat — c'est ce qui a fait tourner DESIGN en rond le 28/09.
+      else
+        lines.push(
+          "**Aucune mesure n'existe à ce stade de la tâche** : ni test exécuté, ni couverture, ni mutation, ni lint.",
+          "Un écart que tu ne peux confronter à aucune mesure n'est pas de ton ressort — n'invente pas de défaut pour avoir quelque chose à dire.",
+          "Il te reste une chose à chercher, et une seule : un livrable qui **se prévaut** d'une qualité que rien n'a mesurée. S'il n'y en a pas, approuve sans défaut.",
+        );
+      lines.push(...list("Livrables :", files.artifacts));
       break;
   }
   return lines.join("\n");

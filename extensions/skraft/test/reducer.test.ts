@@ -194,10 +194,15 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(effects).toEqual([{ kind: "commitPhase", phase: "RESEARCH", message: "docs(skraft): research de us-12" }]);
   });
 
-  it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau", () => {
+  it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau, réduites à ce que la phase peut occuper", () => {
+    // `quality-gates` est écartée de DESIGN (ADR 0028) : aucun fait n'y est mesuré, et sommée de
+    // juger sans matière elle invente un grief hors de son mandat. Les trois autres couvrent à
+    // elles seules les quatre questions — `lentilles-par-phase.test.ts` le vérifie.
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK]);
     expect(state.stage).toBe("REVIEW");
-    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture", "quality-gates"], attempt: 1 }]);
+    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture"], attempt: 1 }]);
+    // Le niveau garde bien ses quatre lentilles : c'est la phase qui en écarte une, pas le niveau.
+    expect(state.lenses).toEqual(["cold-reader", "test-integrity", "architecture", "quality-gates"]);
   });
 
   it("GATE_FAIL avec budget → rollback au checkpoint de phase, relance ciblée avec les motifs", () => {

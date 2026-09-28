@@ -1,6 +1,6 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
-import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
+import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { actionableDefects, synthesize, type LensVerdict } from "./review.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
@@ -151,7 +151,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
           // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
           ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
-        if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: ns.lenses, attempt: ns.attempts + 1 }] };
+        if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
       }
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
