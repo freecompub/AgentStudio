@@ -14,7 +14,7 @@ export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "./errors.js"
 export { globToRegExp, matchesAny } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
-export type { ArchitectureReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
+export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
 export type { TaskEvent, EffectContext } from "@agent-studio/task-engine";
 
 // ---------- Manifeste (§5.1) ------------------------------------------------------

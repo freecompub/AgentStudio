@@ -4,7 +4,7 @@
  * mesurables. Aucune I/O : les effets leur passent le contenu lu par le code.
  */
 import { z } from "zod";
-import type { ArchitectureReport, DependencyRule, Evidence, LintReport, MutationReport } from "@agent-studio/extension-api";
+import type { ArchitectureReport, CoverageReport, DependencyRule, Evidence, LintReport, MutationReport } from "@agent-studio/extension-api";
 import { acOf } from "./distill.js";
 
 export type Granularity = "turn-per-scenario" | "session-per-step";
@@ -83,6 +83,17 @@ const qualitySchema = z.object({
   // extension qui les connaîtrait deviendrait spécifique à un langage. Le projet les déclare,
   // sinon ils viennent de la stack (voir `defaultDependencyRules`).
   dependencyRules: z.array(z.object({ module: z.string(), forbidden: z.array(z.string()) })).default([]),
+  /**
+   * Couverture de lignes. **Aucun seuil par défaut** : sans déclaration du projet, la couverture
+   * est rapportée comme un fait, jamais exigée. Un seuil arbitraire imposé d'en haut ferait échouer
+   * des projets qui n'ont rien demandé, et pousserait à écrire des tests qui couvrent sans juger.
+   */
+  coverage: z
+    .object({
+      core: z.number().min(0).max(100).optional(),
+      edge: z.number().min(0).max(100).optional(),
+    })
+    .prefault({}),
 });
 
 /**
@@ -114,6 +125,27 @@ export function parseQualityBar(raw: string | null): { bar: QualityBar } | { err
 }
 
 const isCore = (path: string, bar: QualityBar) => path.split("/").some((seg) => bar.mutation.coreLayers.some((l) => l.toLowerCase() === seg.toLowerCase()));
+
+/**
+ * Seuils de couverture sur les fichiers de production du scénario. Plancher de la mutation : elle
+ * dit si le code est atteint, pas si les tests le jugent — mais elle est presque toujours
+ * disponible, là où un outil de mutation manque souvent.
+ *
+ * Un fichier absent du rapport n'est pas reproché : il n'a pas été mesuré, et le compter à zéro
+ * serait attester d'une mesure qui n'a pas eu lieu.
+ */
+export function checkCoverage(report: CoverageReport, sources: string[], bar: QualityBar): string[] {
+  const reasons: string[] = [];
+  for (const path of sources) {
+    const seuil = isCore(path, bar) ? bar.coverage.core : bar.coverage.edge;
+    if (seuil === undefined) continue; // le projet n'exige rien : le fait suffit
+    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!f) continue;
+    if (f.score + 1e-9 < seuil)
+      reasons.push(`Couverture : ${path} à ${round(f.score)} % (minimum ${seuil} %), ${f.covered} ligne(s) couverte(s) sur ${f.total}.`);
+  }
+  return reasons;
+}
 
 /** Seuils de mutation sur les fichiers de production du scénario : 100 % cœur, 90 % bords (par défaut). */
 export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar): string[] {

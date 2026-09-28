@@ -77,6 +77,7 @@ describe("skraft — critères de sortie de S1", () => {
     // Ce que la porte n'a pas pu mesurer est dit, jamais supposé conforme.
     expect(s.deliver?.notes).toEqual([
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
+      "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
     ]);

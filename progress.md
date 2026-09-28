@@ -47,6 +47,41 @@ vérifie qu'elle vient après les skills.
 
 ---
 
+## 28/09 — La couverture est enfin mesurée, et non plus supposée
+
+**Le défaut corrigé.** Le prompt de la lentille `quality-gates` affirmait que la couverture faisait
+partie des faits établis par le code — alors qu'aucun fait de couverture n'était jamais produit. La
+lentille recevait l'assurance qu'une catégorie de faits existait, avec consigne de ne pas la
+revérifier, et cette catégorie était toujours vide.
+
+**Cobertura comme format pivot.** `dotnet test --collect`, `vitest --coverage.reporter=cobertura`,
+`pytest --cov-report=xml` et les convertisseurs JaCoCo le produisent tous. **Un lecteur pour quatre
+écosystèmes**, au lieu d'un lecteur par outil. C'est le même raisonnement que pour `junit-xml`.
+
+**Le jeton `{couverture}` est un DOSSIER, pas un fichier.** Je l'avais d'abord écrit comme un
+fichier, et le vrai `dotnet test` m'a détrompé : son collecteur range le rapport sous un
+sous-dossier nommé par un **GUID qu'il choisit lui-même**. Imposer un nom de fichier aurait exclu
+.NET. L'adaptateur cherche donc le rapport dans l'arborescence.
+
+**La séparation que j'ai tenue malgré la demande.** Il m'était proposé de mettre l'objectif de
+couverture dans l'adaptateur. Je l'ai mis dans `.skraft/quality.json`, où vivent déjà les seuils de
+mutation : **le profil dit COMMENT lancer, la barre dit CE QUI est exigé.** Deux endroits qui
+décideraient la politique finiraient par se contredire, et personne ne saurait lequel fait foi.
+
+**Aucun seuil par défaut.** Sans déclaration du projet, la couverture est rapportée comme un fait,
+jamais exigée. Un seuil imposé d'en haut ferait échouer des projets qui n'ont rien demandé, et
+pousserait à écrire des tests qui couvrent sans juger — exactement ce que la mutation existe pour
+attraper.
+
+**Le piège du projet .NET.** `--collect "XPlat Code Coverage"` a d'abord répondu « datacollector
+introuvable » : il vient du paquet `coverlet.collector`, absent de mon `.csproj` écrit à la main.
+Et la suite **passait quand même** — les tests étaient verts, la mesure silencieusement absente.
+→ Un outil de mesure manquant ne fait pas rougir la suite ; seule la porte peut le dire.
+
+**Vérifié en réel** : 5 fichiers mesurés dans la même exécution que les 5 tests, de 66,7 % à 100 %.
+
+---
+
 ## 28/09 — Ce qui est mécanisable dans les skills devient du code
 
 **Contexte.** La branche apporte douze skills reprises telles quelles. Une skill est une consigne :
