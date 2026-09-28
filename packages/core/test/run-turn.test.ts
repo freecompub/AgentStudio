@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createHeartbeat, runTurn, TurnBudgetError, TurnCostError, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
+import { createHeartbeat, runTurn, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, EnvFailureError } from "../src/turns/run-turn.js";
 import { ScriptedSession } from "../src/testing/scripted-session.js";
 
 describe("runTurn — watchdog d'inactivité (D30)", () => {
@@ -239,15 +239,107 @@ describe("runTurn — plafond de coût du tour (ADR 0027)", () => {
     await expect(turn).resolves.toBeUndefined();
   });
 
-  it("le plafond par défaut existe : aucun tour n'est illimité en coût", async () => {
+  it("par défaut, ce n'est plus ce cumul qui borne un tour mais l'occupation de la fenêtre (ADR 0031)", async () => {
+    // Le défaut de 1 M a tué trois essais de DESIGN d'affilée sur un vrai run, sans qu'aucune
+    // lentille n'ait jugé le travail : un tour normal d'architecte, sur un projet réel, fait un
+    // million. Le cumul ne dit d'ailleurs pas ce que je croyais — il compte ce qui a transité,
+    // cache de prompt compris. Le plafond par défaut est désormais dans le describe suivant.
     const s = new ScriptedSession("s1");
     const turn = runTurn(s, "x", { idleMs: 60_000, maxMs: 60 * 60_000 });
-    const caught = turn.catch((e: unknown) => e);
-    // Le rythme réel de DESIGN, par paliers de 100 k.
     for (let i = 0; i < 60; i++) {
       appel(s, 100_000);
       await vi.advanceTimersByTimeAsync(100);
     }
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+  });
+});
+
+describe("runTurn — plafond d'occupation du contexte (ADR 0031)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** Le runtime dit ce qu'occupe la fenêtre, et ce qu'elle peut contenir. */
+  const contexte = (s: ScriptedSession, currentTokens: number, tokenLimit = 200_000) =>
+    s.emit({ type: "context", currentTokens, tokenLimit });
+
+  it("coupe quand la fenêtre est pleine à la fraction fixée", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxContextFraction: 0.9 });
+    const caught = turn.catch((e: unknown) => e);
+    contexte(s, 100_000);
+    await vi.advanceTimersByTimeAsync(10);
+    contexte(s, 185_000);
+    await vi.advanceTimersByTimeAsync(10);
+    const err = await caught;
+    expect(err).toBeInstanceOf(TurnContextError);
+    expect((err as TurnContextError).currentTokens).toBe(185_000);
+    expect((err as TurnContextError).tokenLimit).toBe(200_000);
+    expect(s.aborted).toBe(true);
+  });
+
+  it("une compaction fait redescendre l'occupation, et le tour continue", async () => {
+    // C'est toute la différence avec le cumul des `usage`, qui ne décroît jamais : le runtime
+    // compacte la conversation, la fenêtre se vide, et rien ne justifie plus de couper.
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxContextFraction: 0.9 });
+    contexte(s, 179_000);
+    await vi.advanceTimersByTimeAsync(10);
+    contexte(s, 40_000); // compaction
+    await vi.advanceTimersByTimeAsync(10);
+    contexte(s, 120_000);
+    await vi.advanceTimersByTimeAsync(10);
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+    expect(s.aborted).toBe(false);
+  });
+
+  it("c'est la dernière mesure qui compte, pas la plus haute atteinte", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxContextFraction: 0.5 });
+    const caught = turn.catch((e: unknown) => e);
+    contexte(s, 150_000); // au-dessus du seuil…
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await caught).toBeInstanceOf(TurnContextError);
+  });
+
+  it("le seuil s'adapte au modèle : la même occupation passe sous une fenêtre plus large", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxContextFraction: 0.9 });
+    contexte(s, 185_000, 1_000_000);
+    await vi.advanceTimersByTimeAsync(10);
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+  });
+
+  it("une limite absente ou nulle ne fait rien couper : on ne divise pas par une mesure manquante", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxContextFraction: 0.9 });
+    s.emit({ type: "context", currentTokens: 500_000, tokenLimit: 0 });
+    await vi.advanceTimersByTimeAsync(10);
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+  });
+
+  it("le cumul des tokens d'entrée ne coupe plus rien par défaut (ADR 0027 amendée)", async () => {
+    // Le défaut de 1 M a tué DESIGN trois fois de suite sur un vrai run, sans qu'aucune lentille
+    // n'ait jugé le travail : un tour normal d'architecte, sur un projet réel, fait un million.
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxMs: 3_600_000 });
+    for (let i = 0; i < 40; i++) {
+      s.emit({ type: "usage", inputTokens: 100_000 });
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    s.emit({ type: "idle" });
+    await expect(turn).resolves.toBeUndefined();
+  });
+
+  it("mais il reste disponible quand on le demande explicitement", async () => {
+    const s = new ScriptedSession("s1");
+    const turn = runTurn(s, "x", { idleMs: 60_000, maxInputTokens: 50_000 });
+    const caught = turn.catch((e: unknown) => e);
+    s.emit({ type: "usage", inputTokens: 60_000 });
+    await vi.advanceTimersByTimeAsync(10);
     expect(await caught).toBeInstanceOf(TurnCostError);
   });
 });

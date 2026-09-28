@@ -1,6 +1,6 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "branch": "feat/skraft-agents-skills-md",
   "items": [
     {
@@ -282,6 +282,13 @@
       "verify": "pnpm vitest run --project core test/task-agent-runner.test.ts",
       "passes": true,
       "notes": "`resumeSession` existait sur le port depuis l'origine et n'était utilisée que par la conversation humaine ; les agents de tâche ouvraient toujours une session neuve. Le 28/09, la relance après 1 h 55 a donc tout repayé. Reprenable sur `EnvFailureError` (le modèle n'a pas répondu) et `TurnTimeoutError` (l'agent s'est tu) ; JAMAIS sur `TurnBudgetError` ni `TurnCostError` — quand c'est nous qui avons coupé, le contexte EST le problème et le renvoyer retaperait le plafond aussitôt. C'est ce qui justifie trois erreurs distinctes plutôt qu'une. Mémoire entièrement dans le cœur, par clé `<taskId>/<extension>/<rôle>` : rien de nouveau ne franchit la frontière d'extension (D10), `ctx.agents.run` inchangée. Session disparue → session neuve, pas d'échec. À VÉRIFIER : `systemMessage: append` à la reprise pourrait dupliquer le prompt système (§16)."
+    },
+    {
+      "id": "plafond-occupation-contexte",
+      "title": "Le plafond d'un tour porte sur l'occupation de la fenêtre, mesurée par le runtime, pas sur un cumul deviné (ADR 0031)",
+      "verify": "pnpm vitest run --project core test/run-turn.test.ts && pnpm vitest run --project runtime-copilot test/map-session-event.test.ts",
+      "passes": true,
+      "notes": "L'ADR 0027 coupait à 1 M de tokens d'entrée cumulés. Deux runs réels ont montré que c'était faux deux fois. Le seuil : DESIGN a épuisé ses trois essais uniquement sur ce plafond (1023/1048/1049 k) sans qu'aucune lentille n'ait siégé — un tour normal d'architecte sur un projet réel FAIT un million. La grandeur : le cumul compte ce qui a transité, cache de prompt compris, et ne décroît jamais, même quand le runtime compacte ; Copilot facture d'ailleurs en requêtes. `session.usage_info` donnait depuis le début `currentTokens` et `tokenLimit` — on ne l'écoutait pas. Plafond à 0,9 de la fenêtre, `TurnContextError` ; la DERNIÈRE mesure compte, pas la plus haute atteinte, sinon on réinvente un compteur qui ne redescend pas. `maxInputTokens` désactivé par défaut, pas supprimé. `totalNanoAiu` remonté : seule grandeur de coût réel PAR APPEL. NON VÉRIFIÉ : la part servie par le cache — les compteurs ne sont rendus qu'au résumé de fin de session. PAS AFFICHÉ : le pourcentage existe dans le cœur, `chat:agent` ne le transporte pas."
     },
     {
       "id": "skraft-agents-skills-md",

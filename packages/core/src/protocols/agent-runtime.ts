@@ -110,7 +110,40 @@ export type AgentEvent =
   | { type: "tool-end"; toolCallId: string; success: boolean }
   | { type: "tool-denied"; toolName: string; reason: string }
   /** Consommation d'un appel au modèle (§13) ; `multiplier` = coût relatif du modèle (Copilot). */
-  | { type: "usage"; model?: string; inputTokens?: number; outputTokens?: number; multiplier?: number }
+  | {
+      type: "usage";
+      model?: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      multiplier?: number;
+      /**
+       * Coût réel de cet appel, en **nano-AIU** — l'unité de facturation du fournisseur (ADR 0031).
+       *
+       * C'est la seule grandeur de coût que le runtime rende par appel. Le cumul des `inputTokens`
+       * n'en est pas une : il compte ce qui a transité, cache de prompt compris, et le cache n'est
+       * rendu que dans le résumé de fin de session (`ShutdownModelMetricUsage`), pas ici.
+       */
+      nanoAiu?: number;
+    }
+  /**
+   * Occupation de la fenêtre de contexte, telle que le runtime la mesure (ADR 0031).
+   *
+   * À ne pas confondre avec le cumul des `usage` : celui-ci compte ce qui a **transité**, et ne
+   * décroît jamais ; `currentTokens` dit ce qui **occupe** la fenêtre à l'instant présent, et
+   * diminue quand le runtime compacte ou tronque la conversation.
+   */
+  | {
+      type: "context";
+      currentTokens: number;
+      tokenLimit: number;
+      /** Part du message système (rôle, skills injectées, contrat). */
+      systemTokens?: number;
+      /** Part des messages : ce que l'agent a lu et dit. */
+      conversationTokens?: number;
+      /** Part des définitions d'outils. */
+      toolDefinitionsTokens?: number;
+      messages?: number;
+    }
   | { type: "idle" }
   | { type: "error"; message: string }
   /** Tout autre signe de vie : sert uniquement à réarmer le watchdog. */

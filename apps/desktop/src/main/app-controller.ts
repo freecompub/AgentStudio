@@ -58,8 +58,10 @@ export interface AppControllerDeps {
   idleMs?: number;
   /** Plafond de durée totale d'un tour (ADR 0026). */
   maxTurnMs?: number;
-  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027). */
+  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027, désactivé par défaut depuis 0031). */
   maxInputTokens?: number;
+  /** Fraction de la fenêtre de contexte au-delà de laquelle un tour est coupé (ADR 0031). */
+  maxContextFraction?: number;
 }
 
 /** Un handler par canal de requête : le routeur IPC valide puis délègue. */
@@ -322,11 +324,16 @@ export function createAppController(deps: AppControllerDeps): AppController {
         ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
         ...(deps.maxTurnMs !== undefined ? { maxMs: deps.maxTurnMs } : {}),
         ...(deps.maxInputTokens !== undefined ? { maxInputTokens: deps.maxInputTokens } : {}),
+        ...(deps.maxContextFraction !== undefined ? { maxContextFraction: deps.maxContextFraction } : {}),
       });
       offSession = s.onEvent((e) => {
         if (e.type === "messages") deps.sink.emit("chat:messages", { messages: e.messages });
         else if (e.type === "busy") deps.sink.emit("chat:busy", { busy: e.busy });
-        else if (e.event.type !== "activity" && e.event.type !== "usage") deps.sink.emit("chat:agent", { event: e.event });
+        // `activity`, `usage` et `context` sont des signaux de mesure, pas des messages : ils ne
+        // franchissent pas l'IPC (le contrat de `chat:agent` ne les décrit pas). L'occupation du
+        // contexte mériterait d'être affichée — c'est un chantier d'interface à part.
+        else if (e.event.type !== "activity" && e.event.type !== "usage" && e.event.type !== "context")
+          deps.sink.emit("chat:agent", { event: e.event });
       });
         session = s;
         const messages = await s.start();

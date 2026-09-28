@@ -1,6 +1,8 @@
 # ADR 0027 — Un plafond de coût par tour : le cumul des tokens d'entrée
 
-- Statut : **décidé**, 2026-09-28
+- Statut : **amendé par l'ADR 0031**, 2026-09-29 — le seuil par défaut de 1 M est retiré ; le
+  plafond opératoire porte désormais sur l'occupation de la fenêtre de contexte.
+- Statut initial : **décidé**, 2026-09-28
 - Contexte amont : ADR 0026 (plafond de durée d'un tour), D30, D24/D25
 
 ## Contexte

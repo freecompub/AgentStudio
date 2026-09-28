@@ -77,8 +77,28 @@ describe("mapSessionEvent", () => {
     });
   });
 
-  it("tout autre événement est un signe de vie", () => {
+  it("session.usage_info devient l'occupation de la fenêtre (ADR 0031)", () => {
+    // C'est la seule mesure qui DÉCROÎT quand le runtime compacte, là où le cumul des `usage`
+    // compte ce qui a transité et ne redescend jamais.
+    expect(
+      mapSessionEvent(
+        ev("session.usage_info", { currentTokens: 120_000, tokenLimit: 200_000, systemTokens: 9_000, conversationTokens: 105_000, toolDefinitionsTokens: 6_000, messagesLength: 42 }),
+      ),
+    ).toEqual({
+      type: "context",
+      currentTokens: 120_000,
+      tokenLimit: 200_000,
+      systemTokens: 9_000,
+      conversationTokens: 105_000,
+      toolDefinitionsTokens: 6_000,
+      messages: 42,
+    });
+  });
+
+  it("tout autre événement est un signe de vie — y compris un usage_info sans ses deux nombres", () => {
+    // Un `context` aux champs vides obligerait chaque lecteur à savoir l'ignorer.
     expect(mapSessionEvent(ev("session.usage_info", {}))).toEqual({ type: "activity" });
+    expect(mapSessionEvent(ev("session.usage_info", { currentTokens: 10 }))).toEqual({ type: "activity" });
     expect(mapSessionEvent(ev("hook.start", {}))).toEqual({ type: "activity" });
   });
 });

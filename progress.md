@@ -5,6 +5,43 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Mon plafond de coût mesurait la mauvaise chose (ADR 0031)
+
+**Ce que le run a dit.** Second run réel sur US-2 : DESIGN a épuisé ses trois essais **uniquement**
+sur mon plafond de 1 M — 1023 k, 1048 k, 1049 k — sans qu'aucune lentille n'ait jamais siégé. Le
+filet était devenu la porte. Un tour normal d'`architect-model` sur un vrai projet *fait* un
+million ; j'avais écrit dans l'ADR 0027 que 1 M valait « environ sept fois un tour normal ».
+
+**Et la grandeur elle-même était fausse.** Le cumul des `inputTokens` :
+- compte ce qui a **transité**, cache de prompt compris ;
+- **ne décroît jamais**, même quand le runtime compacte et vide la fenêtre ;
+- n'est pas l'unité de facturation (Copilot facture en requêtes premium).
+
+**La mesure existait depuis le début et je ne l'écoutais pas.** `session.usage_info` donne
+`currentTokens` et `tokenLimit`, plus la ventilation système / conversation / définitions d'outils.
+Le plafond porte désormais sur `currentTokens / tokenLimit`, seuil 0,9. Plus de nombre magique :
+`tokenLimit` vient du modèle employé.
+
+**Le piège que j'ai mis sous test.** C'est la **dernière** mesure qui compte, jamais la plus haute
+atteinte. Sinon on réinvente exactement le compteur qui ne redescend pas — le défaut qu'on corrige.
+
+**Deux choses trouvées en chemin, dont une qui me contredit.** J'avais dit qu'on ignorait
+`cacheReadTokens` : faux, ces compteurs ne sont **pas** sur l'événement par appel, seulement dans
+le résumé de fin de session. Donc l'hypothèse « le cache absorbe l'essentiel de la croissance »
+reste **non vérifiée**, ni confirmée ni écartée. En revanche `copilotUsage.totalNanoAiu` existe :
+c'est le coût réel de chaque appel, désormais remonté.
+
+**Ce qui reste le plus urgent.** Le pourcentage d'occupation vit dans le cœur et **n'est pas
+affiché** — `chat:agent` ne le transporte pas, comme `usage`. Un plafond invisible se redécouvre à
+chaque fois par l'enquête, et c'est ce qui a coûté la soirée.
+
+**La leçon, pour la prochaine fois.** J'ai posé deux seuils en deux jours sans mesurer ce qu'ils
+bornaient. Le premier (30 min) tient parce qu'il est large. Le second était faux d'un facteur sept
+et a bloqué la seule chose qu'il devait protéger. Un seuil ne se règle pas sur une intuition : il
+se règle sur une grandeur qu'on a d'abord regardée.
+
+---
+
 ## 28/09 — Ce qui n'a pas été jugé ne doit pas être jeté (ADR 0029, 0030)
 
 Deux pertes distinctes, toutes deux déclenchées par la même interruption du 28/09.

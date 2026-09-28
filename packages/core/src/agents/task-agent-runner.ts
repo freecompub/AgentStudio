@@ -51,8 +51,10 @@ export interface TaskAgentRunnerDeps {
   idleMs?: number;
   /** Plafond de durée totale d'un tour (ADR 0026). */
   maxMs?: number;
-  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027). */
+  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027, désactivé par défaut depuis 0031). */
   maxInputTokens?: number;
+  /** Fraction de la fenêtre de contexte au-delà de laquelle le tour est coupé (ADR 0031). */
+  maxContextFraction?: number;
   logger?: Logger;
 }
 
@@ -90,6 +92,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
             ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
             ...(deps.maxMs !== undefined ? { maxMs: deps.maxMs } : {}),
             ...(deps.maxInputTokens !== undefined ? { maxInputTokens: deps.maxInputTokens } : {}),
+            ...(deps.maxContextFraction !== undefined ? { maxContextFraction: deps.maxContextFraction } : {}),
             onEvent: (e) => {
               if (e.type === "usage") {
                 multiplier ??= e.multiplier;

@@ -62,6 +62,27 @@ export class TurnCostError extends WorkDefectError {
   }
 }
 
+/**
+ * La fenêtre de contexte du modèle est pleine (ADR 0031).
+ *
+ * Mesure rendue par le runtime, pas calculée par nous : `currentTokens` dit ce qui **occupe** la
+ * fenêtre à l'instant présent — et décroît quand le runtime compacte —, là où le cumul des
+ * `usage` compte ce qui a **transité** et ne décroît jamais. C'est la seule des deux qui dise si
+ * l'agent est près de ne plus pouvoir travailler.
+ */
+export class TurnContextError extends WorkDefectError {
+  constructor(
+    readonly currentTokens: number,
+    readonly tokenLimit: number,
+    readonly fraction: number,
+  ) {
+    super(
+      `La fenêtre de contexte est occupée à ${Math.round((currentTokens / tokenLimit) * 100)} % (${Math.round(currentTokens / 1000)} k sur ${Math.round(tokenLimit / 1000)} k), au-delà du seuil de ${Math.round(fraction * 100)} %`,
+    );
+    this.name = "TurnContextError";
+  }
+}
+
 /** Défaut d'environnement (runtime, quota, API) : escalade immédiate (D25). */
 export class EnvFailureError extends Error {
   constructor(message: string, options?: ErrorOptions) {

@@ -4,8 +4,8 @@ import type { AgentEvent, AgentSession } from "../protocols/agent-runtime.js";
  * Ces erreurs sont définies dans `@agent-studio/extension-api` : une extension doit pouvoir les
  * lever sans dépendre du cœur (D10). Réexportées ici pour tout le reste du cœur.
  */
-export { EnvFailureError, TurnBudgetError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
-import { EnvFailureError, TurnBudgetError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
+export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
+import { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "@agent-studio/extension-api";
 
 /** Signe de vie émis hors session (sortie d'un outil long exécuté par notre code, §6.4). */
 export interface Heartbeat {
@@ -34,10 +34,21 @@ export interface RunTurnOptions {
    */
   maxMs?: number;
   /**
-   * Plafond du **cumul** des tokens d'entrée facturés sur le tour ; défaut 1 M. Chaque appel au
-   * modèle renvoie tout le contexte : un tour de N appels coûte en O(N²), et rien d'autre ne borne N.
+   * Plafond du **cumul** des tokens d'entrée du tour. **Désactivé par défaut** depuis l'ADR 0031 :
+   * son défaut de 1 M a tué trois essais de DESIGN d'affilée sur un vrai run, sans qu'aucune porte
+   * n'ait jugé le travail — un tour normal d'architecte, sur un projet réel, fait un million. Et
+   * ce cumul ne dit pas ce qu'on croyait : il compte ce qui a transité, cache de prompt compris.
+   * Il reste disponible pour qui veut borner explicitement la dépense d'un tour.
    */
   maxInputTokens?: number;
+  /**
+   * Fraction de la fenêtre de contexte au-delà de laquelle le tour est coupé ; défaut 0,9.
+   *
+   * Contrairement au précédent, ce seuil ne porte pas sur un nombre absolu deviné : il s'appuie
+   * sur `tokenLimit`, que le runtime rend pour le modèle employé, et coupe quand l'agent est
+   * réellement près de ne plus pouvoir travailler.
+   */
+  maxContextFraction?: number;
   onEvent?: (e: AgentEvent) => void;
 }
 
@@ -55,7 +66,8 @@ export interface RunTurnOptions {
 export function runTurn(session: AgentSession, prompt: string, opts: RunTurnOptions = {}): Promise<void> {
   const idleMs = opts.idleMs ?? 5 * 60_000;
   const maxMs = opts.maxMs ?? 30 * 60_000;
-  const maxInputTokens = opts.maxInputTokens ?? 1_000_000;
+  const maxInputTokens = opts.maxInputTokens ?? Infinity;
+  const maxContextFraction = opts.maxContextFraction ?? 0.9;
   const debut = Date.now();
   let tokensEntree = 0;
   return new Promise<void>((resolve, reject) => {
@@ -73,6 +85,11 @@ export function runTurn(session: AgentSession, prompt: string, opts: RunTurnOpti
       // couperait rien — les appels rétrécissent souvent alors que la facture monte.
       if (ev.type === "usage") tokensEntree += ev.inputTokens ?? 0;
       if (tokensEntree >= maxInputTokens) return arreter(() => new TurnCostError(maxInputTokens, tokensEntree));
+      // C'est la **dernière** mesure qui compte, jamais la plus haute atteinte : une compaction
+      // vide la fenêtre, et plus rien ne justifie alors de couper. Une limite absente ou nulle ne
+      // fait rien couper — on ne divise pas par une mesure manquante.
+      if (ev.type === "context" && ev.tokenLimit > 0 && ev.currentTokens / ev.tokenLimit >= maxContextFraction)
+        return arreter(() => new TurnContextError(ev.currentTokens, ev.tokenLimit, maxContextFraction));
       if (ev.type === "idle") finish(() => resolve());
       else if (ev.type === "error") finish(() => reject(new EnvFailureError(ev.message)));
     });
