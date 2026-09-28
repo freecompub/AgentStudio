@@ -123,7 +123,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
       }
       if (e.type === "BLOCKER_REPORTED")
         return { state: { ...s, stage: "BLOCKED", blocker: { question: e.question, choices: e.choices } }, effects: [{ kind: "askBlocker", question: e.question, choices: e.choices }] };
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
       break;
     }
 
@@ -155,7 +155,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         return commit(ns);
       }
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
       break;
     }
 
@@ -177,7 +177,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
         return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)]);
       }
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
       break;
     }
 
@@ -240,6 +240,15 @@ function uniq<T>(xs: T[]): T[] {
   return [...new Set(xs)];
 }
 
+/**
+ * Motif rendu au tour suivant après une interruption. La seconde phrase compte autant que la
+ * première : sans elle, l'agent relit des fichiers à moitié écrits en les croyant finis.
+ */
+const tourInterrompu = (raison: string): string[] => [
+  `Le tour précédent a été interrompu (${raison}) : aucune porte n'a jugé ton travail.`,
+  "Ce que tu avais écrit est resté sur le disque, possiblement incomplet. Reprends-le et termine-le ; ne recommence pas de zéro, et ne considère aucun fichier comme fini sans l'avoir relu.",
+];
+
 function specialist(s: SkraftState, feedback: string[]): SkraftEffect {
   const p = s.phase!;
   // DELIVER : sous-machine par scénario, à partir du plan d'implémentation (§7.4).
@@ -297,13 +306,25 @@ function relancerClassifieur(s: SkraftState, reason: string): Out {
 }
 
 /** Rejet de porte, de revue ou délai : réessai ciblé après rollback, ou escalade à budget épuisé (D24). */
-function failure(s0: SkraftState, gate: string, reasons: string[]): Out {
+/**
+ * Échec d'une phase : relance ciblée tant que le budget le permet, escalade ensuite.
+ *
+ * `interrompu` distingue deux choses que le réducteur confondait (ADR 0029) : une **porte qui
+ * refuse** a jugé le travail et l'a trouvé mauvais — l'annuler est juste ; un **tour interrompu**
+ * (délai, plafond) n'a rien jugé — annuler jetterait un travail dont personne n'a dit qu'il est
+ * mauvais. Le 28/09, 1 h 55 de conception ont disparu ainsi. La sécurité ne repose pas sur ce
+ * rollback : la porte de fin de phase juge l'état final, quel qu'ait été le chemin.
+ *
+ * L'escalade, elle, annule dans les deux cas — l'humain doit reprendre un dépôt propre.
+ */
+function failure(s0: SkraftState, gate: string, reasons: string[], interrompu = false): Out {
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
-  const rollback: SkraftEffect[] = cp ? [{ kind: "rollback", to: cp }] : [];
+  const epuise = attempts >= s.budget.maxAttemptsPerPhase;
+  const rollback: SkraftEffect[] = cp && (!interrompu || epuise) ? [{ kind: "rollback", to: cp }] : [];
   const lastRejection = { gate, reasons };
-  if (attempts >= s.budget.maxAttemptsPerPhase) {
+  if (epuise) {
     return {
       state: { ...s, stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
       effects: [...rollback, { kind: "askEscalation", reason: `${gate} : ${reasons.join(" ; ")}`, options: ["retry", "skip", "abort"] }],

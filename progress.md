@@ -5,6 +5,40 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Ce qui n'a pas été jugé ne doit pas être jeté (ADR 0029, 0030)
+
+Deux pertes distinctes, toutes deux déclenchées par la même interruption du 28/09.
+
+**La première : le travail sur disque.** Le réducteur envoyait `TIMEOUT` dans le même `failure()`
+qu'un refus de porte — lequel commence par un `rollback`. Les quinze documents de conception écrits
+pendant 1 h 55 ont donc été effacés **sans qu'aucune porte les ait examinés**. Une porte qui refuse
+a jugé ; un délai n'a rien jugé. Et la sécurité ne reposait pas là-dessus : la porte de fin de phase
+juge l'état final, quel qu'ait été le chemin.
+
+Le détail qui compte dans le message rendu au tour suivant : pas seulement « tu as été interrompu »,
+mais « ce que tu avais écrit est resté, **possiblement incomplet**, relis-le ». Sans la seconde
+phrase, l'agent prend un fichier à moitié écrit pour un fichier fini.
+
+**La seconde : le contexte de la session.** `resumeSession` existait sur le port depuis l'origine.
+Elle n'était appelée que par la conversation humaine ; les agents de tâche ouvraient toujours une
+session neuve. La relance de 12:13 a donc repayé tout ce que l'architecte avait lu.
+
+**La règle qui sauve cette reprise d'être une mauvaise idée.** On ne reprend que si le contexte
+n'est pas en cause : le modèle n'a pas répondu, ou l'agent s'est tu. Si c'est **nous** qui avons
+coupé — plafond de durée ou de coût — reprendre renverrait le contexte qui a causé la coupure et
+retaperait le plafond dans la seconde. C'est la boucle « retried 5 times » du journal. Là, la
+session neuve est le remède, pas la perte.
+
+C'est ce qui justifie après coup d'avoir fait trois erreurs distinctes ce matin plutôt qu'une seule.
+Je ne l'avais pas prévu : je les avais séparées pour que l'humain lise le bon motif.
+
+**Ce que j'ai laissé ouvert.** Le SDK reçoit `systemMessage: { mode: "append" }` à la reprise comme
+à l'ouverture. Si l'append est cumulatif, le prompt système est ajouté deux fois. `main-session.ts`
+fait pareil depuis l'origine sans défaut constaté — mais personne ne l'a éprouvé exprès. Inscrit en
+« À vérifier » dans l'ADR 0030.
+
+---
+
 ## 28/09 — Une lentille sans rien à mesurer invente un grief (ADR 0028)
 
 **Le symptôme.** La revue de DESIGN sur US-2 a été refusée **deux fois de suite**, par la même

@@ -270,6 +270,20 @@
       "notes": "Observé sur le run du 28/09 : la revue de DESIGN a été refusée deux fois de suite par `quality-gates` parce que les documents décrivent la cible et non l'existant. Reproche insatisfaisable — un document de conception décrit ce qui n'existe pas encore — et hors mandat : cette lentille confronte les livrables aux faits MESURÉS, et en DESIGN aucun test n'existe. `reviewFacts` ne lui donnait que des empreintes de livrables, présentées comme des « faits établis ». Une porte ne doit pas attester ce qu'elle n'a pas mesuré ; elle ne doit pas non plus le reprocher. `quality-gates` est donc écartée de DESIGN, et l'invariant qui rend ce retrait légitime est VÉRIFIÉ, pas supposé : un test parcourt les 12 couples (niveau, phase) et exige que les quatre questions de review.ts restent couvertes. Filet distinct pour DISTILL/DELIVER sans mesure disponible : l'instruction dit « aucune mesure n'existe », interdit d'inventer un défaut, et conserve le seul mandat qui tient encore — dénoncer un livrable qui se prévaut d'une qualité non mesurée. NE CORRIGE PAS la cause : rien dans le code n'empêche une lentille de rendre un défaut hors mandat, le contenu d'un défaut n'étant pas contraignable."
     },
     {
+      "id": "interruption-n-est-pas-verdict",
+      "title": "Un tour interrompu ne fait pas annuler le travail : seul un jugement de porte le fait (ADR 0029)",
+      "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts",
+      "passes": true,
+      "notes": "Le réducteur envoyait `TIMEOUT` dans le même `failure()` qu'un refus de porte, qui commence par un rollback au checkpoint de phase. Le 28/09, les quinze documents de conception écrits pendant 1 h 55 ont donc été effacés alors qu'aucune porte ne les avait examinés. Une porte qui refuse a JUGÉ ; un délai n'a rien jugé. La sécurité ne reposait pas sur ce rollback : la porte de fin de phase juge l'état final quel qu'ait été le chemin. Le tour suivant reçoit deux phrases — interrompu et non refusé, et travail resté sur le disque possiblement incomplet, à relire — la seconde évitant qu'il prenne un fichier à moitié écrit pour un fichier fini. L'escalade annule toujours : l'humain doit retrouver un dépôt propre. Le test « TIMEOUT d'un agent = GATE_FAIL » portait l'équivalence dans son titre ; réécrit, pas supprimé."
+    },
+    {
+      "id": "reprise-de-session",
+      "title": "Une session interrompue est reprise, sauf quand c'est nous qui avons coupé (ADR 0030)",
+      "verify": "pnpm vitest run --project core test/task-agent-runner.test.ts",
+      "passes": true,
+      "notes": "`resumeSession` existait sur le port depuis l'origine et n'était utilisée que par la conversation humaine ; les agents de tâche ouvraient toujours une session neuve. Le 28/09, la relance après 1 h 55 a donc tout repayé. Reprenable sur `EnvFailureError` (le modèle n'a pas répondu) et `TurnTimeoutError` (l'agent s'est tu) ; JAMAIS sur `TurnBudgetError` ni `TurnCostError` — quand c'est nous qui avons coupé, le contexte EST le problème et le renvoyer retaperait le plafond aussitôt. C'est ce qui justifie trois erreurs distinctes plutôt qu'une. Mémoire entièrement dans le cœur, par clé `<taskId>/<extension>/<rôle>` : rien de nouveau ne franchit la frontière d'extension (D10), `ctx.agents.run` inchangée. Session disparue → session neuve, pas d'échec. À VÉRIFIER : `systemMessage: append` à la reprise pourrait dupliquer le prompt système (§16)."
+    },
+    {
       "id": "skraft-agents-skills-md",
       "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
       "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",

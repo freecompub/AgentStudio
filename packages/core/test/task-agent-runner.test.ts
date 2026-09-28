@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTaskAgentRunner, type TaskAgentSpec } from "../src/agents/task-agent-runner.js";
 import { ScriptedRuntime } from "../src/testing/scripted-runtime.js";
-import { EnvFailureError, TurnTimeoutError, WorkDefectError } from "../src/turns/run-turn.js";
+import { EnvFailureError, TurnBudgetError, TurnCostError, TurnTimeoutError, WorkDefectError } from "../src/turns/run-turn.js";
 
 const TEST_AGENT: TaskAgentSpec = { role: "tdd-test", systemPrompt: "Tu écris un test.", writable: ["tests/**"], output: "report_phase" };
 const PLANNER: TaskAgentSpec = { role: "tdd-planner", systemPrompt: "Tu planifies.", writable: [], output: "submit_plan" };
@@ -161,5 +161,142 @@ describe("Exécuteur d'agent de tâche", () => {
     const r = await runner.run({ role: "lens", systemPrompt: "Relis.", writable: [], output: "submit_lens_verdict" }, "x");
     expect(errors[0]).toMatch(/invalides/);
     expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+  });
+});
+
+/**
+ * Reprise d'une session après un tour interrompu (ADR 0030).
+ *
+ * Le 28/09, le modèle a cessé de répondre après 1 h 55 de travail. Le réducteur a relancé, et la
+ * relance a ouvert une **session neuve** : tout le contexte accumulé — dépôt lu, fichiers analysés —
+ * était à repayer. `resumeSession` existait pourtant déjà sur le port, utilisée par la seule
+ * conversation humaine.
+ *
+ * La reprise ne vaut pas pour toutes les causes, et c'est le cœur de la règle :
+ *   - le modèle n'a pas répondu, ou l'agent s'est tu → le contexte va bien, on reprend ;
+ *   - c'est NOUS qui avons coupé pour cause de durée ou de coût → le contexte EST le problème.
+ *     Reprendre renverrait le même contexte énorme et retaperait le plafond dans la seconde.
+ */
+describe("Reprise de session après interruption", () => {
+  const CLE = { resumeKey: "t1/tdd-test" };
+  const finir: Parameters<ScriptedRuntime["behave"]>[1] = async (t) => {
+    await t.callTool("report_phase", { summary: "fini", files: [] });
+  };
+
+  it("le modèle ne répond plus : le tour suivant reprend la même session, pas une neuve", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async () => {
+      throw new Error("Failed to get response from the AI model");
+    });
+    await expect(runner.run(TEST_AGENT, "x", CLE)).rejects.toBeInstanceOf(EnvFailureError);
+    const interrompue = runtime.history.at(-1)!.id;
+
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "reprends", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(interrompue);
+  });
+
+  it("une session reprise n'est pas supprimée entre les deux tours : sinon il n'y aurait rien à reprendre", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async () => {
+      throw new Error("Failed to get response from the AI model");
+    });
+    await expect(runner.run(TEST_AGENT, "x", CLE)).rejects.toBeInstanceOf(EnvFailureError);
+    expect(runtime.deleted).toEqual([]);
+  });
+
+  it("silence de l'agent : même règle, le contexte n'est pas en cause", async () => {
+    vi.useFakeTimers();
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", (t) => t.hang()); // l'agent ne rend jamais la main
+    const echec = runner.run(TEST_AGENT, "x", CLE).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await echec).toBeInstanceOf(TurnTimeoutError);
+    const interrompue = runtime.history.at(-1)!.id;
+
+    vi.useRealTimers();
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "reprends", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(interrompue);
+  });
+
+  it("plafond de coût atteint : session NEUVE — reprendre renverrait le contexte qui a causé la coupure", async () => {
+    const runtime = new ScriptedRuntime();
+    const runner = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 60_000, maxInputTokens: 1_000 });
+    runtime.behave("tdd-test", (t) => {
+      t.session.emit({ type: "usage", inputTokens: 5_000 });
+      t.hang();
+    });
+    await expect(runner.run(TEST_AGENT, "x", CLE)).rejects.toBeInstanceOf(TurnCostError);
+    const coupee = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).toContain(coupee);
+
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "encore", CLE);
+    expect(runtime.history.at(-1)!.id).not.toBe(coupee);
+  });
+
+  it("plafond de durée atteint : session neuve également", async () => {
+    vi.useFakeTimers();
+    const runtime = new ScriptedRuntime();
+    const runner = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 60_000, maxMs: 2_000 });
+    // Seuil d'inactivité très haut : seul le plafond de durée peut couper ce tour.
+    runtime.behave("tdd-test", (t) => t.hang());
+    const echec = runner.run(TEST_AGENT, "x", CLE).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(await echec).toBeInstanceOf(TurnBudgetError);
+    const coupee = runtime.history.at(-1)!.id;
+    vi.useRealTimers();
+
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "encore", CLE);
+    expect(runtime.history.at(-1)!.id).not.toBe(coupee);
+  });
+
+  it("session disparue côté runtime : on repart sur une neuve au lieu d'échouer", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async () => {
+      throw new Error("Failed to get response from the AI model");
+    });
+    await expect(runner.run(TEST_AGENT, "x", CLE)).rejects.toBeInstanceOf(EnvFailureError);
+    runtime.unresumable.add(runtime.history.at(-1)!.id);
+
+    runtime.behave("tdd-test", finir);
+    const r = await runner.run(TEST_AGENT, "reprends", CLE);
+    expect(r.output).toEqual({ summary: "fini", files: [] });
+  });
+
+  it("un tour réussi ne laisse rien à reprendre : la session est supprimée comme avant", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "x", CLE);
+    const premiere = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).toContain(premiere);
+    await runner.run(TEST_AGENT, "x", CLE);
+    expect(runtime.history.at(-1)!.id).not.toBe(premiere);
+  });
+
+  it("sans clé de reprise, rien n'est mémorisé : deux rôles homonymes de tâches différentes ne se mélangent pas", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async () => {
+      throw new Error("Failed to get response from the AI model");
+    });
+    await expect(runner.run(TEST_AGENT, "x")).rejects.toBeInstanceOf(EnvFailureError);
+    const interrompue = runtime.history.at(-1)!.id;
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "x");
+    expect(runtime.history.at(-1)!.id).not.toBe(interrompue);
+  });
+
+  it("la clé sépare les tâches : une interruption sur t1 ne se reprend pas sur t2", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", async () => {
+      throw new Error("Failed to get response from the AI model");
+    });
+    await expect(runner.run(TEST_AGENT, "x", { resumeKey: "t1/tdd-test" })).rejects.toBeInstanceOf(EnvFailureError);
+    const interrompue = runtime.history.at(-1)!.id;
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "x", { resumeKey: "t2/tdd-test" });
+    expect(runtime.history.at(-1)!.id).not.toBe(interrompue);
   });
 });

@@ -128,6 +128,10 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
+            // Clé de continuité (ADR 0030) : deux exécutions du même rôle pour la même tâche sont
+            // deux tentatives du même travail. Sans taskId, aucune reprise — c'est le cas des
+            // agents lancés hors tâche.
+            ...(taskId ? { resumeKey: `${taskId}/${manifest.id}/${name}` } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
             tools: (beat: () => void) => [
               ...ownTools(a.tools ?? []),

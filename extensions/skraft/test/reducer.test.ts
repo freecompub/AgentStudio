@@ -28,6 +28,7 @@ const REPORTED: Ev = { type: "AGENT_REPORTED", role: "skraft-researcher", summar
 const GATE_OK: Ev = { type: "GATE_OK", artifacts: [{ path: "a.md", sha256: "h", producedBy: "x", attempt: 1 }] };
 const GATE_FAIL: Ev = { type: "GATE_FAIL", gate: "citations", reasons: ["fichier de 55 lignes"] };
 const COMMITTED: Ev = { type: "COMMITTED", sha: "sha" };
+const TIMEOUT = (reason: string): Ev => ({ type: "TIMEOUT", reason });
 const lens = (verdict: LensVerdict["verdict"], severities: ("blocker" | "major" | "minor")[] = []): LensVerdict => ({
   lens: "cold-reader",
   verdict,
@@ -225,9 +226,13 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     ]);
   });
 
-  it("TIMEOUT d'un agent = GATE_FAIL", () => {
+  it("TIMEOUT d'un agent : même relance qu'un GATE_FAIL, mais sans annuler le travail (ADR 0029)", () => {
+    // L'équivalence TIMEOUT = GATE_FAIL tenait sur la relance et le budget ; elle ne tient pas sur
+    // le rollback. Une porte a jugé le travail, un délai n'a rien jugé. Détail dans le describe
+    // « interruption et verdict » plus bas.
     const { state } = play([...toFirstPhase(), CP("RESEARCH"), { type: "TIMEOUT", reason: "silence" }]);
-    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "délai", reasons: ["silence"] } });
+    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "délai" } });
+    expect(state.lastRejection?.reasons.join(" ")).toContain("silence");
   });
 
   it("ENV_FAILURE → ESCALATED immédiat, sans consommer le budget", () => {
@@ -670,5 +675,50 @@ describe("Invariants (§5.3)", () => {
 
   it("état corrompu refusé par le validateur", () => {
     expect(validateState({ schemaVersion: 1, stage: "DISCOVER" })).toMatchObject({ ok: false, reason: expect.stringMatching(/état corrompu/) });
+  });
+});
+
+/**
+ * Un tour interrompu n'est pas un travail jugé mauvais (ADR 0029).
+ *
+ * Le 28/09, le tour de `skraft-architect-model` a été coupé après 1 h 55, et le réducteur a traité
+ * ce `TIMEOUT` par le **même chemin** qu'un refus de porte : `rollback` au checkpoint de phase.
+ * Tout ce que l'architecte avait écrit a donc été effacé, alors qu'aucune porte ne l'avait examiné.
+ *
+ * Une porte qui refuse a JUGÉ le travail ; un délai dépassé n'a RIEN jugé. La sécurité ne repose
+ * pas sur ce rollback — la porte de fin de phase juge l'état final, quel que soit le nombre de
+ * tours qu'il a fallu pour l'atteindre.
+ */
+describe("Réducteur skraft — interruption et verdict ne mènent pas au même effet", () => {
+  it("TIMEOUT : relance sans rollback — le travail du tour reste sur le disque", () => {
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("silence")]);
+    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1 });
+    expect(effects.map((f) => f.kind)).toEqual(["runSpecialist"]);
+  });
+
+  it("GATE_FAIL : rollback, comme avant — là une porte a jugé", () => {
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-RESEARCH" });
+  });
+
+  it("le tour suivant est prévenu que le précédent a été interrompu, pas refusé", () => {
+    // Sans cette phrase, l'agent relit des fichiers à moitié écrits en les croyant finis.
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("plafond atteint")]);
+    const relance = effects.find((f) => f.kind === "runSpecialist") as unknown as { feedback: string[] };
+    const texte = relance.feedback.join(" ");
+    expect(texte).toContain("plafond atteint");
+    expect(texte).toMatch(/interrompu/i);
+    expect(texte).toMatch(/disque|déjà écrit/i);
+  });
+
+  it("le budget d'essais est consommé quand même : une interruption ne se rejoue pas sans fin", () => {
+    const { state } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("a"), TIMEOUT("b")]);
+    expect(state.attempts).toBe(2);
+  });
+
+  it("budget épuisé : escalade, et là le rollback revient — l'humain reprend un dépôt propre", () => {
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("a"), TIMEOUT("b"), TIMEOUT("c")]);
+    expect(state.stage).toBe("ESCALATED");
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-RESEARCH" });
   });
 });

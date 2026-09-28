@@ -106,6 +106,9 @@ export class ScriptedRuntime implements AgentRuntime {
     this.sessions.set(id, session);
     this.configs.set(id, cfg);
     this.history.push(session);
+    // Une vraie session reprise reçoit la configuration du nouveau tour — outils et garde compris.
+    // Sans ce recâblage, le double rejouerait le comportement du tour précédent.
+    this.wire(session, cfg);
     return session;
   }
 
