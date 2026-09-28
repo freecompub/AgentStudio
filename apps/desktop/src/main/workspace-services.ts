@@ -73,6 +73,8 @@ export interface WorkspaceServicesConfig {
   /** Unité d'usage du runtime (`RuntimeCapabilities.usageUnit`). */
   usageUnit?: "requests" | "tokens";
   agentIdleMs?: number;
+  /** Plafond de durée totale d'un tour d'agent (ADR 0026). */
+  agentMaxTurnMs?: number;
 }
 
 /** Construit la carte de tâche (§7.2) à partir de l'état persisté et des libellés du manifeste. */
@@ -253,6 +255,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           runtime: createLazyRuntime(runtime),
           root: workspace.root,
           ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
+          ...(cfg.agentMaxTurnMs !== undefined ? { maxMs: cfg.agentMaxTurnMs } : {}),
           ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
         workspace,

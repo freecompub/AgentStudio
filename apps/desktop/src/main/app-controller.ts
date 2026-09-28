@@ -56,6 +56,8 @@ export interface AppControllerDeps {
   notifier?: SystemNotifier;
   logger?: Logger;
   idleMs?: number;
+  /** Plafond de durée totale d'un tour (ADR 0026). */
+  maxTurnMs?: number;
 }
 
 /** Un handler par canal de requête : le routeur IPC valide puis délègue. */
@@ -316,6 +318,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
         clock: deps.clock,
         ids: deps.ids,
         ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
+        ...(deps.maxTurnMs !== undefined ? { maxMs: deps.maxTurnMs } : {}),
       });
       offSession = s.onEvent((e) => {
         if (e.type === "messages") deps.sink.emit("chat:messages", { messages: e.messages });

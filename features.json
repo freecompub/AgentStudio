@@ -249,6 +249,13 @@
       "notes": "C4 de `craft-discipline` demandait de vérifier le linter sans donner aucun moyen de le faire : l'agent découvrait le refus quand la porte `deliver` le recalait, une phase entière plus tard. `run_lint` appelle le même `StackAdapter.lint()` que la porte — même mesure, plus tôt — et n'enregistre aucune preuve, sinon l'agent choisirait le moment de la mesure. Le résumé sépare trois états : pas de linter, linter qui n'a examiné aucun fichier, et fichiers examinés sans violation ; seul le troisième vaut conformité. Donné à skraft-test et skraft-dev, pas aux lentilles. Pas de `run_build` : `runTests` compile déjà, et un second outil d'attestation indépendant des tests est le défaut qu'on traque."
     },
     {
+      "id": "plafond-duree-tour",
+      "title": "Un tour d'agent a un plafond de durée que rien ne réarme, distinct du chronomètre d'inactivité (ADR 0026)",
+      "verify": "pnpm vitest run --project core test/run-turn.test.ts",
+      "passes": true,
+      "notes": "Mesuré sur un vrai run, pas supposé : le 28/09, un tour de `skraft-architect-model` sur US-2 du projet d'essai .NET a duré 1 h 55 min 41 s (10:13:59 → 12:09:40 dans main.log). Le chronomètre d'inactivité n'a rien vu — chaque événement le réarmait — et ne s'est déclenché qu'une fois l'agent muet. DESIGN : 4 230 824 tokens d'entrée pour 8 requêtes, résultat rejoué depuis le checkpoint à l'annulation. L'activité n'est pas la progression. Défaut 30 min, `TurnBudgetError` distincte de `TurnTimeoutError` pour que le motif lu par l'humain dise lequel des deux s'est produit. Ne borne PAS le coût : un tour sous 30 min peut consommer 500 k tokens — borner le contexte d'une session reste à faire."
+    },
+    {
       "id": "skraft-agents-skills-md",
       "title": "skraft livre ses rôles et douze skills de skraft-plugin v1.6.1 en Markdown, dans son paquet .asx",
       "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts test/install.test.ts",

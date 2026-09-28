@@ -42,6 +42,8 @@ export interface TaskAgentRunnerDeps {
   runtime: AgentRuntime;
   root: string;
   idleMs?: number;
+  /** Plafond de durée totale d'un tour (ADR 0026). */
+  maxMs?: number;
   logger?: Logger;
 }
 
@@ -65,6 +67,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           await runTurn(session!, text, {
             heartbeat,
             ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
+            ...(deps.maxMs !== undefined ? { maxMs: deps.maxMs } : {}),
             onEvent: (e) => {
               if (e.type === "usage") {
                 multiplier ??= e.multiplier;

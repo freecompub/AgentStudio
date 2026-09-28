@@ -5,6 +5,38 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 28/09 — Un tour d'agent a duré 1 h 55, et rien ne le bornait (ADR 0026)
+
+**Ce qui s'est passé.** Premier vrai run de `skraft-pipeline` sur US-2 du projet d'essai .NET.
+Le responsable a vu une tâche « qui ne finit jamais ». Le journal dit autre chose :
+
+```
+10:13:59  session ouverte   skraft-architect-model
+                            ← 1 h 55 min 41 s sans aucune transition
+12:09:40  effet en échec    TIMEOUT
+```
+
+**Pourquoi le chien de garde n'a rien vu.** Il ne surveille que l'**inactivité** (5 min), et il est
+réarmé par chaque événement de session **et** chaque battement d'outil. L'agent parlait sans cesse.
+Le chronomètre n'a fini par se déclencher que quand l'agent s'est réellement tu, deux heures plus
+tard. D30 dit « un agent qui travaille ne doit pas être coupé » — et c'est vrai. Mais
+**l'activité n'est pas la progression** : DESIGN a brûlé 4 230 824 tokens d'entrée pour 8 requêtes
+(529 k par requête), et tout a été rejoué depuis le checkpoint à l'annulation.
+
+**Ce que j'ai ajouté.** Un plafond de durée totale du tour, défaut 30 min, que **rien ne réarme**.
+Un test le défend explicitement — sans lui, un futur « réarmons-le aussi » en referait un second
+chronomètre d'inactivité, inutile. Erreur distincte `TurnBudgetError`, parce que « il ne répond
+plus » et « il n'en finissait pas » n'appellent pas la même correction chez l'humain qui lit.
+
+**Ce que ça ne corrige pas.** Le coût. Un tour peut tenir sous 30 min et consommer un demi-million
+de tokens : 529 k par requête en DESIGN contre 83 k pour les lentilles. Borner le contexte d'une
+session est un chantier à part, encore ouvert. Troisième point vu au passage : la lentille
+`quality-gates` a rejeté DESIGN deux fois parce que les documents décrivent la cible et non
+l'existant — reproche qu'un document de conception ne peut structurellement pas satisfaire, dans
+une phase où aucun fait n'est mesuré.
+
+---
+
 ## 28/09 — Aucune skill n'était inutilisée ; deux fichiers l'étaient
 
 **Demandé :** supprimer les skills qu'on n'utilise pas. **Mesuré d'abord :** les douze skills

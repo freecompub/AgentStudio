@@ -28,6 +28,23 @@ export class TurnTimeoutError extends WorkDefectError {
   }
 }
 
+/**
+ * Plafond de durée du tour atteint (ADR 0026) : l'agent **travaillait**, mais trop longtemps.
+ *
+ * Distinct de `TurnTimeoutError`, qui dit l'inverse — l'agent s'est tu. La distinction compte pour
+ * l'humain qui lit le motif : « il ne répond plus » et « il n'en finissait pas » n'appellent pas
+ * la même correction.
+ */
+export class TurnBudgetError extends WorkDefectError {
+  constructor(
+    readonly maxMs: number,
+    readonly elapsedMs: number,
+  ) {
+    super(`Le tour a dépassé son plafond de ${Math.round(maxMs / 60_000)} min (écoulé : ${Math.round(elapsedMs / 60_000)} min)`);
+    this.name = "TurnBudgetError";
+  }
+}
+
 /** Défaut d'environnement (runtime, quota, API) : escalade immédiate (D25). */
 export class EnvFailureError extends Error {
   constructor(message: string, options?: ErrorOptions) {
