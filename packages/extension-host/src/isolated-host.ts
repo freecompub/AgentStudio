@@ -139,7 +139,7 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
     };
 
     try {
-      inner = await activateInProcess({ manifest: ext.manifest, module: bridge }, deps);
+      inner = await activateInProcess({ manifest: ext.manifest, module: bridge, directory: ext.directory }, deps);
       log?.info("extension activée (processus isolé)", { pid: c.pid ?? -1 });
     } catch (err) {
       stopping = true;

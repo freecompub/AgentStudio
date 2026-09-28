@@ -107,8 +107,54 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, runs } = await activateWith(() => {});
     const r = await ctx.agents.run("writer", "Écris un test");
     expect(r).toEqual({ output: { summary: "ok", files: [] } });
-    expect(runs[0]?.spec).toEqual({ role: "diabeo.demo/writer", systemPrompt: "Tu écris des tests.", writable: ["tests/**"], output: "report_phase", blocker: false });
+    expect(runs[0]?.spec).toEqual({ role: "diabeo.demo/writer", systemPrompt: expect.any(String), writable: ["tests/**"], output: "report_phase", blocker: false });
+    // Consignes du manifeste, puis contrat d'exécution ajouté par le cœur (ADR 0024).
+    expect(runs[0]?.spec.systemPrompt).toMatch(/^Tu écris des tests\.\n\n## Fonctionnement dans agent-studio\n/);
+    expect(runs[0]?.spec.systemPrompt).toContain("appelant l'outil `report_phase`");
     await expect(ctx.agents.run("inconnu", "x")).rejects.toThrow(/non déclaré/);
+  });
+
+  it("agent en fichier Markdown avec skills : prompt composé, load_skill fourni, chargements rendus à l'extension", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "agent-studio-ext-md-"));
+    try {
+      await mkdir(join(dir, "agents"));
+      await mkdir(join(dir, "skills/craft"), { recursive: true });
+      await writeFile(join(dir, "agents/writer.agent.md"), "---\nname: writer\ndescription: Écrit\n---\n\nTu écris des tests.\n");
+      await writeFile(join(dir, "skills/craft/SKILL.md"), "---\nname: craft\ndescription: Artisanat\n---\n\n# Craft\n\nPetites méthodes.\n");
+      const manifest: ExtensionManifest = {
+        ...MANIFEST,
+        contributes: {
+          ...MANIFEST.contributes,
+          agents: [{ name: "writer", title: "Rédacteur", prompt: "agents/writer.agent.md", output: "report_phase", write: ["tests/**"], skills: { onDemand: ["craft"] } }],
+          skills: [{ name: "craft", path: "skills/craft" }],
+        },
+      };
+      const env = setup(manifest);
+      let tools: import("@agent-studio/core").ToolSpec[] = [];
+      let prompt = "";
+      env.deps.agents = {
+        run: async (spec, _p, opts) => {
+          prompt = spec.systemPrompt;
+          tools = opts?.tools?.(() => {}) ?? [];
+          await tools.find((t) => t.name === "load_skill")!.handler({ name: "craft" });
+          return { output: { summary: "", files: [] } as never };
+        },
+      };
+      let ctx!: ExtensionContext;
+      await activateInProcess({ manifest, module: { activate: (c) => void (ctx = c) }, directory: dir }, env.deps);
+      const r = await ctx.agents.run("writer", "x");
+      expect(prompt.startsWith("Tu écris des tests.")).toBe(true);
+      expect(prompt).toContain("`craft` : Artisanat");
+      expect(tools.map((t) => t.name)).toEqual(["load_skill"]);
+      expect(r).toEqual({ output: { summary: "", files: [] }, skillsLoaded: ["craft"] });
+      // Sans dossier, une extension qui déclare des fichiers de rôle ne s'active pas.
+      await expect(activateInProcess({ manifest, module: { activate: () => {} } }, setup(manifest).deps)).rejects.toThrow(/dossier est inconnu/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("une capacité non déclarée est refusée (D11)", async () => {

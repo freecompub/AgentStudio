@@ -17,6 +17,7 @@ import type { Workspace } from "@agent-studio/workspace";
 import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
+import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
 export interface ExtensionChatSink {
@@ -44,6 +45,8 @@ export interface HostDeps {
 export interface LoadedExtension {
   manifest: ExtensionManifest;
   module: ExtensionModule;
+  /** Dossier de l'extension : fichiers de rôle et skills déclarés par le manifeste (ADR 0024). */
+  directory?: string;
 }
 
 export interface ExtensionHandle {
@@ -76,8 +79,11 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     for (const g of a.write ?? [])
       if (!writeGlobs.has(g)) throw new Error(`L'agent ${a.name} écrit dans ${g} sans la permission fs:write:${g}`);
 
+  // Contenu (fichiers Markdown de l'extension) + contrat du cœur, composés une fois à l'activation.
+  const prompts = await loadAgentPrompts(manifest, ext.directory ? extensionFileReader(ext.directory) : null);
+  const promptOf = (name: string) => prompts.get(name)!;
   for (const a of declared.agents.values())
-    deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: a.role, writable: resolveGlobs(a.write ?? []), output: a.output });
+    deps.registry.addAgent({ extensionId: manifest.id, name: a.name, systemPrompt: promptOf(a.name).systemPrompt, writable: resolveGlobs(a.write ?? []), output: a.output });
 
   const taskName = (name: string) => `${manifest.id}/${name}`;
   const declaredTools = new Map((manifest.contributes.tools ?? []).map((t) => [t.name, t]));
@@ -112,18 +118,20 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const a = declared.agents.get(name);
         if (!a) throw new Error(`Agent non déclaré dans le manifeste : ${name}`);
         let frozen = false;
+        const skillsLoaded: string[] = [];
+        const composed = promptOf(name);
         const taskId = opts?.evidence?.taskId;
         const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
         const r = await deps.agents.run(
-          { role: `${manifest.id}/${name}`, systemPrompt: a.role, writable: resolveGlobs(a.write ?? []), output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
+          { role: `${manifest.id}/${name}`, systemPrompt: composed.systemPrompt, writable: resolveGlobs(a.write ?? []), output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
-            ...(a.tools?.includes("run_tests")
-              ? {
-                  tools: (beat: () => void) => [
-                    ...ownTools(a.tools ?? []),
+            tools: (beat: () => void) => [
+              ...ownTools(a.tools ?? []),
+              ...(a.tools?.includes("run_tests")
+                ? [
                     runTestsTool(testRuns, {
                       beat,
                       ...(opts?.signal ? { signal: opts.signal } : {}),
@@ -132,11 +140,11 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                         if (opts?.freezeTestsAfterRed && run.results.some((t) => t.status === "failed")) frozen = true;
                       },
                     }),
-                  ],
-                }
-              : (a.tools ?? []).some((t) => extensionTools.has(t))
-                ? { tools: () => ownTools(a.tools ?? []) }
-                : {}),
+                  ]
+                : []),
+              // Skills facultatives : chaque chargement est rendu à l'extension, qui le trace dans l'état de sa tâche (D26).
+              ...(composed.onDemand.size ? [loadSkillTool(composed.onDemand, (ref) => void skillsLoaded.push(ref))] : []),
+            ],
             guards: [
               ...(opts?.freezeTestsAfterRed ? [testFreezeGuard(deps.workspace.root, (p) => deps.stack.isTestFile(p), () => frozen)] : []),
               ...(opts?.readOnly?.length ? [readOnlyGuard(deps.workspace.root, resolveGlobs(opts.readOnly))] : []),
@@ -144,7 +152,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             ],
           },
         );
-        return (r.blocker ? { blocker: structuredClone(r.blocker) } : { output: structuredClone(r.output) }) as never;
+        const loaded = skillsLoaded.length ? { skillsLoaded: [...new Set(skillsLoaded)] } : {};
+        return (r.blocker ? { blocker: structuredClone(r.blocker), ...loaded } : { output: structuredClone(r.output), ...loaded }) as never;
       },
     },
 

@@ -8,3 +8,19 @@ export type { MessageChannelLike, RpcMessage } from "./rpc/protocol.js";
 export { createNodeLauncher } from "./launchers/node-launcher.js";
 export { cheminReel, isolationExecArgv, type ChildHandle, type LaunchOptions, type ProcessLauncher } from "./launchers/protocol.js";
 export { bundle } from "./build/bundle.js";
+export {
+  composeAgentPrompt,
+  contractBlock,
+  copyDeclaredFiles,
+  declaredPaths,
+  extensionFileReader,
+  extractSection,
+  loadAgentPrompts,
+  loadSkillTool,
+  parseMarkdownDoc,
+  resolveSkillRef,
+  skillFile,
+  type ComposedAgent,
+  type MarkdownDoc,
+  type SkillSource,
+} from "./agent-prompts.js";
