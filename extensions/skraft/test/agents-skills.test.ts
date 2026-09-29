@@ -161,3 +161,88 @@ describe("Norme de recopie et de nommage de skraft-acceptance (ADR 0043)", () =>
     expect(await corps()).not.toMatch(/run_tests|report_phase|report_blocker|submit_[a-z_]+|render_adr|load_skill|orchestrat/i);
   });
 });
+
+/**
+ * Ce qu'on demande à un agent doit être faisable avec ce qu'on lui accorde.
+ *
+ * Observé chez skraft-plugin v1.6.1 pendant le run comparé du 29/09
+ * (`docs/05-run-compare-skraft-plugin-1.6.1.md`, A2) : deux de leurs quatre lentilles de revue ont
+ * rendu leur verdict en déclarant « [SKILL MISSING] qa-reporting ». Leur contenu impose de charger
+ * cette skill ; leur frontmatter n'accorde que Read, Grep et Glob. La skill EXISTE dans le paquet,
+ * et six agents l'exigent. Elles ont jugé sans leur grille.
+ *
+ * C'est l'intersection qui bloque, pas l'un des deux côtés : le contenu est raisonnable, le jeu
+ * d'outils est raisonnable, personne ne vérifie leur croisement. Nous avons eu exactement la même
+ * chose — le chercheur réclamant `mkdir` sous une garde qui refuse le shell (ADR 0037), six tours
+ * perdus.
+ *
+ * Ces tests vérifient le croisement. Ils ne lisent pas le contrat ajouté par le cœur (celui-là est
+ * DÉRIVÉ du manifeste, donc cohérent par construction) : ils lisent ce que le contenu PARTAGÉ dit
+ * à l'agent de faire, et le confrontent au manifeste.
+ */
+describe("Un agent peut faire ce que son contenu lui demande (ADR 0024, run comparé A2)", () => {
+  const agents = manifest.contributes.agents;
+  const corpsDe = async (nom: string) => parseMarkdownDoc(await readFile(join(EXTENSION_DIR, "agents", `${nom}.agent.md`), "utf8")).body;
+  /** Un agent du manifeste, avec son contenu partagé. */
+  const avecCorps = async () =>
+    Promise.all(agents.filter((a) => a.prompt).map(async (a) => ({ a, corps: await corpsDe(a.name) })));
+
+  it("qui dit « lance les tests » a `run_tests`", async () => {
+    for (const { a, corps } of await avecCorps()) {
+      if (!/lance[rz]?\s+(?:la suite de\s+)?(?:les\s+)?tests|exécute[rz]?\s+les tests/i.test(corps)) continue;
+      expect(a.tools ?? [], `${a.name} demande de lancer les tests`).toContain("run_tests");
+    }
+  });
+
+  it("qui dit « rédige un ADR » a `render_adr`", async () => {
+    for (const { a, corps } of await avecCorps()) {
+      if (!/r[ée]dige[^.\n]{0,40}ADR|ADR[^.\n]{0,40}r[ée]dige/i.test(corps)) continue;
+      expect(a.tools ?? [], `${a.name} demande de rédiger un ADR`).toContain("render_adr");
+    }
+  });
+
+  it("qui nomme un dossier de livrables a le droit d'y écrire", async () => {
+    for (const { a, corps } of await avecCorps()) {
+      // Chemins de livrables cités dans le contenu, sous la forme `.skraft/<slug>/…`.
+      if (!/\.skraft\/<slug>\//.test(corps)) continue;
+      expect(a.write ?? [], `${a.name} nomme un dossier de .skraft/`).toContain(".skraft/**");
+    }
+  });
+
+  it("aucune skill exigée d'un rôle n'est absente du paquet", async () => {
+    // Une skill obligatoire introuvable, c'est le cas `qa-reporting` : l'agent découvre le manque
+    // au moment de juger, et juge quand même.
+    const presentes = new Set(await readdir(join(EXTENSION_DIR, "skills")));
+    for (const r of Object.values(ROLE_SKILLS)) {
+      for (const s of [...((r as { mandatory?: readonly string[] }).mandatory ?? []), ...((r as { onDemand?: readonly string[] }).onDemand ?? [])]) {
+        expect(presentes, s).toContain(s.split("#")[0]!);
+      }
+    }
+  });
+
+  it("toute skill exigée d'un rôle lui est bien accordée par le manifeste", async () => {
+    // Appariement EXPLICITE : déduire la clé du nom échoue — `skraft-lens-test-integrity`
+    // contient « test » et tomberait sur le rôle du testeur.
+    const CLEF: Record<string, keyof typeof ROLE_SKILLS> = {
+      "skraft-researcher": "researcher",
+      "skraft-architect-model": "architectModel",
+      "skraft-architect-decide": "architectDecide",
+      "skraft-acceptance": "acceptance",
+      "skraft-test": "test",
+      "skraft-dev": "dev",
+    };
+    const exigees = (nom: string): string[] => {
+      const k = nom.startsWith("skraft-lens-") ? "lens" : CLEF[nom];
+      if (!k) return [];
+      const r = ROLE_SKILLS[k] as { mandatory?: readonly string[]; onDemand?: readonly string[] };
+      return [...(r.mandatory ?? []), ...(r.onDemand ?? [])];
+    };
+    for (const a of agents) {
+      const attendues = exigees(a.name);
+      if (!attendues.length) continue;
+      const grant = (a.skills ?? {}) as { mandatory?: readonly string[]; onDemand?: readonly string[] };
+      const accordees = [...(grant.mandatory ?? []), ...(grant.onDemand ?? [])];
+      for (const s of attendues) expect(accordees, `${a.name} → ${s}`).toContain(s);
+    }
+  });
+});

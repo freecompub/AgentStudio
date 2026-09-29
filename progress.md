@@ -26,6 +26,14 @@ DESIGN — parce qu'une porte de code constate en millisecondes ce qu'une lentil
 **Le fait qui compte plus que tout le reste : eux sont allés jusqu'au code, nous jamais.** Aucun de
 nos six runs n'a dépassé DISTILL. Aucune considération sur l'élégance de nos portes ne compense ça.
 
+**Un test écrit dans la foulée (A2), et vérifié par mutation.** Cinq assertions confrontent le
+contenu partagé d'un agent à ce que le manifeste lui accorde : « lance les tests » exige
+`run_tests`, « rédige un ADR » exige `render_adr`, nommer un dossier de livrables exige le droit
+d'y écrire, et aucune skill exigée d'un rôle ne peut manquer du paquet — c'est littéralement le cas
+`qa-reporting`. Retirer `run_tests` à `skraft-acceptance` ou exiger une skill inexistante fait bien
+tomber les bons tests. Piège en les écrivant : déduire la clé de rôle du nom d'agent échoue,
+`skraft-lens-test-integrity` contient « test » et tombait sur le rôle du testeur.
+
 **Trois choses à corriger chez nous**, consignées dans `features.json` :
 
 1. **Notre gel des tests est une impasse** dès qu'un refactoring change une signature. Chez eux,
@@ -33,10 +41,7 @@ nos six runs n'a dépassé DISTILL. Aucune considération sur l'élégance de no
    suivre — assertions et valeurs inchangées. `testFreezeGuard` refuserait ; le test ne compilerait
    plus et ne pourrait pas être réparé. Il faudrait comparer ce que le test **vérifie**, pas ce
    qu'il **contient**.
-2. **Rien ne vérifie qu'un agent peut faire ce qu'on lui demande.** Deux de leurs lentilles ont
-   jugé en déclarant `[SKILL MISSING] qa-reporting` : leur contenu impose une skill que leur
-   frontmatter ne leur permet pas de charger. Même intersection que notre `mkdir` sous une garde
-   qui refuse le shell (ADR 0037). Le test est facile à écrire et ne coûte rien.
+2. ~~Rien ne vérifie qu'un agent peut faire ce qu'on lui demande.~~ **Fait** (voir ci-dessus).
 3. **On a supprimé le faux positif en supprimant la capacité de voir.** Leur revue a recalé DELIVER
    sur deux constats *justes* — Object Calisthenics — que ni notre linter ni nos lentilles ne
    relèveraient. L'ADR 0028 a écarté `quality-gates` de ce mandat, l'ADR 0022 confie la forme au
