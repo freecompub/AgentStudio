@@ -5,6 +5,641 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Deux runs gelés en silence, et une réserve que personne ne regardait (ADR 0044)
+
+**Le gel.** Le run relancé à DISTILL s'est arrêté après l'escalade et n'a plus rien fait pendant
+trente minutes, processus vivant, journal muet. Cause : `askEscalation` exige
+`requiredRoles: ['developpeur','architecte','administrateur']`, le banc répondait toujours `po`,
+et le `.catch()` avalait le refus **sans un mot**. Aucun `onChange` ne survenant ensuite, la
+demande restait sans réponse pour toujours.
+
+**Ce que ça m'a fait dire de faux.** Deux fois j'ai annoncé « le cycle repart » après une escalade.
+Non : le rollback est un effet de la transition d'escalade elle-même, qui **précède** la décision
+humaine. La relance, elle, n'a jamais eu lieu — ni hier ni aujourd'hui. J'ai tué le premier run
+sans m'apercevoir qu'il était déjà bloqué.
+
+Un `catch` muet sur le seul mécanisme qui débloque une tâche ne cache pas une erreur, il fabrique
+un état indiscernable d'un agent qui réfléchit.
+
+**La réserve.** L'utilisateur a supposé être à court de crédit. Vérification :
+
+```
+premium_interactions   1471 / 1500   →   28 restantes (1,8 %)
+overage_permitted      false         →   à zéro, les appels sont REFUSÉS
+quota_reset_date       2026-10-01
+```
+
+Il avait raison. Et l'information était à un appel de distance — `/copilot_internal/user` — que
+rien n'interrogeait. On lançait des tâches consommant des dizaines de requêtes sans savoir s'il en
+restait une. C'est l'ADR 0031 qui se répète : un seuil qu'on ne mesure pas est un seuil qu'on subit.
+
+**Ce que j'ai écrit.** `copilotQuota()` dans `github-auth`, qui rend `null` plutôt que de lever —
+le point d'accès n'est pas documenté publiquement, donc tout y est facultatif, et une réserve
+inconnue ne doit jamais empêcher de travailler. Le banc l'affiche avant de lancer. Le canal
+`auth:quota` l'expose au renderer : des chiffres franchissent l'IPC, jamais un jeton (§10.2). Les
+tests portent la charge utile **réellement rendue** par GitHub, pas une charge inventée.
+
+**Ce que je n'ai pas fait, et qui compte plus.** Quand la réserve s'épuise en cours de route, le
+pipeline traite l'erreur comme n'importe quelle panne : message brut, mêmes options, « relancer »
+en premier alors qu'il ne peut que réechouer. Pour classer les pannes du runtime autrement que par
+leur texte — comme le profil de stack classe les erreurs du compilateur par leur **code**, parce
+que les messages sont traduits — il faut en avoir **observé** une. Je ne l'ai jamais vue. Si la
+réserve tombe à zéro au prochain run, la trace nous la donnera.
+
+---
+
+## 29/09 — L'instruction était là, et elle ne suffisait pas (ADR 0043)
+
+**Ce que l'ADR 0042 n'a pas traité.** Il donne un essai de plus à la revue ; il n'explique pas
+pourquoi deux essais avaient été perdus avant elle. La raison : l'agent reformulait.
+
+```
+critère   ligne de 9 articles à 2,00 € : remise 0,00 €
+écrit     Quand une petite quantité est commandée / Alors aucune remise n'est accordée
+```
+
+**Et l'instruction existait.** Dans `skraft-acceptance.agent.md` : « Recopie les valeurs des
+critères mot pour mot. » Une phrase, en fin de paragraphe, sans exemple, sans contre-exemple, et
+qui ne disait pas ce que la porte compare réellement. Lue et appliquée de travers deux fois.
+
+C'est exactement l'ADR 0033 sur le refus de shell, transposé : un texte correct qui ne dit pas quoi
+faire se paie en essais. Une règle énoncée ne vaut pas une règle **montrée**.
+
+**Ce que j'ai écrit à la place :** deux sections. Ce que la comparaison regarde — les caractères,
+pas le sens —, un critère réel avec la liste de ses valeurs, puis un scénario ✗ et un ✓ qui disent
+la même chose, seul le second étant vérifiable. Puis la norme de nommage : marqueur dans le NOM du
+test, deux formes acceptées, une refusée.
+
+**Les exemples sont testés, pas seulement relus.** Chaque forme de nom donnée en exemple passe par
+`acOf` et doit rendre ce que l'exemple promet. Sans ça, un exemple faux dans un prompt vit des mois.
+
+**Un déplacement.** La phrase que j'avais ajoutée au brief le matin même (ADR 0041) en sort : c'est
+une règle statique, sa place est dans le contenu de l'agent, pas dans un dossier de passation
+construit par le code (ADR 0024). Seul l'emplacement des fichiers reste dynamique — lui dépend de
+la stack.
+
+**Je n'en attends pas de miracle.** Un prompt mieux écrit rend un comportement plus probable, il ne
+l'impose pas ; la porte seule décide, et l'ADR 0042 reste le filet. Si DISTILL reperd des essais
+là-dessus au prochain run, c'est la porte qu'il faudra regarder, pas le prompt.
+
+---
+
+## 29/09 — Le budget d'une phase se dépense avant d'arriver au vrai sujet (ADR 0042)
+
+**Le run.** DISTILL relancée depuis une base où RESEARCH et DESIGN étaient déjà produites — c'est
+l'option `--depuis=DISTILL` du banc, ajoutée pour ne pas repayer les phases d'avant. La porte RED
+corrigée le matin a tenu : elle a reconnu ses tests et accepté le rouge, et n'a plus jamais
+protesté. Mais la phase a escaladé quand même, pour une raison entièrement différente.
+
+```
+essai 1  porte valeurs  rejet   « 10 articles ou plus : 5 % » absent du scénario @ac-1
+essai 2  porte valeurs  rejet   même famille
+essai 3  valeurs ✔  RED ✔  →  revue : DEUX DÉFAUTS MAJEURS  →  budget épuisé  →  ESCALADE
+```
+
+**Les deux défauts étaient justes et corrigeables** : `Facture.ATPayer` ignore `Remise`, alors que
+le contrat de conception **ratifié** exige `SommeDesArticles - Remise + FraisDePort`. Ils
+désignaient une ligne. Personne n'a pu y répondre.
+
+**Ce que j'ai compris en regardant pourquoi.** Le budget est commun aux portes de forme et à la
+revue, alors que leurs rejets ne sont pas du même ordre : une porte de forme constate une
+divergence **mécanique** (une valeur non recopiée), la revue rend un jugement sur le **fond**. Et
+la revue siège toujours **en dernier** — elle est donc la seule à pouvoir hériter d'un budget vide.
+Recopier « 2,00 € » dans un Gherkin et rebrancher un calcul de facture ne demandent pas le même
+nombre de tours ; les faire puiser au même compteur, si.
+
+**Correction au plus petit.** La première revue d'une phase obtient un essai, une seule fois.
+J'avais aussi envisagé deux compteurs séparés et un budget rendu au passage d'une porte : les deux
+obligeaient à choisir des chiffres, et l'ADR 0031 a montré ce que valent les seuils non mesurés.
+Ici aucun chiffre n'est introduit, et `reviews[phase]` portait déjà l'information — pas de champ
+d'état, pas de migration.
+
+**Le piège en écrivant les tests.** Mes trois premiers scénarios passaient par RESEARCH… qui n'est
+pas dans `REVIEWED_PHASES`. Ils n'atteignaient jamais de revue et affirmaient donc n'importe quoi.
+Rejoués sur DISTILL, la phase du run réel.
+
+**Reste ouvert, et ce n'est pas le budget :** il a fallu deux tours à l'agent pour comprendre que
+la porte des valeurs veut une **recopie** et non une paraphrase. C'est du côté de ce que la porte
+dit qu'il faut regarder.
+
+---
+
+## 29/09 — La porte cherchait ses tests là où le langage les range (ADR 0041)
+
+**Le run.** Premier passage de DISTILL sur un vrai projet. Trois essais, escalade, sur le même
+reproche : « Aucun test d'acceptance n'a été exécuté. » Pendant ce temps, la preuve enregistrée par
+notre propre code disait : 8 réussis, 2 échecs, et les deux échecs étaient des tests d'acceptance
+rouges **sur assertion métier** — le rouge exact que la porte attend. L'agent avait raison les
+trois fois. Au troisième essai il a relancé `run_tests`, la seule réponse qu'un tel reproche
+appelle, et s'est fait escalader quand même.
+
+**La cause.** `effects.ts` filtrait `run.results` sur `layout.acceptanceTests`, des globs de
+**chemins**, alors qu'un rapport JUnit rend `file` comme un **nom de classe** et `id` comme un nom
+.NET qualifié :
+
+```
+attendu   tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs
+fourni    Tarification.Tests.RemiseParPalierAcceptanceTests
+```
+
+Le filtre rendait toujours zéro. Sur tout profil à rapport JUnit. Le profil TypeScript y échappait
+parce que Vitest rend de vrais chemins — d'où douze mois de CI verte.
+
+**Le même glob servait à deux tâches**, et n'en faisait qu'une. Lire les fichiers : juste, et le
+premier rejet du run le prouve — la porte lisait bien les tests, elle citait leur contenu.
+Reconnaître un résultat : impossible.
+
+**La leçon la plus coûteuse : la réponse était deux lignes plus bas.** `checkAcceptanceRed` appelle
+déjà `acOf(r.id)` pour relier un résultat à son critère. J'ai proposé deux mécaniques avant de la
+voir — un champ `acceptanceTestIds` dans le profil, puis un `acceptanceResultPattern` transporté
+comme `testFilePattern`. Les deux auraient marché. Aucune n'était nécessaire. C'est l'utilisateur
+qui a débloqué ça en demandant « on ne peut pas utiliser un find ? » : partir de ce qui existe, pas
+d'un motif à inventer.
+
+**Une faille refermée au passage.** `checkValues` cherchait le marqueur dans une **ligne** du
+fichier, `checkAcceptanceRed` dans le **nom** du test. Un `// ac-2` en commentaire satisfaisait la
+première et restait invisible à la seconde. Le brief de DISTILL dit maintenant où le placer.
+
+**Et toujours le même motif de fond.** La porte avait mesuré « aucun identifiant ne ressemble à un
+chemin » et rapporté « aucun test n'a été exécuté ». Ce n'est pas une imprécision de rédaction :
+c'est ce qui a envoyé l'agent relancer des tests trois fois. Les deux constats sont désormais
+distincts, et celui qui compte dit combien de tests ont tourné et en cite trois.
+
+---
+
+## 29/09 — On gardait le souvenir et on retirait la chose (ADR 0040)
+
+**L'incohérence.** L'ADR 0039 garde la session de l'agent d'un essai à l'autre. L'ADR 0029 gardait
+le `rollback` sur un rejet de porte, « là un jugement a eu lieu ». Mises ensemble : l'architecte
+relancé arrive avec, dans sa conversation, les appels d'outils qui ont créé `contracts.md`,
+`event-model.md`, `domain-model.md` — et le disque ne les contient plus. On lui demande de
+**corriger** ce qui n'existe pas. Il édite un fichier absent et échoue, ou il retape de mémoire, et
+alors il refait tout le trajet sans que le motif du rejet lui serve de guide.
+
+**Ce que 0029 avait raison de dire, et ce qui a changé sous lui.** Sa distinction — une porte a
+jugé, un délai n'a rien jugé — était juste. Mais son *implication* (donc on annule) tenait sur une
+prémisse silencieuse : chaque essai repartait d'une session neuve, l'agent ne se souvenait de rien,
+effacer ne contredisait rien. 0039 a retiré la prémisse sans que je relise ce qui en dépendait.
+C'est la même leçon que l'ADR 0037 : **quand on change une capacité, se demander ce qui en
+dépendait**.
+
+**Décision.** `failure()` n'émet plus de `rollback` tant que le budget permet un essai, quelle
+qu'en soit la cause. L'escalade annule toujours — l'humain reprend un dépôt propre. Le paramètre
+`interrompu` disparaît : il ne distinguait plus que ce que la décision vient d'unifier. La
+distinction survit là où elle porte encore, le **message** rendu à l'agent (`tourInterrompu()` dit
+« interrompu, pas refusé » et « relis, ne recommence pas »).
+
+**La sécurité ne bouge pas**, et ne reposait déjà pas là : la porte de fin de phase juge l'**état
+final**, quel qu'ait été le chemin.
+
+**Le piège, trouvé par le test de bout en bout de S3.** `render_adr` prend le premier numéro libre
+d'après les fichiers présents dans `docs/adr`. Le rollback rendait le numéro 1 libre entre deux
+essais ; sans lui, le deuxième essai ouvrait un **ADR-002 sur la même décision**. Défaut *révélé*
+par ce changement, pas créé par lui — il attendait depuis toujours qu'on cesse d'effacer. Corrigé
+côté **code** et non côté prompt : l'outil reconnaît le brouillon par son titre, et seulement tant
+qu'il est `Proposed`. Un ADR ratifié n'est jamais réécrit en douce.
+
+**Ce que ça change pour le run en cours** : un `research.md` recalé par sa porte reste sur le
+disque. C'est ce qu'on voulait pouvoir observer — jusqu'ici, la reprise de session était vraie et
+invérifiable, faute de fichiers à reprendre.
+
+---
+
+## 29/09 — On réinitialisait une session que D17 n'obligeait pas à réinitialiser (ADR 0039)
+
+**Le déclencheur.** DESIGN recalée sur `CalculeRemise` cité dans `contracts.md` et absent du
+modèle : une incohérence de **nommage**. À l'essai 2, l'architecte repartait d'une session vide —
+3 messages, 605 tokens — et devait relire tout le dépôt pour renommer un identifiant qu'il venait
+lui-même d'écrire.
+
+**D17 ne demandait pas ça.** « Une session neuve **par phase/rôle** » : trois essais de DESIGN par
+le même architecte sont la même phase et le même rôle. On avait implémenté « par essai », plus
+strict que la décision, et personne ne l'avait vu. Même raisonnement que l'ADR 0030, qui avait déjà
+tranché que la règle vise les **passages de phase**.
+
+**Ce que j'ai dû ajouter pour que ça tienne.** En gardant les sessions, plus rien ne les supprimait
+— jamais. L'unité passe donc du tour à la **tâche** : `releaseTask` les libère à la fin. Ce n'était
+pas dans la demande, mais sans lui l'état des sessions s'accumulait indéfiniment sur le disque.
+
+**Le test de bout en bout de `tdd` a servi de garde-fou.** Il affirmait « sessions éphémères, toutes
+supprimées » et a échoué. En le réécrivant, il vérifie maintenant **davantage** : quatre tours,
+**trois** sessions distinctes — le développeur enchaîne « vert » puis « nettoyage » dans la même —,
+et toutes supprimées à la fin. Il comparait auparavant deux comptes égaux, ce qui masquait ce qui se
+passait vraiment.
+
+**Le garde-fou contre l'ancrage reste le budget d'essais**, puis l'escalade avec les motifs. Il
+était déjà là ; on ne lui ajoute pas une amnésie forcée.
+
+---
+
+## 29/09 — RESEARCH produit enfin, et on ne peut pas lire ce qu'elle produit (ADR 0038)
+
+**Le mur est franchi.** Cinquième run : le chercheur écrit son document, en **deux tours** (un par
+essai), sans question, sans `mkdir`, sans échec d'écriture. La porte le juge sur son **contenu** :
+
+> `LigneDePanier.cs:5-8` : plage hors du fichier, qui compte 7 lignes.
+
+Reproche juste, précis, actionnable. On est passé d'un blocage d'outillage à un aller-retour de
+qualité — ce pour quoi le pipeline existe.
+
+**Et le document était introuvable.** Le rollback exécute `read-tree --reset -u` puis
+`git clean -fdq` ; le fichier n'était pas commité. La trace, elle, enregistre **qu'**un outil a été
+appelé, jamais **avec quoi**. Donc : impossible d'examiner ce qu'un agent produit **au moment
+précis où une porte le refuse**, c'est-à-dire quand on voudrait le lire.
+
+**Archivé dans la trace, pas dans le dépôt** — `git clean -fdq` effacerait tout ce qu'on écrirait à
+côté. Le document et son motif se lisent désormais côte à côte.
+
+**La distinction de l'ADR 0032 a servi pour la première fois.** Ouvrir la trace aux extensions
+demandait de justifier pourquoi ce n'est pas un trou de sécurité : `evidence` **atteste** et une
+porte s'y appuie ; `trace` **raconte** et aucune porte ne doit s'y appuyer. Le test qui verrouille
+la liste des capacités exposées m'a obligé à l'écrire — c'est exactement son rôle.
+
+**Et le livrable est gardé ENTIER.** Je l'avais d'abord inliné dans le JSONL, donc borné : 8 000
+caractères, puis 200 000 après remarque. Aucun des deux ne venait d'une mesure — exactement le
+travers de mon plafond d'un million de tokens, le matin même. La bonne réponse n'était pas un
+meilleur nombre, c'était d'écrire le fichier **à côté** et de n'en garder qu'une référence : plus
+aucun seuil à choisir. Il en reste un, légitime, sur la narration, qui borne un flux sans fin.
+
+**Contrepartie d'avoir ouvert la trace aux extensions** : `archive` borne elle-même l'étiquette et
+les chemins qu'elle reçoit. Sans ça, `ctx.trace.rejected` devenait une écriture arbitraire sur le
+disque, hors du dépôt — pire que tout ce que la garde empêche ailleurs. Dès qu'une API accepte un
+chemin venu de l'extérieur, elle le borne elle-même.
+
+**Quatrième omission de la même famille en deux jours** : la commande refusée, les compteurs de
+cache, le motif d'échec d'un outil, le contenu jugé. À chaque fois l'information existait et
+n'était pas conservée. Et il en reste une : **les arguments des outils** ne sont toujours pas
+tracés.
+
+---
+
+## 29/09 — Trois runs perdus tenaient dans une ligne qu'on ne gardait pas (ADR 0037)
+
+**La cause des trois échecs sur « Document de recherche absent ».** L'outil `create` du CLI ne crée
+pas les dossiers parents — il le documente lui-même. Le chercheur l'a diagnostiqué **seul**, en
+testant : chemin imbriqué, un seul niveau, `.keep`, fichier à la racine de `.skraft/` (seul
+celui-là passe), `edit` avec un `old_str` vide, et jusqu'au lancement d'un **sous-agent** pour voir
+si son outil se comporterait autrement. Sa conclusion, mot pour mot :
+
+> this is likely a harness limitation […] the orchestrator itself needs to create the target
+> directory rather than me.
+
+**Notre garde n'y est pour rien, et y est pour tout.** Sur le run tracé : 18 lectures autorisées,
+2 écritures autorisées, **zéro refus d'écriture**, 3 refus de shell dont deux `mkdir -p`. Le CLI ne
+sait pas créer le dossier ; nous retirons le seul autre moyen. Chaque choix est défendable pris
+seul — **c'est l'intersection qui bloque**, et aucun des deux côtés ne pouvait la voir.
+
+**La règle à retenir** : quand on retire une capacité, se demander **ce qui en dépendait**. On a
+fermé le shell en pensant aux tests et aux commandes dangereuses ; `mkdir` en dépendait aussi. Le
+pendant de l'ADR 0033 : un refus doit dire ce que le rôle peut faire, et ce qu'il peut faire doit
+**suffire**.
+
+**Et l'enquête a coûté trois runs pour rien.** Le SDK rend `{ code, message, remediation }` à la fin
+d'un appel d'outil ; on n'en gardait que `success: boolean`. Quinze échecs, quinze fois « échoué »,
+jamais la raison. Pour répondre à « la CLI produit-elle une erreur ? », j'ai dû lire le
+**raisonnement du modèle** — ce que lui avait compris de l'erreur, pas l'erreur.
+
+C'est la deuxième fois que j'écris un mécanisme d'observation en omettant ce qu'il devait capter :
+l'ADR 0032 disait « on ne garde pas ce sur quoi on décide », et son implémentation jetait le motif
+des échecs d'outil, cinq heures plus tard.
+
+**Relevé, non traité** : un agent peut lancer des **sous-agents**. La garde s'y applique, mais ni la
+trace ni les plafonds ne distinguent ce qui s'y passe.
+
+---
+
+## 29/09 — Le contrat parlait d'un périmètre sans le nommer (ADR 0036)
+
+> Tu n'écris que dans ton périmètre : toute autre écriture est refusée.
+
+Sans dire lequel. `composeAgentPrompt` **avait** les globs — ceux du manifeste, ceux que la garde
+applique — et les réduisait à un booléen avant de rédiger la phrase. L'information existait et
+était jetée à la dernière étape, comme la commande refusée non journalisée ou les compteurs de
+cache. C'est le défaut corrigé le matin même pour le shell, resté intact ici.
+
+**Nommer le permis ne dit pas l'interdit.** Le contrat énonce donc les deux, et cite explicitement
+la **suppression** : un agent peut lire « voilà où tu écris » sans en conclure « et nulle part
+ailleurs, ni modifier, ni supprimer ».
+
+**Ce qu'on a écarté, et pourquoi.** La proposition était de laisser l'agent lancer ses propres
+commandes de recherche, puis de vérifier par Git qu'il n'a modifié que l'autorisé. C'est ce que
+font Claude Code ou Copilot CLI — **mais dans un conteneur**. Sans confinement, le contrôle a
+posteriori ne voit rien de ce qui compte : ce qui se passe hors du dépôt, une exfiltration qui ne
+modifie rien par construction, un effet déjà sorti de la machine qu'aucun rollback ne défait.
+
+**Ce qui répondrait vraiment au besoin** : un outil `search` à paramètres structurés, exécuté en
+argv sans shell. `ProcessRunner` lance déjà « une commande sans shell », et D47/O12 fournit la
+liste de programmes. L'agent composerait sa recherche, le code l'exécuterait — même frontière que
+`run_tests`. Le danger n'est pas la commande, c'est l'interpréteur qui lit le `;`.
+
+---
+
+## 29/09 — Un refus se contournait par une majuscule (ADR 0035)
+
+**Déclencheur** : « l'extension est destinée à fonctionner sur Windows, macOS et Linux. » Les deux
+premiers ont un système de fichiers **insensible à la casse** par défaut — je l'ai vérifié sur la
+machine, APFS l'est.
+
+Or `globToRegExp` compilait sans drapeau. Trois refus, tous adossés à une garantie, se contournaient
+par une majuscule :
+
+- le **gel de la barre de qualité**, que je venais d'écrire une heure plus tôt ;
+- le **gel des tests d'acceptance** (D21/D22), via `isTestFile` ;
+- l'interdiction d'écrire dans **`.git`** — `.GIT/config` passait.
+
+`.skraft/**` accordait l'écriture, `.skraft/quality.json` ne reconnaissait pas
+`.skraft/QUALITY.JSON`, et c'est le même fichier.
+
+**La règle est asymétrique, et c'est voulu.** Refuser ignore la casse pour attraper plus ; accorder
+la respecte pour accorder moins. Les deux vont vers « refuser par défaut ». Rendre les
+autorisations insensibles ouvrirait `.SKRAFT/` sur un Linux où c'est réellement un autre dossier :
+on accorderait au nom d'une confusion qui n'existe qu'ailleurs.
+
+**Ce qu'il faut retenir au-delà du correctif.** C'est la **troisième fois en une journée** qu'une
+garantie reposait sur une comparaison textuelle trop naïve : le lien symbolique dans l'écriture des
+canaris, le chemin recollé de travers par le SDK, et la casse. Le mécanisme était juste chaque fois,
+la comparaison approximative. À se demander pour toute garde : *que compare-t-elle au juste, et le
+système de fichiers est-il d'accord ?*
+
+**Et la CI ne teste que macOS.** Rien de tout cela n'aurait été vu par un test sur Windows ou
+Linux : il n'y en a aucun.
+
+---
+
+## 29/09 — La trace a payé son coût en quatre lignes (ADR 0033)
+
+Premier run avec la trace. Quatre lignes ont suffi à répondre à une question restée ouverte sur
+**deux runs entiers** :
+
+```
+deny  shell  ls -la .skraft/us-2/research/ 2>/dev/null && find .skraft -type f
+```
+
+Le chercheur ne voulait ni écrire son document ni lancer des tests : il voulait **lire**. J'avais
+affirmé le contraire une heure plus tôt, avec assurance, en devinant.
+
+**Le refus était juste, la réponse ne l'était pas.** « Les tests sont lancés par l'orchestrateur,
+modifie les fichiers avec les outils d'édition » : une justification hors sujet — il n'y a aucun
+test en RESEARCH — et une consigne qui oriente vers l'écriture quand l'agent cherchait à lire. Au
+run d'avant, dix-huit refus successifs ne lui avaient pas fait trouver la sortie ; il avait fini
+par déclarer sa phase sans document.
+
+**Ce que je n'ai pas fait :** autoriser le shell en lecture. Juger une commande inoffensive
+demande de l'analyser, et `ls -la .skraft; rm -rf /` passerait n'importe quelle liste blanche.
+
+**La règle qu'on en tire, et qui dépasse ce cas :** un refus s'adresse à quelqu'un qui doit
+**continuer à travailler**. Il doit énoncer la sortie, pas la justification interne de la
+fermeture. Les autres motifs de la garde nommaient déjà le périmètre autorisé ; celui du shell
+était le seul à ne rien proposer d'utile.
+
+---
+
+## 29/09 — On décidait bien, sans jamais garder de quoi comprendre (ADR 0032)
+
+**Quatre runs, quatre diagnostics bloqués au même endroit.** À chaque fois l'information existait
+dans le code et n'était pas conservée :
+
+- la commande refusée par la garde — calculée dans `req.command`, puis jetée. Dix-huit refus
+  successifs sur un run sans savoir une seule fois ce que l'agent tentait ;
+- les fichiers que l'agent déclarait avoir écrits dans `report_phase`, que la porte `citations`
+  ignore alors qu'elle dit « document absent » ;
+- ce qui existait avant le `rollback`, qui rend indistinguables « il n'a jamais écrit » et « il a
+  écrit et on a rembobiné » ;
+- l'occupation du contexte, sur laquelle repose l'ADR 0031, que je n'ai pu vérifier qu'en
+  instrumentant le banc **après** avoir écrit l'ADR.
+
+C'est le motif du projet, retourné une fois de plus : **une décision correcte, prise sans conserver
+ce sur quoi elle porte.** Sauf qu'ici l'aveugle n'est pas une porte, c'est celui qui doit
+comprendre ce qui s'est passé.
+
+**Le changement qui compte.** La garde voyait **tous** les appels et ne rapportait que les refus.
+Elle rapporte maintenant aussi les autorisations, avec leur cible. C'est la seule fenêtre sur ce
+qu'un agent lit : les résultats des outils intégrés du runtime ne nous parviennent jamais,
+`tool-end` ne dit que « réussi ». Sans ça, les vingt-six appels d'un architecte restaient une boîte
+noire.
+
+**Deux distinctions écrites dans le contrat, pour qu'on ne les perde pas.** La trace *raconte*, la
+preuve *atteste* — une porte ne doit jamais s'appuyer sur une trace. Et la cause de fin d'un tour
+est nommée par ce qu'elle est (`silence`, `durée`, `contexte`, `coût`, `blocker`…), pas par un type
+d'erreur : c'est ce qui rend une trace lisible six mois plus tard.
+
+**Un défaut trouvé en route.** `append` levait une exception **synchrone** sur une méthode déclarée
+`Promise<void>` : un appelant qui faisait `.catch()` l'aurait prise en pleine face. Une trace ne
+doit sous aucun prétexte faire tomber la tâche qu'elle observe.
+
+---
+
+## 29/09 — Le premier run qui atteint une revue, et ce qu'il montre
+
+**Trois runs réels sur US-2, et seul le troisième dépasse DESIGN.**
+
+| | 28/09 | run 2 | run 3 |
+| --- | --- | --- | --- |
+| RESEARCH | 4 questions | 1 question | 1 essai, sans rejeu |
+| DESIGN atteint la revue | oui | **non** — mon plafond | **oui, deux fois** |
+| Cause des rejeux | `quality-gates` hors mandat | plafond de tokens | critiques d'architecture justes |
+
+Les correctifs de la veille tiennent. Ce qui reste bloquant est ailleurs, et c'est nouveau.
+
+**Un piège du banc, à ne pas reproduire.** La configuration du projet d'essai (couverture, barre de
+qualité, `coverlet`) vivait sur la branche `skraft/us-2`, pas sur `main`. Or le banc clone puis se
+place sur `main`. Les runs 1 et 2 ont donc tourné **sans** elle, et je m'apprêtais à en présenter
+les résultats DISTILL/DELIVER comme valides. Vérifier la branche que le banc utilise, pas celle
+qu'on a sous les yeux.
+
+### Trois défauts, par gravité croissante
+
+**1. Rien ne borne les questions d'un agent.** Sept questions en DESIGN, huit sessions neuves, et
+l'état affiche toujours « essai 1 » : `BLOCKED` → `HUMAN_DECISION` relance le spécialiste sans
+toucher à `attempts`. Sur un vrai run, le temps de réponse de l'humain masque la boucle ; au banc,
+qui répond en une seconde, elle saute aux yeux.
+
+**2. Les réponses humaines sont incitables — c'est la cause de la boucle.** Cinq de ces sept
+questions étaient la même. L'agent est pris entre notre porte `citations`, qui exige une source
+pour tout ce qu'il affirme, et le fait que les clarifications qu'on vient de lui donner n'existent
+que dans son prompt. Sa dernière question demandait littéralement qu'on les écrive dans un fichier.
+Le code les a pourtant dans `state.answers`.
+
+**3. Le retour de revue ne porte que sur le dernier rejet.** Essai 1 recalé par `architecture`,
+essai 2 par `cold-reader`. L'agent corrige l'un et attire l'autre : `lastRejection` n'en garde
+qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois
+essais, **le budget devient une loterie** — on peut satisfaire chaque critique à son tour sans
+jamais les satisfaire ensemble. C'est le plus sérieux.
+
+### Deux observations qui n'entrent pas dans les trois
+
+**Le modèle a émis un chemin en caractères gujaratis** : `.શ્કraft/us-2/design/domain-model.md`,
+qui *ressemble* à `.skraft/` sans en être. La garde l'a refusé, parce qu'elle compare des chemins
+résolus et non des apparences. Ce n'était pas une attaque, juste un modèle qui déraille — mais une
+garde qui « normaliserait » l'Unicode par confort laisserait passer la même chose.
+
+**La règle de synthèse fonctionne comme écrite** : deux lentilles APPROVED et une
+CHANGES_REQUESTED donnent CHANGES_REQUESTED. La note la plus basse l'emporte, une lentille
+satisfaite n'en rattrape pas une inquiète.
+
+---
+
+## 29/09 — Mon plafond de coût mesurait la mauvaise chose (ADR 0031)
+
+**Ce que le run a dit.** Second run réel sur US-2 : DESIGN a épuisé ses trois essais **uniquement**
+sur mon plafond de 1 M — 1023 k, 1048 k, 1049 k — sans qu'aucune lentille n'ait jamais siégé. Le
+filet était devenu la porte. Un tour normal d'`architect-model` sur un vrai projet *fait* un
+million ; j'avais écrit dans l'ADR 0027 que 1 M valait « environ sept fois un tour normal ».
+
+**Et la grandeur elle-même était fausse.** Le cumul des `inputTokens` :
+- compte ce qui a **transité**, cache de prompt compris ;
+- **ne décroît jamais**, même quand le runtime compacte et vide la fenêtre ;
+- n'est pas l'unité de facturation (Copilot facture en requêtes premium).
+
+**La mesure existait depuis le début et je ne l'écoutais pas.** `session.usage_info` donne
+`currentTokens` et `tokenLimit`, plus la ventilation système / conversation / définitions d'outils.
+Le plafond porte désormais sur `currentTokens / tokenLimit`, seuil 0,9. Plus de nombre magique :
+`tokenLimit` vient du modèle employé.
+
+**Le piège que j'ai mis sous test.** C'est la **dernière** mesure qui compte, jamais la plus haute
+atteinte. Sinon on réinvente exactement le compteur qui ne redescend pas — le défaut qu'on corrige.
+
+**Deux choses trouvées en chemin, dont une qui me contredit.** J'avais dit qu'on ignorait
+`cacheReadTokens` : faux, ces compteurs ne sont **pas** sur l'événement par appel, seulement dans
+le résumé de fin de session. Donc l'hypothèse « le cache absorbe l'essentiel de la croissance »
+reste **non vérifiée**, ni confirmée ni écartée. En revanche `copilotUsage.totalNanoAiu` existe :
+c'est le coût réel de chaque appel, désormais remonté.
+
+**Ce qui reste le plus urgent.** Le pourcentage d'occupation vit dans le cœur et **n'est pas
+affiché** — `chat:agent` ne le transporte pas, comme `usage`. Un plafond invisible se redécouvre à
+chaque fois par l'enquête, et c'est ce qui a coûté la soirée.
+
+**La leçon, pour la prochaine fois.** J'ai posé deux seuils en deux jours sans mesurer ce qu'ils
+bornaient. Le premier (30 min) tient parce qu'il est large. Le second était faux d'un facteur sept
+et a bloqué la seule chose qu'il devait protéger. Un seuil ne se règle pas sur une intuition : il
+se règle sur une grandeur qu'on a d'abord regardée.
+
+---
+
+## 28/09 — Ce qui n'a pas été jugé ne doit pas être jeté (ADR 0029, 0030)
+
+Deux pertes distinctes, toutes deux déclenchées par la même interruption du 28/09.
+
+**La première : le travail sur disque.** Le réducteur envoyait `TIMEOUT` dans le même `failure()`
+qu'un refus de porte — lequel commence par un `rollback`. Les quinze documents de conception écrits
+pendant 1 h 55 ont donc été effacés **sans qu'aucune porte les ait examinés**. Une porte qui refuse
+a jugé ; un délai n'a rien jugé. Et la sécurité ne reposait pas là-dessus : la porte de fin de phase
+juge l'état final, quel qu'ait été le chemin.
+
+Le détail qui compte dans le message rendu au tour suivant : pas seulement « tu as été interrompu »,
+mais « ce que tu avais écrit est resté, **possiblement incomplet**, relis-le ». Sans la seconde
+phrase, l'agent prend un fichier à moitié écrit pour un fichier fini.
+
+**La seconde : le contexte de la session.** `resumeSession` existait sur le port depuis l'origine.
+Elle n'était appelée que par la conversation humaine ; les agents de tâche ouvraient toujours une
+session neuve. La relance de 12:13 a donc repayé tout ce que l'architecte avait lu.
+
+**La règle qui sauve cette reprise d'être une mauvaise idée.** On ne reprend que si le contexte
+n'est pas en cause : le modèle n'a pas répondu, ou l'agent s'est tu. Si c'est **nous** qui avons
+coupé — plafond de durée ou de coût — reprendre renverrait le contexte qui a causé la coupure et
+retaperait le plafond dans la seconde. C'est la boucle « retried 5 times » du journal. Là, la
+session neuve est le remède, pas la perte.
+
+C'est ce qui justifie après coup d'avoir fait trois erreurs distinctes ce matin plutôt qu'une seule.
+Je ne l'avais pas prévu : je les avais séparées pour que l'humain lise le bon motif.
+
+**Ce que j'ai laissé ouvert.** Le SDK reçoit `systemMessage: { mode: "append" }` à la reprise comme
+à l'ouverture. Si l'append est cumulatif, le prompt système est ajouté deux fois. `main-session.ts`
+fait pareil depuis l'origine sans défaut constaté — mais personne ne l'a éprouvé exprès. Inscrit en
+« À vérifier » dans l'ADR 0030.
+
+---
+
+## 28/09 — Une lentille sans rien à mesurer invente un grief (ADR 0028)
+
+**Le symptôme.** La revue de DESIGN sur US-2 a été refusée **deux fois de suite**, par la même
+lentille, sur le même motif : les documents de conception « présentent le flux cible comme
+l'implémentation actuelle » et citent `CalculDuPanier.cs:15-22` qui ne contient pas ce flux.
+
+**Pourquoi c'était sans issue.** Un document de conception décrit ce qui n'existe pas encore ;
+c'est sa fonction. À chaque essai l'architecte réécrit, à chaque essai la lentille retrouve le même
+écart. Le budget s'épuise, la tâche escalade.
+
+**La cause.** `quality-gates` confronte les livrables aux faits **mesurés**. En DESIGN il n'y en a
+aucun : pas un test n'existe. Mais `reviewFacts` lui servait quand même des lignes « Livrable X :
+porte validée à l'essai 1 (sha256 …) » sous l'intitulé *« Faits établis par le code (acquis : ne
+les revérifie pas) »*. L'existence d'un fichier n'est pas une mesure. Sommée de juger sans matière,
+elle est allée chercher ailleurs.
+
+**C'est notre défaut habituel, retourné.** On répète qu'une porte ne doit jamais attester ce
+qu'elle n'a pas mesuré. Il faut lire aussi : elle ne doit pas le **reprocher**.
+
+**Ce qui rend le retrait légitime, et que j'ai mis sous test.** Écarter une lentille pourrait
+laisser une des quatre questions de `review.ts` sans réponse — et la synthèse refuse alors
+d'approuver, ce qui ferait tourner la revue en rond *autrement*. Le test parcourt les **douze**
+couples (niveau, phase) et exige la couverture. Sans ce test, le correctif serait une nouvelle
+impasse déguisée.
+
+**Deux tests existants affirmaient l'ancienne règle.** Je les ai corrigés délibérément — intitulé
+réécrit, renvoi à l'ADR — et non pour les faire redevenir verts.
+
+**Ce que ça ne corrige pas.** Rien, dans le code, n'empêche une lentille de rendre un défaut hors
+de son mandat. Les verdicts sont à schéma, mais le *contenu* d'un défaut n'est pas contraint, et ne
+peut probablement pas l'être. À surveiller sur les prochains runs réels.
+
+---
+
+## 28/09 — La durée ne dit rien du coût (ADR 0027)
+
+**Le chiffre.** DESIGN : 4 230 824 tokens d'entrée, 529 k par tour. Les lentilles de revue, sur le
+même run : 83 k. Un facteur six.
+
+**La cause est structurelle, pas accidentelle.** Chaque appel au modèle renvoie tout le contexte,
+donc le repaie : un tour de N appels d'outil coûte en **O(N²)**, et rien ne bornait N. L'architecte
+lisait le dépôt, appelait un outil, relisait — chaque aller-retour emportant tout ce qui précédait.
+
+**Le signal était déjà là.** L'événement `usage` du runtime porte `inputTokens`, et
+`task-agent-runner.ts` ne s'en servait que pour *compter après coup*. Le lire en direct dans
+`runTurn` suffit à couper. Le piège que j'ai mis sous test : **le cumul ne décroît jamais** — c'est
+ce qui a été payé, pas ce qui tient en mémoire. Regarder la taille du dernier appel ne couperait
+rien, parce que les appels rétrécissent souvent pendant que la facture monte.
+
+**Ce que ça ne corrige pas, et il faut le dire.** C'est un coupe-circuit. Le contexte croît
+exactement pareil ; on cesse seulement de payer au-delà de 1 M. Le vrai correctif n'est pas dans le
+cœur : c'est de donner moins à lire à l'agent — un dossier de passation construit par le code
+plutôt qu'un dépôt à explorer. Et la dépense reste **invisible pendant** la tâche : elle est écrite
+dans `tasks/<id>/usage/<taskId>.json` et ne remonte pas à l'écran. Le responsable a découvert les
+4,2 M en lisant un fichier.
+
+---
+
+## 28/09 — Un tour d'agent a duré 1 h 55, et rien ne le bornait (ADR 0026)
+
+**Ce qui s'est passé.** Premier vrai run de `skraft-pipeline` sur US-2 du projet d'essai .NET.
+Le responsable a vu une tâche « qui ne finit jamais ». Le journal dit autre chose :
+
+```
+10:13:59  session ouverte   skraft-architect-model
+                            ← 1 h 55 min 41 s sans aucune transition
+12:09:40  effet en échec    TIMEOUT
+```
+
+**Pourquoi le chien de garde n'a rien vu.** Il ne surveille que l'**inactivité** (5 min), et il est
+réarmé par chaque événement de session **et** chaque battement d'outil. L'agent parlait sans cesse.
+Le chronomètre n'a fini par se déclencher que quand l'agent s'est réellement tu, deux heures plus
+tard. D30 dit « un agent qui travaille ne doit pas être coupé » — et c'est vrai. Mais
+**l'activité n'est pas la progression** : DESIGN a brûlé 4 230 824 tokens d'entrée pour 8 requêtes
+(529 k par requête), et tout a été rejoué depuis le checkpoint à l'annulation.
+
+**Ce que j'ai ajouté.** Un plafond de durée totale du tour, défaut 30 min, que **rien ne réarme**.
+Un test le défend explicitement — sans lui, un futur « réarmons-le aussi » en referait un second
+chronomètre d'inactivité, inutile. Erreur distincte `TurnBudgetError`, parce que « il ne répond
+plus » et « il n'en finissait pas » n'appellent pas la même correction chez l'humain qui lit.
+
+**Ce que ça ne corrige pas.** Le coût. Un tour peut tenir sous 30 min et consommer un demi-million
+de tokens : 529 k par requête en DESIGN contre 83 k pour les lentilles. Borner le contexte d'une
+session est un chantier à part, encore ouvert. Troisième point vu au passage : la lentille
+`quality-gates` a rejeté DESIGN deux fois parce que les documents décrivent la cible et non
+l'existant — reproche qu'un document de conception ne peut structurellement pas satisfaire, dans
+une phase où aucun fait n'est mesuré.
+
+---
+
 ## 28/09 — Aucune skill n'était inutilisée ; deux fichiers l'étaient
 
 **Demandé :** supprimer les skills qu'on n'utilise pas. **Mesuré d'abord :** les douze skills

@@ -111,6 +111,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       workspace: {
         readFile: (p) => call("workspace.readFile", [p]),
         writeFile: (p, content) => call("workspace.writeFile", [p, content]),
+        ensureDir: (path: string) => call("workspace.ensureDir", [path]) as Promise<void>,
         listFiles: () => call("workspace.listFiles", []),
         checkpoint: (label) => call("workspace.checkpoint", [label]),
         rollback: (id) => call("workspace.rollback", [id]),
@@ -146,6 +147,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       },
       interactions: { request: (req) => call("interactions.request", [req]) },
       evidence: { list: (taskId) => call("evidence.list", [taskId]) },
+      trace: { rejected: (taskId, label, files) => call("trace.rejected", [taskId, label, files]) as Promise<void> },
       tools: {
         register(tool) {
           tools.set(tool.name, tool);

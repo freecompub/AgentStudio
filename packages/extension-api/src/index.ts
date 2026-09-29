@@ -9,9 +9,9 @@ import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 export const API_VERSION = "0.1.0";
 
 // Erreurs et utilitaires utilisables sans dépendre du cœur (D10). Voir `errors.ts`.
-export { EnvFailureError, TurnTimeoutError, WorkDefectError } from "./errors.js";
+export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
-export { globToRegExp, matchesAny } from "@agent-studio/stack-adapters";
+export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
@@ -142,6 +142,11 @@ export interface WorkspaceApi {
   readFile(path: string): Promise<string>;
   /** Écriture par le code de l'extension, limitée aux motifs `fs:write:<glob>` déclarés (D11, D29). */
   writeFile(path: string, content: string): Promise<void>;
+  /**
+   * Crée un dossier et ses parents (ADR 0037) : l'orchestrateur prépare l'arborescence pour que
+   * l'agent n'ait pas à s'en soucier. Confiné comme l'écriture.
+   */
+  ensureDir(path: string): Promise<void>;
   listFiles(): Promise<string[]>;
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;
@@ -255,6 +260,18 @@ export interface ExtensionLog {
   warn(msg: string, fields?: Record<string, string | number | boolean>): void;
 }
 
+/**
+ * Trace d'exécution accessible à une extension (ADR 0038) : elle **raconte**, elle n'atteste rien.
+ * Une porte ne doit jamais s'y appuyer — les preuves (`evidence`) font seules foi.
+ */
+export interface ExtensionTrace {
+  /**
+   * Archive des livrables avant qu'un rollback ne les efface. `étiquette` situe le moment
+   * (« DESIGN essai 2 »), et chaque fichier est enregistré avec son chemin.
+   */
+  rejected(taskId: string, label: string, files: readonly { path: string; content: string }[]): Promise<void>;
+}
+
 export interface ExtensionContext {
   readonly extensionId: string;
   readonly chat: ChatApi;
@@ -265,6 +282,8 @@ export interface ExtensionContext {
   readonly tasks: TasksApi;
   readonly interactions: InteractionsApi;
   readonly evidence: EvidenceApi;
+  /** Trace d'exécution (ADR 0032, 0038) : elle raconte, elle n'atteste rien. */
+  readonly trace: ExtensionTrace;
   readonly hooks: HooksApi;
   readonly tools: ToolsApi;
   readonly log: ExtensionLog;

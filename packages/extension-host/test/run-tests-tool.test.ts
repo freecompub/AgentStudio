@@ -3,6 +3,7 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, RecordingCheck
 import type { ExtensionContext, ExtensionManifest } from "@agent-studio/extension-api";
 import type { StackAdapter, TestRun } from "@agent-studio/stack-adapters";
 import { createTaskEngine, MemoryTaskStore } from "@agent-studio/task-engine";
+import { readOnlyGuard } from "../src/test-runs.js";
 import type { Workspace } from "@agent-studio/workspace";
 import { describe, expect, it } from "vitest";
 import { activateInProcess } from "../src/in-process-host.js";
@@ -49,7 +50,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
   };
   const workspace: Workspace = {
     root: "/projets/demo",
-    files: { read: async () => "contenu", write: async () => {}, list: async () => ["tests/a.test.ts", "src/a.ts"] },
+    files: { read: async () => "contenu", write: async () => {}, ensureDir: async () => {}, list: async () => ["tests/a.test.ts", "src/a.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
     repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
@@ -178,5 +179,25 @@ describe("Outil run_tests et preuves (D20)", () => {
 
   it("résumé d'un dépassement de délai", () => {
     expect(summarizeRun({ ...RED, timedOut: true })).toMatch(/délai/);
+  });
+});
+
+/**
+ * Gel insensible à la casse (ADR 0035).
+ *
+ * Windows et macOS ont un système de fichiers insensible à la casse par défaut : `.skraft/quality.json`
+ * et `.skraft/QUALITY.JSON` y désignent le même fichier. Un gel qui compare la casse ne gèle donc
+ * rien — il suffit d'une majuscule pour réécrire la barre de qualité que la porte lit pour juger.
+ */
+describe("readOnlyGuard — la casse ne contourne pas le gel", () => {
+  it("refuse le chemin gelé quelle que soit sa casse", async () => {
+    const g = readOnlyGuard("/p", [".skraft/quality.json"]);
+    for (const chemin of [".skraft/quality.json", ".skraft/QUALITY.JSON", ".SKRAFT/Quality.Json"])
+      expect(await g.check({ kind: "write", toolName: "edit", path: chemin }), chemin).toMatchObject({ decision: "deny" });
+  });
+
+  it("laisse passer un chemin réellement différent", async () => {
+    const g = readOnlyGuard("/p", [".skraft/quality.json"]);
+    expect(await g.check({ kind: "write", toolName: "edit", path: ".skraft/qualites.json" })).toMatchObject({ decision: "allow" });
   });
 });

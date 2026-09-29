@@ -14,7 +14,7 @@ function fakeWorkspace(): Workspace {
   let n = 0;
   return {
     root: "/projets/demo",
-    files: { read: async () => "", write: async () => {}, list: async () => [] },
+    files: { read: async () => "", write: async () => {}, ensureDir: async () => {}, list: async () => [] },
     checkpoints: {
       create: async (label) => ({ id: `cp-${++n}`, sha: "s", head: "h", label, createdAt: "" }),
       list: async () => [],

@@ -143,10 +143,14 @@ export async function assemble(
   });
   const registry = createRegistry();
   const posted: string[] = [];
+  // Comme l'application : les sessions survivent d'un essai à l'autre et sont libérées quand la
+  // tâche se termine (ADR 0039). Sans ce relais, le banc ne vérifierait plus rien de ce cycle.
+  const agents = createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 });
+  engine.onUpdate((r) => void (r.status === "finished" && agents.releaseTask(r.id)));
   const hostDeps: HostDeps = {
     registry,
     engine,
-    agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
+    agents,
     workspace,
     stack: opts.stack ?? createTypeScriptAdapter(),
     interactions,

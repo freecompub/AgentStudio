@@ -4,7 +4,7 @@ import { satisfies } from "./semver.js";
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;
 /** Outils fournis par le cœur : leur handler est notre code, jamais celui de l'extension. */
-const STANDARD_TOOLS = new Set(["run_tests", "run_lint", "report_blocker"]);
+const STANDARD_TOOLS = new Set(["run_tests", "run_lint", "list_files", "report_blocker"]);
 
 const PERMISSION = /^(fs:read|fs:write:[^\s]+|shell:test|shell:[a-z0-9_.,-]+|git:(commit|branch|revert)|copilot:sessions|net:[a-z0-9.,*-]+)$/;
 const text = (max: number) => z.string().trim().min(1).max(max);

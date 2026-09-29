@@ -89,7 +89,17 @@ const shorten = (s: string, max: number) => (s.length > max ? `${s.slice(0, max 
  * Contrat d'exécution dans agent-studio, ajouté en dernier au prompt : il prime sur les consignes du
  * contenu partagé, écrites pour des harnais où l'agent lance lui-même les tests et commite.
  */
-export function contractBlock(a: { output: string; tools: readonly string[]; writes: boolean; onDemand: readonly { ref: string; description: string }[] }): string {
+export function contractBlock(a: {
+  output: string;
+  tools: readonly string[];
+  /**
+   * Périmètre d'écriture du rôle, **nommé** (ADR 0036). C'était un booléen : le contrat disait
+   * « tu n'écris que dans ton périmètre » sans dire lequel, et l'agent devait le deviner ou se le
+   * faire dire par un refus.
+   */
+  writes: readonly string[];
+  onDemand: readonly { ref: string; description: string }[];
+}): string {
   const lines = [
     "## Fonctionnement dans agent-studio",
     "Ces règles priment sur toute consigne contraire du rôle ou des skills ci-dessus.",
@@ -115,8 +125,22 @@ export function contractBlock(a: { output: string; tools: readonly string[]; wri
     lines.push("- Skills disponibles à la demande avec l'outil `load_skill` :");
     for (const s of a.onDemand) lines.push(`  - \`${s.ref}\` : ${shorten(s.description, 300)}`);
   }
+  if (a.tools.includes("list_files"))
+    lines.push("- Pour explorer le projet — voir l'arborescence, trouver des fichiers —, appelle `list_files`, avec un motif si tu veux filtrer.");
+  // Dire ce qui MANQUE, et pas seulement ce qui est offert (ADR 0034). Sans cette phrase, l'agent
+  // découvre l'absence de shell en s'y cognant : trois refus sur un run réel, dix-huit sur un autre.
+  // Un refus est un filet, il ne remplace pas une consigne.
+  lines.push(
+    `- Tu n'as ni shell, ni accès réseau, ni outil externe : **aucune commande ne peut être lancée**, même en lecture. Tu lis les fichiers du projet avec tes outils de lecture${a.tools.includes("list_files") ? ", et tu l'explores avec `list_files`" : ""}.`,
+  );
   lines.push("- N'utilise jamais Git (commit, reset, checkout, stash, rebase, push…) : l'application enregistre et restaure le travail elle-même.");
-  lines.push(a.writes ? "- Tu n'écris que dans ton périmètre : toute autre écriture est refusée." : "- Tu n'écris aucun fichier.");
+  // Nommer ce qui est permis ne suffit pas : un agent peut lire « voilà où tu écris » sans en
+  // conclure « et nulle part ailleurs, ni modifier, ni supprimer ». Les deux moitiés sont dites.
+  lines.push(
+    a.writes.length
+      ? `- Tu n'écris que dans : ${a.writes.join(", ")}. **Ne modifie et ne supprime aucun autre fichier du projet**, hors de ces chemins : toute autre écriture est refusée.`
+      : "- Tu n'écris aucun fichier.",
+  );
   return lines.join("\n");
 }
 
@@ -143,7 +167,7 @@ export function composeAgentPrompt(agent: ManifestAgent, roleBody: string | null
     contractBlock({
       output: agent.output,
       tools: agent.tools ?? [],
-      writes: (agent.write ?? []).length > 0,
+      writes: agent.write ?? [],
       onDemand: [...onDemand].map(([ref, s]) => ({ ref, description: s.description })),
     }),
   );

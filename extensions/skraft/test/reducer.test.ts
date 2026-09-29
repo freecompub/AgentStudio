@@ -28,6 +28,7 @@ const REPORTED: Ev = { type: "AGENT_REPORTED", role: "skraft-researcher", summar
 const GATE_OK: Ev = { type: "GATE_OK", artifacts: [{ path: "a.md", sha256: "h", producedBy: "x", attempt: 1 }] };
 const GATE_FAIL: Ev = { type: "GATE_FAIL", gate: "citations", reasons: ["fichier de 55 lignes"] };
 const COMMITTED: Ev = { type: "COMMITTED", sha: "sha" };
+const TIMEOUT = (reason: string): Ev => ({ type: "TIMEOUT", reason });
 const lens = (verdict: LensVerdict["verdict"], severities: ("blocker" | "major" | "minor")[] = []): LensVerdict => ({
   lens: "cold-reader",
   verdict,
@@ -194,19 +195,21 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(effects).toEqual([{ kind: "commitPhase", phase: "RESEARCH", message: "docs(skraft): research de us-12" }]);
   });
 
-  it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau", () => {
+  it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau, réduites à ce que la phase peut occuper", () => {
+    // `quality-gates` est écartée de DESIGN (ADR 0028) : aucun fait n'y est mesuré, et sommée de
+    // juger sans matière elle invente un grief hors de son mandat. Les trois autres couvrent à
+    // elles seules les quatre questions — `lentilles-par-phase.test.ts` le vérifie.
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK]);
     expect(state.stage).toBe("REVIEW");
-    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture", "quality-gates"], attempt: 1 }]);
+    expect(effects).toEqual([{ kind: "runReview", phase: "DESIGN", lenses: ["cold-reader", "test-integrity", "architecture"], attempt: 1 }]);
+    // Le niveau garde bien ses quatre lentilles : c'est la phase qui en écarte une, pas le niveau.
+    expect(state.lenses).toEqual(["cold-reader", "test-integrity", "architecture", "quality-gates"]);
   });
 
-  it("GATE_FAIL avec budget → rollback au checkpoint de phase, relance ciblée avec les motifs", () => {
+  it("GATE_FAIL avec budget → relance ciblée avec les motifs, sans rien annuler (ADR 0040)", () => {
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
     expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "citations", reasons: ["fichier de 55 lignes"] } });
-    expect(effects).toEqual([
-      { kind: "rollback", to: "cp-RESEARCH" },
-      { kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] },
-    ]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] }]);
   });
 
   it("GATE_FAIL, budget épuisé → ESCALATED", () => {
@@ -220,9 +223,13 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     ]);
   });
 
-  it("TIMEOUT d'un agent = GATE_FAIL", () => {
+  it("TIMEOUT d'un agent : même relance qu'un GATE_FAIL, mais sans annuler le travail (ADR 0029)", () => {
+    // L'équivalence TIMEOUT = GATE_FAIL tenait sur la relance et le budget ; elle ne tient pas sur
+    // le rollback. Une porte a jugé le travail, un délai n'a rien jugé. Détail dans le describe
+    // « interruption et verdict » plus bas.
     const { state } = play([...toFirstPhase(), CP("RESEARCH"), { type: "TIMEOUT", reason: "silence" }]);
-    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "délai", reasons: ["silence"] } });
+    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "délai" } });
+    expect(state.lastRejection?.reasons.join(" ")).toContain("silence");
   });
 
   it("ENV_FAILURE → ESCALATED immédiat, sans consommer le budget", () => {
@@ -254,13 +261,10 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(kinds(effects)).toEqual(["commitPhase"]);
   });
 
-  it("REVIEW : CHANGES_REQUESTED → rollback, relance avec les seuls défauts blocker et major", () => {
+  it("REVIEW : CHANGES_REQUESTED → relance avec les seuls défauts blocker et major", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL"), REPORTED, GATE_OK, LENSES(lens("APPROVED", ["major", "minor"]))]);
     expect(state.stage).toBe("SPECIALIST");
-    expect(effects).toEqual([
-      { kind: "rollback", to: "cp-DISTILL" },
-      { kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader, major] défaut major (Sources/A.swift:3)"] },
-    ]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader, major] défaut major (Sources/A.swift:3)"] }]);
   });
 
   it("REVIEW : REJECTED → ESCALATED", () => {
@@ -549,10 +553,7 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
       const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague" }] });
       const r = play([...delivered, minorOnly]);
-      expect(r.effects).toEqual([
-        { kind: "rollback", to: "cp-DELIVER" },
-        { kind: "planDeliver" },
-      ]);
+      expect(r.effects).toEqual([{ kind: "planDeliver" }]);
       expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague) ; test-integrity : APPROVED ; architecture : APPROVED ; quality-gates : APPROVED."] });
       expect(r.state.deliver?.step).not.toBe("fix");
     });
@@ -665,5 +666,102 @@ describe("Invariants (§5.3)", () => {
 
   it("état corrompu refusé par le validateur", () => {
     expect(validateState({ schemaVersion: 1, stage: "DISCOVER" })).toMatchObject({ ok: false, reason: expect.stringMatching(/état corrompu/) });
+  });
+});
+
+/**
+ * Un tour interrompu n'est pas un travail jugé mauvais (ADR 0029).
+ *
+ * Le 28/09, le tour de `skraft-architect-model` a été coupé après 1 h 55, et le réducteur a traité
+ * ce `TIMEOUT` par le **même chemin** qu'un refus de porte : `rollback` au checkpoint de phase.
+ * Tout ce que l'architecte avait écrit a donc été effacé, alors qu'aucune porte ne l'avait examiné.
+ *
+ * Une porte qui refuse a JUGÉ le travail ; un délai dépassé n'a RIEN jugé. La sécurité ne repose
+ * pas sur ce rollback — la porte de fin de phase juge l'état final, quel que soit le nombre de
+ * tours qu'il a fallu pour l'atteindre.
+ */
+describe("Réducteur skraft — interruption et verdict ne mènent pas au même effet", () => {
+  it("TIMEOUT : relance sans rollback — le travail du tour reste sur le disque", () => {
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("silence")]);
+    expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1 });
+    expect(effects.map((f) => f.kind)).toEqual(["runSpecialist"]);
+  });
+
+  /**
+   * ADR 0040 : le rejet de porte a rejoint l'interruption, pour une autre raison. Depuis l'ADR 0039
+   * l'agent garde sa session : sa conversation contient les appels d'outils qui ont créé ses
+   * fichiers. Les effacer sous lui, c'est lui demander de corriger ce qui n'existe plus.
+   */
+  it("GATE_FAIL : n'annule plus rien non plus — l'agent garde sa session ET ses fichiers", () => {
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
+    expect(effects.map((f) => f.kind)).toEqual(["runSpecialist"]);
+  });
+
+  it("le tour suivant est prévenu que le précédent a été interrompu, pas refusé", () => {
+    // Sans cette phrase, l'agent relit des fichiers à moitié écrits en les croyant finis.
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("plafond atteint")]);
+    const relance = effects.find((f) => f.kind === "runSpecialist") as unknown as { feedback: string[] };
+    const texte = relance.feedback.join(" ");
+    expect(texte).toContain("plafond atteint");
+    expect(texte).toMatch(/interrompu/i);
+    expect(texte).toMatch(/disque|déjà écrit/i);
+  });
+
+  it("le budget d'essais est consommé quand même : une interruption ne se rejoue pas sans fin", () => {
+    const { state } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("a"), TIMEOUT("b")]);
+    expect(state.attempts).toBe(2);
+  });
+
+  it("budget épuisé : escalade, et là le rollback revient — l'humain reprend un dépôt propre", () => {
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), TIMEOUT("a"), TIMEOUT("b"), TIMEOUT("c")]);
+    expect(state.stage).toBe("ESCALATED");
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-RESEARCH" });
+  });
+});
+
+/**
+ * La première revue d'une phase a droit à un essai (ADR 0042).
+ *
+ * Run du 29/09, DISTILL relancée depuis une base où RESEARCH et DESIGN étaient déjà produites :
+ *
+ *   essai 1  porte valeurs  rejet — « 10 articles ou plus : 5 % » absent du scénario @ac-1
+ *   essai 2  porte valeurs  rejet — même famille
+ *   essai 3  portes valeurs et RED franchies, puis la revue rend DEUX DÉFAUTS MAJEURS :
+ *            `Facture.ATPayer` ignore `Remise`, alors que le contrat de conception ratifié exige
+ *            `SommeDesArticles - Remise + FraisDePort`.
+ *
+ * Précis, corrigeables — et partis en escalade, budget épuisé, sans qu'un seul tour ait pu y
+ * répondre. Le budget est commun aux portes de forme et à la revue, alors que recopier une valeur
+ * dans un Gherkin et rebrancher un calcul de facture ne sont pas le même travail.
+ */
+describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les portes de forme", () => {
+  const CHANGES = LENSES(lens("CHANGES_REQUESTED", ["major"]));
+  // DISTILL, la phase du run : deux rejets de la porte des valeurs, puis la porte passe.
+  const jusquADistill = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL")];
+  const épuiser = [...jusquADistill, REPORTED, GATE_FAIL, REPORTED, GATE_FAIL];
+
+  it("budget à zéro, première revue défavorable : un essai est accordé, pas une escalade", () => {
+    const { state, effects } = play([...épuiser, REPORTED, GATE_OK, CHANGES]);
+    expect(state.attempts).toBe(3); // le budget EST épuisé…
+    expect(state.stage).toBe("SPECIALIST"); // …et pourtant la phase repart
+    expect(kinds(effects)).toEqual(["runSpecialist"]);
+    const relance = effects.find((f) => f.kind === "runSpecialist") as unknown as { feedback: string[] };
+    expect(relance.feedback.join(" ")).toContain("défaut major");
+  });
+
+  it("la DEUXIÈME revue défavorable escalade : l'essai est garanti une fois, pas indéfiniment", () => {
+    const { state, effects } = play([...épuiser, REPORTED, GATE_OK, CHANGES, REPORTED, GATE_OK, CHANGES]);
+    expect(state.stage).toBe("ESCALATED");
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-DISTILL" });
+  });
+
+  it("la garantie ne vaut que pour la revue : une porte de forme escalade comme avant", () => {
+    const { state } = play([...épuiser, REPORTED, GATE_FAIL]);
+    expect(state.stage).toBe("ESCALATED");
+  });
+
+  it("un verdict REJECTED escalade toujours, budget ou non : ce n'est pas une demande de changement", () => {
+    const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
+    expect(state.stage).toBe("ESCALATED");
   });
 });

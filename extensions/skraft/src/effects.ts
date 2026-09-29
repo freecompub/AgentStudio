@@ -72,6 +72,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const branch = `skraft/${slug}`;
       const baseSha = await ctx.git.head();
       await ctx.git.branch(branch);
+      // L'arborescence est créée ICI, une fois pour toutes (ADR 0037) : la trace du 29/09 montrait
+      // le chercheur tenter deux `mkdir -p` avant d'écrire — réflexe juste sous shell, et sans
+      // objet ici. Le code prépare, l'agent n'a plus à y penser.
+      for (const d of dossiersDeLaStory(slug)) await ctx.workspace.ensureDir(d);
       const indicators = computeIndicators(parsed.story, repositoryShape(await ctx.workspace.listFiles()));
       return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators };
     }
@@ -108,8 +112,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         const selected = preselectFiles(state.story, files);
         if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
       }
+      // Seul l'emplacement est dynamique : il vient de la stack. La norme de nommage et de recopie
+      // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
-      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
+      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
     }
@@ -184,9 +190,25 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       });
       return;
 
-    case "rollback":
+    case "rollback": {
+      // Archiver AVANT (ADR 0038) : le rollback efface le livrable en même temps que le verdict qui
+      // le condamne, et on ne peut plus examiner ce qu'un agent a produit au moment précis où on
+      // voudrait le lire. La trace raconte ; elle n'atteste rien.
+      const étiquette = `${state.phase ?? "?"} essai ${state.attempts}`;
+      const àArchiver = await ctx.workspace.changedFiles(effect.to).catch(() => []);
+      const livrables = await Promise.all(
+        àArchiver
+          .filter((f) => f.status !== "deleted")
+          .map(async (f) => ({ path: f.path, content: await ctx.workspace.readFile(f.path).catch(() => "") })),
+      );
+      if (livrables.length) await ctx.trace.rejected(taskId, étiquette, livrables);
       await ctx.workspace.rollback(effect.to);
+      // `git clean -fd` emporte les dossiers non suivis, et Git ne suit jamais un dossier vide :
+      // l'arborescence créée à l'initialisation disparaît au PREMIER rejet, et l'essai suivant
+      // retombe dans l'impasse qui a bloqué RESEARCH pendant trois runs. On la recrée donc ici.
+      for (const d of dossiersDeLaStory(state.slug)) await ctx.workspace.ensureDir(d);
       return;
+    }
 
     case "commitPhase":
       // Rapports de revue réécrits depuis l'état (un rollback de réessai a pu les effacer) : reproductibles.
@@ -228,6 +250,30 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   return { type: "GATE_OK", artifacts };
 }
+
+/**
+ * Fichiers qu'aucun agent n'écrit, quel que soit son périmètre.
+ *
+ * `.skraft/quality.json` porte la **barre de qualité** — seuils de couverture, score de mutation,
+ * règles de dépendance — que la porte de livraison lit pour juger le travail. Le périmètre
+ * d'écriture des rôles est `.skraft/**`, qui l'incluait : un agent pouvait abaisser le critère sur
+ * lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi. C'est le contraire du
+ * principe du projet — le LLM propose, le code décide et vérifie.
+ */
+export const GELÉS = [".skraft/quality.json"] as const;
+
+/**
+ * Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037).
+ *
+ * Créés à l'initialisation. Les tenir ici, en un seul endroit, évite que la liste diverge de ce que
+ * les portes attendent — `checkDesign` lit `design/`, la porte citations lit `research/`.
+ */
+export const dossiersDeLaStory = (slug: string): string[] => [
+  `.skraft/${slug}/research`,
+  `.skraft/${slug}/design`,
+  `.skraft/${slug}/distill/features`,
+  `.skraft/${slug}/reviews`,
+];
 
 /** Porte citations (§7.1) : document au gabarit, citations vérifiées sur le dépôt, questions ouvertes. */
 async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: number): Promise<Ev> {
@@ -319,8 +365,11 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   }
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
-  const results = run.results.filter((r) => matchesAny(acceptanceGlobs, r.file) || matchesAny(acceptanceGlobs, r.id));
-  const red = checkAcceptanceRed({ criteria, testPlan, results });
+  // La suite entière est transmise : c'est la porte qui reconnaît ses tests, au marqueur `ac-<n>`
+  // qu'elle exige (ADR 0041). Filtrer ici sur les globs de `layout.acceptanceTests` comparait un
+  // chemin de fichier à un identifiant que le rapport n'exprime pas ainsi — `Tarification.Tests.
+  // RemiseParPalierAcceptanceTests` pour JUnit — et ne rendait jamais rien.
+  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results });
   if (red.reasons.length) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: red.reasons };
 
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");

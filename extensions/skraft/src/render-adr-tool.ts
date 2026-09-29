@@ -1,7 +1,7 @@
 import type { ExtensionContext, ExtensionTool } from "@agent-studio/extension-api";
-import { adrId, adrPath, nextAdrNumber, parseAdr, renderAdr, supersessionLine, validateAdrInput, type AdrInput } from "./adr.js";
+import { adrId, adrPath, nextAdrNumber, parseAdr, renderAdr, slugify, supersessionLine, validateAdrInput, type AdrInput } from "./adr.js";
 
-const ADR_FILE = /^docs\/adr\/adr-(\d{3,})-[^/]+\.md$/;
+const ADR_FILE = /^docs\/adr\/adr-(\d{3,})-([^/]+)\.md$/;
 export const SUPERSESSIONS = "docs/adr/supersessions.md";
 
 /**
@@ -35,9 +35,23 @@ export function renderAdrTool(ctx: ExtensionContext, today: () => string = () =>
       const existing = (await ctx.workspace.listFiles())
         .map((p) => ({ p, m: ADR_FILE.exec(p) }))
         .filter((x): x is { p: string; m: RegExpExecArray } => !!x.m)
-        .map((x) => ({ path: x.p, number: Number(x.m[1]) }));
+        .map((x) => ({ path: x.p, number: Number(x.m[1]), slug: x.m[2]! }))
+        .sort((a, b) => a.number - b.number);
       let number = nextAdrNumber(existing.map((e) => e.number));
       let path = adrPath(number, input.title);
+      // Même titre, statut encore Proposed : on réécrit ce brouillon plutôt que d'en ouvrir un
+      // second (ADR 0040). Depuis qu'un rejet de porte n'efface plus les fichiers, l'architecte
+      // relancé rappelle `render_adr` sur la même décision ; sans ceci, chaque essai laisserait
+      // un ADR de plus, et deux brouillons de la même décision ne sont pas une décision.
+      if (input.number === undefined) {
+        const slug = slugify(input.title);
+        for (const candidate of existing.filter((e) => e.slug === slug)) {
+          if (parseAdr(await ctx.workspace.readFile(candidate.path)).status !== "Proposed") continue;
+          number = candidate.number;
+          path = candidate.path;
+          break;
+        }
+      }
       if (input.number !== undefined) {
         const same = existing.find((e) => e.number === input.number);
         if (!same) throw new Error(`ADR refusé : ${adrId(input.number)} n'existe pas ; ne donne un numéro que pour amender un ADR proposé.`);

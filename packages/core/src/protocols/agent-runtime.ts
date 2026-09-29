@@ -107,10 +107,55 @@ export type AgentEvent =
   | { type: "reasoning"; text: string }
   | { type: "tool-start"; toolCallId: string; toolName: string }
   | { type: "tool-progress"; toolCallId: string; message: string }
-  | { type: "tool-end"; toolCallId: string; success: boolean }
+  /**
+   * Fin d'un appel d'outil. `error` vient du runtime (ADR 0037) : sans lui, une trace dit qu'un
+   * outil a échoué sans jamais dire pourquoi. Quinze échecs d'écriture ont ainsi coûté trois runs
+   * d'enquête, alors que le message — « Parent directories must exist » — était disponible.
+   */
+  | { type: "tool-end"; toolCallId: string; success: boolean; error?: { code?: string; message: string; remediation?: string } }
   | { type: "tool-denied"; toolName: string; reason: string }
+  /**
+   * Décision de la garde sur un appel soumis à permission, **autorisé comme refusé** (ADR 0032).
+   *
+   * C'est la seule fenêtre sur ce qu'un agent lit, écrit ou exécute : les résultats des outils
+   * intégrés du runtime ne nous parviennent pas, `tool-end` ne dit que « réussi ».
+   */
+  | { type: "permission"; kind: string; toolName: string; target?: string; decision: "allow" | "deny"; reason?: string }
   /** Consommation d'un appel au modèle (§13) ; `multiplier` = coût relatif du modèle (Copilot). */
-  | { type: "usage"; model?: string; inputTokens?: number; outputTokens?: number; multiplier?: number }
+  | {
+      type: "usage";
+      model?: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      multiplier?: number;
+      /**
+       * Coût réel de cet appel, en **nano-AIU** — l'unité de facturation du fournisseur (ADR 0031).
+       *
+       * C'est la seule grandeur de coût que le runtime rende par appel. Le cumul des `inputTokens`
+       * n'en est pas une : il compte ce qui a transité, cache de prompt compris, et le cache n'est
+       * rendu que dans le résumé de fin de session (`ShutdownModelMetricUsage`), pas ici.
+       */
+      nanoAiu?: number;
+    }
+  /**
+   * Occupation de la fenêtre de contexte, telle que le runtime la mesure (ADR 0031).
+   *
+   * À ne pas confondre avec le cumul des `usage` : celui-ci compte ce qui a **transité**, et ne
+   * décroît jamais ; `currentTokens` dit ce qui **occupe** la fenêtre à l'instant présent, et
+   * diminue quand le runtime compacte ou tronque la conversation.
+   */
+  | {
+      type: "context";
+      currentTokens: number;
+      tokenLimit: number;
+      /** Part du message système (rôle, skills injectées, contrat). */
+      systemTokens?: number;
+      /** Part des messages : ce que l'agent a lu et dit. */
+      conversationTokens?: number;
+      /** Part des définitions d'outils. */
+      toolDefinitionsTokens?: number;
+      messages?: number;
+    }
   | { type: "idle" }
   | { type: "error"; message: string }
   /** Tout autre signe de vie : sert uniquement à réarmer le watchdog. */

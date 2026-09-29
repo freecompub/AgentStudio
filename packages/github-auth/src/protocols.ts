@@ -18,8 +18,33 @@ export interface DeviceCode {
   verificationUrl: string;
 }
 
+/**
+ * Réserve de requêtes premium Copilot. C'est la grandeur que Copilot facture — les complétions et
+ * le chat sont illimités, les appels d'agent non. `restantes` est le seul chiffre qui dit si une
+ * tâche peut aller au bout : le 29/09, une tâche a été lancée avec 28 requêtes en réserve pour une
+ * phase qui en demande des dizaines.
+ */
+export interface CopilotQuota {
+  /** Enveloppe du mois. */
+  total: number;
+  utilisees: number;
+  restantes: number;
+  /** Part restante, en pourcentage, telle que GitHub la calcule. */
+  pourcentageRestant: number;
+  /** Faux : une fois à zéro, les appels sont refusés, pas facturés en plus. */
+  depassementAutorise: boolean;
+  /** Date de remise à zéro, au format `AAAA-MM-JJ`. */
+  remiseAZero: string;
+}
+
 export interface GitHubAuth {
   status(): Promise<AuthStatus>;
+  /**
+   * Réserve de requêtes premium, ou `null` si elle n'a pas pu être lue — `gh` absent, utilisateur
+   * déconnecté, point d'accès changé. C'est une information de confort : elle ne doit jamais
+   * empêcher de travailler, seulement éviter de lancer une tâche vouée à s'interrompre.
+   */
+  copilotQuota(): Promise<CopilotQuota | null>;
   /** Jeton courant ; échoue si l'utilisateur n'est pas connecté. */
   token(): Promise<string>;
   /**

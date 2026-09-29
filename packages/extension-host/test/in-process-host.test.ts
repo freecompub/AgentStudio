@@ -25,7 +25,7 @@ function fakeWorkspace(): Workspace {
   const files: Record<string, string> = { "tests/a.test.ts": "x", "src/a.ts": "y" };
   return {
     root: "/projets/demo",
-    files: { read: async (p) => files[p] ?? "", write: async () => {}, list: async () => Object.keys(files) },
+    files: { read: async (p) => files[p] ?? "", write: async () => {}, ensureDir: async () => {}, list: async () => Object.keys(files) },
     checkpoints: {
       create: async (label) => ({ id: "cp-1", sha: "s", head: "h", label, createdAt: "" }),
       list: async () => [],
@@ -46,6 +46,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
       runs.push({ spec, prompt });
       return { output: { summary: "ok", files: [] } as never };
     },
+    releaseTask: async () => {},
   };
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   const posted: string[] = [];
@@ -142,6 +143,7 @@ describe("Hôte d'extension en processus", () => {
           await tools.find((t) => t.name === "load_skill")!.handler({ name: "craft" });
           return { output: { summary: "", files: [] } as never };
         },
+        releaseTask: async () => {},
       };
       let ctx!: ExtensionContext;
       await activateInProcess({ manifest, module: { activate: (c) => void (ctx = c) }, directory: dir }, env.deps);
@@ -228,7 +230,13 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, posted } = await activateWith(() => {});
     ctx.chat.post("Bonjour");
     expect(posted).toEqual(["diabeo.demo: Bonjour"]);
-    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "tools", "workspace"]);
+    // Liste verrouillée : c'est la règle de sécurité n°1 — aucun objet du SDK n'est jamais exposé à
+    // une extension. `trace` s'y ajoute (ADR 0038) et ne la met pas en cause : elle ne sait
+    // qu'archiver des livrables, et la trace RACONTE, elle n'atteste rien (une porte ne doit jamais
+    // s'y appuyer, contrairement à `evidence`).
+    expect(Object.keys(ctx).sort()).toEqual([
+      "agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "tools", "trace", "workspace",
+    ]);
   });
 
   it("hooks : un refus d'extension s'applique aux sessions d'agent, préfixé par l'extension", async () => {
@@ -245,7 +253,7 @@ describe("Hôte d'extension en processus", () => {
   it("hooks : les gardes des extensions sont transmises à chaque agent lancé", async () => {
     let seen: unknown[] = [];
     const env = setup();
-    env.deps.agents = { run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    env.deps.agents = { releaseTask: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
     let ctx!: ExtensionContext;
     await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void ((ctx = c), c.hooks.onPreToolUse(() => undefined)) } }, env.deps);
     await ctx.agents.run("writer", "x");
@@ -255,7 +263,7 @@ describe("Hôte d'extension en processus", () => {
   it("readOnly : écriture refusée sur les motifs gelés (@stack:* résolus), le reste du périmètre reste permis", async () => {
     let seen: import("@agent-studio/core").ToolCallGuard[] = [];
     const env = setup();
-    env.deps.agents = { run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    env.deps.agents = { releaseTask: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
     let ctx!: ExtensionContext;
     await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (ctx = c) } }, env.deps);
     await ctx.agents.run("writer", "x", { readOnly: ["@stack:acceptanceTests"] });

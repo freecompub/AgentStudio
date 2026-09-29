@@ -1,10 +1,11 @@
-import type { GitHubAuth, AuthStatus } from "@agent-studio/github-auth";
+import type { GitHubAuth, AuthStatus, CopilotQuota } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
 import { MemoryConversationStore, reply, ScriptedRuntime, sequentialIds, fixedClock } from "@agent-studio/core/testing";
 import { describe, expect, it } from "vitest";
 import { createAppController } from "../src/main/app-controller.js";
 import type { AppSettings, EventSink, WorkspaceProvider, WorkspaceServices, WorkspaceServicesArgs } from "../src/main/protocols.js";
 import type { EventChannel } from "../src/shared/ipc-contract.js";
+import { requests } from "../src/shared/ipc-contract.js";
 
 const OAUTH: AuthStatus = { loggedIn: true, user: "octo", tokenKind: "oauth", copilotCompatible: true, hostname: "github.com" };
 
@@ -16,7 +17,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
     root,
     rolledBack,
     diffs,
-    files: { read: async () => "", write: async () => {}, list: async () => [] },
+    files: { read: async () => "", write: async () => {}, ensureDir: async () => {}, list: async () => [] },
     checkpoints: {
       create: async (label) => ({ id: `cp-${++n}`, sha: "s", head: "h", label, createdAt: "" }),
       list: async () => [],
@@ -35,7 +36,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
   };
 }
 
-function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Partial<Parameters<typeof createAppController>[0]> } = {}) {
+function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: CopilotQuota | null; extra?: Partial<Parameters<typeof createAppController>[0]> } = {}) {
   const runtime = new ScriptedRuntime();
   const tokens: string[] = [];
   const emitted: { channel: EventChannel; payload: unknown }[] = [];
@@ -61,6 +62,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; extra?: Part
   const auth: GitHubAuth = {
     status: async () => (deconnecte ? { loggedIn: false, hostname: hote } : (opts.status ?? { ...OAUTH, hostname: hote })),
     token: async () => "gho_secret",
+    copilotQuota: async () => opts.quota ?? null,
     hostname: () => hote,
     logout: async () => void (deconnecte = true),
     login: async (onCode, o) => {
@@ -673,5 +675,33 @@ describe("AppController — profils, modes et extensions (J6)", () => {
   it("installation annulée au choix du fichier", async () => {
     const { controller } = setup({ extra: { installer: { installFromFile: async () => ({ status: "declined" }), list: async () => [], uninstall: async () => {}, applyRevocations: async () => [], active: async () => [] }, folderPicker: { pick: async () => null, pickPackage: async () => null } } });
     expect(await controller["extensions:install"]({})).toEqual({ status: "cancelled" });
+  });
+});
+
+/**
+ * Réserve Copilot exposée au renderer (ADR 0044).
+ *
+ * Le 29/09, une tâche a été lancée avec 28 requêtes premium en réserve sur 1500, pour une phase
+ * qui en demande des dizaines. L'information existait chez GitHub, à un appel d'ici, et rien ne la
+ * demandait. §10.2 tient : ce sont des chiffres qui franchissent l'IPC, jamais un jeton.
+ */
+describe("auth:quota", () => {
+  const QUOTA = { total: 1500, utilisees: 1471, restantes: 28, pourcentageRestant: 1.8, depassementAutorise: false, remiseAZero: "2026-10-01" };
+
+  it("rend la réserve telle que l'authentification la lit", async () => {
+    const { controller } = setup({ quota: QUOTA });
+    expect(await controller["auth:quota"]({})).toEqual(QUOTA);
+  });
+
+  it("réserve illisible : `null` traverse l'IPC sans faire échouer l'appel", async () => {
+    const { controller } = setup({ quota: null });
+    expect(await controller["auth:quota"]({})).toBeNull();
+  });
+
+  it("le contrat IPC accepte les deux formes, et rien d'autre", async () => {
+    // Le renderer est sandboxé : ce qui franchit l'IPC est validé, ici comme ailleurs.
+    expect(requests["auth:quota"].output.parse(QUOTA)).toEqual(QUOTA);
+    expect(requests["auth:quota"].output.parse(null)).toBeNull();
+    expect(() => requests["auth:quota"].output.parse({ restantes: "beaucoup" })).toThrow();
   });
 });

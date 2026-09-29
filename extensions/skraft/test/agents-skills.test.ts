@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { extensionFileReader, loadAgentPrompts, parseMarkdownDoc } from "@agent-studio/extension-host";
 import { describe, expect, it } from "vitest";
 import { manifest } from "../src/manifest.js";
+import { acOf } from "../src/distill.js";
 import { ROLE_SKILLS, SKILLS } from "../src/roles.js";
 import { EXTENSION_DIR } from "./support/harness.js";
 
@@ -109,5 +110,54 @@ describe("Arbitrage entre skills reprises et décisions du projet", () => {
       expect(p.indexOf("le linter du projet fait foi"), name).toBeGreaterThan(p.lastIndexOf("### Skill "));
       expect(p.indexOf("## Fonctionnement dans agent-studio"), name).toBeGreaterThan(p.indexOf("le linter du projet fait foi"));
     }
+  });
+});
+
+/**
+ * La norme que `skraft-acceptance` doit porter (ADR 0043).
+ *
+ * Run du 29/09 : deux des trois essais de DISTILL ont été perdus sur la porte des valeurs, l'agent
+ * écrivant des scénarios justes de sens mais reformulés — « une petite quantité » là où le critère
+ * dit « 9 articles à 2,00 € ». L'instruction EXISTAIT : « Recopie les valeurs des critères mot pour
+ * mot », en fin de paragraphe, sans exemple et sans dire ce que la porte compare réellement.
+ *
+ * Ces tests vérifient que la norme est là et qu'elle est ILLUSTRÉE — un exemple juste et un
+ * contre-exemple —, pas qu'une phrase existe quelque part.
+ */
+describe("Norme de recopie et de nommage de skraft-acceptance (ADR 0043)", () => {
+  const corps = async () => parseMarkdownDoc(await readFile(join(EXTENSION_DIR, "agents", "skraft-acceptance.agent.md"), "utf8")).body;
+  // Le fichier est replié à 100 colonnes : une assertion sur une phrase doit survivre au repli.
+  const prose = async () => (await corps()).replace(/\s+/g, " ");
+
+  it("dit que la comparaison porte sur les caractères, pas sur le sens", async () => {
+    const b = await prose();
+    expect(b).toMatch(/caractère par caractère/i);
+    expect(b).toMatch(/reformulation[^.]*ne passe pas/i);
+  });
+
+  it("montre un contre-exemple à côté de l'exemple : une règle sans contre-exemple n'a jamais suffi", async () => {
+    const b = await corps();
+    expect(b).toContain("✗");
+    expect(b).toContain("✓");
+    // Les valeurs de l'exemple sont celles d'un vrai critère, recopiées telles quelles.
+    for (const v of ["10 articles ou plus : 5 %", "9 articles", "2,00 €", "0,00 €"]) expect(b, v).toContain(v);
+  });
+
+  it("place le marqueur dans le NOM du test, et le dit avec les formes qui marchent", async () => {
+    const b = await corps();
+    expect(await prose()).toMatch(/nom du test/i);
+    // Toute forme donnée en exemple doit être reconnue par le code qui relie un résultat à son critère.
+    for (const [ligne, attendu] of [
+      ["Ac2_Une_ligne_qui_atteint_le_seuil_obtient_la_remise", 2],
+      ["test_ac_2_ligne_au_seuil", 2],
+      ["Une_ligne_qui_atteint_le_seuil", null],
+    ] as const) {
+      expect(b, ligne).toContain(ligne);
+      expect(acOf(ligne), ligne).toBe(attendu);
+    }
+  });
+
+  it("reste partageable : la norme ne nomme aucun outil ni mécanisme d'agent-studio", async () => {
+    expect(await corps()).not.toMatch(/run_tests|report_phase|report_blocker|submit_[a-z_]+|render_adr|load_skill|orchestrat/i);
   });
 });

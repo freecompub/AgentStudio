@@ -37,6 +37,11 @@ export function createLocalFileStore(root: string, git: GitRunner): FileStore {
       await guard(rel); // revérifie après création des dossiers intermédiaires
       await writeFile(file, content);
     },
+    async ensureDir(rel) {
+      const dir = await guard(rel);
+      await mkdir(dir, { recursive: true });
+      await guard(rel); // revérifie après création : un lien a pu apparaître entre-temps
+    },
     async list() {
       const out = await git.run(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
       return [...new Set(out.split("\0").filter(Boolean))].sort();

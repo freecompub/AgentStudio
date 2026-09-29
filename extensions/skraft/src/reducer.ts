@@ -1,6 +1,6 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
-import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
+import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { actionableDefects, synthesize, type LensVerdict } from "./review.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
@@ -123,7 +123,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
       }
       if (e.type === "BLOCKER_REPORTED")
         return { state: { ...s, stage: "BLOCKED", blocker: { question: e.question, choices: e.choices } }, effects: [{ kind: "askBlocker", question: e.question, choices: e.choices }] };
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -151,11 +151,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
           // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
           ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
-        if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: ns.lenses, attempt: ns.attempts + 1 }] };
+        if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
       }
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -175,9 +175,12 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const defects = actionableDefects(e.lenses);
         if (p === "DELIVER" && defects.length && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, defects);
         // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
-        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)]);
+        // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
+        // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
+        // sans que personne n'ait eu l'occasion d'y répondre.
+        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)], ns.reviews[p].length === 1);
       }
-      if (e.type === "TIMEOUT") return failure(s, "délai", [e.reason]);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -240,6 +243,15 @@ function uniq<T>(xs: T[]): T[] {
   return [...new Set(xs)];
 }
 
+/**
+ * Motif rendu au tour suivant après une interruption. La seconde phrase compte autant que la
+ * première : sans elle, l'agent relit des fichiers à moitié écrits en les croyant finis.
+ */
+const tourInterrompu = (raison: string): string[] => [
+  `Le tour précédent a été interrompu (${raison}) : aucune porte n'a jugé ton travail.`,
+  "Ce que tu avais écrit est resté sur le disque, possiblement incomplet. Reprends-le et termine-le ; ne recommence pas de zéro, et ne considère aucun fichier comme fini sans l'avoir relu.",
+];
+
 function specialist(s: SkraftState, feedback: string[]): SkraftEffect {
   const p = s.phase!;
   // DELIVER : sous-machine par scénario, à partir du plan d'implémentation (§7.4).
@@ -296,14 +308,35 @@ function relancerClassifieur(s: SkraftState, reason: string): Out {
   };
 }
 
-/** Rejet de porte, de revue ou délai : réessai ciblé après rollback, ou escalade à budget épuisé (D24). */
-function failure(s0: SkraftState, gate: string, reasons: string[]): Out {
+/**
+ * Échec d'une phase : relance ciblée tant que le budget le permet, escalade ensuite.
+ *
+ * **Un réessai n'annule rien** (ADR 0029, amendée par 0040). L'agent garde sa session (ADR 0039) :
+ * il croit avoir écrit ses fichiers, et il les a écrits. Les effacer sous lui lui ferait corriger
+ * de mémoire un dépôt qui ne contient plus rien — on lui demande de *corriger*, pas de retaper.
+ * ADR 0029 avait déjà retiré le rollback du tour interrompu ; la raison vaut pour le rejet de
+ * porte, où elle est même plus forte : la porte a lu des fichiers précis et dit ce qui cloche.
+ *
+ * La sécurité ne repose pas sur ce rollback : la porte de fin de phase juge l'**état final**, quel
+ * qu'ait été le chemin. Un essai qui laisse un fichier bancal sera recalé par elle.
+ *
+ * L'escalade, elle, annule toujours — quand la main repasse à l'humain, le dépôt doit être propre.
+ *
+ * `essaiGaranti` force un essai de plus malgré un budget épuisé. Un seul appelant s'en sert : la
+ * première revue d'une phase (ADR 0042). Le budget est commun aux portes de forme et à la revue,
+ * alors que les rejets n'y sont pas du même ordre — recopier une valeur dans un Gherkin et
+ * rebrancher un calcul de facture ne demandent pas le même travail. Le 29/09, DISTILL a dépensé
+ * ses trois essais sur la porte des valeurs, puis la revue a rendu deux défauts majeurs et justes
+ * qui sont partis en escalade sans qu'aucun tour ne puisse y répondre.
+ */
+function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
-  const rollback: SkraftEffect[] = cp ? [{ kind: "rollback", to: cp }] : [];
+  const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
+  const rollback: SkraftEffect[] = cp && epuise ? [{ kind: "rollback", to: cp }] : [];
   const lastRejection = { gate, reasons };
-  if (attempts >= s.budget.maxAttemptsPerPhase) {
+  if (epuise) {
     return {
       state: { ...s, stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
       effects: [...rollback, { kind: "askEscalation", reason: `${gate} : ${reasons.join(" ; ")}`, options: ["retry", "skip", "abort"] }],

@@ -56,9 +56,14 @@ describe.each(HOST_MODES)("Extension tdd — critères de sortie de J2 (extensio
     );
     expect(git(root, "status", "--porcelain")).toBe("");
     expect(app.posted[0]).toContain("Cycle TDD lancé");
-    // Sessions éphémères : une par rôle et par phase, toutes supprimées (D17).
-    expect(runtime.deleted.length).toBe(runtime.history.length);
+    // Sessions éphémères à l'échelle de la TÂCHE, plus du tour (ADR 0039). D17 dit « une session
+    // neuve par phase/rôle » : deux tours du même rôle dans la même phase n'en font pas deux.
     expect(runtime.history.length).toBe(4); // planificateur, test, dev vert, dev nettoyage
+    const distinctes = new Set(runtime.history.map((s) => s.id));
+    // Le développeur enchaîne « vert » puis « nettoyage » : même rôle, même phase, MÊME session.
+    expect(distinctes.size).toBe(3);
+    // Et aucune ne survit à la tâche : sans cela leur état s'accumulerait sur le disque.
+    expect(new Set(runtime.deleted)).toEqual(distinctes);
   }, 90_000);
 
   it("2. une modification de test par l'agent dev est détectée, annulée, et l'agent est relancé avec le motif", async () => {

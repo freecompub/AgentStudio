@@ -18,6 +18,7 @@ import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
 import { runLintTool } from "./lint-tool.js";
+import { listFilesTool, type TraceStore } from "@agent-studio/core";
 import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -37,6 +38,8 @@ export interface HostDeps {
   hooks: HookRegistry;
   /** Usage des agents, attribué à la tâche et à son état courant (D37). */
   usage?: UsageRecorder;
+  /** Trace d'exécution (ADR 0032). Absente, rien n'est tracé — le fonctionnement n'en dépend pas. */
+  trace?: TraceStore;
   chat: ExtensionChatSink;
   clock: Clock;
   ids: IdGenerator;
@@ -128,6 +131,12 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),
+            // Clé de continuité (ADR 0030) : deux exécutions du même rôle pour la même tâche sont
+            // deux tentatives du même travail. Sans taskId, aucune reprise — c'est le cas des
+            // agents lancés hors tâche.
+            ...(taskId ? { resumeKey: `${taskId}/${manifest.id}/${name}` } : {}),
+            // Trace d'exécution (ADR 0032) : tout ce que ce tour échange, et pourquoi il s'arrête.
+            ...(taskId ? { trace: { taskId, ...(phase ? { phase } : {}) } } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
             tools: (beat: () => void) => [
               ...ownTools(a.tools ?? []),
@@ -143,6 +152,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                     }),
                   ]
                 : []),
+              // Explorer n'atteste rien : `list_files` ne produit aucune preuve, il rend des chemins.
+              ...(a.tools?.includes("list_files") ? [listFilesTool({ list: () => deps.workspace.files.list() }, { beat })] : []),
               // `run_lint` n'enregistre aucune preuve : la porte relance le linter elle-même, sinon
               // l'agent choisirait le moment de la mesure. Ici il ne fait que s'informer.
               ...(a.tools?.includes("run_lint")
@@ -183,6 +194,12 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const rel = p.replaceAll("\\", "/");
         if (!matchesAny(resolveGlobs(perm.writeGlobs()), rel)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
         await deps.workspace.files.write(rel, content);
+      },
+      /** Même permission que l'écriture : préparer un dossier, c'est préparer une écriture (ADR 0037). */
+      async ensureDir(p) {
+        const rel = p.replaceAll("\\", "/");
+        if (!matchesAny(resolveGlobs(perm.writeGlobs()), `${rel.replace(/\/+$/, "")}/x`)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
+        await deps.workspace.files.ensureDir(rel);
       },
       listFiles: async () => (perm.require("fs:read"), deps.workspace.files.list()),
       checkpoint: async (label) => ({ id: (await deps.workspace.checkpoints.create(label)).id }),
@@ -232,6 +249,16 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           ...(opts?.files ? { files: opts.files } : {}),
           ...(opts?.signal ? { signal: opts.signal } : {}),
         });
+      },
+    },
+
+    trace: {
+      async rejected(taskId, label, files) {
+        // Silencieuse comme le reste de la trace : elle observe, elle ne décide pas, et elle ne
+        // doit jamais faire tomber la tâche qu'elle documente.
+        await deps.trace
+          ?.archive(taskId, label, files)
+          .catch((err: unknown) => log?.warn("livrables rejetés non archivés", { label, error: String(err) }));
       },
     },
 

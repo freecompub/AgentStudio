@@ -68,7 +68,7 @@ describe("Extension tierce installée depuis un fichier (J6)", () => {
     const posts: string[] = [];
     const workspace: Workspace = {
       root: join(dir, "projet"),
-      files: { read: async () => "", write: async () => {}, list: async () => ["src/a.ts", "src/b.ts", "README.md"] },
+      files: { read: async () => "", write: async () => {}, ensureDir: async () => {}, list: async () => ["src/a.ts", "src/b.ts", "README.md"] },
       checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
       repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.

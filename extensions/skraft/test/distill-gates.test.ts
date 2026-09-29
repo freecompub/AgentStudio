@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { acOf, checkAcceptanceRed, checkValues, featureScenarios } from "../src/distill.js";
+import { matchesAny } from "@agent-studio/extension-api";
 import { parseStory } from "../src/story.js";
 import { US12 } from "./story.test.js";
 
@@ -103,7 +104,88 @@ describe("Porte RED d'acceptance (SPEC-skraft §7.3, fixture §13.2)", () => {
     expect(checkAcceptanceRed({ criteria, testPlan: plan, results })).toEqual({ reasons: [], regressions: ["ac-3 aucun plafond"] });
   });
 
-  it("aucun test d'acceptance exécuté : rejet", () => {
-    expect(checkAcceptanceRed({ criteria, testPlan: "", results: [] }).reasons).toEqual(["Aucun test d'acceptance n'a été exécuté."]);
+  it("les tests SANS marqueur sont ignorés, pas jugés : la suite entière peut être transmise", () => {
+    // La porte reçoit tous les résultats de la suite. Un test unitaire vert n'est pas « un test
+    // d'acceptance qui passe déjà » : il n'est pas de son ressort.
+    const unitaire = { id: "CalculDuPanierTests.Un_panier_vide_vaut_zero", file: "x", status: "passed" as const };
+    const r = checkAcceptanceRed({ criteria, testPlan: "", results: [unitaire, red("ac-1 x", "missing_symbol"), red("ac-2 x", "assertion"), red("ac-3 x", "assertion")] });
+    expect(r).toEqual({ reasons: [], regressions: [] });
+  });
+
+  it("aucun test exécuté du tout : la porte le dit ainsi", () => {
+    expect(checkAcceptanceRed({ criteria, testPlan: "", results: [] }).reasons).toEqual(["Aucun test n'a été exécuté : la suite n'a produit aucun résultat."]);
+  });
+});
+
+/**
+ * Ce que la porte RED a reproché trois fois de suite à un agent qui avait raison (29/09, ADR 0041).
+ *
+ * `effects.ts` filtrait les résultats sur les globs de `layout.acceptanceTests` —
+ * `tests/**\/*AcceptanceTests.cs` — alors qu'un rapport JUnit exprime `file` comme un NOM DE CLASSE
+ * (`file: c.classname`, read-report.ts) et `id` comme un nom .NET qualifié. Aucun glob de chemin ne
+ * peut correspondre à l'un ou à l'autre : le filtre rendait toujours zéro, et la porte répondait
+ * « Aucun test d'acceptance n'a été exécuté » alors que dix tests venaient de tourner, dont deux
+ * rouges sur assertion — exactement le rouge qu'elle attendait.
+ *
+ * L'agent a épuisé ses trois essais sur un reproche que rien, dans son travail, ne pouvait lever.
+ * La réponse était deux lignes plus bas : `acOf(r.id)`, que la porte appelait déjà pour relier un
+ * résultat à son critère.
+ */
+describe("Porte RED : reconnaître ses tests par leur marqueur, pas par leur rangement", () => {
+  const criteria = [1, 2, 3, 4, 5].map((n) => ({ n, text: `critère ${n}`, literals: [] }));
+  const dotnet = (nom: string, status: "passed" | "failed", failureKind?: "assertion") => ({
+    id: `Tarification.Tests.${nom}`,
+    file: `Tarification.Tests.${nom.split(".")[0]}`,
+    status,
+    ...(failureKind ? { failureKind } : {}),
+  });
+  // Les dix résultats réels du run, tels que le rapport JUnit de `dotnet test` les a rendus.
+  const suite = [
+    dotnet("RemiseParPalierAcceptanceTests.Ac1_Sous_le_seuil_aucune_remise", "passed"),
+    dotnet("RemiseParPalierAcceptanceTests.Ac2_Une_ligne_qui_atteint_le_seuil_obtient_la_remise_du_palier", "failed", "assertion"),
+    dotnet("RemiseParPalierAcceptanceTests.Ac3_Le_palier_le_plus_eleve_atteint_l_emporte", "failed", "assertion"),
+    dotnet("RemiseParPalierAcceptanceTests.Ac4_La_remise_se_calcule_par_ligne_jamais_sur_le_panier_entier", "passed"),
+    dotnet("RemiseParPalierAcceptanceTests.Ac5_Aucun_palier_configure_n_accorde_aucune_remise", "passed"),
+    dotnet("CalculDuPanierTests.Un_panier_vide_vaut_zero", "passed"),
+    dotnet("CalculDuPanierTests.Plusieurs_lignes_s_additionnent", "passed"),
+    dotnet("CalculDuPanierTests.Un_montant_negatif_n_existe_pas", "passed"),
+    dotnet("MontantTests.Une_quantite_multiplie_un_montant", "passed"),
+    dotnet("FactureTests.Le_total_a_payer_additionne_les_lignes", "passed"),
+  ];
+  // Le compte du run : 8 réussis, 2 échecs sur assertion.
+  it("la fixture est bien celle du run", () => {
+    expect(suite).toHaveLength(10);
+    expect(suite.filter((r) => r.status === "passed")).toHaveLength(8);
+  });
+
+  it("un identifiant .NET n'a jamais la forme d'un chemin — et n'a pas à l'avoir", () => {
+    const glob = "tests/**/*AcceptanceTests.cs";
+    for (const r of suite) {
+      expect(matchesAny([glob], r.id), r.id).toBe(false);
+      expect(matchesAny([glob], r.file), r.file).toBe(false);
+    }
+  });
+
+  it("le marqueur, lui, les distingue : les cinq d'acceptance, et aucun unitaire", () => {
+    expect(suite.filter((r) => acOf(r.id) !== null).map((r) => acOf(r.id))).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("la porte juge ce que l'agent avait produit : deux rouges sur assertion, trois verts à justifier", () => {
+    const plan = [1, 4, 5].map((n) => `- @ac-${n} : role: regression — justification : comportement déjà couvert.`).join("\n");
+    expect(checkAcceptanceRed({ criteria, testPlan: plan, results: suite })).toEqual({
+      reasons: [],
+      regressions: suite.filter((r) => r.status === "passed" && acOf(r.id) !== null).map((r) => r.id),
+    });
+  });
+
+  it("aucun marqueur nulle part : la porte dit ce qu'elle a mesuré, et où mettre le marqueur", () => {
+    // L'ancien message — « aucun test d'acceptance n'a été exécué » — affirmait un fait faux, et
+    // l'agent ne pouvait qu'y répondre en relançant les tests, ce qu'il a fait, en vain.
+    const sansMarqueur = suite.map((r) => ({ ...r, id: r.id.replace(/Ac\d_/, "") }));
+    const [motif] = checkAcceptanceRed({ criteria, testPlan: "", results: sansMarqueur }).reasons;
+    expect(motif).toContain("10 test(s) exécuté(s)");
+    expect(motif).toMatch(/NOM/);
+    expect(motif).toContain("Tarification.Tests.RemiseParPalierAcceptanceTests."); // ce qu'elle a vu
+    expect(motif).not.toMatch(/n'a été exécuté/);
   });
 });

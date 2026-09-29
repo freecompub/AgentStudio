@@ -1,5 +1,7 @@
 import type { Evidence } from "@agent-studio/extension-api";
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { GELÉS } from "../src/effects.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 const bar = (raw: string | null = null): QualityBar => {
@@ -172,5 +174,25 @@ describe("Seuils de couverture", () => {
     const defaut = parseQualityBar(null);
     if ("error" in defaut) throw new Error(defaut.error);
     expect(checkCoverage(rapport([{ file: "src/Domain/Panier.cs", score: 5 }]), ["src/Domain/Panier.cs"], defaut.bar)).toEqual([]);
+  });
+});
+
+/**
+ * La barre de qualité n'est pas modifiable par ceux qu'elle juge (ADR 0034).
+ *
+ * Le périmètre d'écriture des rôles est `.skraft/**`, et `.skraft/quality.json` y vivait : seuils
+ * de couverture, score de mutation, règles de dépendance — tout ce que la porte de livraison lit
+ * pour juger. Un agent pouvait donc abaisser le critère sur lequel il allait être jugé, et la porte
+ * l'aurait validé en toute bonne foi. Le contraire du principe du projet.
+ */
+describe("Barre de qualité hors de portée des agents", () => {
+  it("`.skraft/quality.json` est gelé", () => {
+    expect(GELÉS).toContain(".skraft/quality.json");
+  });
+
+  it("le gel est passé à chaque lancement de spécialiste, pas seulement déclaré", async () => {
+    // Une constante que personne ne transmet ne protège rien.
+    const src = await readFile(new URL("../src/effects.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS\]/);
   });
 });

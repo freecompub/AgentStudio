@@ -7,7 +7,7 @@ import type {
   IdGenerator,
   TurnCheckpoints,
 } from "../protocols/conversation.js";
-import { EnvFailureError, runTurn, TurnTimeoutError } from "../turns/run-turn.js";
+import { EnvFailureError, runTurn, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError } from "../turns/run-turn.js";
 
 export interface MainSessionDeps {
   runtime: AgentRuntime;
@@ -22,6 +22,12 @@ export interface MainSessionDeps {
   model?: string;
   /** Seuil d'inactivité du watchdog (D30). */
   idleMs?: number;
+  /** Plafond de durée totale d'un tour (ADR 0026). */
+  maxMs?: number;
+  /** Plafond du cumul des tokens d'entrée d'un tour (ADR 0027, désactivé par défaut depuis 0031). */
+  maxInputTokens?: number;
+  /** Fraction de la fenêtre de contexte au-delà de laquelle le tour est coupé (ADR 0031). */
+  maxContextFraction?: number;
 }
 
 export type MainSessionEvent =
@@ -144,6 +150,9 @@ export function createMainSession(deps: MainSessionDeps): MainSession {
         try {
           await runTurn(s, note + prompt, {
             ...(deps.idleMs !== undefined ? { idleMs: deps.idleMs } : {}),
+            ...(deps.maxMs !== undefined ? { maxMs: deps.maxMs } : {}),
+            ...(deps.maxInputTokens !== undefined ? { maxInputTokens: deps.maxInputTokens } : {}),
+            ...(deps.maxContextFraction !== undefined ? { maxContextFraction: deps.maxContextFraction } : {}),
             onEvent: (event) => {
               emit({ type: "agent", event });
               if (event.type === "message" && event.text.trim()) {
@@ -153,7 +162,13 @@ export function createMainSession(deps: MainSessionDeps): MainSession {
             },
           });
         } catch (err) {
-          if (err instanceof TurnTimeoutError)
+          if (err instanceof TurnContextError)
+            append("notice", `${err.message}. Le tour a été interrompu : repartez d'une conversation neuve, ou demandez moins à la fois.`);
+          else if (err instanceof TurnCostError)
+            append("notice", `Le tour a dépassé son plafond de ${Math.round(err.maxInputTokens / 1000)} k tokens d'entrée et a été interrompu. Découpez la demande : chaque appel renvoie tout le contexte, donc la facture monte au carré.`);
+          else if (err instanceof TurnBudgetError)
+            append("notice", `L'agent travaillait encore, mais le tour a dépassé son plafond de ${Math.round(err.maxMs / 60_000)} min : il a été interrompu. Reformulez en demandant moins à la fois.`);
+          else if (err instanceof TurnTimeoutError)
             append("notice", "L'agent ne répond plus : le tour a été interrompu. Vous pouvez reformuler ou annuler ce tour.");
           else if (err instanceof EnvFailureError) append("notice", `L'agent a rencontré une erreur : ${err.message}`);
           else append("notice", `Erreur inattendue : ${err instanceof Error ? err.message : String(err)}`);

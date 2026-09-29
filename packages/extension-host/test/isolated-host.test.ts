@@ -36,7 +36,7 @@ function deps() {
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   const workspace: Workspace = {
     root: "/projets/demo",
-    files: { read: async () => "", write: async () => {}, list: async () => ["a.ts", "b.ts"] },
+    files: { read: async () => "", write: async () => {}, ensureDir: async () => {}, list: async () => ["a.ts", "b.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
     repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
@@ -50,7 +50,7 @@ function deps() {
     testFilePattern: "^tests/",
     runTests: async () => ({ results: [{ id: "x", file: "x", status: "passed" }], exitCode: 0, timedOut: false, output: "", durationMs: 1 }),
   };
-  const agents: TaskAgentRunner = { run: async () => ({ output: { summary: "", files: [] } as never }) };
+  const agents: TaskAgentRunner = { releaseTask: async () => {}, run: async () => ({ output: { summary: "", files: [] } as never }) };
   const evidence = new MemoryEvidenceStore();
   const d: HostDeps = {
     registry: createRegistry(),

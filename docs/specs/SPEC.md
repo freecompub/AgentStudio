@@ -409,9 +409,13 @@ Le réducteur traite `TIMEOUT` comme un rejet (réessai ciblé si budget) et `EN
 
 Avant chaque effet, le moteur persiste un marqueur `{ effect, checkpoint, attempt, startedAt }`. Au redémarrage, un effet commencé mais non terminé déclenche : rollback au checkpoint, puis événement `RESUMED` et relance de l'effet. Aucun travail partiel n'est réutilisé.
 
-### 6.4 Exécution d'un tour d'agent (D30)
+### 6.4 Exécution d'un tour d'agent (D30, amendé par l'ADR 0026)
 
 Pas de `sendAndWait` avec délai fixe. Le tour est lancé avec `send()` ; tout événement de session réarme un chronomètre d'inactivité ; `session.idle` termine le tour ; un silence au-delà du seuil déclenche `abort()` et l'événement `TIMEOUT`. Les outils longs (`run_tests`) réarment le chronomètre à chaque ligne de sortie.
+
+Au-dessus de ce chronomètre, un **plafond de durée totale** du tour (défaut 30 min, ADR 0026), que **rien ne réarme** et qui lève `TurnBudgetError`. Le chronomètre d'inactivité ne voit pas un agent qui parle sans avancer : le 28/09, un tour a duré 1 h 55 avant que le silence ne finisse par le trahir. L'activité n'est pas la progression.
+
+Et un **plafond de coût** (défaut 1 M tokens d'entrée cumulés, ADR 0027), lu en direct sur l'événement `usage`, qui lève `TurnCostError`. Chaque appel renvoie tout le contexte : un tour de N appels coûte en O(N²). Durée et coût sont indépendants — un tour peut être bref et ruineux.
 
 ```ts
 async function runTurn(session: AgentSession, prompt: string, idleMs = 5 * 60_000) {
