@@ -102,14 +102,14 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
   });
 
   it("contrat : outil de fin, run_tests, report_blocker, load_skill et périmètre selon l'agent ; Git toujours interdit", () => {
-    const full = contractBlock({ output: "report_phase", tools: ["run_tests", "report_blocker"], writes: true, onDemand: [{ ref: "x", description: "d".repeat(400) }] });
+    const full = contractBlock({ output: "report_phase", tools: ["run_tests", "report_blocker"], writes: ["tests/**"], onDemand: [{ ref: "x", description: "d".repeat(400) }] });
     expect(full).toContain("appelant l'outil `report_phase`");
     expect(full).toContain("`run_tests`");
     expect(full).toContain("`report_blocker`");
     expect(full).toContain("`load_skill`");
     expect(full).toMatch(/`x` : d{299}…/);
     expect(full).toContain("N'utilise jamais Git");
-    const lens = contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] });
+    const lens = contractBlock({ output: "submit_lens_verdict", tools: [], writes: [], onDemand: [] });
     expect(lens).not.toMatch(/run_tests|report_blocker|load_skill/);
     expect(lens).toContain("Tu n'écris aucun fichier.");
   });
@@ -121,32 +121,65 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
     // « passe par run_tests » ne suffit pas : ça couvre les tests et laisse la compilation
     // à l'agent, avec une commande qui n'existe pas chez lui. Le contrat, qui prime (§3),
     // doit donc retirer la commande, pas seulement en proposer une autre.
-    const full = contractBlock({ output: "report_phase", tools: ["run_tests"], writes: true, onDemand: [] });
+    const full = contractBlock({ output: "report_phase", tools: ["run_tests"], writes: ["tests/**"], onDemand: [] });
     expect(full).toContain("N'exécute aucune commande de compilation ou de test toi-même");
     expect(full).toContain("dotnet test");
     // Un agent qui ne lance pas de tests n'a pas à recevoir cette consigne.
-    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] })).not.toContain("dotnet test");
+    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: [], onDemand: [] })).not.toContain("dotnet test");
   });
 
   it("contrat : `run_lint` annoncé avec la réserve qui va avec — rien mesuré ne vaut pas conforme", () => {
-    const dev = contractBlock({ output: "report_phase", tools: ["run_tests", "run_lint"], writes: true, onDemand: [] });
+    const dev = contractBlock({ output: "report_phase", tools: ["run_tests", "run_lint"], writes: ["tests/**"], onDemand: [] });
     expect(dev).toContain("`run_lint`");
     expect(dev).toMatch(/n'a rien mesuré/);
-    expect(contractBlock({ output: "report_phase", tools: ["run_tests"], writes: true, onDemand: [] })).not.toContain("run_lint");
+    expect(contractBlock({ output: "report_phase", tools: ["run_tests"], writes: ["tests/**"], onDemand: [] })).not.toContain("run_lint");
   });
 
   it("contrat : dire ce que l'agent N'A PAS, pas seulement ce qu'il a (ADR 0034)", () => {
     // Le contrat énumérait les outils disponibles et taisait les absents. L'agent découvrait donc
     // l'absence de shell en s'y cognant : trois refus sur un run réel, dix-huit sur un autre.
     // Un refus est un filet ; il ne remplace pas une consigne.
-    const p = contractBlock({ output: "report_phase", tools: ["list_files", "run_tests"], writes: true, onDemand: [] });
+    const p = contractBlock({ output: "report_phase", tools: ["list_files", "run_tests"], writes: ["tests/**"], onDemand: [] });
     expect(p).toMatch(/ni shell|aucune commande/i);
     expect(p).toContain("`list_files`");
   });
 
   it("contrat : l'alternative proposée est celle que ce rôle possède vraiment", () => {
     // Proposer `list_files` à un rôle qui ne l'a pas enverrait l'agent contre un second mur.
-    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] })).not.toContain("`list_files`");
+    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: [], onDemand: [] })).not.toContain("`list_files`");
+  });
+
+  it("contrat : le périmètre d'écriture est NOMMÉ, pas seulement évoqué (ADR 0036)", () => {
+    // Le contrat disait « tu n'écris que dans ton périmètre » sans dire lequel : l'agent devait le
+    // deviner, ou se le faire dire par un refus. C'est le défaut corrigé ce matin pour le shell,
+    // resté ici. `composeAgentPrompt` ne transmettait qu'un booléen.
+    const p = contractBlock({ output: "report_phase", tools: [], writes: [".skraft/us-2/**", "tests/**"], onDemand: [] });
+    expect(p).toContain(".skraft/us-2/**");
+    expect(p).toContain("tests/**");
+  });
+
+  it("contrat : dit aussi de ne RIEN modifier ni supprimer ailleurs", () => {
+    // Nommer ce qui est permis ne dit pas ce qui est interdit : un agent peut lire « voilà où tu
+    // écris » sans en conclure « et nulle part ailleurs, ni modifier, ni supprimer ».
+    const p = contractBlock({ output: "report_phase", tools: [], writes: [".skraft/us-2/**"], onDemand: [] });
+    expect(p).toMatch(/supprim/i);
+    expect(p).toMatch(/aucun autre|nulle part ailleurs|hors de/i);
+  });
+
+  it("contrat : un rôle sans périmètre n'en invente pas", () => {
+    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: [], onDemand: [] })).toContain("Tu n'écris aucun fichier.");
+  });
+
+  it("le périmètre annoncé est celui que la garde appliquera", () => {
+    // Deux sources pour une même règle divergeraient : le prompt vient du manifeste, la garde
+    // aussi. Ici on vérifie que la composition transmet bien les globs du manifeste.
+    const { systemPrompt } = composeAgentPrompt(
+      { name: "a", title: "A", output: "report_phase", write: [".skraft/**", "@stack:sources"] },
+      null,
+      new Map(),
+    );
+    expect(systemPrompt).toContain(".skraft/**");
+    expect(systemPrompt).toContain("@stack:sources");
   });
 
   it("agent sans fichier (consignes seules) : consignes puis contrat", () => {

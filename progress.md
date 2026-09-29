@@ -5,6 +5,32 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Le contrat parlait d'un périmètre sans le nommer (ADR 0036)
+
+> Tu n'écris que dans ton périmètre : toute autre écriture est refusée.
+
+Sans dire lequel. `composeAgentPrompt` **avait** les globs — ceux du manifeste, ceux que la garde
+applique — et les réduisait à un booléen avant de rédiger la phrase. L'information existait et
+était jetée à la dernière étape, comme la commande refusée non journalisée ou les compteurs de
+cache. C'est le défaut corrigé le matin même pour le shell, resté intact ici.
+
+**Nommer le permis ne dit pas l'interdit.** Le contrat énonce donc les deux, et cite explicitement
+la **suppression** : un agent peut lire « voilà où tu écris » sans en conclure « et nulle part
+ailleurs, ni modifier, ni supprimer ».
+
+**Ce qu'on a écarté, et pourquoi.** La proposition était de laisser l'agent lancer ses propres
+commandes de recherche, puis de vérifier par Git qu'il n'a modifié que l'autorisé. C'est ce que
+font Claude Code ou Copilot CLI — **mais dans un conteneur**. Sans confinement, le contrôle a
+posteriori ne voit rien de ce qui compte : ce qui se passe hors du dépôt, une exfiltration qui ne
+modifie rien par construction, un effet déjà sorti de la machine qu'aucun rollback ne défait.
+
+**Ce qui répondrait vraiment au besoin** : un outil `search` à paramètres structurés, exécuté en
+argv sans shell. `ProcessRunner` lance déjà « une commande sans shell », et D47/O12 fournit la
+liste de programmes. L'agent composerait sa recherche, le code l'exécuterait — même frontière que
+`run_tests`. Le danger n'est pas la commande, c'est l'interpréteur qui lit le `;`.
+
+---
+
 ## 29/09 — Un refus se contournait par une majuscule (ADR 0035)
 
 **Déclencheur** : « l'extension est destinée à fonctionner sur Windows, macOS et Linux. » Les deux

@@ -326,6 +326,13 @@
       "notes": "L'extension vise Windows, macOS et Linux ; les deux premiers ont un système de fichiers insensible à la casse par défaut — vérifié sur la machine de développement. `globToRegExp` compilait sans drapeau, donc TROIS refus adossés à une garantie se contournaient par une majuscule : le gel de la barre de qualité (ADR 0034, écrite une heure plus tôt), le gel des tests d'acceptance (D21/D22, via `isTestFile`), et l'interdiction d'écrire dans `.git` (`.GIT/config` passait). Règle asymétrique, les deux moitiés allant vers « refuser par défaut » : refuser ignore la casse pour attraper plus, accorder la respecte pour accorder moins — rendre les autorisations insensibles ouvrirait `.SKRAFT/` sur un Linux où c'est un autre dossier. Troisième fois en une journée qu'une garantie reposait sur une comparaison textuelle trop naïve (après le lien symbolique des canaris et le chemin recollé par le SDK). LA CI NE TESTE QUE MACOS. RESTE OUVERT : normalisation Unicode, lettres de lecteur et UNC."
     },
     {
+      "id": "perimetre-nomme",
+      "title": "Le contrat nomme les chemins où l'agent peut écrire, et interdit explicitement de modifier ou supprimer ailleurs (ADR 0036)",
+      "verify": "pnpm vitest run --project extension-host test/agent-prompts.test.ts",
+      "passes": true,
+      "notes": "Le contrat disait « tu n'écris que dans ton périmètre » SANS le nommer : `composeAgentPrompt` recevait les globs du manifeste — ceux que la garde applique — et les réduisait à un booléen avant de rédiger la consigne. L'agent devait deviner, ou l'apprendre par un refus : le défaut corrigé le matin même pour le shell (ADR 0033), resté ici. Deux moitiés dites, parce que nommer le permis ne dit pas l'interdit : un agent peut lire « voilà où tu écris » sans en conclure « et nulle part ailleurs », et l'interdiction de SUPPRIMER n'est pas impliquée par une permission d'écrire. Un test vérifie que le périmètre annoncé vient du manifeste, source unique avec la garde. ÉCARTÉ : le contrôle a posteriori par Git — il vaut pour un processus confiné, et sans confinement il ne voit ni ce qui se passe hors du dépôt, ni une exfiltration (qui ne modifie rien), ni un effet déjà sorti de la machine. RESTE OUVERT : un outil `search` en argv sans shell, et le périmètre `.skraft/<slug>/`."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",
