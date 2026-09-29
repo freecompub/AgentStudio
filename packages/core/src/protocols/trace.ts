@@ -26,7 +26,7 @@ export type TraceEntry = {
   | { kind: "message"; texte: string }
   | { kind: "raisonnement"; texte: string }
   | { kind: "outil"; nom: string; appel: string }
-  | { kind: "outil-fin"; appel: string; succès: boolean }
+  | { kind: "outil-fin"; appel: string; succès: boolean; erreur?: string }
   /** Décision de la garde : **tout** appel soumis à permission, autorisé comme refusé. */
   | { kind: "permission"; sorte: string; outil: string; cible?: string; décision: "allow" | "deny"; raison?: string }
   | { kind: "usage"; modèle?: string; entrée?: number; sortie?: number; nanoAiu?: number }

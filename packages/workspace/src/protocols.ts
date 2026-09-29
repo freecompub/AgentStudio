@@ -16,6 +16,11 @@ export interface FileStore {
   read(rel: string): Promise<string>;
   write(rel: string, content: string): Promise<void>;
   /** Fichiers suivis et non suivis, hors fichiers ignorés, triés. */
+  /**
+   * Crée un dossier et ses parents (ADR 0037). Confiné comme l'écriture : rien hors du dépôt,
+   * liens symboliques résolus. Sans objet si le dossier existe déjà.
+   */
+  ensureDir(path: string): Promise<void>;
   list(): Promise<string[]>;
 }
 

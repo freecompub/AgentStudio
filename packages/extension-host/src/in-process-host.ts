@@ -193,6 +193,12 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         if (!matchesAny(resolveGlobs(perm.writeGlobs()), rel)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
         await deps.workspace.files.write(rel, content);
       },
+      /** Même permission que l'écriture : préparer un dossier, c'est préparer une écriture (ADR 0037). */
+      async ensureDir(p) {
+        const rel = p.replaceAll("\\", "/");
+        if (!matchesAny(resolveGlobs(perm.writeGlobs()), `${rel.replace(/\/+$/, "")}/x`)) throw new PermissionDeniedError(manifest.id, `fs:write:${rel}`);
+        await deps.workspace.files.ensureDir(rel);
+      },
       listFiles: async () => (perm.require("fs:read"), deps.workspace.files.list()),
       checkpoint: async (label) => ({ id: (await deps.workspace.checkpoints.create(label)).id }),
       rollback: async (id) => (perm.require("git:revert"), deps.workspace.checkpoints.rollback(id)),

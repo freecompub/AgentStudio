@@ -77,6 +77,33 @@ describe("mapSessionEvent", () => {
     });
   });
 
+  it("l'échec d'un outil porte SON MOTIF, pas seulement un booléen (ADR 0037)", () => {
+    // Quinze échecs d'écriture ont coûté trois runs d'enquête : la trace disait « échoué » et le
+    // message du SDK — « Parent directories must exist before creating the file » — était jeté ici.
+    expect(
+      mapSessionEvent(
+        ev("tool.execution_complete", {
+          toolCallId: "t1",
+          success: false,
+          error: { code: "ENOENT", message: "Parent directories must exist before creating the file" },
+        }),
+      ),
+    ).toEqual({
+      type: "tool-end",
+      toolCallId: "t1",
+      success: false,
+      error: { code: "ENOENT", message: "Parent directories must exist before creating the file" },
+    });
+  });
+
+  it("un succès reste un succès nu : pas de champ d'erreur inventé", () => {
+    expect(mapSessionEvent(ev("tool.execution_complete", { toolCallId: "t1", success: true }))).toEqual({
+      type: "tool-end",
+      toolCallId: "t1",
+      success: true,
+    });
+  });
+
   it("session.usage_info devient l'occupation de la fenêtre (ADR 0031)", () => {
     // C'est la seule mesure qui DÉCROÎT quand le runtime compacte, là où le cumul des `usage`
     // compte ce qui a transité et ne redescend jamais.

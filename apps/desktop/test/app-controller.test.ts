@@ -16,7 +16,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
     root,
     rolledBack,
     diffs,
-    files: { read: async () => "", write: async () => {}, list: async () => [] },
+    files: { read: async () => "", write: async () => {}, ensureDir: async () => {}, list: async () => [] },
     checkpoints: {
       create: async (label) => ({ id: `cp-${++n}`, sha: "s", head: "h", label, createdAt: "" }),
       list: async () => [],

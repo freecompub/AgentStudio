@@ -136,7 +136,14 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
               if (e.type === "message") tracer({ kind: "message", texte: e.text });
               else if (e.type === "reasoning") tracer({ kind: "raisonnement", texte: e.text });
               else if (e.type === "tool-start") tracer({ kind: "outil", nom: e.toolName, appel: e.toolCallId });
-              else if (e.type === "tool-end") tracer({ kind: "outil-fin", appel: e.toolCallId, succès: e.success });
+              else if (e.type === "tool-end")
+                tracer({
+                  kind: "outil-fin",
+                  appel: e.toolCallId,
+                  succès: e.success,
+                  // Sans le motif, la trace dit « échoué » et n'apprend rien (ADR 0037).
+                  ...(e.error ? { erreur: [e.error.code, e.error.message, e.error.remediation].filter(Boolean).join(" — ") } : {}),
+                });
               else if (e.type === "permission")
                 tracer({
                   kind: "permission",

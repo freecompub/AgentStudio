@@ -72,6 +72,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const branch = `skraft/${slug}`;
       const baseSha = await ctx.git.head();
       await ctx.git.branch(branch);
+      // L'arborescence est créée ICI, une fois pour toutes (ADR 0037) : la trace du 29/09 montrait
+      // le chercheur tenter deux `mkdir -p` avant d'écrire — réflexe juste sous shell, et sans
+      // objet ici. Le code prépare, l'agent n'a plus à y penser.
+      for (const d of dossiersDeLaStory(slug)) await ctx.workspace.ensureDir(d);
       const indicators = computeIndicators(parsed.story, repositoryShape(await ctx.workspace.listFiles()));
       return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators };
     }
@@ -239,6 +243,19 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
  * principe du projet — le LLM propose, le code décide et vérifie.
  */
 export const GELÉS = [".skraft/quality.json"] as const;
+
+/**
+ * Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037).
+ *
+ * Créés à l'initialisation. Les tenir ici, en un seul endroit, évite que la liste diverge de ce que
+ * les portes attendent — `checkDesign` lit `design/`, la porte citations lit `research/`.
+ */
+export const dossiersDeLaStory = (slug: string): string[] => [
+  `.skraft/${slug}/research`,
+  `.skraft/${slug}/design`,
+  `.skraft/${slug}/distill/features`,
+  `.skraft/${slug}/reviews`,
+];
 
 /** Porte citations (§7.1) : document au gabarit, citations vérifiées sur le dépôt, questions ouvertes. */
 async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: number): Promise<Ev> {

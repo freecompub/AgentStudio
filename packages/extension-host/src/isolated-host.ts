@@ -44,6 +44,7 @@ const CALLS: Record<string, Dispatch> = {
   "agents.run": (ctx, [name, prompt, opts], signal) => ctx.agents.run(String(name), String(prompt), { ...(opts as object), signal }),
   "workspace.readFile": (ctx, [p]) => ctx.workspace.readFile(String(p)),
   "workspace.writeFile": (ctx, [p, content]) => ctx.workspace.writeFile(String(p), String(content)),
+  "workspace.ensureDir": (ctx, [p]) => ctx.workspace.ensureDir(String(p)),
   "workspace.listFiles": (ctx) => ctx.workspace.listFiles(),
   "workspace.checkpoint": (ctx, [label]) => ctx.workspace.checkpoint(String(label)),
   "workspace.rollback": (ctx, [id]) => ctx.workspace.rollback(String(id)),

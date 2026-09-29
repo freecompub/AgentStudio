@@ -5,6 +5,41 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Trois runs perdus tenaient dans une ligne qu'on ne gardait pas (ADR 0037)
+
+**La cause des trois échecs sur « Document de recherche absent ».** L'outil `create` du CLI ne crée
+pas les dossiers parents — il le documente lui-même. Le chercheur l'a diagnostiqué **seul**, en
+testant : chemin imbriqué, un seul niveau, `.keep`, fichier à la racine de `.skraft/` (seul
+celui-là passe), `edit` avec un `old_str` vide, et jusqu'au lancement d'un **sous-agent** pour voir
+si son outil se comporterait autrement. Sa conclusion, mot pour mot :
+
+> this is likely a harness limitation […] the orchestrator itself needs to create the target
+> directory rather than me.
+
+**Notre garde n'y est pour rien, et y est pour tout.** Sur le run tracé : 18 lectures autorisées,
+2 écritures autorisées, **zéro refus d'écriture**, 3 refus de shell dont deux `mkdir -p`. Le CLI ne
+sait pas créer le dossier ; nous retirons le seul autre moyen. Chaque choix est défendable pris
+seul — **c'est l'intersection qui bloque**, et aucun des deux côtés ne pouvait la voir.
+
+**La règle à retenir** : quand on retire une capacité, se demander **ce qui en dépendait**. On a
+fermé le shell en pensant aux tests et aux commandes dangereuses ; `mkdir` en dépendait aussi. Le
+pendant de l'ADR 0033 : un refus doit dire ce que le rôle peut faire, et ce qu'il peut faire doit
+**suffire**.
+
+**Et l'enquête a coûté trois runs pour rien.** Le SDK rend `{ code, message, remediation }` à la fin
+d'un appel d'outil ; on n'en gardait que `success: boolean`. Quinze échecs, quinze fois « échoué »,
+jamais la raison. Pour répondre à « la CLI produit-elle une erreur ? », j'ai dû lire le
+**raisonnement du modèle** — ce que lui avait compris de l'erreur, pas l'erreur.
+
+C'est la deuxième fois que j'écris un mécanisme d'observation en omettant ce qu'il devait capter :
+l'ADR 0032 disait « on ne garde pas ce sur quoi on décide », et son implémentation jetait le motif
+des échecs d'outil, cinq heures plus tard.
+
+**Relevé, non traité** : un agent peut lancer des **sous-agents**. La garde s'y applique, mais ni la
+trace ni les plafonds ne distinguent ce qui s'y passe.
+
+---
+
 ## 29/09 — Le contrat parlait d'un périmètre sans le nommer (ADR 0036)
 
 > Tu n'écris que dans ton périmètre : toute autre écriture est refusée.

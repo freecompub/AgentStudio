@@ -50,7 +50,7 @@ async function setup(runs: TestRun[], manifest = MANIFEST) {
   };
   const workspace: Workspace = {
     root: "/projets/demo",
-    files: { read: async () => "contenu", write: async () => {}, list: async () => ["tests/a.test.ts", "src/a.ts"] },
+    files: { read: async () => "contenu", write: async () => {}, ensureDir: async () => {}, list: async () => ["tests/a.test.ts", "src/a.ts"] },
     checkpoints: { create: async (l) => ({ id: "cp", sha: "", head: "", label: l, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
     repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.

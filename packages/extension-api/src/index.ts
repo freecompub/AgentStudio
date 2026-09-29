@@ -142,6 +142,11 @@ export interface WorkspaceApi {
   readFile(path: string): Promise<string>;
   /** Écriture par le code de l'extension, limitée aux motifs `fs:write:<glob>` déclarés (D11, D29). */
   writeFile(path: string, content: string): Promise<void>;
+  /**
+   * Crée un dossier et ses parents (ADR 0037) : l'orchestrateur prépare l'arborescence pour que
+   * l'agent n'ait pas à s'en soucier. Confiné comme l'écriture.
+   */
+  ensureDir(path: string): Promise<void>;
   listFiles(): Promise<string[]>;
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;

@@ -20,7 +20,21 @@ export function mapSessionEvent(event: SessionEvent): AgentEvent {
     case "tool.execution_progress":
       return { type: "tool-progress", toolCallId: event.data.toolCallId, message: event.data.progressMessage };
     case "tool.execution_complete":
-      return { type: "tool-end", toolCallId: event.data.toolCallId, success: event.data.success };
+      return {
+        type: "tool-end",
+        toolCallId: event.data.toolCallId,
+        success: event.data.success,
+        // `code`, `message` et la remédiation étaient rendus par le SDK et jetés ici (ADR 0037).
+        ...(event.data.error
+          ? {
+              error: {
+                ...(event.data.error.code !== undefined ? { code: event.data.error.code } : {}),
+                message: event.data.error.message,
+                ...(typeof event.data.error.remediation === "string" ? { remediation: event.data.error.remediation } : {}),
+              },
+            }
+          : {}),
+      };
     case "assistant.usage":
       return {
         type: "usage",

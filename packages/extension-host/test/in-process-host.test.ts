@@ -25,7 +25,7 @@ function fakeWorkspace(): Workspace {
   const files: Record<string, string> = { "tests/a.test.ts": "x", "src/a.ts": "y" };
   return {
     root: "/projets/demo",
-    files: { read: async (p) => files[p] ?? "", write: async () => {}, list: async () => Object.keys(files) },
+    files: { read: async (p) => files[p] ?? "", write: async () => {}, ensureDir: async () => {}, list: async () => Object.keys(files) },
     checkpoints: {
       create: async (label) => ({ id: "cp-1", sha: "s", head: "h", label, createdAt: "" }),
       list: async () => [],

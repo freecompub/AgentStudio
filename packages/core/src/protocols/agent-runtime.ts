@@ -107,7 +107,12 @@ export type AgentEvent =
   | { type: "reasoning"; text: string }
   | { type: "tool-start"; toolCallId: string; toolName: string }
   | { type: "tool-progress"; toolCallId: string; message: string }
-  | { type: "tool-end"; toolCallId: string; success: boolean }
+  /**
+   * Fin d'un appel d'outil. `error` vient du runtime (ADR 0037) : sans lui, une trace dit qu'un
+   * outil a échoué sans jamais dire pourquoi. Quinze échecs d'écriture ont ainsi coûté trois runs
+   * d'enquête, alors que le message — « Parent directories must exist » — était disponible.
+   */
+  | { type: "tool-end"; toolCallId: string; success: boolean; error?: { code?: string; message: string; remediation?: string } }
   | { type: "tool-denied"; toolName: string; reason: string }
   /**
    * Décision de la garde sur un appel soumis à permission, **autorisé comme refusé** (ADR 0032).

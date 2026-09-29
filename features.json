@@ -333,6 +333,20 @@
       "notes": "Le contrat disait « tu n'écris que dans ton périmètre » SANS le nommer : `composeAgentPrompt` recevait les globs du manifeste — ceux que la garde applique — et les réduisait à un booléen avant de rédiger la consigne. L'agent devait deviner, ou l'apprendre par un refus : le défaut corrigé le matin même pour le shell (ADR 0033), resté ici. Deux moitiés dites, parce que nommer le permis ne dit pas l'interdit : un agent peut lire « voilà où tu écris » sans en conclure « et nulle part ailleurs », et l'interdiction de SUPPRIMER n'est pas impliquée par une permission d'écrire. Un test vérifie que le périmètre annoncé vient du manifeste, source unique avec la garde. ÉCARTÉ : le contrôle a posteriori par Git — il vaut pour un processus confiné, et sans confinement il ne voit ni ce qui se passe hors du dépôt, ni une exfiltration (qui ne modifie rien), ni un effet déjà sorti de la machine. RESTE OUVERT : un outil `search` en argv sans shell, et le périmètre `.skraft/<slug>/`."
     },
     {
+      "id": "arborescence-preparee",
+      "title": "L'orchestrateur crée les dossiers de la story ; l'agent n'a jamais à en créer (ADR 0037)",
+      "verify": "pnpm vitest run --project ext-skraft test/dossiers-de-la-story.test.ts && pnpm vitest run --project workspace test/ensure-dir.test.ts",
+      "passes": true,
+      "notes": "Cause des TROIS runs échoués sur « Document de recherche absent ». L'outil `create` du CLI ne crée pas les dossiers parents — il le documente : « Parent directories must exist before creating the file ». Relevé des décisions de la garde sur le run tracé : 18 lectures autorisées, 2 écritures autorisées, ZÉRO refus d'écriture, 3 refus de shell dont deux `mkdir -p`. Le CLI ne sait pas créer le dossier, nous retirons le seul autre moyen : c'est l'INTERSECTION qui bloque, aucun des deux côtés ne pouvait le voir seul. L'agent l'avait diagnostiqué seul après six contournements, dont le lancement d'un sous-agent, et concluait que l'orchestrateur devait créer le dossier. `ensureDir` ajoutée à l'API d'extension (elle n'avait que `writeFile`), confinée comme l'écriture. RÈGLE : quand on retire une capacité, se demander ce qui en dépendait."
+    },
+    {
+      "id": "erreur-d-outil-tracee",
+      "title": "Quand un outil échoue, la trace dit pourquoi (ADR 0037)",
+      "verify": "pnpm vitest run --project runtime-copilot test/map-session-event.test.ts",
+      "passes": true,
+      "notes": "Le SDK rend `{ code, message, remediation }` sur la fin d'un appel d'outil ; le mapping n'en gardait que `success: boolean`. Quinze échecs d'écriture, quinze fois « échoué », sans jamais la raison — qui était disponible. Pour répondre à la question « la CLI produit-elle une erreur ? » il a fallu lire le RAISONNEMENT du modèle, c'est-à-dire ce que lui avait compris de l'erreur, pas l'erreur. Trois runs d'enquête tenaient dans cette ligne. C'est le défaut que l'ADR 0032 devait corriger, reproduit dans sa propre implémentation cinq heures plus tard."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",
