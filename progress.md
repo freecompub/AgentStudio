@@ -272,6 +272,48 @@ facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas
 
 ---
 
+## 29/09 — Le test instable, et les deux défauts derrière lui
+
+**Comment je l'ai trouvé.** Pas en lisant : en rejouant la suite **huit fois**. Un échec, un seul,
+au quatrième passage — « le texte saisi accompagne la réponse », dans `j6.test.tsx`. Je l'avais
+signalé plus tôt sans son nom, faute d'avoir capturé la sortie au moment où il était tombé ; c'est
+la seule raison qui m'a coûté ces huit exécutions.
+
+**Deux causes distinctes, un seul symptôme** — le panneau reste vide après l'émission.
+
+**Dans le produit.** `TaskPanel` s'abonne aux événements **et** demande un instantané au montage :
+
+```ts
+api.on("interactions:changed", ({ pending }) => setPending(pending));   // synchrone
+api.call("interactions:list", {}).then(setPending, () => undefined);    // promesse
+```
+
+Un événement reçu pendant le chargement était écrasé, à la résolution, par une liste déjà périmée.
+Même schéma pour `tasks:list` / `task:update`, en pire : la liste **remplace** la Map là où
+l'événement y **fusionne**. Corrigé par un garde de fraîcheur — l'instantané ne s'applique que si
+rien de plus récent n'est arrivé.
+
+**Dans les tests.** `FakeApi.emit` parcourt les auditeurs enregistrés et ne garde rien : un
+événement émis avant le montage du panneau est perdu **en silence**. Attendre « (PO / BA) » ou
+« Votre message » ne prouve que le montage d'un *autre* composant. Les tests attendent désormais que
+le panneau soit abonné — son effet s'abonne puis appelle `interactions:list`, donc voir l'appel
+suffit à le prouver.
+
+**Ce qui m'a évité de m'arrêter trop tôt.** Après le premier correctif, j'ai rejoué dix fois : échec
+au neuvième. Sans ça j'aurais conclu « réglé » sur une seule exécution verte, alors que je n'avais
+traité qu'une des deux causes. Les deux tests de course sont d'ailleurs vérifiés par mutation.
+
+**Stabilité mesurée** : 15 exécutions du fichier et 5 de la suite complète sans échec, contre 2
+échecs sur 12 avant.
+
+**Et `scripts/` est entré dans le typecheck**, ce qui a trouvé deux défauts immédiatement : un
+doublon d'import que je venais d'introduire dans le banc — le paquet exportait déjà `createGhAuth`
+et un `createNodeCommandRunner` que j'avais réécrit à la main — et, plus ancien, un confirmateur de
+garde rendant `false` dans `smoke-copilot.ts` là où `ConfirmAnswer` attend une des trois réponses.
+L'essai réel contre Copilot tournait avec une garde qui ne disait rien de valide.
+
+---
+
 ## 29/09 — Le dépôt revenait en arrière, la mémoire non (ADR 0050, numéroté 0045 à l’origine)
 
 **L'incohérence que j'avais laissée derrière moi.** L'ADR 0040 du matin cesse de rembobiner sur un

@@ -562,6 +562,20 @@
       "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts test/profile-adapter.test.ts -t \"Stryker\"",
       "passes": true,
       "notes": "Lecteur écrit sur un rapport réel de Stryker.NET 5.0.0 (03/10) ; éprouvé de bout en bout sur le code livré d’US-2 : 72 % en 32 s, comme Stryker. dotnet-stryker installé en outil global sur la machine de dev ; le projet d’essai n’a pas encore la commande dans son stack.yaml."
+    },
+    {
+      "id": "instantane-initial-ne-perime-pas-un-evenement",
+      "title": "Un événement reçu pendant le chargement n'est ni perdu ni écrasé par l'instantané initial",
+      "verify": "pnpm vitest run --project desktop test/renderer/j6.test.tsx test/renderer/app.test.tsx",
+      "passes": true,
+      "notes": "Un test de l'interface (« le texte saisi accompagne la réponse ») échouait une fois sur huit. TROUVÉ EN REJOUANT LA SUITE HUIT FOIS, pas en la lisant : je l'avais d'abord signalé sans son nom, faute d'avoir capturé la sortie. DEUX causes distinctes derrière le même symptôme. (1) Dans le PRODUIT : `TaskPanel` s'abonne aux événements ET demande un instantané au montage ; les événements sont synchrones, l'instantané est une promesse, donc un `interactions:changed` reçu pendant le chargement était écrasé à la résolution par une liste déjà périmée — même schéma pour `tasks:list` / `task:update`, aggravé car la liste REMPLACE la Map quand l'événement y fusionne. Corrigé par un garde de fraîcheur : l'instantané ne s'applique que si aucun événement n'est arrivé. (2) Dans les TESTS : `FakeApi.emit` parcourt les auditeurs enregistrés et ne garde rien — un événement émis avant le montage du panneau est perdu EN SILENCE, et attendre « (PO / BA) » ou « Votre message » ne prouve que le montage d'un autre composant. Les tests attendent désormais que le panneau soit abonné (son effet s'abonne puis appelle `interactions:list` : voir l'appel prouve l'abonnement). Les deux tests de course sont VÉRIFIÉS PAR MUTATION — sans le garde de fraîcheur ils échouent. Stabilité mesurée : 15 exécutions du fichier et 5 de la suite complète sans échec, contre 2 échecs sur 12 avant."
+    },
+    {
+      "id": "scripts-typechecke",
+      "title": "`scripts/` est couvert par `pnpm typecheck`",
+      "verify": "pnpm typecheck",
+      "passes": true,
+      "notes": "`tsconfig.json` n'incluait que packages, extensions et apps : un import faux dans `scripts/` passait sans un mot, et ça m'a piégé le 29/09 (un `PHASE_ORDER` importé d'un module qui ne l'exporte pas, découvert à l'exécution). L'élargissement a trouvé DEUX défauts du premier coup : un doublon d'import de `createGhAuth` que je venais d'introduire dans le banc — le paquet l'exportait déjà, ainsi qu'un `createNodeCommandRunner` que j'avais réécrit à la main ; et dans `scripts/smoke-copilot.ts`, un confirmateur de garde rendant `false` là où `ConfirmAnswer` attend « allow-once | allow-always | deny » — l'essai réel contre Copilot tournait donc avec une garde dont la réponse n'était aucune des trois. La CI lance déjà `pnpm typecheck`, aucun changement de workflow."
     }
   ]
 }
