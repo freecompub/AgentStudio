@@ -147,6 +147,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       },
       interactions: { request: (req) => call("interactions.request", [req]) },
       evidence: { list: (taskId) => call("evidence.list", [taskId]) },
+      trace: { rejected: (taskId, label, files) => call("trace.rejected", [taskId, label, files]) as Promise<void> },
       tools: {
         register(tool) {
           tools.set(tool.name, tool);

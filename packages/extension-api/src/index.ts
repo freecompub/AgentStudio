@@ -260,6 +260,18 @@ export interface ExtensionLog {
   warn(msg: string, fields?: Record<string, string | number | boolean>): void;
 }
 
+/**
+ * Trace d'exécution accessible à une extension (ADR 0038) : elle **raconte**, elle n'atteste rien.
+ * Une porte ne doit jamais s'y appuyer — les preuves (`evidence`) font seules foi.
+ */
+export interface ExtensionTrace {
+  /**
+   * Archive des livrables avant qu'un rollback ne les efface. `étiquette` situe le moment
+   * (« DESIGN essai 2 »), et chaque fichier est enregistré avec son chemin.
+   */
+  rejected(taskId: string, label: string, files: readonly { path: string; content: string }[]): Promise<void>;
+}
+
 export interface ExtensionContext {
   readonly extensionId: string;
   readonly chat: ChatApi;
@@ -270,6 +282,8 @@ export interface ExtensionContext {
   readonly tasks: TasksApi;
   readonly interactions: InteractionsApi;
   readonly evidence: EvidenceApi;
+  /** Trace d'exécution (ADR 0032, 0038) : elle raconte, elle n'atteste rien. */
+  readonly trace: ExtensionTrace;
   readonly hooks: HooksApi;
   readonly tools: ToolsApi;
   readonly log: ExtensionLog;

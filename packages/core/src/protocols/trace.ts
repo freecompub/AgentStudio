@@ -35,6 +35,14 @@ export type TraceEntry = {
   | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[] }
   /** Rejet par une porte ou une revue, avec ses motifs entiers. */
   | { kind: "rejet"; porte: string; motifs: string[] }
+  /**
+   * Livrable archivé **avant** qu'un rollback ne l'efface (ADR 0038).
+   *
+   * Un rejet de porte rembobine le dépôt : le document jugé disparaît en même temps que le verdict
+   * qui le condamne. On ne peut alors plus examiner ce qu'un agent a produit **au moment précis où
+   * on voudrait le lire**. Le contenu est tronqué comme le reste, en le disant.
+   */
+  | { kind: "livrable-rejeté"; étiquette: string; chemin: string; contenu: string }
 );
 
 /**

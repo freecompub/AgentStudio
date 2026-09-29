@@ -18,7 +18,7 @@ import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
 import { runLintTool } from "./lint-tool.js";
-import { listFilesTool } from "@agent-studio/core";
+import { listFilesTool, type TraceStore } from "@agent-studio/core";
 import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -38,6 +38,8 @@ export interface HostDeps {
   hooks: HookRegistry;
   /** Usage des agents, attribué à la tâche et à son état courant (D37). */
   usage?: UsageRecorder;
+  /** Trace d'exécution (ADR 0032). Absente, rien n'est tracé — le fonctionnement n'en dépend pas. */
+  trace?: TraceStore;
   chat: ExtensionChatSink;
   clock: Clock;
   ids: IdGenerator;
@@ -247,6 +249,17 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           ...(opts?.files ? { files: opts.files } : {}),
           ...(opts?.signal ? { signal: opts.signal } : {}),
         });
+      },
+    },
+
+    trace: {
+      async rejected(taskId, label, files) {
+        // Silencieuse comme le reste de la trace : elle observe, elle ne décide pas, et elle ne
+        // doit jamais faire tomber la tâche qu'elle documente.
+        for (const f of files)
+          await deps.trace
+            ?.append({ taskId, at: deps.clock.now().toISOString(), kind: "livrable-rejeté", étiquette: label, chemin: f.path, contenu: f.content })
+            .catch((err: unknown) => log?.warn("livrable rejeté non archivé", { path: f.path, error: String(err) }));
       },
     },
 

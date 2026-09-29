@@ -347,6 +347,13 @@
       "notes": "Le SDK rend `{ code, message, remediation }` sur la fin d'un appel d'outil ; le mapping n'en gardait que `success: boolean`. Quinze échecs d'écriture, quinze fois « échoué », sans jamais la raison — qui était disponible. Pour répondre à la question « la CLI produit-elle une erreur ? » il a fallu lire le RAISONNEMENT du modèle, c'est-à-dire ce que lui avait compris de l'erreur, pas l'erreur. Trois runs d'enquête tenaient dans cette ligne. C'est le défaut que l'ADR 0032 devait corriger, reproduit dans sa propre implémentation cinq heures plus tard."
     },
     {
+      "id": "livrable-rejete-archive",
+      "title": "Un livrable refusé par une porte est archivé avant le rollback, à côté de son motif (ADR 0038)",
+      "verify": "pnpm vitest run --project extension-host test/in-process-host.test.ts && pnpm vitest run --project ext-skraft",
+      "passes": true,
+      "notes": "Cinquième run sur US-2 : RESEARCH produit enfin un document, la porte le juge sur son contenu (« LigneDePanier.cs:5-8 : plage hors du fichier, qui compte 7 lignes »), et à la demande « montre-moi ce qu'il a produit » le document était introuvable. Le rollback exécute `read-tree --reset -u` puis `git clean -fdq` ; le fichier n'était pas commité. Et la trace enregistre QU'un outil a été appelé, jamais AVEC QUOI. On ne pouvait donc pas examiner ce qu'un agent produit au moment précis où une porte le refuse. Archivé dans la trace et non dans le dépôt : `git clean -fdq` effacerait tout ce qu'on écrirait à côté. La trace s'ouvre aux extensions par une API étroite ; la distinction de l'ADR 0032 sert ici pour la première fois — `evidence` atteste, `trace` raconte. Le test qui verrouille la surface exposée aux extensions a dû être mis à jour : c'est son rôle. TRONQUÉ à 8 000 caractères. QUATRIÈME omission de la même famille en deux jours ; les ARGUMENTS des outils ne sont toujours pas tracés."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",

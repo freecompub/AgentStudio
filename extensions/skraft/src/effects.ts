@@ -188,9 +188,21 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       });
       return;
 
-    case "rollback":
+    case "rollback": {
+      // Archiver AVANT (ADR 0038) : le rollback efface le livrable en même temps que le verdict qui
+      // le condamne, et on ne peut plus examiner ce qu'un agent a produit au moment précis où on
+      // voudrait le lire. La trace raconte ; elle n'atteste rien.
+      const étiquette = `${state.phase ?? "?"} essai ${state.attempts}`;
+      const àArchiver = await ctx.workspace.changedFiles(effect.to).catch(() => []);
+      const livrables = await Promise.all(
+        àArchiver
+          .filter((f) => f.status !== "deleted")
+          .map(async (f) => ({ path: f.path, content: await ctx.workspace.readFile(f.path).catch(() => "") })),
+      );
+      if (livrables.length) await ctx.trace.rejected(taskId, étiquette, livrables);
       await ctx.workspace.rollback(effect.to);
       return;
+    }
 
     case "commitPhase":
       // Rapports de revue réécrits depuis l'état (un rollback de réessai a pu les effacer) : reproductibles.

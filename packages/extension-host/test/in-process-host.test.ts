@@ -228,7 +228,13 @@ describe("Hôte d'extension en processus", () => {
     const { ctx, posted } = await activateWith(() => {});
     ctx.chat.post("Bonjour");
     expect(posted).toEqual(["diabeo.demo: Bonjour"]);
-    expect(Object.keys(ctx).sort()).toEqual(["agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "tools", "workspace"]);
+    // Liste verrouillée : c'est la règle de sécurité n°1 — aucun objet du SDK n'est jamais exposé à
+    // une extension. `trace` s'y ajoute (ADR 0038) et ne la met pas en cause : elle ne sait
+    // qu'archiver des livrables, et la trace RACONTE, elle n'atteste rien (une porte ne doit jamais
+    // s'y appuyer, contrairement à `evidence`).
+    expect(Object.keys(ctx).sort()).toEqual([
+      "agents", "chat", "evidence", "extensionId", "git", "hooks", "interactions", "log", "stack", "tasks", "tools", "trace", "workspace",
+    ]);
   });
 
   it("hooks : un refus d'extension s'applique aux sessions d'agent, préfixé par l'extension", async () => {

@@ -5,6 +5,36 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — RESEARCH produit enfin, et on ne peut pas lire ce qu'elle produit (ADR 0038)
+
+**Le mur est franchi.** Cinquième run : le chercheur écrit son document, en **deux tours** (un par
+essai), sans question, sans `mkdir`, sans échec d'écriture. La porte le juge sur son **contenu** :
+
+> `LigneDePanier.cs:5-8` : plage hors du fichier, qui compte 7 lignes.
+
+Reproche juste, précis, actionnable. On est passé d'un blocage d'outillage à un aller-retour de
+qualité — ce pour quoi le pipeline existe.
+
+**Et le document était introuvable.** Le rollback exécute `read-tree --reset -u` puis
+`git clean -fdq` ; le fichier n'était pas commité. La trace, elle, enregistre **qu'**un outil a été
+appelé, jamais **avec quoi**. Donc : impossible d'examiner ce qu'un agent produit **au moment
+précis où une porte le refuse**, c'est-à-dire quand on voudrait le lire.
+
+**Archivé dans la trace, pas dans le dépôt** — `git clean -fdq` effacerait tout ce qu'on écrirait à
+côté. Le document et son motif se lisent désormais côte à côte.
+
+**La distinction de l'ADR 0032 a servi pour la première fois.** Ouvrir la trace aux extensions
+demandait de justifier pourquoi ce n'est pas un trou de sécurité : `evidence` **atteste** et une
+porte s'y appuie ; `trace` **raconte** et aucune porte ne doit s'y appuyer. Le test qui verrouille
+la liste des capacités exposées m'a obligé à l'écrire — c'est exactement son rôle.
+
+**Quatrième omission de la même famille en deux jours** : la commande refusée, les compteurs de
+cache, le motif d'échec d'un outil, le contenu jugé. À chaque fois l'information existait et
+n'était pas conservée. Et il en reste une : **les arguments des outils** ne sont toujours pas
+tracés.
+
+---
+
 ## 29/09 — Trois runs perdus tenaient dans une ligne qu'on ne gardait pas (ADR 0037)
 
 **La cause des trois échecs sur « Document de recherche absent ».** L'outil `create` du CLI ne crée

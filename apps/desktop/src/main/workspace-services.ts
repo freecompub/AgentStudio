@@ -160,6 +160,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const usage = cfg.usageRecorder ?? createUsageRecorder(join(cfg.tasksDir, projectKey, "usage"));
+    // Une seule trace pour la tâche : l'exécuteur d'agents y écrit les tours, l'extension y archive
+    // les livrables qu'un rollback va effacer (ADR 0038).
+    const traceStore = cfg.traceStore ?? createJsonlTraceStore(join(cfg.tasksDir, projectKey, "traces"));
     const usageRows = new Map<string, UsageRow[]>();
     const engine = createTaskEngine({
       usage,
@@ -267,7 +270,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           ...(cfg.agentMaxInputTokens !== undefined ? { maxInputTokens: cfg.agentMaxInputTokens } : {}),
           ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
           // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
-          trace: cfg.traceStore ?? createJsonlTraceStore(join(cfg.tasksDir, projectKey, "traces")),
+          trace: traceStore,
           ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
         workspace,
@@ -275,6 +278,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         interactions,
         evidence,
         hooks,
+        trace: traceStore,
         usage,
         clock: cfg.clock,
         ids: cfg.ids,
