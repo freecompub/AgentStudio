@@ -272,6 +272,41 @@ facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas
 
 ---
 
+## 29/09 — Les fichiers du système, et un banc qui peut travailler chez toi
+
+**Ce que j'avais affirmé à tort.** J'ai annoncé ce matin que les `.DS_Store` apparus dans
+`.skraft/<slug>/` étaient enregistrés comme artefacts « produits par » l'agent. Faux sur ce poste :
+un `~/.gitignore_global` les couvre, et l'instantané d'un checkpoint passe par `git add -A`, qui
+respecte `.gitignore`. Je n'avais pas suivi la chaîne avant de le dire.
+
+**Le risque restait, conditionné à la configuration de l'utilisateur.** Un poste neuf, la CI, un
+collègue sous Windows avec `Thumbs.db` et `desktop.ini` : là ils entrent dans l'instantané, donc
+dans les artefacts, donc dans le commit de la phase. Le même travail rendrait des empreintes
+différentes selon la machine. C'est une garantie du produit qui dépendait d'un réglage personnel.
+
+**Où je l'ai écrit, et pourquoi.** Dans le Workspace, seul service qui touche le disque, et parce
+que c'est une connaissance de **plateforme** — pas de langage, donc pas dans un adaptateur de stack.
+
+**Le détail qui a changé l'implémentation.** J'ai d'abord exclu ces fichiers du `git add` par
+pathspec. `git add` **échoue** dès qu'un pathspec explicite désigne un fichier ignoré par un
+`.gitignore`, même si ce même fichier est exclu par un autre pathspec du même appel. Mesuré dans un
+dépôt jetable avant de recoder. La bonne voie est `reset HEAD` après l'ajout, qui a en prime la
+sémantique voulue aux deux bouts : absent de HEAD il sort de l'index, déjà suivi il y revient — donc
+un `desktop.ini` commité volontairement est préservé.
+
+**Ce que mes tests prouvent vraiment.** Trois tests, un seul discrimine le correctif. Les deux
+autres gardent contre une *mauvaise* correction — supprimer le fichier, ou retirer un fichier
+volontairement suivi — et passent sans lui. Vérifié par mutation, et dit tel quel dans l'ADR.
+
+**`--en-place` pour le banc.** Il clonait toujours vers un dossier temporaire : le dépôt était
+protégé, mais les livrables restaient hors de vue, à chercher dans `/private/var/folders/...`.
+L'option renverse le choix, avec deux garde-fous, parce que le pipeline commite, branche et
+rembobine : un arbre de travail **sale** fait échouer le lancement en nommant les fichiers, et le
+banc annonce en clair que le dépôt sera modifié. Les deux branches essayées à la main ; pas de test
+automatisé, `scripts/` n'a pas de suite.
+
+---
+
 ## 29/09 — Le test instable, et les deux défauts derrière lui
 
 **Comment je l'ai trouvé.** Pas en lisant : en rejouant la suite **huit fois**. Un échec, un seul,

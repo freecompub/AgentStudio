@@ -576,6 +576,20 @@
       "verify": "pnpm typecheck",
       "passes": true,
       "notes": "`tsconfig.json` n'incluait que packages, extensions et apps : un import faux dans `scripts/` passait sans un mot, et ça m'a piégé le 29/09 (un `PHASE_ORDER` importé d'un module qui ne l'exporte pas, découvert à l'exécution). L'élargissement a trouvé DEUX défauts du premier coup : un doublon d'import de `createGhAuth` que je venais d'introduire dans le banc — le paquet l'exportait déjà, ainsi qu'un `createNodeCommandRunner` que j'avais réécrit à la main ; et dans `scripts/smoke-copilot.ts`, un confirmateur de garde rendant `false` là où `ConfirmAnswer` attend « allow-once | allow-always | deny » — l'essai réel contre Copilot tournait donc avec une garde dont la réponse n'était aucune des trois. La CI lance déjà `pnpm typecheck`, aucun changement de workflow."
+    },
+    {
+      "id": "checkpoint-ignore-les-fichiers-du-systeme",
+      "title": "Un checkpoint n'enregistre pas les fichiers que le système d'exploitation sème (ADR 0051)",
+      "verify": "pnpm vitest run --project workspace test/checkpoints.test.ts",
+      "passes": true,
+      "notes": "Des `.DS_Store` apparaissent dans `.skraft/<slug>/` pendant un run, créés par macOS et non par l'agent. J'AVAIS AFFIRMÉ À TORT qu'ils étaient enregistrés comme artefacts : sur ce poste un `~/.gitignore_global` les couvre, et l'instantané passe par `git add -A` qui respecte `.gitignore` — ils n'entraient jamais. Le risque est réel mais CONDITIONNÉ à la configuration Git de l'utilisateur : poste neuf, CI, ou Windows avec `Thumbs.db` et `desktop.ini`. Là ils entrent dans l'instantané, donc dans `changedFiles`, donc dans les artefacts ATTRIBUÉS À L'AGENT et dans son commit ; un même run rendrait des empreintes différentes selon la machine. Écrit dans le Workspace, seul service qui touche le disque, et parce que c'est une connaissance de PLATEFORME et non de langage. Par `reset HEAD` après l'ajout et non par exclusion de `git add` : dès qu'un pathspec explicite désigne un fichier ignoré, `git add` ÉCHOUE, même si ce fichier est exclu par un autre pathspec du même appel (mesuré). `reset HEAD` a la bonne sémantique aux deux bouts — absent de HEAD il sort de l'index, présent il y revient, donc un `desktop.ini` volontairement commité est préservé. CE QUE LES TESTS PROUVENT : sur trois, un seul discrimine le correctif ; les deux autres gardent contre une MAUVAISE correction (supprimer le fichier, ou retirer un fichier volontairement suivi) et passent sans lui. NON TRAITÉ : la liste est fixe, un projet ne peut pas l'étendre — son `.gitignore` reste le bon endroit."
+    },
+    {
+      "id": "banc-en-place",
+      "title": "Le banc peut travailler dans le dépôt de l'utilisateur plutôt qu'une copie jetable",
+      "verify": "npx tsx scripts/mesure-skraft.ts <dépôt> <story> 1 --en-place",
+      "passes": true,
+      "notes": "Le banc clonait toujours vers un dossier temporaire, ce qui protège le dépôt mais laisse les livrables hors de vue : après chaque run il fallait aller les chercher dans `/private/var/folders/...`. `--en-place` renverse le choix, avec deux garde-fous puisque le pipeline commite, crée une branche et peut rembobiner : un arbre de travail SALE fait échouer le lancement, en nommant les fichiers concernés ; et le banc annonce en clair que le dépôt SERA modifié. Le rapport final dit lequel des deux modes a servi. Les deux branches sont vérifiées à la main (refus sur arbre sale, acceptation et annonce sur arbre propre) ; pas de test automatisé — `scripts/` n'a pas de suite, il est seulement typechecké depuis aujourd'hui."
     }
   ]
 }

@@ -82,8 +82,15 @@ const classesModeles = Object.fromEntries(
 for (const k of Object.keys(classesModeles))
   if (!(MODEL_CLASSES as readonly string[]).includes(k)) throw new Error(`--modeles : classe inconnue « ${k} » (attendu : ${MODEL_CLASSES.join(", ")})`);
 const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
+// `--en-place` : travailler DANS le dépôt donné, au lieu d'une copie jetable. Les livrables restent
+// donc sous les yeux de l'utilisateur, avec son historique et ses branches — c'est tout l'intérêt,
+// et c'est aussi le risque : le pipeline commite, crée une branche et peut rembobiner.
+const enPlace = args.includes("--en-place");
 const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
-if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE]");
+if (!source || !storyPath)
+  throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--en-place] [--pousser] [--modeles=…]");
+// `--base` choisit la branche à COPIER ; `--en-place` travaille sur l'état courant du dépôt, sans copie.
+if (enPlace && args.some((a) => a.startsWith("--base="))) throw new Error("--base et --en-place sont incompatibles : en place, le banc part de l'état courant du dépôt.");
 const limite = Number(minutes ?? 90) * 60_000;
 // `indexOf` rend -1 sur une phase inconnue, et `slice(-1)` rendrait la DERNIÈRE phase : une faute
 // de frappe lancerait DELIVER seul. L'index est donc vérifié avant d'être utilisé.
@@ -91,14 +98,31 @@ const iDepuis = depuis ? PHASE_ORDER.indexOf(depuis as (typeof PHASE_ORDER)[numb
 if (depuis && iDepuis < 0) throw new Error(`--depuis : phase inconnue « ${depuis} » (attendu : ${PHASE_ORDER.join(", ")})`);
 const phaseOrder = depuis ? PHASE_ORDER.slice(iDepuis) : undefined;
 
-// ---------- Copie du projet : le dépôt d'origine n'est jamais touché ------------------------
+// ---------- Où le run travaille -------------------------------------------------------------
+// Par défaut une copie jetable : le dépôt d'origine n'est jamais touché. `--en-place` renverse ce
+// choix, et l'annonce.
 // `realpath` : sous macOS, `mkdtemp` rend un chemin passant par le lien /var → /private/var, et le
 // SDK Copilot recolle mal le chemin résolu (`…0000gnT/…` au lieu de `…0000gn/T/…`), ce qui fait
 // refuser à l'agent la lecture de ses propres livrables. Le banc doit mesurer skraft, pas ça.
-const root = await realpath(await mkdtemp(join(tmpdir(), "mesure-skraft-")));
-execFileSync("git", ["clone", "-q", "--no-hardlinks", source, root]);
-execFileSync("git", ["checkout", "-q", base], { cwd: root });
-console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}`);
+let root: string;
+if (enPlace) {
+  root = await realpath(source);
+  // Refuser un arbre sale : le pipeline commite et peut rembobiner. Emporter un travail en cours
+  // que l'utilisateur n'a pas mis à l'abri serait la pire façon de lui rendre service.
+  const sale = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim();
+  if (sale)
+    throw new Error(
+      `--en-place refusé : l'arbre de travail de ${root} n'est pas propre.\n` +
+        `Le pipeline commite, crée une branche et peut rembobiner : commitez ou mettez de côté d'abord.\n${sale}`,
+    );
+  console.log(`EN PLACE dans ${root} — ce dépôt SERA modifié (branche, commits, rembobinages).`);
+  console.log(`Base  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}\n`);
+} else {
+  root = await realpath(await mkdtemp(join(tmpdir(), "mesure-skraft-")));
+  execFileSync("git", ["clone", "-q", "--no-hardlinks", source, root]);
+  execFileSync("git", ["checkout", "-q", base], { cwd: root });
+  console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}`);
+}
 
 // ---------- Branche de run sur GitHub (--pousser) ---------------------------------------------
 // La copie est clonée depuis le dépôt local : son `origin` est un chemin. On pousse vers l'`origin`
@@ -107,8 +131,12 @@ console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline",
 const jour = new Date().toISOString().slice(0, 10);
 const brancheRun = `run/${basename(storyPath, ".md").toLowerCase()}-${jour}-${randomUUID().slice(0, 4)}`;
 const distant = pousser ? execFileSync("git", ["remote", "get-url", "origin"], { cwd: source, encoding: "utf8" }).trim() : null;
+// En place, la « copie » EST le dépôt de l'utilisateur : son `origin` pointe déjà vers GitHub, et
+// lui ajouter un remote modifierait durablement sa configuration. Dans une copie, `origin` est un
+// chemin local : on y déclare le vrai distant sous un autre nom.
+const nomDistant = enPlace ? "origin" : "github";
 if (distant) {
-  execFileSync("git", ["remote", "add", "github", distant], { cwd: root });
+  if (!enPlace) execFileSync("git", ["remote", "add", nomDistant, distant], { cwd: root });
   console.log(`Poussée : ${distant} → ${brancheRun}`);
 }
 let derniereSha = "";
@@ -120,7 +148,7 @@ async function pousserBranche(motif: string): Promise<void> {
   try {
     // `--force-with-lease` : la branche appartient à ce seul run, et un rollback peut légitimement
     // réécrire ce qu'on y a poussé. Elle ne peut pas écraser le travail de quelqu'un d'autre.
-    await execFileAsync("git", ["push", "-q", "--force-with-lease", "github", `HEAD:refs/heads/${brancheRun}`], { cwd: root });
+    await execFileAsync("git", ["push", "-q", "--force-with-lease", nomDistant, `HEAD:refs/heads/${brancheRun}`], { cwd: root });
     derniereSha = sha;
     console.log(`§ ⇪ poussé sur ${brancheRun} (${sha.slice(0, 7)}, ${motif})`);
   } catch (err) {
@@ -433,7 +461,7 @@ await writeFile(join(rapportDir, "rapport.md"), md);
 await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ resume, releves, brancheRun: distant ? brancheRun : null, etatFinal: { stage: state?.stage, phase: state?.phase } }, null, 2));
 console.log(`\nRapport : ${join(rapportDir, "rapport.md")}`);
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state }, null, 2));
-console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\nCopie du projet : ${root}`);
+console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\n${enPlace ? "Dépôt (modifié en place)" : "Copie du projet"} : ${root}`);
 await agents.releaseTask(taskId);
 await runtime.stop();
 process.exit(0);
