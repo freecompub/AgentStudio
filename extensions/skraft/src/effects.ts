@@ -112,12 +112,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         const selected = preselectFiles(state.story, files);
         if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
       }
-      if (effect.phase === "DISTILL")
-        brief +=
-          `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}` +
-          // Le marqueur doit être dans le NOM : c'est lui, et lui seul, qui relie un résultat de
-          // test au critère qu'il pilote (ADR 0041). En commentaire, il est invisible à la porte.
-          `\nNomme chaque test d'acceptance d'après son critère, marqueur « ac-<n> » dans le NOM du test (par exemple « Ac2_… », « ac_2_… ») : un marqueur placé ailleurs, en commentaire ou en attribut, ne relie le test à aucun critère.`;
+      // Seul l'emplacement est dynamique : il vient de la stack. La norme de nommage et de recopie
+      // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
+      if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };

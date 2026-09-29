@@ -5,6 +5,42 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — L'instruction était là, et elle ne suffisait pas (ADR 0043)
+
+**Ce que l'ADR 0042 n'a pas traité.** Il donne un essai de plus à la revue ; il n'explique pas
+pourquoi deux essais avaient été perdus avant elle. La raison : l'agent reformulait.
+
+```
+critère   ligne de 9 articles à 2,00 € : remise 0,00 €
+écrit     Quand une petite quantité est commandée / Alors aucune remise n'est accordée
+```
+
+**Et l'instruction existait.** Dans `skraft-acceptance.agent.md` : « Recopie les valeurs des
+critères mot pour mot. » Une phrase, en fin de paragraphe, sans exemple, sans contre-exemple, et
+qui ne disait pas ce que la porte compare réellement. Lue et appliquée de travers deux fois.
+
+C'est exactement l'ADR 0033 sur le refus de shell, transposé : un texte correct qui ne dit pas quoi
+faire se paie en essais. Une règle énoncée ne vaut pas une règle **montrée**.
+
+**Ce que j'ai écrit à la place :** deux sections. Ce que la comparaison regarde — les caractères,
+pas le sens —, un critère réel avec la liste de ses valeurs, puis un scénario ✗ et un ✓ qui disent
+la même chose, seul le second étant vérifiable. Puis la norme de nommage : marqueur dans le NOM du
+test, deux formes acceptées, une refusée.
+
+**Les exemples sont testés, pas seulement relus.** Chaque forme de nom donnée en exemple passe par
+`acOf` et doit rendre ce que l'exemple promet. Sans ça, un exemple faux dans un prompt vit des mois.
+
+**Un déplacement.** La phrase que j'avais ajoutée au brief le matin même (ADR 0041) en sort : c'est
+une règle statique, sa place est dans le contenu de l'agent, pas dans un dossier de passation
+construit par le code (ADR 0024). Seul l'emplacement des fichiers reste dynamique — lui dépend de
+la stack.
+
+**Je n'en attends pas de miracle.** Un prompt mieux écrit rend un comportement plus probable, il ne
+l'impose pas ; la porte seule décide, et l'ADR 0042 reste le filet. Si DISTILL reperd des essais
+là-dessus au prochain run, c'est la porte qu'il faudra regarder, pas le prompt.
+
+---
+
 ## 29/09 — Le budget d'une phase se dépense avant d'arriver au vrai sujet (ADR 0042)
 
 **Le run.** DISTILL relancée depuis une base où RESEARCH et DESIGN étaient déjà produites — c'est
