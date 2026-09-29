@@ -5,6 +5,44 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — On gardait le souvenir et on retirait la chose (ADR 0040)
+
+**L'incohérence.** L'ADR 0039 garde la session de l'agent d'un essai à l'autre. L'ADR 0029 gardait
+le `rollback` sur un rejet de porte, « là un jugement a eu lieu ». Mises ensemble : l'architecte
+relancé arrive avec, dans sa conversation, les appels d'outils qui ont créé `contracts.md`,
+`event-model.md`, `domain-model.md` — et le disque ne les contient plus. On lui demande de
+**corriger** ce qui n'existe pas. Il édite un fichier absent et échoue, ou il retape de mémoire, et
+alors il refait tout le trajet sans que le motif du rejet lui serve de guide.
+
+**Ce que 0029 avait raison de dire, et ce qui a changé sous lui.** Sa distinction — une porte a
+jugé, un délai n'a rien jugé — était juste. Mais son *implication* (donc on annule) tenait sur une
+prémisse silencieuse : chaque essai repartait d'une session neuve, l'agent ne se souvenait de rien,
+effacer ne contredisait rien. 0039 a retiré la prémisse sans que je relise ce qui en dépendait.
+C'est la même leçon que l'ADR 0037 : **quand on change une capacité, se demander ce qui en
+dépendait**.
+
+**Décision.** `failure()` n'émet plus de `rollback` tant que le budget permet un essai, quelle
+qu'en soit la cause. L'escalade annule toujours — l'humain reprend un dépôt propre. Le paramètre
+`interrompu` disparaît : il ne distinguait plus que ce que la décision vient d'unifier. La
+distinction survit là où elle porte encore, le **message** rendu à l'agent (`tourInterrompu()` dit
+« interrompu, pas refusé » et « relis, ne recommence pas »).
+
+**La sécurité ne bouge pas**, et ne reposait déjà pas là : la porte de fin de phase juge l'**état
+final**, quel qu'ait été le chemin.
+
+**Le piège, trouvé par le test de bout en bout de S3.** `render_adr` prend le premier numéro libre
+d'après les fichiers présents dans `docs/adr`. Le rollback rendait le numéro 1 libre entre deux
+essais ; sans lui, le deuxième essai ouvrait un **ADR-002 sur la même décision**. Défaut *révélé*
+par ce changement, pas créé par lui — il attendait depuis toujours qu'on cesse d'effacer. Corrigé
+côté **code** et non côté prompt : l'outil reconnaît le brouillon par son titre, et seulement tant
+qu'il est `Proposed`. Un ADR ratifié n'est jamais réécrit en douce.
+
+**Ce que ça change pour le run en cours** : un `research.md` recalé par sa porte reste sur le
+disque. C'est ce qu'on voulait pouvoir observer — jusqu'ici, la reprise de session était vraie et
+invérifiable, faute de fichiers à reprendre.
+
+---
+
 ## 29/09 — On réinitialisait une session que D17 n'obligeait pas à réinitialiser (ADR 0039)
 
 **Le déclencheur.** DESIGN recalée sur `CalculeRemise` cité dans `contracts.md` et absent du

@@ -206,13 +206,10 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(state.lenses).toEqual(["cold-reader", "test-integrity", "architecture", "quality-gates"]);
   });
 
-  it("GATE_FAIL avec budget → rollback au checkpoint de phase, relance ciblée avec les motifs", () => {
+  it("GATE_FAIL avec budget → relance ciblée avec les motifs, sans rien annuler (ADR 0040)", () => {
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
     expect(state).toMatchObject({ stage: "SPECIALIST", attempts: 1, lastRejection: { gate: "citations", reasons: ["fichier de 55 lignes"] } });
-    expect(effects).toEqual([
-      { kind: "rollback", to: "cp-RESEARCH" },
-      { kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] },
-    ]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] }]);
   });
 
   it("GATE_FAIL, budget épuisé → ESCALATED", () => {
@@ -264,13 +261,10 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(kinds(effects)).toEqual(["commitPhase"]);
   });
 
-  it("REVIEW : CHANGES_REQUESTED → rollback, relance avec les seuls défauts blocker et major", () => {
+  it("REVIEW : CHANGES_REQUESTED → relance avec les seuls défauts blocker et major", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL"), REPORTED, GATE_OK, LENSES(lens("APPROVED", ["major", "minor"]))]);
     expect(state.stage).toBe("SPECIALIST");
-    expect(effects).toEqual([
-      { kind: "rollback", to: "cp-DISTILL" },
-      { kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader, major] défaut major (Sources/A.swift:3)"] },
-    ]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader, major] défaut major (Sources/A.swift:3)"] }]);
   });
 
   it("REVIEW : REJECTED → ESCALATED", () => {
@@ -559,10 +553,7 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
       const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague" }] });
       const r = play([...delivered, minorOnly]);
-      expect(r.effects).toEqual([
-        { kind: "rollback", to: "cp-DELIVER" },
-        { kind: "planDeliver" },
-      ]);
+      expect(r.effects).toEqual([{ kind: "planDeliver" }]);
       expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague) ; test-integrity : APPROVED ; architecture : APPROVED ; quality-gates : APPROVED."] });
       expect(r.state.deliver?.step).not.toBe("fix");
     });
@@ -696,9 +687,14 @@ describe("Réducteur skraft — interruption et verdict ne mènent pas au même 
     expect(effects.map((f) => f.kind)).toEqual(["runSpecialist"]);
   });
 
-  it("GATE_FAIL : rollback, comme avant — là une porte a jugé", () => {
+  /**
+   * ADR 0040 : le rejet de porte a rejoint l'interruption, pour une autre raison. Depuis l'ADR 0039
+   * l'agent garde sa session : sa conversation contient les appels d'outils qui ont créé ses
+   * fichiers. Les effacer sous lui, c'est lui demander de corriger ce qui n'existe plus.
+   */
+  it("GATE_FAIL : n'annule plus rien non plus — l'agent garde sa session ET ses fichiers", () => {
     const { effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
-    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-RESEARCH" });
+    expect(effects.map((f) => f.kind)).toEqual(["runSpecialist"]);
   });
 
   it("le tour suivant est prévenu que le précédent a été interrompu, pas refusé", () => {

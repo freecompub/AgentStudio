@@ -123,7 +123,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
       }
       if (e.type === "BLOCKER_REPORTED")
         return { state: { ...s, stage: "BLOCKED", blocker: { question: e.question, choices: e.choices } }, effects: [{ kind: "askBlocker", question: e.question, choices: e.choices }] };
-      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -155,7 +155,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         return commit(ns);
       }
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
-      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -177,7 +177,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
         return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)]);
       }
-      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason), true);
+      if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
 
@@ -305,24 +305,26 @@ function relancerClassifieur(s: SkraftState, reason: string): Out {
   };
 }
 
-/** Rejet de porte, de revue ou délai : réessai ciblé après rollback, ou escalade à budget épuisé (D24). */
 /**
  * Échec d'une phase : relance ciblée tant que le budget le permet, escalade ensuite.
  *
- * `interrompu` distingue deux choses que le réducteur confondait (ADR 0029) : une **porte qui
- * refuse** a jugé le travail et l'a trouvé mauvais — l'annuler est juste ; un **tour interrompu**
- * (délai, plafond) n'a rien jugé — annuler jetterait un travail dont personne n'a dit qu'il est
- * mauvais. Le 28/09, 1 h 55 de conception ont disparu ainsi. La sécurité ne repose pas sur ce
- * rollback : la porte de fin de phase juge l'état final, quel qu'ait été le chemin.
+ * **Un réessai n'annule rien** (ADR 0029, amendée par 0040). L'agent garde sa session (ADR 0039) :
+ * il croit avoir écrit ses fichiers, et il les a écrits. Les effacer sous lui lui ferait corriger
+ * de mémoire un dépôt qui ne contient plus rien — on lui demande de *corriger*, pas de retaper.
+ * ADR 0029 avait déjà retiré le rollback du tour interrompu ; la raison vaut pour le rejet de
+ * porte, où elle est même plus forte : la porte a lu des fichiers précis et dit ce qui cloche.
  *
- * L'escalade, elle, annule dans les deux cas — l'humain doit reprendre un dépôt propre.
+ * La sécurité ne repose pas sur ce rollback : la porte de fin de phase juge l'**état final**, quel
+ * qu'ait été le chemin. Un essai qui laisse un fichier bancal sera recalé par elle.
+ *
+ * L'escalade, elle, annule toujours — quand la main repasse à l'humain, le dépôt doit être propre.
  */
-function failure(s0: SkraftState, gate: string, reasons: string[], interrompu = false): Out {
+function failure(s0: SkraftState, gate: string, reasons: string[]): Out {
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
   const epuise = attempts >= s.budget.maxAttemptsPerPhase;
-  const rollback: SkraftEffect[] = cp && (!interrompu || epuise) ? [{ kind: "rollback", to: cp }] : [];
+  const rollback: SkraftEffect[] = cp && epuise ? [{ kind: "rollback", to: cp }] : [];
   const lastRejection = { gate, reasons };
   if (epuise) {
     return {
