@@ -305,6 +305,20 @@
       "notes": "Trouvé grâce à la trace de l'ADR 0032, au premier run et en quatre lignes : le chercheur tentait `ls -la .skraft/us-2/research/ && find .skraft -type f` — il voulait LIRE. J'avais affirmé le contraire avec assurance, faute de trace. Le refus était juste (aucune commande ne peut être jugée inoffensive sans être analysée ; `ls -la .skraft; rm -rf /` passerait n'importe quelle liste blanche), mais il répondait « les tests sont lancés par l'orchestrateur, modifie les fichiers avec les outils d'édition » : justification hors sujet en RESEARCH où aucun test ne tourne, et consigne orientée vers l'écriture quand l'agent cherchait à lire. Dix-huit refus successifs au run précédent sans qu'il trouve la sortie. La garde reçoit désormais les outils du rôle et ne propose que des sorties existantes. Règle générale : un refus s'adresse à quelqu'un qui doit continuer à travailler ; il énonce la sortie, pas la justification interne de la fermeture."
     },
     {
+      "id": "explorer-sans-shell",
+      "title": "Un agent explore le projet par `list_files`, et le contrat lui dit ce qu'il n'a pas (ADR 0034)",
+      "verify": "pnpm vitest run --project core test/list-files-tool.test.ts && pnpm vitest run --project extension-host test/agent-prompts.test.ts",
+      "passes": true,
+      "notes": "Lire un dossier était permis, mais un aller-retour par niveau, et chacun réemporte tout le contexte : d'où le `ls && find` observé dans la trace. `list_files` rend la même chose en un appel, borné à 200 chemins, en DISANT combien sont omis — une troncature muette se lirait comme une liste complète. Le contrat énonce désormais les absences (ni shell, ni réseau, aucune commande même en lecture) et nomme l'alternative : l'agent découvrait l'absence de shell en s'y cognant, trois fois sur un run, dix-huit sur un autre. L'alternative proposée est celle que le rôle possède — proposer `list_files` à qui ne l'a pas enverrait contre un second mur."
+    },
+    {
+      "id": "barre-de-qualite-gelee",
+      "title": "La barre de qualité n'est pas modifiable par les agents qu'elle juge (ADR 0034)",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
+      "passes": true,
+      "notes": "Les rôles écrivent dans `.skraft/**`, et `.skraft/quality.json` y vit : seuils de couverture, score de mutation, règles de dépendance, tout ce que la porte de livraison lit pour juger. Un agent pouvait abaisser le critère sur lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi — le contraire du principe du projet. Gelé par `readOnly`, le mécanisme que DELIVER emploie déjà pour les tests ; un test vérifie qu'il est TRANSMIS et pas seulement déclaré. Le périmètre reste `.skraft/**` : `.skraft/<slug>/**` aurait demandé une substitution que le manifeste ne sait pas faire (il ne résout que `@stack:*`). RESTE OUVERT : l'isolation entre stories. RELEVÉ, NON TRAITÉ : `skraft-acceptance` peut écrire dans les sources."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",

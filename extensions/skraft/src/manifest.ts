@@ -52,7 +52,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.researcher,
         output: "report_phase",
         write: [SKRAFT_DIR],
-        tools: ["report_blocker"],
+        tools: ["list_files", "report_blocker"],
       },
       {
         name: "skraft-architect-model",
@@ -61,7 +61,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.architectModel,
         output: "report_phase",
         write: [SKRAFT_DIR],
-        tools: ["report_blocker"],
+        tools: ["list_files", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.architectModel),
       },
       // Aucun droit d'écriture direct dans docs/adr : seul render_adr y écrit (§6.3).
@@ -72,7 +72,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.architectDecide,
         output: "report_phase",
         write: [SKRAFT_DIR],
-        tools: ["render_adr", "report_blocker"],
+        tools: ["list_files", "render_adr", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.architectDecide),
       },
       {
@@ -82,7 +82,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.acceptance,
         output: "report_phase",
         write: [SKRAFT_DIR, ACCEPTANCE, SOURCES],
-        tools: ["run_tests", "report_blocker"],
+        tools: ["list_files", "run_tests", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.acceptance),
       },
       {
@@ -92,7 +92,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.test,
         output: "report_phase",
         write: [UNIT_TESTS],
-        tools: ["run_tests", "run_lint", "report_blocker"],
+        tools: ["list_files", "run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.test),
       },
       {
@@ -102,7 +102,7 @@ export const manifest: ExtensionManifest = {
         role: ROLES.dev,
         output: "report_phase",
         write: [SOURCES],
-        tools: ["run_tests", "run_lint", "report_blocker"],
+        tools: ["list_files", "run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.dev),
       },
       ...(Object.keys(LENS_FOCUS) as (keyof typeof LENS_FOCUS)[]).map((name) => ({

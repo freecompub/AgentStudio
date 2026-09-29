@@ -18,6 +18,7 @@ import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
 import { runLintTool } from "./lint-tool.js";
+import { listFilesTool } from "@agent-studio/core";
 import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -149,6 +150,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
                     }),
                   ]
                 : []),
+              // Explorer n'atteste rien : `list_files` ne produit aucune preuve, il rend des chemins.
+              ...(a.tools?.includes("list_files") ? [listFilesTool({ list: () => deps.workspace.files.list() }, { beat })] : []),
               // `run_lint` n'enregistre aucune preuve : la porte relance le linter elle-même, sinon
               // l'agent choisirait le moment de la mesure. Ici il ne fait que s'informer.
               ...(a.tools?.includes("run_lint")

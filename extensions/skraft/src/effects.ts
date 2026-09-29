@@ -109,7 +109,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
       }
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
-      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, evidence: tag(effect.phase) });
+      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
     }
@@ -228,6 +228,17 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   return { type: "GATE_OK", artifacts };
 }
+
+/**
+ * Fichiers qu'aucun agent n'écrit, quel que soit son périmètre.
+ *
+ * `.skraft/quality.json` porte la **barre de qualité** — seuils de couverture, score de mutation,
+ * règles de dépendance — que la porte de livraison lit pour juger le travail. Le périmètre
+ * d'écriture des rôles est `.skraft/**`, qui l'incluait : un agent pouvait abaisser le critère sur
+ * lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi. C'est le contraire du
+ * principe du projet — le LLM propose, le code décide et vérifie.
+ */
+export const GELÉS = [".skraft/quality.json"] as const;
 
 /** Porte citations (§7.1) : document au gabarit, citations vérifiées sur le dépôt, questions ouvertes. */
 async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: number): Promise<Ev> {

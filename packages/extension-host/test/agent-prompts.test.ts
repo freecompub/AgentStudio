@@ -135,6 +135,20 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
     expect(contractBlock({ output: "report_phase", tools: ["run_tests"], writes: true, onDemand: [] })).not.toContain("run_lint");
   });
 
+  it("contrat : dire ce que l'agent N'A PAS, pas seulement ce qu'il a (ADR 0034)", () => {
+    // Le contrat énumérait les outils disponibles et taisait les absents. L'agent découvrait donc
+    // l'absence de shell en s'y cognant : trois refus sur un run réel, dix-huit sur un autre.
+    // Un refus est un filet ; il ne remplace pas une consigne.
+    const p = contractBlock({ output: "report_phase", tools: ["list_files", "run_tests"], writes: true, onDemand: [] });
+    expect(p).toMatch(/ni shell|aucune commande/i);
+    expect(p).toContain("`list_files`");
+  });
+
+  it("contrat : l'alternative proposée est celle que ce rôle possède vraiment", () => {
+    // Proposer `list_files` à un rôle qui ne l'a pas enverrait l'agent contre un second mur.
+    expect(contractBlock({ output: "submit_lens_verdict", tools: [], writes: false, onDemand: [] })).not.toContain("`list_files`");
+  });
+
   it("agent sans fichier (consignes seules) : consignes puis contrat", () => {
     const p = composeAgentPrompt({ name: "a", title: "A", role: "Tu testes.", output: "report_phase" }, null, new Map()).systemPrompt;
     expect(p.startsWith("Tu testes.\n\n## Fonctionnement dans agent-studio")).toBe(true);
