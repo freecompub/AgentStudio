@@ -132,6 +132,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             // deux tentatives du même travail. Sans taskId, aucune reprise — c'est le cas des
             // agents lancés hors tâche.
             ...(taskId ? { resumeKey: `${taskId}/${manifest.id}/${name}` } : {}),
+            // Trace d'exécution (ADR 0032) : tout ce que ce tour échange, et pourquoi il s'arrête.
+            ...(taskId ? { trace: { taskId, ...(phase ? { phase } : {}) } } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
             tools: (beat: () => void) => [
               ...ownTools(a.tools ?? []),

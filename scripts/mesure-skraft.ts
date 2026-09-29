@@ -24,6 +24,7 @@ import {
   createRegistry,
   createTaskAgentRunner,
   createUsageRecorder,
+  createJsonlTraceStore,
   createJsonLogger,
   type AgentEvent,
   type AgentRuntime,
@@ -143,7 +144,7 @@ if ("error" in lu) throw new Error(`Profil refusé : ${lu.error}`);
 const hostDeps: HostDeps = {
   registry: createRegistry(),
   engine,
-  agents: createTaskAgentRunner({ runtime, root: workspace.root, logger }),
+  agents: createTaskAgentRunner({ runtime, root: workspace.root, logger, trace: createJsonlTraceStore(join(tasksDir, "traces")) }),
   workspace,
   stack: createProfileAdapter(lu.profile),
   interactions,
@@ -195,6 +196,6 @@ console.log(`État final : ${state?.stage} / ${state?.phase}, essais ${state?.at
 console.log("Usage par phase :");
 console.table(await usage.report(taskId));
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state }, null, 2));
-console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nCopie du projet : ${root}`);
+console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\nCopie du projet : ${root}`);
 await runtime.stop();
 process.exit(0);

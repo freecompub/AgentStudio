@@ -1,5 +1,5 @@
 import type { SessionConfigBase } from "@github/copilot-sdk";
-import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger } from "@agent-studio/core";
+import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger, ToolCallRequest } from "@agent-studio/core";
 import { mapSessionEvent } from "./events/map-session-event.js";
 import { createPermissionHandler } from "./permissions/permission-handler.js";
 import type { CopilotClientPort, CopilotSessionPort } from "./protocols.js";
@@ -10,11 +10,14 @@ export interface CopilotRuntimeDeps {
   logger?: Logger;
 }
 
+/** Ce sur quoi porte un appel : commande, chemin ou URL selon la sorte. */
+const cible = (r: ToolCallRequest): string | undefined => r.command ?? r.path ?? r.url;
+
 /** Adaptateur `AgentRuntime` pour le Copilot SDK (D3, D35). */
 export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
   const { client, logger } = deps;
 
-  function sessionOptions(cfg: AgentSessionConfig, denied: (e: AgentEvent) => void): SessionConfigBase {
+  function sessionOptions(cfg: AgentSessionConfig, emettre: (e: AgentEvent) => void): SessionConfigBase {
     return {
       workingDirectory: cfg.workingDirectory,
       systemMessage: { mode: "append", content: cfg.systemPrompt },
@@ -23,9 +26,21 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       onPermissionRequest: createPermissionHandler(cfg.guard, {
         ...(cfg.guardTimeoutMs !== undefined ? { timeoutMs: cfg.guardTimeoutMs } : {}),
         onDenied: (req, reason) => {
-          logger?.info("outil refusé", { role: cfg.role, toolName: req.toolName, kind: req.kind, reason });
-          denied({ type: "tool-denied", toolName: req.toolName, reason });
+          // La cible — commande, chemin, URL — était calculée puis jetée. Sans elle, un refus ne
+          // dit que « quelque chose a été interdit », ce qui n'aide ni à diagnostiquer un agent
+          // qui se heurte en boucle, ni à repérer une tentative anormale.
+          logger?.info("outil refusé", { role: cfg.role, toolName: req.toolName, kind: req.kind, cible: cible(req), reason });
+          emettre({ type: "tool-denied", toolName: req.toolName, reason });
         },
+        onDecision: (req, decision) =>
+          emettre({
+            type: "permission",
+            kind: req.kind,
+            toolName: req.toolName,
+            ...(cible(req) !== undefined ? { target: cible(req)! } : {}),
+            decision: decision.decision,
+            ...(decision.decision === "deny" ? { reason: decision.reason } : {}),
+          }),
       }),
       ...(cfg.model ? { model: cfg.model } : {}),
     };

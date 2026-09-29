@@ -109,6 +109,13 @@ export type AgentEvent =
   | { type: "tool-progress"; toolCallId: string; message: string }
   | { type: "tool-end"; toolCallId: string; success: boolean }
   | { type: "tool-denied"; toolName: string; reason: string }
+  /**
+   * Décision de la garde sur un appel soumis à permission, **autorisé comme refusé** (ADR 0032).
+   *
+   * C'est la seule fenêtre sur ce qu'un agent lit, écrit ou exécute : les résultats des outils
+   * intégrés du runtime ne nous parviennent pas, `tool-end` ne dit que « réussi ».
+   */
+  | { type: "permission"; kind: string; toolName: string; target?: string; decision: "allow" | "deny"; reason?: string }
   /** Consommation d'un appel au modèle (§13) ; `multiplier` = coût relatif du modèle (Copilot). */
   | {
       type: "usage";

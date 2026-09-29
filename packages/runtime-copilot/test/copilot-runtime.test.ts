@@ -146,7 +146,10 @@ describe("CopilotRuntime", () => {
     expect(seen).toEqual([{ type: "message", text: "salut" }, { type: "idle" }]);
   });
 
-  it("un refus de l'arbitre est aussi émis comme événement tool-denied", async () => {
+  it("un refus est émis deux fois : la décision avec sa CIBLE, puis tool-denied (ADR 0032)", async () => {
+    // La cible — commande, chemin, URL — était calculée puis jetée. Sans elle, un refus ne dit que
+    // « quelque chose a été interdit » : on ne peut ni diagnostiquer un agent qui se heurte en
+    // boucle, ni repérer une tentative anormale. C'est ce qui a rendu deux runs indiagnosticables.
     const client = new FakeClient();
     const s = await createCopilotRuntime({ client }).openSession(
       cfg({ guard: { check: async () => ({ decision: "deny", reason: "non" }) } }),
@@ -155,7 +158,22 @@ describe("CopilotRuntime", () => {
     s.onEvent((e) => seen.push(e));
     const handler = client.created[0]!.onPermissionRequest!;
     await handler({ kind: "shell", fullCommandText: "ls" } as never, { sessionId: "sdk-1" });
-    expect(seen).toEqual([{ type: "tool-denied", toolName: "shell", reason: "non" }]);
+    expect(seen).toEqual([
+      { type: "permission", kind: "shell", toolName: "shell", target: "ls", decision: "deny", reason: "non" },
+      { type: "tool-denied", toolName: "shell", reason: "non" },
+    ]);
+  });
+
+  it("une AUTORISATION est émise elle aussi : c'est la seule fenêtre sur ce que l'agent lit", async () => {
+    // Les résultats des outils intégrés du CLI ne nous parviennent pas — `tool-end` ne dit que
+    // « réussi ». La garde est le seul endroit qui sache quel fichier a été lu.
+    const client = new FakeClient();
+    const s = await createCopilotRuntime({ client }).openSession(cfg({ guard: { check: async () => ({ decision: "allow" }) } }));
+    const seen: AgentEvent[] = [];
+    s.onEvent((e) => seen.push(e));
+    const handler = client.created[0]!.onPermissionRequest!;
+    await handler({ kind: "read", resolvedPath: "/p/src/A.cs" } as never, { sessionId: "sdk-1" });
+    expect(seen).toEqual([{ type: "permission", kind: "read", toolName: "read", target: "/p/src/A.cs", decision: "allow" }]);
   });
 
   it("reprend une session par son identifiant", async () => {

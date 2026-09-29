@@ -5,6 +5,41 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — On décidait bien, sans jamais garder de quoi comprendre (ADR 0032)
+
+**Quatre runs, quatre diagnostics bloqués au même endroit.** À chaque fois l'information existait
+dans le code et n'était pas conservée :
+
+- la commande refusée par la garde — calculée dans `req.command`, puis jetée. Dix-huit refus
+  successifs sur un run sans savoir une seule fois ce que l'agent tentait ;
+- les fichiers que l'agent déclarait avoir écrits dans `report_phase`, que la porte `citations`
+  ignore alors qu'elle dit « document absent » ;
+- ce qui existait avant le `rollback`, qui rend indistinguables « il n'a jamais écrit » et « il a
+  écrit et on a rembobiné » ;
+- l'occupation du contexte, sur laquelle repose l'ADR 0031, que je n'ai pu vérifier qu'en
+  instrumentant le banc **après** avoir écrit l'ADR.
+
+C'est le motif du projet, retourné une fois de plus : **une décision correcte, prise sans conserver
+ce sur quoi elle porte.** Sauf qu'ici l'aveugle n'est pas une porte, c'est celui qui doit
+comprendre ce qui s'est passé.
+
+**Le changement qui compte.** La garde voyait **tous** les appels et ne rapportait que les refus.
+Elle rapporte maintenant aussi les autorisations, avec leur cible. C'est la seule fenêtre sur ce
+qu'un agent lit : les résultats des outils intégrés du runtime ne nous parviennent jamais,
+`tool-end` ne dit que « réussi ». Sans ça, les vingt-six appels d'un architecte restaient une boîte
+noire.
+
+**Deux distinctions écrites dans le contrat, pour qu'on ne les perde pas.** La trace *raconte*, la
+preuve *atteste* — une porte ne doit jamais s'appuyer sur une trace. Et la cause de fin d'un tour
+est nommée par ce qu'elle est (`silence`, `durée`, `contexte`, `coût`, `blocker`…), pas par un type
+d'erreur : c'est ce qui rend une trace lisible six mois plus tard.
+
+**Un défaut trouvé en route.** `append` levait une exception **synchrone** sur une méthode déclarée
+`Promise<void>` : un appelant qui faisait `.catch()` l'aurait prise en pleine face. Une trace ne
+doit sous aucun prétexte faire tomber la tâche qu'elle observe.
+
+---
+
 ## 29/09 — Le premier run qui atteint une revue, et ce qu'il montre
 
 **Trois runs réels sur US-2, et seul le troisième dépasse DESIGN.**

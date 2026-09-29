@@ -1,6 +1,8 @@
 import type { AgentEvent, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } from "../protocols/agent-runtime.js";
 import type { Logger } from "../protocols/logger.js";
 import type { UsageDelta } from "../protocols/usage.js";
+import type { TraceBody, TraceEntry, TraceStore, TurnEnd } from "../protocols/trace.js";
+import { TurnBudgetError, TurnContextError, TurnCostError } from "../turns/run-turn.js";
 import { createTaskAgentGuard } from "../guards/task-agent-guard.js";
 import { composeGuards } from "../guards/compose-guards.js";
 import { createHeartbeat, EnvFailureError, runTurn, TurnTimeoutError, WorkDefectError } from "../turns/run-turn.js";
@@ -34,6 +36,8 @@ export interface TaskAgentRunOptions {
    * Absente, rien n'est mémorisé — c'est le comportement d'avant.
    */
   resumeKey?: string;
+  /** Tâche et phase auxquelles rattacher la trace (ADR 0032) ; absentes, rien n'est tracé. */
+  trace?: { taskId: string; phase?: string };
 }
 
 /** Sortie structurée du rôle, ou blocage signalé par `report_blocker`. */
@@ -56,6 +60,8 @@ export interface TaskAgentRunnerDeps {
   /** Fraction de la fenêtre de contexte au-delà de laquelle le tour est coupé (ADR 0031). */
   maxContextFraction?: number;
   logger?: Logger;
+  /** Trace d'exécution (ADR 0032). Son échec n'interrompt jamais un tour : elle observe, elle ne décide pas. */
+  trace?: TraceStore;
 }
 
 /**
@@ -81,6 +87,34 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
       let session: AgentSession | undefined;
       /** Session laissée en vie pour que le tour suivant la reprenne (ADR 0030). */
       let garder = false;
+
+      /**
+       * Écrit une entrée de trace (ADR 0032). Silencieuse par construction : une trace qui ferait
+       * échouer le tour qu'elle observe serait pire que pas de trace du tout.
+       */
+      const tracer = (e: TraceBody): void => {
+        if (!deps.trace || !opts.trace) return;
+        void deps.trace
+          .append({
+            taskId: opts.trace.taskId,
+            at: new Date().toISOString(),
+            ...(session ? { sessionId: session.id } : {}),
+            role: spec.role,
+            ...e,
+          } as TraceEntry)
+          .catch((err: unknown) => deps.logger?.warn("trace non écrite", { error: String(err) }));
+      };
+
+      /** Ce qui a mis fin au tour, nommé par sa cause et non par son type d'erreur. */
+      const finDe = (err: unknown): TurnEnd => {
+        if (err instanceof TurnContextError) return "contexte";
+        if (err instanceof TurnBudgetError) return "durée";
+        if (err instanceof TurnCostError) return "coût";
+        if (err instanceof TurnTimeoutError) return "silence";
+        if (err instanceof EnvFailureError) return "panne";
+        if (err instanceof WorkDefectError) return "sans-sortie";
+        return "annulé";
+      };
       const heartbeat = createHeartbeat();
       const turn = async (text: string) => {
         let multiplier: number | undefined;
@@ -99,6 +133,37 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
                 inputTokens += e.inputTokens ?? 0;
                 outputTokens += e.outputTokens ?? 0;
               }
+              if (e.type === "message") tracer({ kind: "message", texte: e.text });
+              else if (e.type === "reasoning") tracer({ kind: "raisonnement", texte: e.text });
+              else if (e.type === "tool-start") tracer({ kind: "outil", nom: e.toolName, appel: e.toolCallId });
+              else if (e.type === "tool-end") tracer({ kind: "outil-fin", appel: e.toolCallId, succès: e.success });
+              else if (e.type === "permission")
+                tracer({
+                  kind: "permission",
+                  sorte: e.kind,
+                  outil: e.toolName,
+                  ...(e.target !== undefined ? { cible: e.target } : {}),
+                  décision: e.decision,
+                  ...(e.reason !== undefined ? { raison: e.reason } : {}),
+                });
+              else if (e.type === "usage")
+                tracer({
+                  kind: "usage",
+                  ...(e.model !== undefined ? { modèle: e.model } : {}),
+                  ...(e.inputTokens !== undefined ? { entrée: e.inputTokens } : {}),
+                  ...(e.outputTokens !== undefined ? { sortie: e.outputTokens } : {}),
+                  ...(e.nanoAiu !== undefined ? { nanoAiu: e.nanoAiu } : {}),
+                });
+              else if (e.type === "context")
+                tracer({
+                  kind: "contexte",
+                  occupés: e.currentTokens,
+                  limite: e.tokenLimit,
+                  ...(e.systemTokens !== undefined ? { système: e.systemTokens } : {}),
+                  ...(e.conversationTokens !== undefined ? { conversation: e.conversationTokens } : {}),
+                  ...(e.toolDefinitionsTokens !== undefined ? { outils: e.toolDefinitionsTokens } : {}),
+                  ...(e.messages !== undefined ? { messages: e.messages } : {}),
+                });
               opts.onEvent?.(e);
             },
           });
@@ -117,6 +182,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           reprenables.set(opts.resumeKey, session.id);
           garder = true;
         }
+        tracer({ kind: "tour-fin", fin: "blocker", sortie: blocker });
         return { blocker: blocker! };
       };
       const onAbort = () => void session?.abort();
@@ -154,6 +220,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         });
         opts.signal?.addEventListener("abort", onAbort, { once: true });
         deps.logger?.info("agent de tâche lancé", { role: spec.role, sessionId: session.id });
+        tracer({ kind: "tour-début", prompt, ...(opts.trace?.phase ? { phase: opts.trace.phase } : {}), repris: session.id === aReprendre });
 
         await turn(prompt);
         if (blocker && !output) return questionPosee();
@@ -162,8 +229,10 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         if (opts.signal?.aborted) throw new Error("Annulé");
         if (blocker && !output) return questionPosee();
         if (!output) throw new WorkDefectError(`L'agent ${spec.role} n'a pas clôturé sa phase par ${spec.output}.`);
+        tracer({ kind: "tour-fin", fin: "output", sortie: output });
         return { output };
       } catch (err) {
+        tracer({ kind: "tour-fin", fin: finDe(err), raison: err instanceof Error ? err.message : String(err) });
         // Reprenable seulement si le contexte n'est pas en cause (ADR 0030) : le modèle n'a pas
         // répondu, ou l'agent s'est tu. Un plafond de durée ou de coût exclut la reprise — son
         // contexte est la cause de la coupure. `TurnBudgetError` et `TurnCostError` sont des

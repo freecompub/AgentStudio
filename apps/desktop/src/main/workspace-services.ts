@@ -8,8 +8,10 @@ import {
   createJsonEvidenceStore,
   createJsonInteractionStore,
   createProgressReporter,
+  createJsonlTraceStore,
   createUsageRecorder,
   sumUsage,
+  type TraceStore,
   type UsageRecorder,
   type UsageRow,
   createLazyRuntime,
@@ -65,6 +67,8 @@ export interface WorkspaceServicesConfig {
   clock: Clock;
   ids: IdGenerator;
   logger?: Logger;
+  /** Trace d'exécution imposée (tests) ; sinon un fichier JSONL par tâche sous `traces/`. */
+  traceStore?: TraceStore;
   /** Pour les tests : stockages imposés. */
   taskStore?: TaskStore;
   evidenceStore?: EvidenceStore;
@@ -262,6 +266,8 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           ...(cfg.agentMaxTurnMs !== undefined ? { maxMs: cfg.agentMaxTurnMs } : {}),
           ...(cfg.agentMaxInputTokens !== undefined ? { maxInputTokens: cfg.agentMaxInputTokens } : {}),
           ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
+          // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
+          trace: cfg.traceStore ?? createJsonlTraceStore(join(cfg.tasksDir, projectKey, "traces")),
           ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
         }),
         workspace,

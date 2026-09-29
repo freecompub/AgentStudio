@@ -291,6 +291,13 @@
       "notes": "L'ADR 0027 coupait à 1 M de tokens d'entrée cumulés. Deux runs réels ont montré que c'était faux deux fois. Le seuil : DESIGN a épuisé ses trois essais uniquement sur ce plafond (1023/1048/1049 k) sans qu'aucune lentille n'ait siégé — un tour normal d'architecte sur un projet réel FAIT un million. La grandeur : le cumul compte ce qui a transité, cache de prompt compris, et ne décroît jamais, même quand le runtime compacte ; Copilot facture d'ailleurs en requêtes. `session.usage_info` donnait depuis le début `currentTokens` et `tokenLimit` — on ne l'écoutait pas. Plafond à 0,9 de la fenêtre, `TurnContextError` ; la DERNIÈRE mesure compte, pas la plus haute atteinte, sinon on réinvente un compteur qui ne redescend pas. `maxInputTokens` désactivé par défaut, pas supprimé. `totalNanoAiu` remonté : seule grandeur de coût réel PAR APPEL. NON VÉRIFIÉ : la part servie par le cache — les compteurs ne sont rendus qu'au résumé de fin de session. PAS AFFICHÉ : le pourcentage existe dans le cœur, `chat:agent` ne le transporte pas."
     },
     {
+      "id": "trace-d-execution",
+      "title": "Chaque tâche laisse une trace : prompts, outils, décisions de la garde, usage, contexte, cause de fin (ADR 0032)",
+      "verify": "pnpm vitest run --project core test/trace.test.ts && pnpm vitest run --project runtime-copilot test/copilot-runtime.test.ts",
+      "passes": true,
+      "notes": "Écrite après quatre runs réels où le diagnostic a buté sur une information qui existait dans le code et n'était pas conservée : la commande refusée (calculée dans `req.command`, puis jetée — dix-huit refus sans savoir ce qui était tenté), les fichiers que l'agent déclarait avoir écrits, ce qui existait avant le rollback, l'occupation du contexte sur laquelle repose l'ADR 0031 et qui n'a pu être vérifiée qu'en instrumentant le banc APRÈS coup. Point central : la garde rapporte désormais TOUTES ses décisions, pas seulement ses refus — c'est la seule fenêtre sur ce qu'un agent lit, puisque les résultats des outils intégrés du runtime ne nous parviennent jamais (`tool-end` ne dit que « réussi »). La trace RACONTE, la preuve ATTESTE : une porte ne doit jamais s'appuyer dessus. Ne fait jamais tomber la tâche ; `append` ne lève plus d'exception synchrone sur une méthode déclarée `Promise<void>`. La troncature dit ce qu'elle coupe. HORS DE PORTÉE : le contenu rendu par les outils intégrés. PAS AFFICHÉE : ne franchit pas l'IPC."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",

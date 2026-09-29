@@ -332,7 +332,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
         // `activity`, `usage` et `context` sont des signaux de mesure, pas des messages : ils ne
         // franchissent pas l'IPC (le contrat de `chat:agent` ne les décrit pas). L'occupation du
         // contexte mériterait d'être affichée — c'est un chantier d'interface à part.
-        else if (e.event.type !== "activity" && e.event.type !== "usage" && e.event.type !== "context")
+        else if (e.event.type !== "activity" && e.event.type !== "usage" && e.event.type !== "context" && e.event.type !== "permission")
           deps.sink.emit("chat:agent", { event: e.event });
       });
         session = s;
