@@ -181,7 +181,7 @@ describe("Norme de recopie et de nommage de skraft-acceptance (ADR 0043)", () =>
  * à l'agent de faire, et le confrontent au manifeste.
  */
 describe("Un agent peut faire ce que son contenu lui demande (ADR 0024, run comparé A2)", () => {
-  const agents = manifest.contributes.agents;
+  const agents = manifest.contributes.agents ?? [];
   const corpsDe = async (nom: string) => parseMarkdownDoc(await readFile(join(EXTENSION_DIR, "agents", `${nom}.agent.md`), "utf8")).body;
   /** Un agent du manifeste, avec son contenu partagé. */
   const avecCorps = async () =>
