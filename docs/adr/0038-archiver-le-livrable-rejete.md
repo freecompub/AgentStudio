@@ -27,8 +27,15 @@ distinguer « il n'a jamais écrit » de « il a écrit et on a rembobiné ».
 1. **Avant tout rollback, les fichiers que le checkpoint va effacer sont archivés dans la trace.**
    `changedFiles(checkpoint)` en donne la liste exacte ; chacun est lu et enregistré avec son
    chemin et une étiquette qui situe le moment (« DESIGN essai 2 »).
-2. **Dans la trace, pas dans le dépôt.** Elle vit déjà hors du projet, ne le pollue pas, et surtout
-   `git clean -fdq` effacerait tout ce qu'on écrirait à côté.
+2. **À côté de la trace, pas dans le dépôt.** Le dépôt est exclu parce que `git clean -fdq`
+   effacerait tout ce qu'on y écrirait. Et le livrable est écrit **entier**, dans un fichier à lui
+   (`traces/<taskId>/<étiquette>/<chemin>`), la trace n'en gardant que la référence.
+
+   Il a d'abord été inliné dans le JSONL, donc borné — 8 000 caractères, puis 200 000. C'était le
+   même travers que le plafond d'un million de tokens de l'ADR 0027 : **un seuil qu'on n'a pas
+   mesuré est un seuil qui sera faux**. La bonne réponse n'était pas de mieux régler le nombre,
+   c'était de supprimer le besoin d'en avoir un. Il reste une borne, légitime, sur la narration
+   (messages, raisonnements) : elle, borne un flux réellement sans fin.
 3. **La trace s'ouvre aux extensions**, par une API étroite : `ctx.trace.rejected(taskId, étiquette,
    fichiers)`. La distinction posée par l'ADR 0032 sert ici pour la première fois — `evidence`
    **atteste** et une porte s'y appuie ; `trace` **raconte** et aucune porte ne doit s'y appuyer.
@@ -44,8 +51,11 @@ distinguer « il n'a jamais écrit » de « il a écrit et on a rembobiné ».
 - Le test qui verrouille la liste des capacités exposées à une extension — matérialisation de la
   règle de sécurité n°1 — a dû être mis à jour. C'est son rôle : obliger à justifier chaque ajout à
   cette surface plutôt que de l'y glisser.
-- **Le contenu est tronqué à 8 000 caractères**, comme le reste de la trace, en le disant. Un
-  document de recherche y tient ; un gros livrable serait coupé.
+- **`archive` borne elle-même les chemins qu'elle reçoit.** L'étiquette et les chemins viennent
+  d'une extension, de confiance nulle (D10) : sans ce contrôle, `ctx.trace.rejected` deviendrait une
+  écriture arbitraire sur le disque de l'utilisateur, hors du dépôt — pire que tout ce que la garde
+  empêche par ailleurs. Contrepartie d'avoir ouvert la trace aux extensions : dès qu'une API accepte
+  un chemin venu de l'extérieur, elle le borne elle-même.
 - Ceci est la **quatrième** omission de la même famille relevée en deux jours : la commande refusée,
   les compteurs de cache, le motif d'échec d'un outil, et maintenant le contenu jugé. À chaque fois
   l'information existait et n'était pas conservée. La trace enregistre désormais les décisions, les

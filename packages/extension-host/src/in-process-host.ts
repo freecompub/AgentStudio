@@ -256,10 +256,9 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       async rejected(taskId, label, files) {
         // Silencieuse comme le reste de la trace : elle observe, elle ne décide pas, et elle ne
         // doit jamais faire tomber la tâche qu'elle documente.
-        for (const f of files)
-          await deps.trace
-            ?.append({ taskId, at: deps.clock.now().toISOString(), kind: "livrable-rejeté", étiquette: label, chemin: f.path, contenu: f.content })
-            .catch((err: unknown) => log?.warn("livrable rejeté non archivé", { path: f.path, error: String(err) }));
+        await deps.trace
+          ?.archive(taskId, label, files)
+          .catch((err: unknown) => log?.warn("livrables rejetés non archivés", { label, error: String(err) }));
       },
     },
 

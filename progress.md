@@ -28,6 +28,17 @@ demandait de justifier pourquoi ce n'est pas un trou de sécurité : `evidence` 
 porte s'y appuie ; `trace` **raconte** et aucune porte ne doit s'y appuyer. Le test qui verrouille
 la liste des capacités exposées m'a obligé à l'écrire — c'est exactement son rôle.
 
+**Et le livrable est gardé ENTIER.** Je l'avais d'abord inliné dans le JSONL, donc borné : 8 000
+caractères, puis 200 000 après remarque. Aucun des deux ne venait d'une mesure — exactement le
+travers de mon plafond d'un million de tokens, le matin même. La bonne réponse n'était pas un
+meilleur nombre, c'était d'écrire le fichier **à côté** et de n'en garder qu'une référence : plus
+aucun seuil à choisir. Il en reste un, légitime, sur la narration, qui borne un flux sans fin.
+
+**Contrepartie d'avoir ouvert la trace aux extensions** : `archive` borne elle-même l'étiquette et
+les chemins qu'elle reçoit. Sans ça, `ctx.trace.rejected` devenait une écriture arbitraire sur le
+disque, hors du dépôt — pire que tout ce que la garde empêche ailleurs. Dès qu'une API accepte un
+chemin venu de l'extérieur, elle le borne elle-même.
+
 **Quatrième omission de la même famille en deux jours** : la commande refusée, les compteurs de
 cache, le motif d'échec d'un outil, le contenu jugé. À chaque fois l'information existait et
 n'était pas conservée. Et il en reste une : **les arguments des outils** ne sont toujours pas

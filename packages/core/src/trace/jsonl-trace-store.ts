@@ -1,5 +1,5 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { TraceEntry, TraceStore } from "../protocols/trace.js";
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -14,9 +14,9 @@ export const LIMITE_TEXTE = 8_000;
  * Coupe un texte trop long **en disant ce qu'il a perdu**. Une troncature muette ferait lire un
  * texte amputé comme s'il était entier — c'est la même faute que de taire ce qu'on n'a pas mesuré.
  */
-export function tronquer<T>(valeur: T): T {
-  if (typeof valeur !== "string" || valeur.length <= LIMITE_TEXTE) return valeur;
-  return `${valeur.slice(0, LIMITE_TEXTE)} [... ${valeur.length - LIMITE_TEXTE} caractères coupés]` as unknown as T;
+export function tronquer<T>(valeur: T, limite = LIMITE_TEXTE): T {
+  if (typeof valeur !== "string" || valeur.length <= limite) return valeur;
+  return `${valeur.slice(0, limite)} [... ${valeur.length - limite} caractères coupés]` as unknown as T;
 }
 
 const tronquerEntree = (e: TraceEntry): TraceEntry =>
@@ -51,6 +51,28 @@ export function createJsonlTraceStore(dir: string): TraceStore {
       });
       chains.set(file, next.catch(() => undefined));
       return next;
+    },
+    /**
+     * Livrables écrits **entiers**, à côté de la trace : `<dir>/<taskId>/<étiquette>/<chemin>`.
+     * La trace n'en garde que la référence, donc elle reste légère et aucune borne n'est à choisir.
+     */
+    async archive(taskId, label, files) {
+      const base = join(fileFor(taskId).replace(/\.jsonl$/, ""), label);
+      // Étiquette et chemins viennent d'une extension : ils ne doivent pas sortir du dossier.
+      const dedans = (p: string) => {
+        const cible = resolve(base, p);
+        const rel = relative(resolve(base), cible);
+        if (rel.startsWith("..") || isAbsolute(rel)) throw new Error(`Chemin d'archive hors du dossier : ${p}`);
+        return cible;
+      };
+      const racine = resolve(join(dir, taskId));
+      if (relative(racine, resolve(base)).startsWith("..")) throw new Error(`Étiquette d'archive invalide : ${label}`);
+      for (const f of files) {
+        const cible = dedans(f.path);
+        await mkdir(dirname(cible), { recursive: true });
+        await writeFile(cible, f.content);
+        await this.append({ taskId, at: new Date().toISOString(), kind: "livrable-rejeté", étiquette: label, chemin: f.path });
+      }
     },
     async list(taskId) {
       let raw: string;

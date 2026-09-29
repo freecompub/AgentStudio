@@ -81,3 +81,51 @@ describe("createJsonlTraceStore", () => {
     expect((await s.list("t1")).length).toBe(40);
   });
 });
+
+/**
+ * Un livrable archivé est gardé ENTIER, à côté de la trace (ADR 0038).
+ *
+ * Il l'a d'abord été *dans* le JSONL, borné à 200 000 caractères. C'était le même travers que le
+ * plafond d'un million de tokens : un seuil qu'on n'a pas mesuré est un seuil qui sera faux. La
+ * bonne réponse n'était pas de mieux régler le nombre, c'était de supprimer le besoin d'en avoir
+ * un — le fichier est écrit à côté, la trace n'en garde qu'une référence.
+ */
+describe("Livrables archivés : entiers, à côté de la trace", () => {
+  const store = async () => {
+    const dir = await mkdtemp(join(tmpdir(), "trace-"));
+    return { dir, s: createJsonlTraceStore(dir) };
+  };
+
+  it("garde le document entier, quelle que soit sa taille", async () => {
+    const { dir, s } = await store();
+    const doc = "# Recherche\n".repeat(40_000); // très au-delà de toute limite de narration
+    await s.archive("t1", "RESEARCH essai 1", [{ path: ".skraft/us-2/research/research.md", content: doc }]);
+    expect(await readFile(join(dir, "t1", "RESEARCH essai 1", ".skraft/us-2/research/research.md"), "utf8")).toBe(doc);
+  });
+
+  it("la trace n'en garde qu'une référence, et reste légère", async () => {
+    const { dir, s } = await store();
+    await s.archive("t1", "RESEARCH essai 1", [{ path: "a.md", content: "x".repeat(100_000) }]);
+    const [e] = await s.list("t1");
+    expect(e).toMatchObject({ kind: "livrable-rejeté", étiquette: "RESEARCH essai 1", chemin: "a.md" });
+    expect((await readFile(join(dir, "t1.jsonl"), "utf8")).length).toBeLessThan(1_000);
+  });
+
+  it("plusieurs livrables d'un même essai cohabitent", async () => {
+    const { dir, s } = await store();
+    await s.archive("t1", "DESIGN essai 2", [{ path: "d/a.md", content: "A" }, { path: "d/b.md", content: "B" }]);
+    expect(await readFile(join(dir, "t1", "DESIGN essai 2", "d/a.md"), "utf8")).toBe("A");
+    expect(await readFile(join(dir, "t1", "DESIGN essai 2", "d/b.md"), "utf8")).toBe("B");
+    expect((await s.list("t1")).length).toBe(2);
+  });
+
+  it("un chemin qui tenterait de sortir du dossier d'archive est refusé", async () => {
+    const { s } = await store();
+    await expect(s.archive("t1", "x", [{ path: "../../evade.md", content: "z" }])).rejects.toThrow();
+  });
+
+  it("une étiquette qui tenterait la même chose est refusée", async () => {
+    const { s } = await store();
+    await expect(s.archive("t1", "../..", [{ path: "a.md", content: "z" }])).rejects.toThrow();
+  });
+});

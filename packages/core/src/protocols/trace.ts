@@ -40,9 +40,12 @@ export type TraceEntry = {
    *
    * Un rejet de porte rembobine le dépôt : le document jugé disparaît en même temps que le verdict
    * qui le condamne. On ne peut alors plus examiner ce qu'un agent a produit **au moment précis où
-   * on voudrait le lire**. Le contenu est tronqué comme le reste, en le disant.
+   * on voudrait le lire**.
+   *
+   * Le contenu n'est **pas** ici : il est écrit à côté de la trace, entier. L'avoir mis dans le
+   * JSONL obligeait à le borner, donc à choisir un seuil qu'aucune mesure ne justifiait.
    */
-  | { kind: "livrable-rejeté"; étiquette: string; chemin: string; contenu: string }
+  | { kind: "livrable-rejeté"; étiquette: string; chemin: string }
 );
 
 /**
@@ -56,4 +59,9 @@ export type TraceBody = TraceEntry extends infer T ? (T extends TraceEntry ? Omi
 export interface TraceStore {
   append(entry: TraceEntry): Promise<void>;
   list(taskId: string): Promise<TraceEntry[]>;
+  /**
+   * Archive des livrables **entiers**, à côté de la trace, et en note la référence dedans.
+   * `étiquette` situe le moment (« DESIGN essai 2 »).
+   */
+  archive(taskId: string, label: string, files: readonly { path: string; content: string }[]): Promise<void>;
 }
