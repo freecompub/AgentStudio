@@ -250,6 +250,9 @@ export type SkraftEffect =
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "rollback"; to: string }
+  // Rembobiner le dépôt sans faire oublier les conversations qui le décrivent, c'est garder le
+  // souvenir et retirer la chose (ADR 0040, 0050). Les deux vont ensemble.
+  | { kind: "forgetSessions"; roles: string[] }
   | { kind: "commitPhase"; phase: Phase; message: string }
   | { kind: "finalReport" }
   | { kind: "planDeliver" }

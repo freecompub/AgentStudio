@@ -103,6 +103,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
         post: (md) => void call("chat.post", [md]).catch(() => undefined),
       },
       agents: {
+        forget: (taskId: string, names: readonly string[]) => call("agents.forget", [taskId, [...names]]) as Promise<void>,
         run: (name, prompt, opts) => {
           const { signal, ...rest } = opts ?? {};
           return call("agents.run", [name, prompt, rest], signal);

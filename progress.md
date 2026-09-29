@@ -272,6 +272,41 @@ facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas
 
 ---
 
+## 29/09 — Le dépôt revenait en arrière, la mémoire non (ADR 0050, numéroté 0045 à l’origine)
+
+**L'incohérence que j'avais laissée derrière moi.** L'ADR 0040 du matin cesse de rembobiner sur un
+réessai, précisément parce que l'agent garde sa session. Je n'ai pas regardé ce que devenait cette
+session sur le chemin d'**escalade**, où l'ADR 0029 veut au contraire que le dépôt redevienne
+propre. Le rollback partait ; la conversation restait. À la relance, l'architecte revenait avec la
+mémoire de fichiers que le rollback venait d'effacer.
+
+Même phrase que le matin, un cran plus loin : **garder le souvenir et retirer la chose**.
+
+**Pourquoi on ne l'avait jamais vu.** Le banc répondait `po` à une escalade qui exige développeur
+ou architecte ; le refus était avalé en silence et la relance n'avait jamais lieu (ADR 0044). Deux
+runs gelés là-dessus. Le défaut était derrière un autre défaut.
+
+**Ce que j'ai fait.** Une fonction unique du réducteur fabrique la paire `rollback` +
+`forgetSessions`, et les trois chemins qui rembobinent l'utilisent. L'oubli porte sur **tous les
+rôles de la phase** (`phaseRoles`), pas celui du tour en cours : DESIGN en a deux, DELIVER aussi,
+et n'en oublier qu'un reconstituerait exactement le défaut.
+
+**Ce que ça a coûté de traverser la frontière d'extension.** `ctx.agents.forget(taskId, noms)` :
+seuls des noms de rôles franchissent, jamais un objet de session (règle de sécurité n°1). Il a
+fallu câbler l'API, le port du cœur, l'hôte en processus, le RPC de l'hôte isolé et l'enfant — le
+typecheck a listé chacun des points, y compris les doubles de test à compléter.
+
+**Le détail qui rend la correction petite** : la clé de continuité `<taskId>/<extension>/<rôle>`
+n'avait pas été conçue pour filtrer, et elle s'y prête sans changement.
+
+**Trois tests affirmaient le rollback seul** à l'escalade. Réécrits pour exiger la paire.
+
+**Reste à vérifier sur un vrai run** : ce chemin n'a jamais été parcouru de bout en bout. Le banc
+est corrigé pour y arriver, mais tant qu'aucune escalade n'aura été relancée pour de vrai, le
+comportement est une déduction.
+
+---
+
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)
 
 **Le dispositif.** skraft-plugin v1.6.1 chargé par `--plugin-dir`, leur `skraft-orchestrator`, la

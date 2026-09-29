@@ -1,5 +1,5 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
-import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
+import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { synthesize, type LensVerdict } from "./review.js";
@@ -389,12 +389,24 @@ function relancerClassifieur(s: SkraftState, reason: string): Out {
  * ses trois essais sur la porte des valeurs, puis la revue a rendu deux défauts majeurs et justes
  * qui sont partis en escalade sans qu'aucun tour ne puisse y répondre.
  */
+/**
+ * Rembobiner le dépôt et faire oublier les conversations qui le décrivent (ADR 0050).
+ *
+ * Les deux sont indissociables : un agent relancé sur un dépôt rembobiné, avec dans sa mémoire les
+ * appels d'outils qui ont créé les fichiers effacés, corrige de mémoire un dépôt vide. C'est
+ * l'incohérence que l'ADR 0040 a levée pour le réessai, restée sur le chemin d'escalade.
+ */
+function rembobiner(s: SkraftState): SkraftEffect[] {
+  const cp = s.phase ? s.checkpoints[s.phase] : undefined;
+  if (!cp) return [];
+  return [{ kind: "rollback", to: cp }, ...(s.phase ? [{ kind: "forgetSessions", roles: phaseRoles(s.phase) } as SkraftEffect] : [])];
+}
+
 function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
-  const cp = s.phase ? s.checkpoints[s.phase] : undefined;
   const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
-  const rollback: SkraftEffect[] = cp && epuise ? [{ kind: "rollback", to: cp }] : [];
+  const rollback: SkraftEffect[] = epuise ? rembobiner(s) : [];
   const lastRejection = { gate, reasons };
   if (epuise) {
     return {
@@ -411,10 +423,9 @@ function escalate(s: SkraftState, reason: string): Out {
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
-  const cp = s.phase ? s.checkpoints[s.phase] : undefined;
   return {
     state: { ...s, stage: "ESCALATED", escalation: { from: "PHASE", reason } },
-    effects: [...(cp ? [{ kind: "rollback", to: cp } as SkraftEffect] : []), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+    effects: [...rembobiner(s), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
   };
 }
 
@@ -437,9 +448,9 @@ function decide(s: SkraftState, decision: string): Out {
     return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };
   }
   if (decision === "skip" && from === "PHASE" && s.phase) {
-    const cp = s.checkpoints[s.phase];
+    const efface = rembobiner(s);
     const r = route({ ...s, skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null });
-    return { state: r.state, effects: [...(cp ? [{ kind: "rollback", to: cp } as SkraftEffect] : []), ...r.effects] };
+    return { state: r.state, effects: [...efface, ...r.effects] };
   }
   return { state: s, effects: [] };
 }

@@ -144,6 +144,14 @@ export type AgentRunResult<N extends TerminalToolName> =
 export interface AgentsApi {
   /** Lance un agent déclaré par l'extension ; ne renvoie qu'un résultat sérialisé. */
   run<N extends TerminalToolName>(name: string, prompt: string, opts?: AgentRunOptions): Promise<AgentRunResult<N>>;
+  /**
+   * Oublie la conversation de ces rôles : le prochain tour repartira d'une session neuve (ADR 0050).
+   *
+   * À appeler quand l'état du dépôt sur lequel ils ont travaillé n'existe plus — une escalade
+   * rembobine, et une mémoire qui décrit des fichiers effacés est pire qu'une mémoire vide.
+   * Ne transporte que des noms de rôles ; aucun objet de session ne franchit la frontière.
+   */
+  forget(taskId: string, names: readonly string[]): Promise<void>;
 }
 
 export interface WorkspaceApi {

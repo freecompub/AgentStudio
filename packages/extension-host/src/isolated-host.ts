@@ -42,6 +42,7 @@ const CALLS: Record<string, Dispatch> = {
     void ctx.chat.registerCommand(String(name), async (args) => void (await rpc.call("command.invoke", [name, args]))),
   "chat.post": (ctx, [md]) => ctx.chat.post(String(md)),
   "agents.run": (ctx, [name, prompt, opts], signal) => ctx.agents.run(String(name), String(prompt), { ...(opts as object), signal }),
+  "agents.forget": (ctx, [taskId, names]) => ctx.agents.forget(String(taskId), (names as string[]).map(String)),
   "workspace.readFile": (ctx, [p]) => ctx.workspace.readFile(String(p)),
   "workspace.writeFile": (ctx, [p, content]) => ctx.workspace.writeFile(String(p), String(content)),
   "workspace.ensureDir": (ctx, [p]) => ctx.workspace.ensureDir(String(p)),

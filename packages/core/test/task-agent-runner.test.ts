@@ -443,3 +443,57 @@ describe("Reprise entre deux essais d'une même phase", () => {
     expect(runtime.deleted).toContain(coupee);
   });
 });
+
+/**
+ * Libérer les sessions d'une phase rembobinée (ADR 0050).
+ *
+ * `releaseTask` clôt la tâche entière. Ici la tâche continue, mais une escalade a rembobiné le
+ * dépôt : les conversations qui décrivent le travail effacé doivent partir avec lui, et celles des
+ * autres rôles rester. Sans ce point, l'agent relancé corrige de mémoire un dépôt vide.
+ */
+describe("Libération des sessions d'une phase rembobinée", () => {
+  const finir: Parameters<ScriptedRuntime["behave"]>[1] = async (t) => {
+    await t.callTool("report_phase", { summary: "fini", files: [] });
+  };
+  const ouvrir = async (runner: ReturnType<typeof createTaskAgentRunner>, runtime: ScriptedRuntime, cle: string) => {
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "x", { resumeKey: cle });
+    return runtime.history.at(-1)!.id;
+  };
+
+  it("supprime la session du rôle nommé, et lui seul", async () => {
+    const { runtime, runner } = setup();
+    const modele = await ouvrir(runner, runtime, "t1/skraft/skraft-architect-model");
+    const decide = await ouvrir(runner, runtime, "t1/skraft/skraft-architect-decide");
+
+    await runner.releaseRoles("t1", ["skraft/skraft-architect-model"]);
+    expect(runtime.deleted).toEqual([modele]);
+
+    // Celle qu'on n'a pas nommée est intacte : le tour suivant la reprend.
+    await runner.run(TEST_AGENT, "x", { resumeKey: "t1/skraft/skraft-architect-decide" });
+    expect(runtime.history.at(-1)!.id).toBe(decide);
+  });
+
+  it("le rôle libéré repart d'une session NEUVE au tour suivant", async () => {
+    const { runtime, runner } = setup();
+    const avant = await ouvrir(runner, runtime, "t1/skraft/skraft-researcher");
+    await runner.releaseRoles("t1", ["skraft/skraft-researcher"]);
+    await runner.run(TEST_AGENT, "x", { resumeKey: "t1/skraft/skraft-researcher" });
+    expect(runtime.history.at(-1)!.id).not.toBe(avant);
+  });
+
+  it("ne touche pas aux autres tâches : le même rôle ailleurs est préservé", async () => {
+    const { runtime, runner } = setup();
+    await ouvrir(runner, runtime, "t1/skraft/skraft-researcher");
+    const autre = await ouvrir(runner, runtime, "t2/skraft/skraft-researcher");
+    await runner.releaseRoles("t1", ["skraft/skraft-researcher"]);
+    await runner.run(TEST_AGENT, "x", { resumeKey: "t2/skraft/skraft-researcher" });
+    expect(runtime.history.at(-1)!.id).toBe(autre);
+  });
+
+  it("un rôle sans session mémorisée : rien ne casse", async () => {
+    const { runtime, runner } = setup();
+    await expect(runner.releaseRoles("t1", ["skraft/jamais-lancé"])).resolves.toBeUndefined();
+    expect(runtime.deleted).toEqual([]);
+  });
+});
