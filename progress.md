@@ -5,6 +5,33 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — On réinitialisait une session que D17 n'obligeait pas à réinitialiser (ADR 0039)
+
+**Le déclencheur.** DESIGN recalée sur `CalculeRemise` cité dans `contracts.md` et absent du
+modèle : une incohérence de **nommage**. À l'essai 2, l'architecte repartait d'une session vide —
+3 messages, 605 tokens — et devait relire tout le dépôt pour renommer un identifiant qu'il venait
+lui-même d'écrire.
+
+**D17 ne demandait pas ça.** « Une session neuve **par phase/rôle** » : trois essais de DESIGN par
+le même architecte sont la même phase et le même rôle. On avait implémenté « par essai », plus
+strict que la décision, et personne ne l'avait vu. Même raisonnement que l'ADR 0030, qui avait déjà
+tranché que la règle vise les **passages de phase**.
+
+**Ce que j'ai dû ajouter pour que ça tienne.** En gardant les sessions, plus rien ne les supprimait
+— jamais. L'unité passe donc du tour à la **tâche** : `releaseTask` les libère à la fin. Ce n'était
+pas dans la demande, mais sans lui l'état des sessions s'accumulait indéfiniment sur le disque.
+
+**Le test de bout en bout de `tdd` a servi de garde-fou.** Il affirmait « sessions éphémères, toutes
+supprimées » et a échoué. En le réécrivant, il vérifie maintenant **davantage** : quatre tours,
+**trois** sessions distinctes — le développeur enchaîne « vert » puis « nettoyage » dans la même —,
+et toutes supprimées à la fin. Il comparait auparavant deux comptes égaux, ce qui masquait ce qui se
+passait vraiment.
+
+**Le garde-fou contre l'ancrage reste le budget d'essais**, puis l'escalade avec les motifs. Il
+était déjà là ; on ne lui ajoute pas une amnésie forcée.
+
+---
+
 ## 29/09 — RESEARCH produit enfin, et on ne peut pas lire ce qu'elle produit (ADR 0038)
 
 **Le mur est franchi.** Cinquième run : le chercheur écrit son document, en **deux tours** (un par

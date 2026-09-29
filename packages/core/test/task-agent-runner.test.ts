@@ -266,14 +266,17 @@ describe("Reprise de session après interruption", () => {
     expect(r.output).toEqual({ summary: "fini", files: [] });
   });
 
-  it("un tour réussi ne laisse rien à reprendre : la session est supprimée comme avant", async () => {
+  it("un tour réussi garde sa session : l'essai suivant de la même phase la reprend (ADR 0039)", async () => {
+    // Cette attente disait le contraire. D17 dit « une session neuve par phase/rôle », et deux
+    // essais du même rôle dans la même phase n'en font pas deux. Corriger un identifiant mal nommé
+    // ne doit pas obliger l'agent à relire tout le dépôt.
     const { runtime, runner } = setup();
     runtime.behave("tdd-test", finir);
     await runner.run(TEST_AGENT, "x", CLE);
     const premiere = runtime.history.at(-1)!.id;
-    expect(runtime.deleted).toContain(premiere);
-    await runner.run(TEST_AGENT, "x", CLE);
-    expect(runtime.history.at(-1)!.id).not.toBe(premiere);
+    expect(runtime.deleted).toEqual([]);
+    await runner.run(TEST_AGENT, "la porte refuse : …", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(premiere);
   });
 
   it("sans clé de reprise, rien n'est mémorisé : deux rôles homonymes de tâches différentes ne se mélangent pas", async () => {
@@ -366,13 +369,74 @@ describe("Reprise de session après une question de l'agent", () => {
     expect(runtime.history.at(-1)!.id).not.toBe(questionneuse);
   });
 
-  it("une fois la phase close, plus rien à reprendre : la session est supprimée", async () => {
+  it("la phase close garde elle aussi sa session : un rejet de porte peut la rouvrir (ADR 0039)", async () => {
     const { runtime, runner } = setup();
     runtime.behave("tdd-test", demande);
     await runner.run(QUESTIONNEUR, "x", CLE);
     runtime.behave("tdd-test", finir);
     await runner.run(QUESTIONNEUR, "réponse", CLE);
-    const close = runtime.history.at(-1)!.id;
-    expect(runtime.deleted).toContain(close);
+    expect(runtime.deleted).toEqual([]);
+  });
+});
+
+/**
+ * Reprise entre deux essais d'une même phase (ADR 0039).
+ *
+ * D17 dit « une session neuve **par phase/rôle** ». Notre implémentation était plus stricte que la
+ * décision : une session neuve par **essai**. Or trois essais de DESIGN par `skraft-architect-model`
+ * sont la même phase et le même rôle — c'est le raisonnement qui a déjà validé la reprise après une
+ * question (ADR 0030).
+ *
+ * Le rejet observé le 29/09 rend l'écart visible :
+ *
+ *   `CalculeRemise` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.
+ *
+ * Une incohérence de nommage. Pour la corriger, on faisait relire tout le dépôt à l'architecte,
+ * reconstruire son modèle mental et réécrire quinze documents.
+ */
+describe("Reprise entre deux essais d'une même phase", () => {
+  const CLE = { resumeKey: "t1/skraft/architect" };
+  const finir: Parameters<ScriptedRuntime["behave"]>[1] = async (t) => {
+    await t.callTool("report_phase", { summary: "fini", files: [] });
+  };
+
+  it("après un tour clos normalement, le tour suivant reprend la même session", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "écris la conception", CLE);
+    const premiere = runtime.history.at(-1)!.id;
+    await runner.run(TEST_AGENT, "la porte refuse : `CalculeRemise` n'existe pas dans le modèle", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(premiere);
+  });
+
+  it("la session n'est pas supprimée entre les deux : sinon il n'y aurait rien à reprendre", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", finir);
+    await runner.run(TEST_AGENT, "x", CLE);
+    expect(runtime.deleted).toEqual([]);
+  });
+
+  it("un rôle différent ouvre bien une session neuve : la clé sépare les rôles", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", finir);
+    runtime.behave("tdd-planner", async (t) => void (await t.callTool("submit_plan", { steps: [{ id: "s1", behavior: "un comportement" }] })));
+    await runner.run(TEST_AGENT, "x", { resumeKey: "t1/skraft/model" });
+    const model = runtime.history.at(-1)!.id;
+    await runner.run(PLANNER, "x", { resumeKey: "t1/skraft/decide" });
+    expect(runtime.history.at(-1)!.id).not.toBe(model);
+  });
+
+  it("un tour coupé par un plafond reste non reprenable : son contexte EST le problème", async () => {
+    // La règle de l'ADR 0030 tient : ce n'est pas parce qu'on garde la session entre deux essais
+    // qu'on la garde quand c'est nous qui avons coupé pour cause de contexte.
+    const runtime = new ScriptedRuntime();
+    const runner = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 60_000, maxInputTokens: 1_000 });
+    runtime.behave("tdd-test", (t) => {
+      t.session.emit({ type: "usage", inputTokens: 5_000 });
+      t.hang();
+    });
+    await expect(runner.run(TEST_AGENT, "x", CLE)).rejects.toBeInstanceOf(TurnCostError);
+    const coupee = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).toContain(coupee);
   });
 });

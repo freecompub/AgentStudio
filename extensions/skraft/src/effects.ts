@@ -201,6 +201,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       );
       if (livrables.length) await ctx.trace.rejected(taskId, étiquette, livrables);
       await ctx.workspace.rollback(effect.to);
+      // `git clean -fd` emporte les dossiers non suivis, et Git ne suit jamais un dossier vide :
+      // l'arborescence créée à l'initialisation disparaît au PREMIER rejet, et l'essai suivant
+      // retombe dans l'impasse qui a bloqué RESEARCH pendant trois runs. On la recrée donc ici.
+      for (const d of dossiersDeLaStory(state.slug)) await ctx.workspace.ensureDir(d);
       return;
     }
 

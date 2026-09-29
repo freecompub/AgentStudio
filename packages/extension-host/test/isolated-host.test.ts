@@ -50,7 +50,7 @@ function deps() {
     testFilePattern: "^tests/",
     runTests: async () => ({ results: [{ id: "x", file: "x", status: "passed" }], exitCode: 0, timedOut: false, output: "", durationMs: 1 }),
   };
-  const agents: TaskAgentRunner = { run: async () => ({ output: { summary: "", files: [] } as never }) };
+  const agents: TaskAgentRunner = { releaseTask: async () => {}, run: async () => ({ output: { summary: "", files: [] } as never }) };
   const evidence = new MemoryEvidenceStore();
   const d: HostDeps = {
     registry: createRegistry(),

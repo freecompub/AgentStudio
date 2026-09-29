@@ -227,10 +227,14 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const offTasks = engine.onUpdate((record) => {
       records.set(record.id, record);
       publish(record);
-      if (record.status === "finished")
+      if (record.status === "finished") {
         // Écriture sur disque : un échec ne doit pas devenir une exception non capturée
         // du processus principal.
         void interactions.cancelForTask(record.id).catch((err: unknown) => cfg.logger?.warn("annulation des demandes impossible", { taskId: record.id, error: String(err) }));
+        // Les sessions d'agent survivent d'un essai à l'autre (ADR 0039) : c'est ici qu'elles sont
+        // libérées, sans quoi leur état s'accumulerait indéfiniment sur le disque.
+        void agents.releaseTask(record.id).catch((err: unknown) => cfg.logger?.warn("libération des sessions impossible", { taskId: record.id, error: String(err) }));
+      }
     });
     // L'usage arrive aussi hors transition (fin d'un tour d'agent) : la carte suit.
     const offUsage = usage.onChange((taskId, rows) => {
@@ -256,23 +260,27 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         ),
       });
 
+    // Un seul exécuteur d'agents pour toutes les extensions : la clé de continuité porte déjà
+    // l'identifiant de l'extension, et `releaseTask` doit pouvoir libérer les sessions d'une
+    // tâche où qu'elles aient été ouvertes (ADR 0039).
+    const agents = createTaskAgentRunner({
+      runtime: createLazyRuntime(runtime),
+      root: workspace.root,
+      ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
+      ...(cfg.agentMaxTurnMs !== undefined ? { maxMs: cfg.agentMaxTurnMs } : {}),
+      ...(cfg.agentMaxInputTokens !== undefined ? { maxInputTokens: cfg.agentMaxInputTokens } : {}),
+      ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
+      // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
+      trace: traceStore,
+      ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
+    });
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of sources) {
       const hostDeps = {
         registry,
         engine,
-        agents: createTaskAgentRunner({
-          runtime: createLazyRuntime(runtime),
-          root: workspace.root,
-          ...(cfg.agentIdleMs !== undefined ? { idleMs: cfg.agentIdleMs } : {}),
-          ...(cfg.agentMaxTurnMs !== undefined ? { maxMs: cfg.agentMaxTurnMs } : {}),
-          ...(cfg.agentMaxInputTokens !== undefined ? { maxInputTokens: cfg.agentMaxInputTokens } : {}),
-          ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
-          // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
-          trace: traceStore,
-          ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
-        }),
+        agents,
         workspace,
         stack,
         interactions,

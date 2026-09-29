@@ -47,6 +47,14 @@ export type TaskAgentResult<N extends TerminalToolName> =
 
 export interface TaskAgentRunner {
   run<N extends TerminalToolName>(spec: TaskAgentSpec<N>, prompt: string, opts?: TaskAgentRunOptions): Promise<TaskAgentResult<N>>;
+  /**
+   * Libère les sessions d'une tâche terminée (ADR 0039).
+   *
+   * Les sessions survivent désormais d'un essai à l'autre. Sans ce point de libération elles ne
+   * seraient plus jamais supprimées et leur état s'accumulerait sur le disque : elles restent
+   * éphémères, mais à l'échelle de la **tâche** et non du tour.
+   */
+  releaseTask(taskId: string): Promise<void>;
 }
 
 export interface TaskAgentRunnerDeps {
@@ -81,6 +89,14 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
   const reprenables = new Map<string, string>();
 
   return {
+    async releaseTask(taskId) {
+      const prefixe = `${taskId}/`;
+      for (const [cle, id] of [...reprenables]) {
+        if (!cle.startsWith(prefixe)) continue;
+        reprenables.delete(cle);
+        await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
+      }
+    },
     async run(spec, prompt, opts = {}) {
       let output: TerminalOutput<typeof spec.output> | undefined;
       let blocker: TerminalOutput<"report_blocker"> | undefined;
@@ -239,6 +255,13 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         if (blocker && !output) return questionPosee();
         if (!output) throw new WorkDefectError(`L'agent ${spec.role} n'a pas clôturé sa phase par ${spec.output}.`);
         tracer({ kind: "tour-fin", fin: "output", sortie: output });
+        // La session survit à un tour clos normalement (ADR 0039). D17 dit « une session neuve par
+        // phase/rôle » : trois essais de DESIGN par le même architecte sont la même phase et le même
+        // rôle. Sans cela, corriger un identifiant mal nommé oblige l'agent à relire tout le dépôt.
+        if (opts.resumeKey && session) {
+          reprenables.set(opts.resumeKey, session.id);
+          garder = true;
+        }
         return { output };
       } catch (err) {
         tracer({ kind: "tour-fin", fin: finDe(err), raison: err instanceof Error ? err.message : String(err) });
