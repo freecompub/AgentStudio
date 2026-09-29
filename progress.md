@@ -5,6 +5,49 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Deux runs gelés en silence, et une réserve que personne ne regardait (ADR 0044)
+
+**Le gel.** Le run relancé à DISTILL s'est arrêté après l'escalade et n'a plus rien fait pendant
+trente minutes, processus vivant, journal muet. Cause : `askEscalation` exige
+`requiredRoles: ['developpeur','architecte','administrateur']`, le banc répondait toujours `po`,
+et le `.catch()` avalait le refus **sans un mot**. Aucun `onChange` ne survenant ensuite, la
+demande restait sans réponse pour toujours.
+
+**Ce que ça m'a fait dire de faux.** Deux fois j'ai annoncé « le cycle repart » après une escalade.
+Non : le rollback est un effet de la transition d'escalade elle-même, qui **précède** la décision
+humaine. La relance, elle, n'a jamais eu lieu — ni hier ni aujourd'hui. J'ai tué le premier run
+sans m'apercevoir qu'il était déjà bloqué.
+
+Un `catch` muet sur le seul mécanisme qui débloque une tâche ne cache pas une erreur, il fabrique
+un état indiscernable d'un agent qui réfléchit.
+
+**La réserve.** L'utilisateur a supposé être à court de crédit. Vérification :
+
+```
+premium_interactions   1471 / 1500   →   28 restantes (1,8 %)
+overage_permitted      false         →   à zéro, les appels sont REFUSÉS
+quota_reset_date       2026-10-01
+```
+
+Il avait raison. Et l'information était à un appel de distance — `/copilot_internal/user` — que
+rien n'interrogeait. On lançait des tâches consommant des dizaines de requêtes sans savoir s'il en
+restait une. C'est l'ADR 0031 qui se répète : un seuil qu'on ne mesure pas est un seuil qu'on subit.
+
+**Ce que j'ai écrit.** `copilotQuota()` dans `github-auth`, qui rend `null` plutôt que de lever —
+le point d'accès n'est pas documenté publiquement, donc tout y est facultatif, et une réserve
+inconnue ne doit jamais empêcher de travailler. Le banc l'affiche avant de lancer. Le canal
+`auth:quota` l'expose au renderer : des chiffres franchissent l'IPC, jamais un jeton (§10.2). Les
+tests portent la charge utile **réellement rendue** par GitHub, pas une charge inventée.
+
+**Ce que je n'ai pas fait, et qui compte plus.** Quand la réserve s'épuise en cours de route, le
+pipeline traite l'erreur comme n'importe quelle panne : message brut, mêmes options, « relancer »
+en premier alors qu'il ne peut que réechouer. Pour classer les pannes du runtime autrement que par
+leur texte — comme le profil de stack classe les erreurs du compilateur par leur **code**, parce
+que les messages sont traduits — il faut en avoir **observé** une. Je ne l'ai jamais vue. Si la
+réserve tombe à zéro au prochain run, la trace nous la donnera.
+
+---
+
 ## 29/09 — L'instruction était là, et elle ne suffisait pas (ADR 0043)
 
 **Ce que l'ADR 0042 n'a pas traité.** Il donne un essai de plus à la revue ; il n'explique pas

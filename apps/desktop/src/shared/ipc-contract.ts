@@ -34,6 +34,22 @@ export const authStatusSchema = z.union([
 ]);
 export type AuthStatusDto = z.infer<typeof authStatusSchema>;
 
+/**
+ * Réserve de requêtes premium Copilot, ou `null` si elle n'a pas pu être lue (ADR 0044). Aucun
+ * jeton ne franchit l'IPC — seulement ces chiffres (§10.2).
+ */
+export const copilotQuotaSchema = z
+  .object({
+    total: z.number(),
+    utilisees: z.number(),
+    restantes: z.number(),
+    pourcentageRestant: z.number(),
+    depassementAutorise: z.boolean(),
+    remiseAZero: z.string(),
+  })
+  .nullable();
+export type CopilotQuotaDto = z.infer<typeof copilotQuotaSchema>;
+
 export const fileChangeSchema = z.object({ path: z.string(), status: z.enum(["added", "modified", "deleted"]) });
 export const workspaceDiffSchema = z.object({ files: z.array(fileChangeSchema), patch: z.string() });
 export type WorkspaceDiffDto = z.infer<typeof workspaceDiffSchema>;
@@ -139,6 +155,7 @@ const empty = z.object({}).strict();
 /** Requêtes (renderer → principal, `invoke`) : entrée et sortie par canal. */
 export const requests = {
   "auth:status": { input: empty, output: authStatusSchema },
+  "auth:quota": { input: empty, output: copilotQuotaSchema },
   "auth:login": { input: z.object({ hostname: text(253).min(1).optional() }).strict(), output: authStatusSchema },
   "auth:logout": { input: empty, output: z.void() },
   "workspace:current": { input: empty, output: workspaceInfoSchema.nullable() },

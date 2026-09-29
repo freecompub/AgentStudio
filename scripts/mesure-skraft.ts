@@ -35,6 +35,10 @@ import { activateInProcess, type HostDeps } from "@agent-studio/extension-host";
 import { createProfileAdapter, parseStackProfile } from "../packages/stack-adapters/src/index.js";
 import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/src/index.js";
 import { openWorkspace } from "@agent-studio/workspace";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
+import { createGhAuth } from "../packages/github-auth/src/index.js";
+const execFileAsync = promisify(execFile);
 import { DEFAULT_ALLOWED_PROGRAMS } from "../apps/desktop/src/main/admin-config.js";
 import { manifest, skraftExtension, type SkraftState } from "../extensions/skraft/src/index.js";
 // `scripts/` n'est pas couvert par `pnpm typecheck` (tsconfig.json n'inclut que packages, extensions
@@ -146,8 +150,20 @@ const repondre = async () => {
     const texte = `${q.title}\n${q.detail ?? ""}`;
     const voulue = REPONSES.find(([re]) => re.test(texte))?.[1];
     const choix = q.options.find((o) => o.id === voulue || o.label === voulue) ?? q.options[0]!;
-    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${choix.label.slice(0, 110)}`);
-    await interactions.respond(q.id, choix.id, undefined, { role: "po" }).catch(() => repondues.delete(q.id));
+    // Le profil doit être accepté par la demande : l'escalade n'admet ni le PO ni le testeur
+    // (`requiredRoles`). Répondre « po » à tout laissait la demande sans réponse, donc la tâche en
+    // attente définitive — deux runs gelés le 29/09 avant qu'on le voie.
+    const role = q.requiredRoles?.length && !q.requiredRoles.includes("po") ? q.requiredRoles[0]! : "po";
+    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${choix.label.slice(0, 110)}${role === "po" ? "" : ` (profil ${role})`}`);
+    try {
+      await interactions.respond(q.id, choix.id, undefined, { role });
+    } catch (err) {
+      // JAMAIS en silence : c'est le seul mécanisme qui débloque la tâche. Un refus avalé ne se
+      // distingue pas d'un agent qui réfléchit, et le banc attend jusqu'au plafond.
+      repondues.delete(q.id);
+      console.error(`\n  ✖ réponse REFUSÉE pour « ${q.title} » : ${err instanceof Error ? err.message : String(err)}`);
+      console.error("    La tâche reste en attente tant que personne n'y répond.");
+    }
   }
 };
 interactions.onChange(() => void repondre());
@@ -174,6 +190,15 @@ const hostDeps: HostDeps = {
 await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
 
 // ---------- Lancement ------------------------------------------------------------------------
+// Réserve Copilot AVANT de lancer (ADR 0044) : une tâche skraft consomme des dizaines de requêtes
+// premium, et le 29/09 un run a été lancé avec 28 en réserve. Jamais bloquant — seulement dit.
+const quota = await createGhAuth({ runner: { run: async (cmd, args) => execFileAsync(cmd, [...args]).then((r) => ({ code: 0, ...r })).catch((e) => ({ code: e.code ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? String(e) })) }, spawner: null as never }).copilotQuota();
+if (!quota) console.log("Réserve Copilot : inconnue (gh absent, déconnecté, ou point d'accès changé).\n");
+else {
+  const alerte = quota.restantes <= 100 && !quota.depassementAutorise ? "  ⚠ insuffisant pour une tâche complète" : "";
+  console.log(`Réserve Copilot : ${quota.restantes}/${quota.total} requêtes premium (${quota.pourcentageRestant} %), remise à zéro le ${quota.remiseAZero}${alerte}\n`);
+}
+
 const taskId = await engine.start("agent-studio.skraft/skraft-pipeline", { storyPath, confirmDifficulty: true, ...(phaseOrder ? { phaseOrder } : {}) });
 if (phaseOrder)
   console.log(

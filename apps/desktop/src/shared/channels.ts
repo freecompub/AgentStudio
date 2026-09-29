@@ -4,6 +4,7 @@
  */
 export const REQUEST_CHANNELS = [
   "auth:status",
+  "auth:quota",
   "auth:login",
   "auth:logout",
   "workspace:current",

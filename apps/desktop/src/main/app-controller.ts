@@ -217,6 +217,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
   return {
     "auth:status": () => deps.auth.status(),
 
+    // Consultée avant de lancer une tâche : une tâche skraft consomme des dizaines de requêtes
+    // premium, et il vaut mieux le savoir avant qu'au milieu d'une phase (ADR 0044).
+    "auth:quota": () => deps.auth.copilotQuota(),
+
     "auth:login": async ({ hostname }) => {
       const status = await deps.auth.login(
         (code) => deps.sink.emit("auth:device-code", code),

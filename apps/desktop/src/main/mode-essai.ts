@@ -53,6 +53,8 @@ export function fabriquesDEssai(): FabriquesDEssai {
     auth: {
       status: async () => ({ loggedIn: true, user: "essai", tokenKind: "oauth", copilotCompatible: true, hostname: "github.invalid" }),
       token: async () => "jeton-d-essai-jamais-envoyé",
+      // Le mode d'essai ne joint jamais GitHub : réserve inconnue, pas réserve nulle.
+      copilotQuota: async () => null,
       login: async () => ({ loggedIn: true, user: "essai", tokenKind: "oauth", copilotCompatible: true, hostname: "github.invalid" }),
       logout: async () => {},
       hostname: () => "github.invalid",

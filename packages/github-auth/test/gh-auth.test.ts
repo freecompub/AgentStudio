@@ -192,3 +192,74 @@ describe("GhAuth", () => {
     await expect(auth.login(() => {})).rejects.toThrow(/connexion GitHub a échoué/);
   });
 });
+
+/**
+ * Réserve de requêtes premium Copilot (ADR 0044).
+ *
+ * Le 29/09, six runs de mesure ont été lancés dans la journée ; le dernier s'est arrêté sans que
+ * rien n'indique pourquoi il fallait s'arrêter. La réserve était à **28 requêtes sur 1500**, et
+ * `overage_permitted: false` — à zéro, les appels sont refusés, pas facturés. L'information
+ * existait, à un appel d'ici, et personne ne la demandait.
+ *
+ * La charge utile ci-dessous est celle que GitHub a réellement rendue ce jour-là, réduite aux
+ * champs lus. Le point d'accès n'est pas documenté publiquement : tout y est traité comme
+ * facultatif, et une surprise rend `null` plutôt que d'empêcher de travailler.
+ */
+const QUOTA_CMD = "gh api --hostname github.com -H Editor-Version: agent-studio /copilot_internal/user";
+const REPONSE_REELLE = JSON.stringify({
+  login: "octo",
+  copilot_plan: "individual",
+  quota_reset_date: "2026-10-01",
+  quota_snapshots: {
+    chat: { unlimited: true, percent_remaining: 100.0 },
+    completions: { unlimited: true, percent_remaining: 100.0 },
+    premium_interactions: {
+      entitlement: 1500,
+      credits_used: 1471,
+      remaining: 28,
+      percent_remaining: 1.8,
+      overage_permitted: false,
+      unlimited: false,
+    },
+  },
+});
+
+describe("Réserve de requêtes premium Copilot", () => {
+  const avec = (r: CommandResult) => createGhAuth({ runner: runner({ ...LOGGED_IN, [QUOTA_CMD]: r }), spawner: null as never });
+
+  it("lit les chiffres que GitHub rend vraiment", async () => {
+    expect(await avec(ok(REPONSE_REELLE)).copilotQuota()).toEqual({
+      total: 1500,
+      utilisees: 1471,
+      restantes: 28,
+      pourcentageRestant: 1.8,
+      depassementAutorise: false,
+      remiseAZero: "2026-10-01",
+    });
+  });
+
+  it("interroge le point d'accès des éditeurs, en-tête compris : sans lui GitHub refuse", async () => {
+    const r = runner({ ...LOGGED_IN, [QUOTA_CMD]: ok(REPONSE_REELLE) });
+    await createGhAuth({ runner: r, spawner: null as never }).copilotQuota();
+    expect(r.calls).toContain(QUOTA_CMD);
+  });
+
+  it("un dépassement autorisé est rapporté tel quel : à zéro, tout le monde ne s'arrête pas", async () => {
+    const permis = REPONSE_REELLE.replace('"overage_permitted":false', '"overage_permitted":true');
+    expect((await avec(ok(permis)).copilotQuota())?.depassementAutorise).toBe(true);
+  });
+
+  it.each([
+    ["gh en échec", ko("HTTP 404")],
+    ["réponse illisible", ok("<html>maintenance</html>")],
+    ["champ premium_interactions disparu", ok(JSON.stringify({ quota_snapshots: {} }))],
+    ["chiffres absents", ok(JSON.stringify({ quota_snapshots: { premium_interactions: { unlimited: true } } }))],
+  ])("%s : rend null, jamais une exception — une réserve inconnue n'empêche pas de travailler", async (_, r) => {
+    await expect(avec(r).copilotQuota()).resolves.toBeNull();
+  });
+
+  it("gh absent : rend null aussi, sans le message d'installation", async () => {
+    const auth = createGhAuth({ runner: { run: async () => Promise.reject(Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" })) }, spawner: null as never });
+    await expect(auth.copilotQuota()).resolves.toBeNull();
+  });
+});

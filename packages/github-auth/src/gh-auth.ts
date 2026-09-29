@@ -1,4 +1,4 @@
-import type { AuthStatus, CommandRunner, GitHubAuth, ProcessSpawner, TokenKind } from "./protocols.js";
+import type { AuthStatus, CommandRunner, CopilotQuota, GitHubAuth, ProcessSpawner, TokenKind } from "./protocols.js";
 
 export interface GhAuthDeps {
   runner: CommandRunner;
@@ -52,8 +52,49 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
     return { loggedIn: true, user: user.stdout.trim(), tokenKind, copilotCompatible: tokenKind !== "classic-pat", hostname: host };
   }
 
+  /**
+   * Lu sur `/copilot_internal/user`, point d'accès que les éditeurs interrogent (d'où l'en-tête
+   * `Editor-Version`, sans lequel GitHub refuse). Il n'est pas documenté publiquement : tout y est
+   * donc traité comme facultatif, et la moindre surprise rend `null` plutôt que de lever. Une
+   * réserve inconnue ne doit pas empêcher de lancer une tâche.
+   */
+  async function copilotQuota(): Promise<CopilotQuota | null> {
+    let brut: string;
+    try {
+      const r = await gh("api", "--hostname", host, "-H", "Editor-Version: agent-studio", "/copilot_internal/user");
+      if (r.code !== 0) return null;
+      brut = r.stdout;
+    } catch {
+      return null;
+    }
+    try {
+      const d = JSON.parse(brut) as {
+        quota_reset_date?: unknown;
+        quota_snapshots?: { premium_interactions?: Record<string, unknown> };
+      };
+      const q = d.quota_snapshots?.premium_interactions;
+      const nombre = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+      const total = nombre(q?.entitlement);
+      const restantes = nombre(q?.remaining);
+      const utilisees = nombre(q?.credits_used);
+      // Sans ces trois chiffres, il n'y a rien à dire d'utile : mieux vaut se taire que deviner.
+      if (total === null || restantes === null || utilisees === null) return null;
+      return {
+        total,
+        utilisees,
+        restantes,
+        pourcentageRestant: nombre(q?.percent_remaining) ?? (total > 0 ? (restantes / total) * 100 : 0),
+        depassementAutorise: q?.overage_permitted === true,
+        remiseAZero: typeof d.quota_reset_date === "string" ? d.quota_reset_date : "",
+      };
+    } catch {
+      return null;
+    }
+  }
+
   return {
     status,
+    copilotQuota,
 
     hostname: () => host,
 
