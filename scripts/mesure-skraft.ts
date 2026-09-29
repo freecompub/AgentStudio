@@ -37,10 +37,23 @@ import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/s
 import { openWorkspace } from "@agent-studio/workspace";
 import { DEFAULT_ALLOWED_PROGRAMS } from "../apps/desktop/src/main/admin-config.js";
 import { manifest, skraftExtension, type SkraftState } from "../extensions/skraft/src/index.js";
+// `scripts/` n'est pas couvert par `pnpm typecheck` (tsconfig.json n'inclut que packages, extensions
+// et apps) : cet import profond ne serait pas signalé s'il était faux. Vérifié à l'exécution.
+import { PHASE_ORDER } from "../extensions/skraft/src/config.js";
 
-const [source, storyPath, minutes] = process.argv.slice(2);
-if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max]");
+const args = process.argv.slice(2);
+// `--depuis=DISTILL` : reprendre le pipeline à une phase donnée, les précédentes étant tenues pour
+// faites. Sert à réessayer une phase tardive sans repayer celles d'avant — le dépôt source doit
+// alors DÉJÀ contenir leurs livrables, le banc ne les fabrique pas.
+const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
+const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
+if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE]");
 const limite = Number(minutes ?? 90) * 60_000;
+// `indexOf` rend -1 sur une phase inconnue, et `slice(-1)` rendrait la DERNIÈRE phase : une faute
+// de frappe lancerait DELIVER seul. L'index est donc vérifié avant d'être utilisé.
+const iDepuis = depuis ? PHASE_ORDER.indexOf(depuis as (typeof PHASE_ORDER)[number]) : 0;
+if (depuis && iDepuis < 0) throw new Error(`--depuis : phase inconnue « ${depuis} » (attendu : ${PHASE_ORDER.join(", ")})`);
+const phaseOrder = depuis ? PHASE_ORDER.slice(iDepuis) : undefined;
 
 // ---------- Copie du projet : le dépôt d'origine n'est jamais touché ------------------------
 // `realpath` : sous macOS, `mkdtemp` rend un chemin passant par le lien /var → /private/var, et le
@@ -161,7 +174,13 @@ const hostDeps: HostDeps = {
 await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
 
 // ---------- Lancement ------------------------------------------------------------------------
-const taskId = await engine.start("agent-studio.skraft/skraft-pipeline", { storyPath, confirmDifficulty: true });
+const taskId = await engine.start("agent-studio.skraft/skraft-pipeline", { storyPath, confirmDifficulty: true, ...(phaseOrder ? { phaseOrder } : {}) });
+if (phaseOrder)
+  console.log(
+    `Reprise à ${depuis} : phases ${phaseOrder.join(" → ")}.\n` +
+      "  Les phases précédentes ne sont PAS dans `phasesCompleted` : le dossier de passation ne\n" +
+      "  nommera pas leurs livrables, l'agent devra les trouver dans .skraft/<slug>/.",
+  );
 console.log(`Tâche ${taskId} sur ${storyPath}\n`);
 
 const fini = async () => {

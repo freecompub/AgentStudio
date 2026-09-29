@@ -175,7 +175,10 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const defects = actionableDefects(e.lenses);
         if (p === "DELIVER" && defects.length && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, defects);
         // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
-        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)]);
+        // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
+        // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
+        // sans que personne n'ait eu l'occasion d'y répondre.
+        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)], ns.reviews[p].length === 1);
       }
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
@@ -318,12 +321,19 @@ function relancerClassifieur(s: SkraftState, reason: string): Out {
  * qu'ait été le chemin. Un essai qui laisse un fichier bancal sera recalé par elle.
  *
  * L'escalade, elle, annule toujours — quand la main repasse à l'humain, le dépôt doit être propre.
+ *
+ * `essaiGaranti` force un essai de plus malgré un budget épuisé. Un seul appelant s'en sert : la
+ * première revue d'une phase (ADR 0042). Le budget est commun aux portes de forme et à la revue,
+ * alors que les rejets n'y sont pas du même ordre — recopier une valeur dans un Gherkin et
+ * rebrancher un calcul de facture ne demandent pas le même travail. Le 29/09, DISTILL a dépensé
+ * ses trois essais sur la porte des valeurs, puis la revue a rendu deux défauts majeurs et justes
+ * qui sont partis en escalade sans qu'aucun tour ne puisse y répondre.
  */
-function failure(s0: SkraftState, gate: string, reasons: string[]): Out {
+function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const cp = s.phase ? s.checkpoints[s.phase] : undefined;
-  const epuise = attempts >= s.budget.maxAttemptsPerPhase;
+  const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
   const rollback: SkraftEffect[] = cp && epuise ? [{ kind: "rollback", to: cp }] : [];
   const lastRejection = { gate, reasons };
   if (epuise) {

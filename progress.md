@@ -5,6 +5,46 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Le budget d'une phase se dépense avant d'arriver au vrai sujet (ADR 0042)
+
+**Le run.** DISTILL relancée depuis une base où RESEARCH et DESIGN étaient déjà produites — c'est
+l'option `--depuis=DISTILL` du banc, ajoutée pour ne pas repayer les phases d'avant. La porte RED
+corrigée le matin a tenu : elle a reconnu ses tests et accepté le rouge, et n'a plus jamais
+protesté. Mais la phase a escaladé quand même, pour une raison entièrement différente.
+
+```
+essai 1  porte valeurs  rejet   « 10 articles ou plus : 5 % » absent du scénario @ac-1
+essai 2  porte valeurs  rejet   même famille
+essai 3  valeurs ✔  RED ✔  →  revue : DEUX DÉFAUTS MAJEURS  →  budget épuisé  →  ESCALADE
+```
+
+**Les deux défauts étaient justes et corrigeables** : `Facture.ATPayer` ignore `Remise`, alors que
+le contrat de conception **ratifié** exige `SommeDesArticles - Remise + FraisDePort`. Ils
+désignaient une ligne. Personne n'a pu y répondre.
+
+**Ce que j'ai compris en regardant pourquoi.** Le budget est commun aux portes de forme et à la
+revue, alors que leurs rejets ne sont pas du même ordre : une porte de forme constate une
+divergence **mécanique** (une valeur non recopiée), la revue rend un jugement sur le **fond**. Et
+la revue siège toujours **en dernier** — elle est donc la seule à pouvoir hériter d'un budget vide.
+Recopier « 2,00 € » dans un Gherkin et rebrancher un calcul de facture ne demandent pas le même
+nombre de tours ; les faire puiser au même compteur, si.
+
+**Correction au plus petit.** La première revue d'une phase obtient un essai, une seule fois.
+J'avais aussi envisagé deux compteurs séparés et un budget rendu au passage d'une porte : les deux
+obligeaient à choisir des chiffres, et l'ADR 0031 a montré ce que valent les seuils non mesurés.
+Ici aucun chiffre n'est introduit, et `reviews[phase]` portait déjà l'information — pas de champ
+d'état, pas de migration.
+
+**Le piège en écrivant les tests.** Mes trois premiers scénarios passaient par RESEARCH… qui n'est
+pas dans `REVIEWED_PHASES`. Ils n'atteignaient jamais de revue et affirmaient donc n'importe quoi.
+Rejoués sur DISTILL, la phase du run réel.
+
+**Reste ouvert, et ce n'est pas le budget :** il a fallu deux tours à l'agent pour comprendre que
+la porte des valeurs veut une **recopie** et non une paraphrase. C'est du côté de ce que la porte
+dit qu'il faut regarder.
+
+---
+
 ## 29/09 — La porte cherchait ses tests là où le langage les range (ADR 0041)
 
 **Le run.** Premier passage de DISTILL sur un vrai projet. Trois essais, escalade, sur le même

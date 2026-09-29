@@ -718,3 +718,50 @@ describe("Réducteur skraft — interruption et verdict ne mènent pas au même 
     expect(effects[0]).toEqual({ kind: "rollback", to: "cp-RESEARCH" });
   });
 });
+
+/**
+ * La première revue d'une phase a droit à un essai (ADR 0042).
+ *
+ * Run du 29/09, DISTILL relancée depuis une base où RESEARCH et DESIGN étaient déjà produites :
+ *
+ *   essai 1  porte valeurs  rejet — « 10 articles ou plus : 5 % » absent du scénario @ac-1
+ *   essai 2  porte valeurs  rejet — même famille
+ *   essai 3  portes valeurs et RED franchies, puis la revue rend DEUX DÉFAUTS MAJEURS :
+ *            `Facture.ATPayer` ignore `Remise`, alors que le contrat de conception ratifié exige
+ *            `SommeDesArticles - Remise + FraisDePort`.
+ *
+ * Précis, corrigeables — et partis en escalade, budget épuisé, sans qu'un seul tour ait pu y
+ * répondre. Le budget est commun aux portes de forme et à la revue, alors que recopier une valeur
+ * dans un Gherkin et rebrancher un calcul de facture ne sont pas le même travail.
+ */
+describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les portes de forme", () => {
+  const CHANGES = LENSES(lens("CHANGES_REQUESTED", ["major"]));
+  // DISTILL, la phase du run : deux rejets de la porte des valeurs, puis la porte passe.
+  const jusquADistill = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL")];
+  const épuiser = [...jusquADistill, REPORTED, GATE_FAIL, REPORTED, GATE_FAIL];
+
+  it("budget à zéro, première revue défavorable : un essai est accordé, pas une escalade", () => {
+    const { state, effects } = play([...épuiser, REPORTED, GATE_OK, CHANGES]);
+    expect(state.attempts).toBe(3); // le budget EST épuisé…
+    expect(state.stage).toBe("SPECIALIST"); // …et pourtant la phase repart
+    expect(kinds(effects)).toEqual(["runSpecialist"]);
+    const relance = effects.find((f) => f.kind === "runSpecialist") as unknown as { feedback: string[] };
+    expect(relance.feedback.join(" ")).toContain("défaut major");
+  });
+
+  it("la DEUXIÈME revue défavorable escalade : l'essai est garanti une fois, pas indéfiniment", () => {
+    const { state, effects } = play([...épuiser, REPORTED, GATE_OK, CHANGES, REPORTED, GATE_OK, CHANGES]);
+    expect(state.stage).toBe("ESCALATED");
+    expect(effects[0]).toEqual({ kind: "rollback", to: "cp-DISTILL" });
+  });
+
+  it("la garantie ne vaut que pour la revue : une porte de forme escalade comme avant", () => {
+    const { state } = play([...épuiser, REPORTED, GATE_FAIL]);
+    expect(state.stage).toBe("ESCALATED");
+  });
+
+  it("un verdict REJECTED escalade toujours, budget ou non : ce n'est pas une demande de changement", () => {
+    const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
+    expect(state.stage).toBe("ESCALATED");
+  });
+});
