@@ -5,6 +5,38 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — Un refus se contournait par une majuscule (ADR 0035)
+
+**Déclencheur** : « l'extension est destinée à fonctionner sur Windows, macOS et Linux. » Les deux
+premiers ont un système de fichiers **insensible à la casse** par défaut — je l'ai vérifié sur la
+machine, APFS l'est.
+
+Or `globToRegExp` compilait sans drapeau. Trois refus, tous adossés à une garantie, se contournaient
+par une majuscule :
+
+- le **gel de la barre de qualité**, que je venais d'écrire une heure plus tôt ;
+- le **gel des tests d'acceptance** (D21/D22), via `isTestFile` ;
+- l'interdiction d'écrire dans **`.git`** — `.GIT/config` passait.
+
+`.skraft/**` accordait l'écriture, `.skraft/quality.json` ne reconnaissait pas
+`.skraft/QUALITY.JSON`, et c'est le même fichier.
+
+**La règle est asymétrique, et c'est voulu.** Refuser ignore la casse pour attraper plus ; accorder
+la respecte pour accorder moins. Les deux vont vers « refuser par défaut ». Rendre les
+autorisations insensibles ouvrirait `.SKRAFT/` sur un Linux où c'est réellement un autre dossier :
+on accorderait au nom d'une confusion qui n'existe qu'ailleurs.
+
+**Ce qu'il faut retenir au-delà du correctif.** C'est la **troisième fois en une journée** qu'une
+garantie reposait sur une comparaison textuelle trop naïve : le lien symbolique dans l'écriture des
+canaris, le chemin recollé de travers par le SDK, et la casse. Le mécanisme était juste chaque fois,
+la comparaison approximative. À se demander pour toute garde : *que compare-t-elle au juste, et le
+système de fichiers est-il d'accord ?*
+
+**Et la CI ne teste que macOS.** Rien de tout cela n'aurait été vu par un test sur Windows ou
+Linux : il n'y en a aucun.
+
+---
+
 ## 29/09 — La trace a payé son coût en quatre lignes (ADR 0033)
 
 Premier run avec la trace. Quatre lignes ont suffi à répondre à une question restée ouverte sur

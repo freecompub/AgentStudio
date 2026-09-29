@@ -60,6 +60,8 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   const runner = deps.runner ?? createNodeProcessRunner();
   const fichierTemporaire = (ext: string) => join(tmpdir(), `agent-studio-${profile.id}-${randomBytes(6).toString("hex")}.${ext}`);
   const motifs = (globs: readonly string[]) => globs.map((g) => globToRegExp(g));
+  /** Pour le GEL des tests : insensible à la casse (ADR 0035), sinon une majuscule le contourne. */
+  const motifsSansCasse = (globs: readonly string[]) => globs.map((g) => globToRegExp(g, "i"));
   const testGlobs = [...profile.layout.unitTests, ...profile.layout.acceptanceTests];
 
   return {
@@ -73,7 +75,9 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     // rien. `(?!)` ne reconnaît jamais rien, ce qui est le repli sûr et s'accorde avec
     // `isTestFile` juste en dessous.
     testFilePattern: testGlobs.length === 0 ? "(?!)" : testGlobs.map((g) => globToRegExp(g).source).join("|"),
-    isTestFile: (p) => motifs(testGlobs).some((re) => re.test(p.replaceAll("\\", "/"))),
+    // Insensible à la casse (ADR 0035) : `isTestFile` sert au GEL des tests (D21/D22). Un test
+    // gelé que la casse rendrait méconnaissable redeviendrait modifiable.
+    isTestFile: (p) => motifsSansCasse(testGlobs).some((re) => re.test(p.replaceAll("\\", "/"))),
 
     async detect(root) {
       for (const f of profile.detect) if (await existe(join(root, f))) return true;

@@ -1,5 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { matchesAny, type Clock, type Evidence, type EvidenceStore, type IdGenerator, type ToolCallGuard, type ToolSpec } from "@agent-studio/core";
+import { matchesAnyIgnoringCase, type Clock, type Evidence, type EvidenceStore, type IdGenerator, type ToolCallGuard, type ToolSpec } from "@agent-studio/core";
 import type { EvidenceTag } from "@agent-studio/extension-api";
 import { fingerprintFiles, type StackAdapter, type TestRun } from "@agent-studio/stack-adapters";
 import type { Workspace } from "@agent-studio/workspace";
@@ -121,7 +121,9 @@ export function readOnlyGuard(root: string, globs: string[]): ToolCallGuard {
       const rel = relative(base, resolve(base, req.path));
       if (rel.startsWith("..") || isAbsolute(rel)) return { decision: "allow" }; // hors projet : l'autre garde refuse
       const path = rel.split(sep).join("/");
-      return matchesAny(globs, path)
+      // Insensible à la casse (ADR 0035) : c'est un REFUS, et un gel qui ne reconnaîtrait pas
+      // `.skraft/QUALITY.JSON` laisserait réécrire la barre de qualité sur Windows et macOS.
+      return matchesAnyIgnoringCase(globs, path)
         ? { decision: "deny", reason: `Écriture refusée : ${path} est gelé pour ce rôle (tests existants). Modifie uniquement les fichiers de ton périmètre.` }
         : { decision: "allow" };
     },

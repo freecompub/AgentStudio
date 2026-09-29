@@ -9,6 +9,13 @@ import { matchesAny } from "../guards/glob.js";
  * permis, mais un aller-retour par niveau, et chacun réemporte tout le contexte accumulé.
  */
 
+/**
+ * Aucun langage n'apparaît dans les textes rendus à l'agent (D10) : le cœur et les extensions
+ * ignorent les langages, seul l'adaptateur de pile les connaît. Un exemple en `.cs` dans la
+ * description biaiserait l'agent sur un projet Swift ou Python, et ferait entrer une connaissance
+ * de pile là où elle n'a rien à faire.
+ */
+
 /** Au-delà, la liste est coupée. Un dépôt de dix mille fichiers noierait le contexte qu'il éclaire. */
 export const LIMITE_CHEMINS = 200;
 
@@ -20,7 +27,7 @@ export function listFilesTool(files: ProjectFiles, opts: { beat?: () => void } =
   return {
     name: "list_files",
     description:
-      "Liste les chemins du projet, éventuellement filtrés par un motif (`src/**/*.cs`). C'est la façon d'explorer l'arborescence : aucune commande ne peut être lancée.",
+      "Liste les chemins du projet, éventuellement filtrés par un motif glob (`src/**`, `**/tests/**`). C'est la façon d'explorer l'arborescence : aucune commande ne peut être lancée.",
     parameters: {
       type: "object",
       properties: { glob: { type: "string", description: "Motif de filtrage ; tout le projet si absent." } },
@@ -29,7 +36,7 @@ export function listFilesTool(files: ProjectFiles, opts: { beat?: () => void } =
     async handler(args) {
       opts.beat?.();
       const motif = (args as { glob?: unknown } | null)?.glob;
-      if (motif !== undefined && typeof motif !== "string") return "Le motif doit être une chaîne, par exemple `src/**/*.cs`.";
+      if (motif !== undefined && typeof motif !== "string") return "Le motif doit être une chaîne, par exemple `src/**`.";
       const tous = await files.list();
       opts.beat?.();
       const retenus = motif === undefined ? tous : tous.filter((f) => matchesAny([motif], f));

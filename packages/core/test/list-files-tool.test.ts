@@ -61,3 +61,27 @@ describe("listFilesTool", () => {
     expect(outil([]).name).toBe("list_files");
   });
 });
+
+/**
+ * Le cœur ignore les langages (D10).
+ *
+ * J'avais mis un motif en « .cs » en exemple dans la description de l'outil — celle que le modèle lit.
+ * Sur un projet Swift ou Python, cet exemple oriente l'agent vers une extension qui n'existe pas
+ * chez lui, et il fait entrer une connaissance de pile dans le cœur, où seul l'adaptateur en a.
+ */
+describe("Aucune connaissance de langage dans ce que l'agent lit", () => {
+  const EXTENSIONS = /\.(cs|swift|ts|js|py|java|kt|rb|go|rs|php|cpp|scala)\b/i;
+  const outil = listFilesTool({ list: async () => [] });
+
+  it("la description de l'outil ne cite aucune extension de fichier", () => {
+    expect(outil.description).not.toMatch(EXTENSIONS);
+  });
+
+  it("le motif des paramètres non plus", () => {
+    expect(JSON.stringify(outil.parameters)).not.toMatch(EXTENSIONS);
+  });
+
+  it("ni le message d'erreur sur un motif illisible", async () => {
+    expect(String(await outil.handler({ glob: 1 as never }))).not.toMatch(EXTENSIONS);
+  });
+});

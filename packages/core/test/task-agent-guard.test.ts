@@ -89,3 +89,26 @@ describe("Refus de shell : dire ce que le rôle PEUT faire", () => {
     expect(r).not.toMatch(/outils d'édition/i);
   });
 });
+
+/**
+ * Casse des chemins dans les gardes (ADR 0035).
+ *
+ * Windows et macOS ont un système de fichiers insensible à la casse par défaut. Un refus qui
+ * compare la casse ne refuse donc rien : il suffit d'une majuscule pour écrire le même fichier.
+ */
+describe("Les refus ne se contournent pas par une majuscule", () => {
+  const g = createTaskAgentGuard({ root: ROOT, writable: ["**"] });
+
+  it("`.git` reste interdit quelle que soit la casse", async () => {
+    for (const p of [".git/config", ".GIT/config", "sous/.Git/HEAD"])
+      expect(await g.check({ kind: "write", toolName: "edit", path: p }), p).toMatchObject({ decision: "deny" });
+  });
+
+  it("le périmètre d'écriture, lui, reste sensible : ailleurs c'est un autre dossier", async () => {
+    // Accorder est l'opération qu'on veut la plus étroite possible ; sur un Linux sensible à la
+    // casse, `.SKRAFT/` n'est pas `.skraft/`, et rien ne justifie de l'ouvrir.
+    const s = createTaskAgentGuard({ root: ROOT, writable: [".skraft/**"] });
+    expect(await s.check({ kind: "write", toolName: "edit", path: ".skraft/a.md" })).toMatchObject({ decision: "allow" });
+    expect(await s.check({ kind: "write", toolName: "edit", path: ".SKRAFT/a.md" })).toMatchObject({ decision: "deny" });
+  });
+});

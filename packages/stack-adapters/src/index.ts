@@ -12,7 +12,7 @@ export { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, pa
 export { selectStackAdapter } from "./select-stack.js";
 export { findLocalSwiftToolchain } from "./swift/local-toolchain.js";
 export { parseStackProfile, CANARY_KINDS, REPORT_READERS, type CanaryKind, type ReportReader, type StackProfile } from "./profile/stack-profile.js";
-export { globToRegExp, matchesAny } from "./glob.js";
+export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./glob.js";
 export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile-adapter.js";
 export { diagnoseProfile, proposeProfile, type Constat, type DiagnosticDeps, type Gravite, type IndicesDuProjet } from "./profile/stack-doctor.js";
 export { jugerCanari, runCanaries, type CanaryObservation, type CanaryRun, type RunCanariesDeps } from "./profile/canaries.js";

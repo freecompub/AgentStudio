@@ -11,7 +11,7 @@ export { createJsonConversationStore } from "./conversation/json-conversation-st
 export { createWorkspaceGuard, type WorkspaceGuardDeps } from "./guards/workspace-guard.js";
 export { createJsonLogger, type JsonLoggerOptions } from "./logging/json-logger.js";
 export { createTaskAgentGuard, type TaskAgentGuardDeps } from "./guards/task-agent-guard.js";
-export { globToRegExp, matchesAny } from "./guards/glob.js";
+export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./guards/glob.js";
 export { terminalTool, terminalSchemas, type TerminalOutput, type TerminalToolName } from "./agents/terminal-tools.js";
 export {
   createTaskAgentRunner,

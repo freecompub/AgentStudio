@@ -57,7 +57,10 @@ export function createTaskAgentGuard(deps: TaskAgentGuardDeps): ToolCallGuard {
           return rel(req.path) !== null ? allow : deny(`Lecture interdite hors du projet : ${req.path}`);
         case "write": {
           const r = req.path ? rel(req.path) : null;
-          if (r === null || r === "" || r.split("/").includes(".git")) return deny(`Écriture interdite : ${req.path ?? "(chemin inconnu)"}`);
+          // `.git` comparé sans la casse (ADR 0035) : sur Windows et macOS, `.GIT/config` est le
+          // même fichier, et un refus qui ne le reconnaît pas ne refuse rien.
+          if (r === null || r === "" || r.split("/").some((seg) => seg.toLowerCase() === ".git"))
+            return deny(`Écriture interdite : ${req.path ?? "(chemin inconnu)"}`);
           if (!matchesAny(deps.writable, r))
             return deny(
               deps.writable.length
