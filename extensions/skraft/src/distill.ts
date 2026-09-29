@@ -78,11 +78,26 @@ export function checkValues(i: { criteria: Criterion[]; features: SourceFile[]; 
 export function checkAcceptanceRed(i: { criteria: Criterion[]; testPlan: string; results: AcceptanceResult[] }): { reasons: string[]; regressions: string[] } {
   const reasons: string[] = [];
   const regressions: string[] = [];
-  if (i.results.length === 0) return { reasons: ["Aucun test d'acceptance n'a été exécuté."], regressions };
+  // `results` est la suite ENTIÈRE ; les tests d'acceptance s'y reconnaissent au marqueur que
+  // skraft exige lui-même (ADR 0041), jamais à l'endroit où le langage range ses fichiers.
+  const acceptance = i.results.filter((r) => acOf(r.id) !== null);
+  if (acceptance.length === 0) {
+    // Deux situations que « aucun test d'acceptance » confondait, et qui n'appellent pas la même
+    // correction : rien n'a tourné, ou tout a tourné sans porter de marqueur.
+    if (i.results.length === 0) return { reasons: ["Aucun test n'a été exécuté : la suite n'a produit aucun résultat."], regressions };
+    const vus = i.results.slice(0, 3).map((r) => `« ${r.id} »`).join(", ");
+    return {
+      reasons: [
+        `${i.results.length} test(s) exécuté(s), aucun ne porte de marqueur « ac-<n> » dans son NOM (vus : ${vus}…). ` +
+          `Nomme chaque test d'acceptance d'après son critère — par exemple « Ac2_… », « ac_2_… » ou « ac-2 » — sinon la porte ne peut pas le relier au critère qu'il pilote.`,
+      ],
+      regressions,
+    };
+  }
   const justified = (n: number) =>
     i.testPlan.split("\n").some((l) => new RegExp(`@ac-${n}(?![0-9])`).test(l) && /r[ée]gression/i.test(l) && /justification\s*:\s*\S/i.test(l));
 
-  for (const r of i.results) {
+  for (const r of acceptance) {
     if (r.status === "failed") {
       if (r.failureKind === "other_error") reasons.push(`Le test d'acceptance « ${r.id} » échoue pour une mauvaise raison : ${(r.message ?? "").split("\n")[0]}`);
       continue;

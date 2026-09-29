@@ -5,6 +5,49 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — La porte cherchait ses tests là où le langage les range (ADR 0041)
+
+**Le run.** Premier passage de DISTILL sur un vrai projet. Trois essais, escalade, sur le même
+reproche : « Aucun test d'acceptance n'a été exécuté. » Pendant ce temps, la preuve enregistrée par
+notre propre code disait : 8 réussis, 2 échecs, et les deux échecs étaient des tests d'acceptance
+rouges **sur assertion métier** — le rouge exact que la porte attend. L'agent avait raison les
+trois fois. Au troisième essai il a relancé `run_tests`, la seule réponse qu'un tel reproche
+appelle, et s'est fait escalader quand même.
+
+**La cause.** `effects.ts` filtrait `run.results` sur `layout.acceptanceTests`, des globs de
+**chemins**, alors qu'un rapport JUnit rend `file` comme un **nom de classe** et `id` comme un nom
+.NET qualifié :
+
+```
+attendu   tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs
+fourni    Tarification.Tests.RemiseParPalierAcceptanceTests
+```
+
+Le filtre rendait toujours zéro. Sur tout profil à rapport JUnit. Le profil TypeScript y échappait
+parce que Vitest rend de vrais chemins — d'où douze mois de CI verte.
+
+**Le même glob servait à deux tâches**, et n'en faisait qu'une. Lire les fichiers : juste, et le
+premier rejet du run le prouve — la porte lisait bien les tests, elle citait leur contenu.
+Reconnaître un résultat : impossible.
+
+**La leçon la plus coûteuse : la réponse était deux lignes plus bas.** `checkAcceptanceRed` appelle
+déjà `acOf(r.id)` pour relier un résultat à son critère. J'ai proposé deux mécaniques avant de la
+voir — un champ `acceptanceTestIds` dans le profil, puis un `acceptanceResultPattern` transporté
+comme `testFilePattern`. Les deux auraient marché. Aucune n'était nécessaire. C'est l'utilisateur
+qui a débloqué ça en demandant « on ne peut pas utiliser un find ? » : partir de ce qui existe, pas
+d'un motif à inventer.
+
+**Une faille refermée au passage.** `checkValues` cherchait le marqueur dans une **ligne** du
+fichier, `checkAcceptanceRed` dans le **nom** du test. Un `// ac-2` en commentaire satisfaisait la
+première et restait invisible à la seconde. Le brief de DISTILL dit maintenant où le placer.
+
+**Et toujours le même motif de fond.** La porte avait mesuré « aucun identifiant ne ressemble à un
+chemin » et rapporté « aucun test n'a été exécuté ». Ce n'est pas une imprécision de rédaction :
+c'est ce qui a envoyé l'agent relancer des tests trois fois. Les deux constats sont désormais
+distincts, et celui qui compte dit combien de tests ont tourné et en cite trois.
+
+---
+
 ## 29/09 — On gardait le souvenir et on retirait la chose (ADR 0040)
 
 **L'incohérence.** L'ADR 0039 garde la session de l'agent d'un essai à l'autre. L'ADR 0029 gardait

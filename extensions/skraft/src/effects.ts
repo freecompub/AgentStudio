@@ -112,7 +112,12 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         const selected = preselectFiles(state.story, files);
         if (selected.length) brief += `\nFichiers utiles (présélection) :\n${selected.map((f) => `  - ${f}`).join("\n")}`;
       }
-      if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
+      if (effect.phase === "DISTILL")
+        brief +=
+          `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}` +
+          // Le marqueur doit être dans le NOM : c'est lui, et lui seul, qui relie un résultat de
+          // test au critère qu'il pilote (ADR 0041). En commentaire, il est invisible à la porte.
+          `\nNomme chaque test d'acceptance d'après son critère, marqueur « ac-<n> » dans le NOM du test (par exemple « Ac2_… », « ac_2_… ») : un marqueur placé ailleurs, en commentaire ou en attribut, ne relie le test à aucun critère.`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
@@ -363,8 +368,11 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   }
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
-  const results = run.results.filter((r) => matchesAny(acceptanceGlobs, r.file) || matchesAny(acceptanceGlobs, r.id));
-  const red = checkAcceptanceRed({ criteria, testPlan, results });
+  // La suite entière est transmise : c'est la porte qui reconnaît ses tests, au marqueur `ac-<n>`
+  // qu'elle exige (ADR 0041). Filtrer ici sur les globs de `layout.acceptanceTests` comparait un
+  // chemin de fichier à un identifiant que le rapport n'exprime pas ainsi — `Tarification.Tests.
+  // RemiseParPalierAcceptanceTests` pour JUnit — et ne rendait jamais rien.
+  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results });
   if (red.reasons.length) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: red.reasons };
 
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
