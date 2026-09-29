@@ -5,6 +5,34 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — La trace a payé son coût en quatre lignes (ADR 0033)
+
+Premier run avec la trace. Quatre lignes ont suffi à répondre à une question restée ouverte sur
+**deux runs entiers** :
+
+```
+deny  shell  ls -la .skraft/us-2/research/ 2>/dev/null && find .skraft -type f
+```
+
+Le chercheur ne voulait ni écrire son document ni lancer des tests : il voulait **lire**. J'avais
+affirmé le contraire une heure plus tôt, avec assurance, en devinant.
+
+**Le refus était juste, la réponse ne l'était pas.** « Les tests sont lancés par l'orchestrateur,
+modifie les fichiers avec les outils d'édition » : une justification hors sujet — il n'y a aucun
+test en RESEARCH — et une consigne qui oriente vers l'écriture quand l'agent cherchait à lire. Au
+run d'avant, dix-huit refus successifs ne lui avaient pas fait trouver la sortie ; il avait fini
+par déclarer sa phase sans document.
+
+**Ce que je n'ai pas fait :** autoriser le shell en lecture. Juger une commande inoffensive
+demande de l'analyser, et `ls -la .skraft; rm -rf /` passerait n'importe quelle liste blanche.
+
+**La règle qu'on en tire, et qui dépasse ce cas :** un refus s'adresse à quelqu'un qui doit
+**continuer à travailler**. Il doit énoncer la sortie, pas la justification interne de la
+fermeture. Les autres motifs de la garde nommaient déjà le périmètre autorisé ; celui du shell
+était le seul à ne rien proposer d'utile.
+
+---
+
 ## 29/09 — On décidait bien, sans jamais garder de quoi comprendre (ADR 0032)
 
 **Quatre runs, quatre diagnostics bloqués au même endroit.** À chaque fois l'information existait

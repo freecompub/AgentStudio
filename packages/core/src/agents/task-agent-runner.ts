@@ -188,6 +188,8 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
       const onAbort = () => void session?.abort();
       try {
         if (opts.signal?.aborted) throw new Error("Annulé");
+        const outilsPropres = opts.tools?.(() => heartbeat.beat()) ?? [];
+        const outilsDuRole = outilsPropres.map((t) => t.name);
         const config = {
           role: spec.role,
           workingDirectory: deps.root,
@@ -195,9 +197,9 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           tools: [
             terminalTool(spec.output, (o) => void (output = o)),
             ...(spec.blocker ? [terminalTool("report_blocker", (b) => void (blocker = b))] : []),
-            ...(opts.tools?.(() => heartbeat.beat()) ?? []),
+            ...outilsPropres,
           ],
-          guard: composeGuards([createTaskAgentGuard({ root: deps.root, writable: spec.writable }), ...(opts.guards ?? [])]),
+          guard: composeGuards([createTaskAgentGuard({ root: deps.root, writable: spec.writable, outils: outilsDuRole }), ...(opts.guards ?? [])]),
           ...(spec.model ? { model: spec.model } : {}),
         };
         const aReprendre = opts.resumeKey ? reprenables.get(opts.resumeKey) : undefined;

@@ -298,6 +298,13 @@
       "notes": "Écrite après quatre runs réels où le diagnostic a buté sur une information qui existait dans le code et n'était pas conservée : la commande refusée (calculée dans `req.command`, puis jetée — dix-huit refus sans savoir ce qui était tenté), les fichiers que l'agent déclarait avoir écrits, ce qui existait avant le rollback, l'occupation du contexte sur laquelle repose l'ADR 0031 et qui n'a pu être vérifiée qu'en instrumentant le banc APRÈS coup. Point central : la garde rapporte désormais TOUTES ses décisions, pas seulement ses refus — c'est la seule fenêtre sur ce qu'un agent lit, puisque les résultats des outils intégrés du runtime ne nous parviennent jamais (`tool-end` ne dit que « réussi »). La trace RACONTE, la preuve ATTESTE : une porte ne doit jamais s'appuyer dessus. Ne fait jamais tomber la tâche ; `append` ne lève plus d'exception synchrone sur une méthode déclarée `Promise<void>`. La troncature dit ce qu'elle coupe. HORS DE PORTÉE : le contenu rendu par les outils intégrés. PAS AFFICHÉE : ne franchit pas l'IPC."
     },
     {
+      "id": "refus-qui-oriente",
+      "title": "Un refus de garde nomme les sorties qui existent pour ce rôle, à commencer par la lecture (ADR 0033)",
+      "verify": "pnpm vitest run --project core test/task-agent-guard.test.ts",
+      "passes": true,
+      "notes": "Trouvé grâce à la trace de l'ADR 0032, au premier run et en quatre lignes : le chercheur tentait `ls -la .skraft/us-2/research/ && find .skraft -type f` — il voulait LIRE. J'avais affirmé le contraire avec assurance, faute de trace. Le refus était juste (aucune commande ne peut être jugée inoffensive sans être analysée ; `ls -la .skraft; rm -rf /` passerait n'importe quelle liste blanche), mais il répondait « les tests sont lancés par l'orchestrateur, modifie les fichiers avec les outils d'édition » : justification hors sujet en RESEARCH où aucun test ne tourne, et consigne orientée vers l'écriture quand l'agent cherchait à lire. Dix-huit refus successifs au run précédent sans qu'il trouve la sortie. La garde reçoit désormais les outils du rôle et ne propose que des sorties existantes. Règle générale : un refus s'adresse à quelqu'un qui doit continuer à travailler ; il énonce la sortie, pas la justification interne de la fermeture."
+    },
+    {
       "id": "budget-de-questions",
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",
