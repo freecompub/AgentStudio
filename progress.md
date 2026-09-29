@@ -5,6 +5,54 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)
+
+**Le dispositif.** skraft-plugin v1.6.1 chargé par `--plugin-dir`, leur `skraft-orchestrator`, la
+même `US-2.md`, une copie du même dépôt. Résultat brut : **2 h 11, 37,81 $, 14 commits, 24 tests
+verts** — mais DELIVER n'est pas close, la seconde revue n'a pas rendu son verdict. Détail complet
+dans `docs/05-run-compare-skraft-plugin-1.6.1.md`.
+
+**Deux erreurs de méthode, à ne pas refaire.** J'ai pointé `--plugin-dir` sur la racine du dépôt,
+qui n'est qu'un *marketplace* : le plugin ne s'est pas chargé, et l'agent a **improvisé** le
+pipeline avec des `general-purpose` après avoir lu les prompts sur le disque. Pire, j'avais pris sa
+récitation des 31 noms de fichiers pour une preuve de chargement. La vérification qui vaut est la
+liste `agents` de l'événement `init`, pas ce que le modèle raconte. Coût du faux départ : ~0,9 $.
+
+**Ce que la comparaison a confirmé.** Les deux pipelines exigent les mêmes documents de conception,
+gèlent les tests d'acceptance, et ont recalé DESIGN à l'essai 1 pour le passer à l'essai 2. Nous
+sommes plus rapides là où nous passons — 3 min contre 4,7 sur RESEARCH, 12,5 contre 26,8 sur
+DESIGN — parce qu'une porte de code constate en millisecondes ce qu'une lentille doit relire.
+
+**Le fait qui compte plus que tout le reste : eux sont allés jusqu'au code, nous jamais.** Aucun de
+nos six runs n'a dépassé DISTILL. Aucune considération sur l'élégance de nos portes ne compense ça.
+
+**Trois choses à corriger chez nous**, consignées dans `features.json` :
+
+1. **Notre gel des tests est une impasse** dès qu'un refactoring change une signature. Chez eux,
+   `Article` et `Reference` naissent d'une remarque de revue, la fabrique privée du test doit
+   suivre — assertions et valeurs inchangées. `testFreezeGuard` refuserait ; le test ne compilerait
+   plus et ne pourrait pas être réparé. Il faudrait comparer ce que le test **vérifie**, pas ce
+   qu'il **contient**.
+2. **Rien ne vérifie qu'un agent peut faire ce qu'on lui demande.** Deux de leurs lentilles ont
+   jugé en déclarant `[SKILL MISSING] qa-reporting` : leur contenu impose une skill que leur
+   frontmatter ne leur permet pas de charger. Même intersection que notre `mkdir` sous une garde
+   qui refuse le shell (ADR 0037). Le test est facile à écrire et ne coûte rien.
+3. **On a supprimé le faux positif en supprimant la capacité de voir.** Leur revue a recalé DELIVER
+   sur deux constats *justes* — Object Calisthenics — que ni notre linter ni nos lentilles ne
+   relèveraient. L'ADR 0028 a écarté `quality-gates` de ce mandat, l'ADR 0022 confie la forme au
+   linter, et `dotnet format` ne connaît pas ces règles. Piste : un analyseur Roslyn dans le profil
+   de stack.
+
+**Et une chose qu'ils font mieux, mesurée** : router les rôles vers des modèles différents
+(`cost_role_class`). 25,64 $ de Sonnet pour les sous-agents, 10,47 $ d'Opus pour l'orchestrateur,
+1,71 $ de Haiku. Nous utilisons un seul modèle pour tout.
+
+**Ce qu'on ne peut pas comparer, et que je n'ai pas comparé** : les coûts (deux monnaies), les
+tokens (deux façons de compter), et un run contre un run (variance du LLM, entrée adaptée, et cinq
+de nos six runs occupés par nos propres défauts).
+
+---
+
 ## 29/09 — Deux runs gelés en silence, et une réserve que personne ne regardait (ADR 0044)
 
 **Le gel.** Le run relancé à DISTILL s'est arrêté après l'escalade et n'a plus rien fait pendant

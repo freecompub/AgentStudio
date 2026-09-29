@@ -319,6 +319,27 @@
       "notes": "Deux runs gelés le 29/09 sans que rien ne l'indique. `askEscalation` déclare `requiredRoles: ['developpeur','architecte','administrateur']` ; le banc répondait toujours `role: 'po'`, refusé par `interaction-service.ts:98`, et le `.catch(() => repondues.delete(q.id))` avalait le refus SANS UN MOT. Plus aucun `onChange` ne survenant, la tâche restait en attente définitive — processus vivant, journal muet, indiscernable d'un agent qui réfléchit. M'a fait affirmer deux fois que « le cycle repart » après une escalade : c'était faux, le rollback est un effet de la transition d'escalade elle-même, qui précède la décision humaine ; la relance n'a jamais eu lieu. Défaut du BANC, pas du produit — dans l'application c'est l'utilisateur qui répond, avec son profil réel — mais il a masqué deux fois ce qu'on cherchait justement à observer. Le banc lit maintenant `requiredRoles` et journalise tout refus en clair."
     },
     {
+      "id": "gel-distingue-adaptation-et-alteration",
+      "title": "Le gel des tests d'acceptance distingue une adaptation mécanique d'une altération de ce qui est vérifié",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
+      "passes": false,
+      "notes": "OUVERT. Révélé par le run comparé du 29/09 (docs/05-run-compare-skraft-plugin-1.6.1.md, A1) : chez skraft-plugin, un refactoring réclamé par la revue fait naître les types `Article` et `Reference`, et la fabrique privée du test d'acceptance doit suivre — `new(reference, Quantite.De(q), Montant.De(p))` devient `new(new Article(Reference.De(reference), Montant.De(p)), Quantite.De(q))`. ASSERTIONS, VALEURS ET SCÉNARIOS INCHANGÉS. Chez nous `testFreezeGuard` refuserait l'écriture et `acceptanceHash` échouerait : le test ne compile plus ET ne peut pas être réparé, DELIVER est dans une impasse. Le fichier a été retouché DEUX FOIS pendant leur DELIVER, chaque fois pour suivre le modèle. Aucune correction évidente : il faudrait comparer ce que le test VÉRIFIE, pas ce qu'il CONTIENT. Aucun de nos tests ne couvre ce cas — nos scénarios de DELIVER n'ont jamais refactorisé un objet-valeur."
+    },
+    {
+      "id": "un-agent-peut-faire-ce-qu-on-lui-demande",
+      "title": "Tout outil ou skill nommé dans le contenu d'un agent lui est accordé par le manifeste",
+      "verify": "pnpm vitest run --project ext-skraft test/agents-skills.test.ts",
+      "passes": false,
+      "notes": "OUVERT. Défaut PARTAGÉ, observé chez skraft-plugin le 29/09 (docs/05-…, A2) : deux de leurs quatre lentilles ont déclaré « [SKILL MISSING] qa-reporting » et jugé SANS leur grille — leur contenu impose de charger cette skill, leur frontmatter n'accorde que Read/Grep/Glob. La skill existe dans le plugin et SIX agents l'exigent. C'est la même intersection que notre chercheur voulant `mkdir` sous une garde qui refuse le shell (ADR 0037) : ni le contenu ni le manifeste n'est fautif seul, c'est leur croisement qui bloque. Test à écrire, sans coût : pour chaque rôle du manifeste, vérifier que tout outil ou skill nommé dans son contenu figure dans ce que le manifeste lui accorde. À leur crédit, leur lentille DÉCLARE la dégradation au lieu de juger en silence — notre propre principe appliqué par un agent à lui-même."
+    },
+    {
+      "id": "qualite-de-forme-au-dela-du-formatage",
+      "title": "La qualité de forme au-delà du formatage est mesurée par un analyseur, pas par une lentille",
+      "verify": "(à définir)",
+      "passes": false,
+      "notes": "OUVERT. Le run comparé (docs/05-…, A3) a recalé DELIVER sur deux constats JUSTES que personne ne relèverait chez nous : `LigneDePanier` a trois attributs d'instance (Object Calisthenics règle 8), `Remise()` enchaîne les points dans ses lambdas (règle 5, loi de Déméter). Le reproche a produit un vrai changement de modèle, deux objets-valeurs neufs. Chez nous l'ADR 0022 confie la forme au linter du projet, et `dotnet format` ne connaît pas Object Calisthenics ; et l'ADR 0028 a écarté `quality-gates` de ce mandat après qu'elle eut inventé un grief. On a donc supprimé le faux positif ET la capacité de voir. Piste : une règle d'analyseur Roslyn déclarée dans le profil de stack — mesurable, reproductible, configurable par projet — plutôt qu'un jugement de LLM. NOTRE ORDONNANCEMENT RESTE MEILLEUR : le linter juge pendant la boucle interne, avant le gel ; chez eux la remarque arrive à la revue finale et se propage en cascade jusqu'aux tests gelés (A4)."
+    },
+    {
       "id": "reprise-de-session",
       "title": "Une session interrompue est reprise, sauf quand c'est nous qui avons coupé (ADR 0030)",
       "verify": "pnpm vitest run --project core test/task-agent-runner.test.ts",
