@@ -55,6 +55,8 @@ interface Appel { at: number; inputTokens: number; outputTokens: number }
 interface Tour { role: string; sessionId: string; debut: number; fin?: number; appels: Appel[] }
 const tours: Tour[] = [];
 const t0 = Date.now();
+/** Combien d'événements `context` le runtime a réellement émis. Zéro = le plafond de l'ADR 0031 est aveugle. */
+let contextes = 0;
 
 /** Enveloppe du runtime : horodate l'ouverture de chaque session et chaque événement `usage`. */
 function instrumente(rt: AgentRuntime): AgentRuntime {
@@ -66,6 +68,17 @@ function instrumente(rt: AgentRuntime): AgentRuntime {
       tours.push(tour);
       console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ▶ ${cfg.role}  (prompt système ${cfg.systemPrompt.length} car.)`);
       session.onEvent((e: AgentEvent) => {
+        // Occupation de la fenêtre (ADR 0031) : le plafond repose dessus, et personne n'a encore
+        // vérifié que le runtime l'émet réellement. Sans cette ligne, on ne peut pas le savoir.
+        if (e.type === "context") {
+          contextes++;
+          const pct = e.tokenLimit > 0 ? ((e.currentTokens / e.tokenLimit) * 100).toFixed(1) : "?";
+          console.log(
+            `        [${tour.sessionId.slice(0, 4)}] CONTEXTE : ${e.currentTokens}/${e.tokenLimit} = ${pct} %` +
+              ` (système ${e.systemTokens ?? "?"}, conversation ${e.conversationTokens ?? "?"}, outils ${e.toolDefinitionsTokens ?? "?"}, ${e.messages ?? "?"} messages)`,
+          );
+          return;
+        }
         if (e.type !== "usage") return;
         tour.appels.push({ at: Date.now(), inputTokens: e.inputTokens ?? 0, outputTokens: e.outputTokens ?? 0 });
         const cumul = tour.appels.reduce((n, a) => n + a.inputTokens, 0);
@@ -172,6 +185,11 @@ const lignes = tours.map((t, i) => {
 });
 console.log("\n\n===== TOURS =====");
 console.table(lignes);
+console.log(
+  contextes
+    ? `\n✔ Occupation du contexte : ${contextes} mesures reçues du runtime — le plafond de l'ADR 0031 voit quelque chose.`
+    : "\n✖ AUCUNE mesure d'occupation reçue : le plafond de l'ADR 0031 est AVEUGLE sur ce runtime.",
+);
 console.log(`\nTotal : ${s(Date.now() - t0)}, ${lignes.reduce((n, l) => n + l.entree, 0)} tokens d'entrée, ${tours.length} tours.`);
 console.log(`État final : ${state?.stage} / ${state?.phase}, essais ${state?.attempts}`);
 console.log("Usage par phase :");

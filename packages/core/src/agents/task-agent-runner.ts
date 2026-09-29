@@ -106,6 +106,19 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           opts.onUsage?.({ requests: multiplier ?? 1, inputTokens, outputTokens });
         }
       };
+      /**
+       * L'agent a posé une question (ADR 0030, amendée). Ce n'est **pas** un échec : il a fait ce
+       * qu'on lui demande — s'arrêter plutôt qu'inventer. C'est donc le cas le plus clairement
+       * reprenable de tous, et c'était le seul qu'on punissait en supprimant sa session : il
+       * reperdait, à chaque question, tout ce qu'il avait lu du dépôt.
+       */
+      const questionPosee = () => {
+        if (opts.resumeKey && session) {
+          reprenables.set(opts.resumeKey, session.id);
+          garder = true;
+        }
+        return { blocker: blocker! };
+      };
       const onAbort = () => void session?.abort();
       try {
         if (opts.signal?.aborted) throw new Error("Annulé");
@@ -143,11 +156,11 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         deps.logger?.info("agent de tâche lancé", { role: spec.role, sessionId: session.id });
 
         await turn(prompt);
-        if (blocker && !output) return { blocker };
+        if (blocker && !output) return questionPosee();
         if (!output && !opts.signal?.aborted)
           await turn(`Tu n'as pas appelé l'outil ${spec.output}. Termine maintenant ta phase en l'appelant avec des arguments valides.`);
         if (opts.signal?.aborted) throw new Error("Annulé");
-        if (blocker && !output) return { blocker };
+        if (blocker && !output) return questionPosee();
         if (!output) throw new WorkDefectError(`L'agent ${spec.role} n'a pas clôturé sa phase par ${spec.output}.`);
         return { output };
       } catch (err) {

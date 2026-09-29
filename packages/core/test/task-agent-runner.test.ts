@@ -300,3 +300,79 @@ describe("Reprise de session après interruption", () => {
     expect(runtime.history.at(-1)!.id).not.toBe(interrompue);
   });
 });
+
+/**
+ * Reprise après une question de l'agent (ADR 0030, amendée).
+ *
+ * `report_blocker` n'est pas une erreur : c'est un outil terminal, et le tour se termine
+ * normalement. La mémorisation de session, écrite dans le `catch`, ne le voyait donc jamais — et le
+ * `finally` supprimait la session. L'agent perdait tout ce qu'il avait lu, à chaque question.
+ *
+ * C'est pourtant le cas le plus évidemment reprenable des quatre : **rien n'a échoué**. L'agent a
+ * fait exactement ce qu'on lui demande — s'arrêter plutôt qu'inventer — et c'est le seul cas qu'on
+ * punissait en lui effaçant la mémoire. Mesuré : sept questions en DESIGN sur un run réel, chacune
+ * faisant repayer l'exploration complète du dépôt.
+ */
+describe("Reprise de session après une question de l'agent", () => {
+  const CLE = { resumeKey: "t1/tdd-test" };
+  const QUESTIONNEUR: TaskAgentSpec = { ...TEST_AGENT, blocker: true };
+
+  const demande: Parameters<ScriptedRuntime["behave"]>[1] = async (t) => {
+    await t.callTool("report_blocker", { question: "Quelle règle d'arrondi ?", choices: ["au centime", "au plus proche"] });
+  };
+  const finir: Parameters<ScriptedRuntime["behave"]>[1] = async (t) => {
+    await t.callTool("report_phase", { summary: "fini", files: [] });
+  };
+
+  it("le tour suivant reprend la session : l'agent garde ce qu'il avait lu", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", demande);
+    const r = await runner.run(QUESTIONNEUR, "x", CLE);
+    expect(r.blocker).toBeDefined();
+    const questionneuse = runtime.history.at(-1)!.id;
+
+    runtime.behave("tdd-test", finir);
+    await runner.run(QUESTIONNEUR, "réponse : au centime", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(questionneuse);
+  });
+
+  it("la session n'est pas supprimée entre la question et la réponse", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", demande);
+    await runner.run(QUESTIONNEUR, "x", CLE);
+    expect(runtime.deleted).toEqual([]);
+  });
+
+  it("deux questions d'affilée reprennent la même session, pas une par question", async () => {
+    // C'est le cas mesuré : six questions en 105 secondes, six sessions neuves.
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", demande);
+    await runner.run(QUESTIONNEUR, "x", CLE);
+    const premiere = runtime.history.at(-1)!.id;
+    await runner.run(QUESTIONNEUR, "réponse 1", CLE);
+    await runner.run(QUESTIONNEUR, "réponse 2", CLE);
+    expect(runtime.history.at(-1)!.id).toBe(premiere);
+    expect(runtime.deleted).toEqual([]);
+  });
+
+  it("sans clé de continuité, rien ne change : session neuve comme avant", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", demande);
+    await runner.run(QUESTIONNEUR, "x");
+    const questionneuse = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).toContain(questionneuse);
+    runtime.behave("tdd-test", finir);
+    await runner.run(QUESTIONNEUR, "réponse", {});
+    expect(runtime.history.at(-1)!.id).not.toBe(questionneuse);
+  });
+
+  it("une fois la phase close, plus rien à reprendre : la session est supprimée", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("tdd-test", demande);
+    await runner.run(QUESTIONNEUR, "x", CLE);
+    runtime.behave("tdd-test", finir);
+    await runner.run(QUESTIONNEUR, "réponse", CLE);
+    const close = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).toContain(close);
+  });
+});

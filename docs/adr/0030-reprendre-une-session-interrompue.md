@@ -1,6 +1,7 @@
 # ADR 0030 — Reprendre la session d'un tour interrompu, mais jamais celle qu'on a coupée
 
-- Statut : **décidé**, 2026-09-28
+- Statut : **décidé**, 2026-09-28 — **complété le 2026-09-29** : une question de l'agent rend elle
+  aussi la session reprenable (point 2 bis ci-dessous).
 - Contexte amont : ADR 0026 et 0027 (plafonds), ADR 0029 (interruption ≠ verdict), D17 (une session
   neuve par phase/rôle), D10 (aucun objet du SDK exposé à une extension)
 
@@ -24,6 +25,19 @@ tour qui recommence les repaie.
    - `EnvFailureError` — le modèle n'a pas répondu ; le contexte va bien, c'est le service qui a
      hoqueté ;
    - `TurnTimeoutError` — l'agent s'est tu ; le contexte n'est pas en cause.
+2 bis. **Une question de l'agent aussi** (`report_blocker`), et c'est le cas le plus clair des
+   quatre : **rien n'a échoué**. L'agent a fait exactement ce qu'on lui demande — s'arrêter plutôt
+   qu'inventer.
+
+   Ce cas manquait à la rédaction initiale, et il manquait *par construction* : j'avais raisonné
+   sur les **erreurs**, or un blocage n'en est pas une. `report_blocker` est un outil terminal, le
+   tour se termine normalement, et la mémorisation — écrite dans le `catch` — ne le voyait jamais.
+   Le `finally` supprimait alors la session.
+
+   Le coût était mesurable : sept questions en DESIGN sur un run réel, six en RESEARCH sur un
+   autre, chacune faisant repayer à l'agent l'exploration complète du dépôt. C'était le seul des
+   quatre cas où l'on effaçait la mémoire d'un agent qui n'avait rien fait de mal.
+
 3. **`TurnBudgetError` et `TurnCostError` ne le rendent jamais.** C'est le point qui justifie
    d'avoir trois erreurs distinctes plutôt qu'une : quand c'est **nous** qui avons coupé, le
    contexte **est** le problème. Reprendre renverrait le même contexte énorme et retaperait le
