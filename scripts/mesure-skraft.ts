@@ -141,10 +141,13 @@ interactions.onChange(() => void repondre());
 
 const lu = parseStackProfile(await readFile(join(root, ".agent-studio/stack.yaml"), "utf8"), { allowedPrograms: DEFAULT_ALLOWED_PROGRAMS });
 if ("error" in lu) throw new Error(`Profil refusé : ${lu.error}`);
+// L'application libère les sessions quand la tâche se termine (ADR 0039, workspace-services.ts) ;
+// le banc doit faire de même, sans quoi il laisse derrière lui un état que le produit supprime.
+const agents = createTaskAgentRunner({ runtime, root: workspace.root, logger, trace: createJsonlTraceStore(join(tasksDir, "traces")) });
 const hostDeps: HostDeps = {
   registry: createRegistry(),
   engine,
-  agents: createTaskAgentRunner({ runtime, root: workspace.root, logger, trace: createJsonlTraceStore(join(tasksDir, "traces")) }),
+  agents,
   workspace,
   stack: createProfileAdapter(lu.profile),
   interactions,
@@ -197,5 +200,6 @@ console.log("Usage par phase :");
 console.table(await usage.report(taskId));
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state }, null, 2));
 console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\nCopie du projet : ${root}`);
+await agents.releaseTask(taskId);
 await runtime.stop();
 process.exit(0);
