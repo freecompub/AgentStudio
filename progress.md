@@ -7,6 +7,9 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ## 03/10 — Suivre un run étape par étape, et la porte qui recalait une conception juste
 
+> Synthèse de la journée, problème par problème (symptôme, cause, solution, vérification) :
+> `docs/06-run-us-2-problemes-et-solutions.md`. Le récit ci-dessous garde le détail chronologique.
+
 **Fait.** Branche `feat/suivi-run`, partie de `main`. Le banc `scripts/mesure-skraft.ts` annonce en
 direct chaque étape, rejet (avec ses motifs) et fin de tour anormale — lignes `§` —, pousse le
 travail sur une branche `run/<story>-<date>-<id>` du projet d'essai (`--pousser`, jamais `main`,
