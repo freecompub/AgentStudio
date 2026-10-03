@@ -9,6 +9,14 @@ export const terminalSchemas = {
   report_phase: z.object({
     summary: z.string().min(1).max(2_000).describe("Ce que tu as fait, en une ou deux phrases"),
     files: z.array(z.string().max(1_000)).max(500).describe("Chemins relatifs des fichiers que tu as modifiés"),
+    // Facultatif, et seulement une PROPOSITION : le code vérifie que ce test existe, qu'il est le
+    // bon et qu'il échoue pour une bonne raison avant d'en tenir compte (ADR 0045).
+    coveredBy: z
+      .string()
+      .min(1)
+      .max(1_000)
+      .optional()
+      .describe("Si tu n'écris pas de nouveau test parce qu'un test existant vérifie déjà le comportement demandé : son identifiant exact"),
   }),
   submit_plan: z.object({
     steps: z

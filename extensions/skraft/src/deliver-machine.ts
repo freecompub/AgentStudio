@@ -62,7 +62,19 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
     case "AGENT_REPORTED": {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
       if (d.step === "test")
-        return { state: s, effects: [{ kind: "verifyUnitRed", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline, pending: pending(d, true) }] };
+        return {
+          state: s,
+          effects: [
+            {
+              kind: "verifyUnitRed",
+              scenarioId: scenario.id,
+              since: d.stepCheckpoint,
+              baseline: d.baseline,
+              pending: pending(d, true),
+              ...(e.coveredBy ? { coveredBy: e.coveredBy } : {}),
+            },
+          ],
+        };
       if (d.step === "fix")
         return { state: s, effects: [{ kind: "verifyUnitGreen", mode: "fix", scenarioId: scenario.id, since: d.stepCheckpoint, newTest: null, unitTestsHash: d.unitTestsHash, pending: [] }] };
       return {
@@ -80,7 +92,10 @@ export function deliverTransition(s: SkraftState, e: Ev): Out | null {
         const nd: DeliverState = {
           ...base,
           newTest,
-          unitTests: newTest ? [...d.unitTests, newTest] : d.unitTests,
+          // Couvert par l'acceptance (ADR 0045) : le test d'acceptance est la cible du pas de code,
+          // mais ce n'est pas un test unitaire du scénario — la séquence rouge puis vert des tests
+          // unitaires ne le concerne pas.
+          unitTests: newTest && !e.viaAcceptance ? [...d.unitTests, newTest] : d.unitTests,
           unitTestsHash: e.unitTestsHash ?? d.unitTestsHash,
           step: d.granularity === "turn-per-scenario" ? "dev" : "green",
         };

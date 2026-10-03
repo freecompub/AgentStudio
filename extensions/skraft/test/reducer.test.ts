@@ -416,6 +416,23 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     expect(auPlafond.state.deliver?.granularity).toBe("session-per-step");
   });
 
+  // ADR 0045 : un comportement déjà vérifié par le test d'acceptance du scénario n'exige pas de
+  // test unitaire. Le testeur le déclare (`coveredBy`), le code le vérifie, et le test d'acceptance
+  // devient la cible du pas de code — sans entrer dans la liste des tests unitaires du scénario.
+  it("couvert par l'acceptance : la déclaration du testeur est transmise à la porte RED", () => {
+    const r = play([...toDeliver(), PLANNED, STARTED, { ...REP_TEST, coveredBy: "A > ac-1" } as Ev]);
+    expect(r.effects).toEqual([expect.objectContaining({ kind: "verifyUnitRed", scenarioId: "ac-1", coveredBy: "A > ac-1" })]);
+  });
+
+  it("couvert par l'acceptance : le pas de code vise le test d'acceptance, aucun test unitaire n'est ajouté", () => {
+    const viaAcceptance: Ev = { type: "STEP_OK", checkpointId: "cp-acc", all: [], passed: ["U > old"], newTest: "A > ac-1", viaAcceptance: true };
+    const r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, viaAcceptance]);
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "dev", scenarioId: "ac-1", attempt: 1, feedback: [] }]);
+    expect(r.state.deliver).toMatchObject({ newTest: "A > ac-1", unitTests: [], step: "dev" });
+    const dev = play([...toDeliver(), PLANNED, STARTED, REP_TEST, viaAcceptance, REP_DEV]);
+    expect(dev.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "dev", newTest: "A > ac-1" })]);
+  });
+
   it("un tour par pas : test rouge, puis code, jusqu'au vert de l'acceptance ; porte de fin de scénario", () => {
     let r = play([...toDeliver(), PLANNED, STARTED]);
     expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: [] }]);

@@ -264,3 +264,60 @@ describe("concerns — un test désigné par son fichier (rouge de compilation)"
     expect(checkRedGreenSequence([rouge, vert], [fichier])).toEqual([]);
   });
 });
+
+/**
+ * ADR 0045 — couvert par l'acceptance. Run réel US-2 du 03/10 : `skraft-test` refusait d'écrire un
+ * test unitaire pour `PalierApplicable`, dont les quatre branches sont vérifiées par ac-1/2/3/5
+ * (mandat 4 de `test-design-mandates`) ; la porte n'avait aucune sortie pour ce cas. Le testeur le
+ * déclare, et le CODE vérifie : rien d'écrit, le test désigné est celui du scénario, et il est
+ * rouge pour une bonne raison.
+ */
+describe("verifyUnitRed — couvert par l'acceptance", async () => {
+  const { verifyUnitRed } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const classe = "Tarification.Tests.RemiseParPalierAcceptanceTests";
+  const ac2 = `${classe}.Ac2_Palier_atteint`;
+  const res = (id: string, status: "passed" | "failed", failureKind?: string) => ({ id, file: classe, name: id, status, ...(failureKind ? { failureKind, message: "Assert.Equal() Failure" } : {}) });
+  const scenarios = [{ id: "ac-2", ac: 2, acceptanceTestId: ac2, role: "driver", status: "in_progress" }];
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", deliver: { scenarios, current: 0 } } as never;
+
+  function run(o: { changed?: string[]; results: unknown[]; coveredBy?: string }) {
+    const commits: string[] = [];
+    const ctx = {
+      workspace: {
+        changedFiles: async () => (o.changed ?? []).map((path) => ({ path, status: "added" })),
+        fingerprint: async () => "h",
+        checkpoint: async () => ({ id: "cp-acc" }),
+      },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: o.results }) },
+      git: { commit: async (m: string) => void commits.push(m) },
+    } as never;
+    const e = { kind: "verifyUnitRed", scenarioId: "ac-2", since: "cp", baseline: { all: [ac2, "U.old"], passed: ["U.old"] }, pending: [ac2], coveredBy: o.coveredBy ?? ac2 } as never;
+    return verifyUnitRed(e, { ctx, state, taskId: "t", signal: new AbortController().signal });
+  }
+
+  it("rien d'écrit, test d'acceptance du scénario rouge sur assertion : le pas est accepté et vise ce test", async () => {
+    const ev = await run({ results: [res("U.old", "passed"), res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_OK", newTest: ac2, viaAcceptance: true, checkpointId: "cp-acc" });
+  });
+
+  it("un test désigné qui n'est pas le test d'acceptance du scénario est refusé", async () => {
+    const ev = await run({ coveredBy: `${classe}.Ac3_Autre_critere`, results: [res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/n'est pas le test d'acceptance du scénario/) });
+  });
+
+  it("le test d'acceptance déjà vert : refusé, il n'y a plus rien à faire passer", async () => {
+    const ev = await run({ results: [res(ac2, "passed")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/déjà vert/) });
+  });
+
+  it("le test d'acceptance rouge pour une mauvaise raison : refusé", async () => {
+    const ev = await run({ results: [res(ac2, "failed", "other_error")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/mauvaise raison/) });
+  });
+
+  it("une déclaration « couvert » accompagnée de fichiers modifiés est contradictoire : refusée", async () => {
+    const ev = await run({ changed: ["tests/Tarification.Tests/GrilleTests.cs"], results: [res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/couvert.*aucun fichier/i) });
+  });
+});

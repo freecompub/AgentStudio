@@ -176,7 +176,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[] }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
@@ -184,7 +184,17 @@ export type SkraftEvent =
   | { type: "COMMITTED"; sha: string | null }
   | { type: "DELIVER_PLANNED"; scenarios: DeliverScenario[]; all: string[]; passed: string[] }
   | { type: "SCENARIO_STARTED"; checkpointId: string }
-  | { type: "STEP_OK"; checkpointId: string; all: string[]; passed: string[]; newTest?: string; unitTestsHash?: string; acceptanceGreen?: boolean }
+  | {
+      type: "STEP_OK";
+      checkpointId: string;
+      all: string[];
+      passed: string[];
+      newTest?: string;
+      unitTestsHash?: string;
+      acceptanceGreen?: boolean;
+      /** Pas « test » sans test unitaire : le comportement est couvert par l'acceptance (ADR 0045). */
+      viaAcceptance?: boolean;
+    }
   | { type: "STEP_FAIL"; reason: string }
   | { type: "SCENARIO_OK"; notes: string[]; facts?: string[] }
   | { type: "SCENARIO_FAIL"; reasons: string[] };
@@ -208,7 +218,7 @@ export type SkraftEffect =
   | { kind: "planDeliver" }
   | { kind: "startScenario"; scenarioId: string }
   | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
-  | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[] }
+  | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[]; coveredBy?: string }
   | {
       kind: "verifyUnitGreen";
       mode: "dev" | "green" | "refactor" | "fix";

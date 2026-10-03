@@ -55,7 +55,9 @@ Le test à faire passer est indiqué dans le dossier de passation. Tous les test
 même hors des outils d'écriture, est détectée par empreinte et annule le tour.`,
 
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
-Rends ton verdict avec l'outil submit_lens_verdict.`,
+Rends ton verdict avec l'outil submit_lens_verdict.
+Un comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test
+manquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).`,
 };
 
 /**

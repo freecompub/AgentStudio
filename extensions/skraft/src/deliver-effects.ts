@@ -66,7 +66,8 @@ export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<
 
 const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | null; unit: string; sources: string }) => string> = {
   test: ({ unit }) =>
-    `Pas en cours : écris UN nouveau test unitaire (dans ${unit}) pour le prochain petit comportement du scénario, vérifie avec run_tests qu'il échoue sur une assertion ou un symbole manquant, puis rends la main. N'écris aucun code de production.`,
+    `Pas en cours : écris UN nouveau test unitaire (dans ${unit}) pour le prochain petit comportement du scénario, vérifie avec run_tests qu'il échoue sur une assertion ou un symbole manquant, puis rends la main. N'écris aucun code de production.\n` +
+    "Si ce comportement est déjà vérifié par le test d'acceptance du scénario et qu'un test unitaire ne ferait que le dupliquer, n'écris rien : rends la main en désignant ce test d'acceptance dans le champ `coveredBy` de report_phase. Le code vérifiera qu'il échoue pour une bonne raison, et le pas suivant le fera passer.",
   dev: ({ newTest, sources }) =>
     `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifie avec run_tests, puis nettoie le code sans changer son comportement. Ne modifie aucun test.`,
   green: ({ newTest, sources }) => `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifié avec run_tests. Ne modifie aucun test.`,
@@ -96,7 +97,14 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
   const readOnly = e.step === "test" ? ["@stack:acceptanceTests"] : ["@stack:acceptanceTests", "@stack:unitTests"];
   const r = await ctx.agents.run<"report_phase">(role, lines.join("\n"), { signal, readOnly, evidence: { taskId, phase: "DELIVER", stepId: sc.id } });
   if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
+  return {
+    type: "AGENT_REPORTED",
+    role,
+    summary: r.output.summary,
+    files: r.output.files,
+    ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
+    ...(e.step === "test" && r.output.coveredBy ? { coveredBy: r.output.coveredBy } : {}),
+  };
 }
 
 /** Porte RED d'un pas (SPEC.md §8.3) : un seul nouveau test unitaire, rouge pour une bonne raison, aucun test gelé touché. */
@@ -104,7 +112,11 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
   const k = kinds(ctx);
   const changed = await ctx.workspace.changedFiles(e.since);
-  if (changed.length === 0) return fail("Aucun fichier modifié : écris un nouveau test unitaire.");
+  if (e.coveredBy) return coveredByAcceptance(e, changed.length, { ctx, state, taskId, signal });
+  if (changed.length === 0)
+    return fail(
+      "Aucun fichier modifié : écris un nouveau test unitaire, ou, si le test d'acceptance du scénario vérifie déjà le comportement, désigne-le dans `coveredBy`.",
+    );
   const outside = changed.filter((f) => !k.unit(f.path));
   if (outside.length) return fail(`Seuls des tests unitaires peuvent être modifiés à ce pas. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
 
@@ -125,6 +137,31 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   await ctx.git.commit(`test(${state.slug}): ${e.scenarioId}, ${t.id}`);
   const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : rouge ${e.scenarioId}`);
   return { type: "STEP_OK", checkpointId: cp.id, all: uniq([...e.baseline.all, t.id]), passed: e.baseline.passed, newTest: t.id, unitTestsHash };
+}
+
+/**
+ * Pas « test » sans test unitaire (ADR 0045) : le testeur déclare que le test d'acceptance du
+ * scénario vérifie déjà le comportement. Le LLM propose, le code décide : rien ne doit avoir été
+ * écrit, le test désigné doit être CELUI du scénario, et il doit échouer pour une bonne raison —
+ * c'est lui qui tient lieu de rouge, et le pas de code devra le faire passer.
+ */
+async function coveredByAcceptance(e: Fx<"verifyUnitRed">, changed: number, { ctx, state, taskId, signal }: Run): Promise<Ev> {
+  const sc = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!;
+  if (changed > 0) return fail("Tu as déclaré le comportement couvert par l'acceptance : aucun fichier ne doit alors être modifié. Écris un test unitaire, ou ne déclare rien.");
+  if (!concerns(sc.acceptanceTestId, e.coveredBy!))
+    return fail(`« ${e.coveredBy} » n'est pas le test d'acceptance du scénario : seul ${sc.acceptanceTestId} peut tenir lieu de test rouge à ce pas.`);
+  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
+  if (run.timedOut) return fail("Les tests ont dépassé le délai.");
+  const own = run.results.find((r) => concerns(r.id, sc.acceptanceTestId));
+  if (!own) return fail(`Le test d'acceptance ${sc.acceptanceTestId} est introuvable dans les résultats.`);
+  if (own.status === "passed") return fail(`Le test d'acceptance ${sc.acceptanceTestId} est déjà vert : il n'y a plus de comportement à faire passer.`);
+  if (own.status !== "failed" || own.failureKind === "other_error")
+    return fail(`Le test d'acceptance échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${firstLine(own.message)}`);
+  const regressions = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
+  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+  const unitTestsHash = await ctx.workspace.fingerprint(["@stack:unitTests"]);
+  const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : couvert par l'acceptance ${e.scenarioId}`);
+  return { type: "STEP_OK", checkpointId: cp.id, all: e.baseline.all, passed: e.baseline.passed, newTest: sc.acceptanceTestId, unitTestsHash, viaAcceptance: true };
 }
 
 /** Porte GREEN ou REFACTOR : tests gelés intacts (sinon tour annulé), code de production seul, suite verte hors acceptance en attente. */

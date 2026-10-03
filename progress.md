@@ -105,8 +105,16 @@ d'exiger ; et comment une correction de revue peut ajouter un test (aujourd'hui 
 **Consommation de la journée : environ 915 requêtes** (run 1 : 242, relance : 404, reprises : 100 et
 165). Réserve à ~620 le 03/10.
 
-**Prochaine étape.** Trancher le conflit (ADR), puis reprendre DELIVER depuis
-`run/us-2-2026-10-03-2973`.
+**Tranché : option A (ADR 0045).** Un comportement couvert par l'acceptance n'exige pas de test
+unitaire. Le testeur le déclare dans `coveredBy` (champ facultatif de `report_phase`), le code le
+vérifie — rien d'écrit, c'est le test d'acceptance du scénario, rouge pour une bonne raison — et ce
+test devient la cible du pas de code, sans entrer dans les tests unitaires du scénario. Les lentilles
+ont la consigne de chercher dans l'acceptance avant de réclamer un test.
+Reste ouvert, critère `correction-de-revue-peut-ajouter-un-test` : une correction de revue ne peut
+toujours pas ajouter de test (gel par empreinte en mode `fix`).
+
+**Prochaine étape.** Reprendre DELIVER depuis `run/us-2-2026-10-03-2973` pour éprouver l'ADR 0045
+(compter 50 à 100 requêtes) ; puis concevoir l'ajout de test en correction de revue.
 
 ---
 

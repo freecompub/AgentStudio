@@ -492,6 +492,20 @@
       "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"concerns\"",
       "passes": true,
       "notes": "Run réel US-2 du 03/10, deuxième pas de DELIVER : « test du pas introuvable » sur un test vert. `concerns` ne connaissait que les identifiants `chemin > test` ; un fichier `…/QuantiteTests.cs` désigne désormais les tests de la classe `….QuantiteTests`."
+    },
+    {
+      "id": "couvert-par-l-acceptance",
+      "title": "Un pas « test » peut déclarer le comportement couvert par l’acceptance ; le code le vérifie (ADR 0045)",
+      "verify": "pnpm vitest run --project ext-skraft -t \"couvert par l\"",
+      "passes": true,
+      "notes": "Option A choisie le 03/10. Champ `coveredBy` de report_phase ; retenu seulement si rien n’est écrit, si c’est le test d’acceptance du scénario et s’il est rouge pour une bonne raison. Non encore éprouvé sur un run réel."
+    },
+    {
+      "id": "correction-de-revue-peut-ajouter-un-test",
+      "title": "Une correction de revue peut ajouter un test (rouge vérifié) au lieu de trouver les tests gelés",
+      "verify": "MANUEL : à concevoir (ADR 0045, « Reste ouvert »)",
+      "passes": false,
+      "notes": "Révélé le 03/10 sur US-2 : un défaut « test manquant » est impossible à corriger en mode fix, les tests unitaires étant gelés par empreinte."
     }
   ]
 }
