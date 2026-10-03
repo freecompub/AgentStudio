@@ -78,10 +78,12 @@ Trois autres manques :
   éprouvé de bout en bout sur le code livré d'US-2 : 72 % en 32 s, le score affiché par Stryker.
   Commande type dans `stack.yaml` :
   `[dotnet, stryker, --solution, Tarification.sln, --reporter, json, --output, "{dossier}"]`.
-- **Mutations des messages d'erreur** : sur US-2, une part des survivants mute le texte d'une
-  exception, que les tests ne vérifient pas. Au seuil de 100 % pour le domaine, ils deviendraient des
-  défauts de faible valeur. À trancher par le projet : exclure ces mutations dans la commande, ou
-  fixer un seuil réaliste dans `quality.yaml`.
+- **Mutations des messages d'erreur — tranché le 03/10 : exclues.** Sur US-2, 4 survivants sur 7
+  ne mutaient que le texte d'une exception, que les tests ne vérifient pas ; au seuil de 100 % du
+  domaine, ils auraient valu au testeur des demandes sans valeur. Le projet d'essai les écarte dans
+  `stryker-config.json` (`"ignore-mutations": ["string"]`, Stryker.NET n'a pas d'option en ligne de
+  commande) : score 72 % → 85,7 %, restent les deux vrais trous de `Montant.Multiplie`. Baisser le
+  seuil du domaine a été écarté : un vrai trou aurait pu passer.
 - **Aucune interface** pour régler la barre : le fichier seulement. `/stack doctor` pourrait
   afficher la barre retenue et les fichiers reconnus comme cœur.
 - Le projet d'essai porte encore l'ancien `.skraft/quality.json`.

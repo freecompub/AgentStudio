@@ -260,8 +260,15 @@ le rapport réel sert de référence (`test/fixtures/stryker-net-us2.json`, chem
 - Stryker.NET écrit un **dossier** (`--output`) : nouveau jeton `{dossier}`, sur le modèle de
   `{couverture}`.
 - Bout en bout réel (profil → adaptateur → Stryker → lecteur) : 72 % en 32 s, projet laissé propre.
-- **À trancher par le responsable** : une part des survivants mute le texte des messages d'erreur ;
-  au seuil de 100 % du domaine, ils deviendraient des défauts sans valeur pour le testeur.
+- **Tranché** : les mutations de chaînes sont écartées (`stryker-config.json` du projet d'essai,
+  `"ignore-mutations": ["string"]` ; Stryker.NET n'a pas d'option en ligne de commande pour cela).
+  Plutôt que baisser le seuil du domaine, qui aurait laissé passer un vrai trou.
+
+**Jugement de la porte sur la branche livrée d'US-2, sans crédit** (`run/us-2-2026-10-03-9362`,
+configurée avec `quality.yaml`, la commande Stryker et `dotnet-tools.json`) : `GrilleDePaliers.cs`
+100 %, `Montant.cs` sous le seuil → **refus**, alors que la revue avait approuvé. Les deux survivants
+restants sont de vrais trous : aucun test ne vérifie qu'un facteur négatif est refusé, ni qu'un
+facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas vu.
 
 ---
 
