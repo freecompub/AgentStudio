@@ -46,7 +46,8 @@ et elle choisirait ce qu'ils paient.
 
 ## Reste ouvert
 
-- **Aucune interface** pour régler `modelClasses` : le fichier de réglages seulement, ou
-  `--modeles` au banc. La liste déroulante de l'ADR 0020 pourrait s'étendre aux trois classes.
+- ~~Aucune interface~~ — **fait le 03/10** : panneau « Modèles des agents », en mode avancé
+  seulement (canaux `model-classes:list` et `model-class:set`). Une liste par classe, avec une
+  option « Par défaut (modèle du projet) » ; le mode simple n'expose pas ce réglage fin.
 - **Association par défaut** : le port prévoit un multiplicateur de facturation par modèle ; quand
   le runtime le renseigne, il permettrait de proposer une association raisonnable par classe.

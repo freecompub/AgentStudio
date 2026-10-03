@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import type { ChatMessageDto, CommandListingDto, ModelListingDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
+import { ModelsPanel } from "../components/ModelsPanel";
 import { GuidedActions } from "../components/GuidedActions";
 import { TaskPanel } from "../components/TaskPanel";
 import { TurnChanges } from "../components/TurnChanges";
@@ -24,6 +25,7 @@ export function ChatScreen(props: {
 }) {
   const advanced = props.mode === "advanced";
   const [extensionsOpen, setExtensionsOpen] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [busy, setBusy] = useState(false);
@@ -163,6 +165,8 @@ export function ChatScreen(props: {
         {syncNote && <span className="hint">{syncNote}</span>}
         <button onClick={() => void sync()}>Synchroniser</button>
         <button onClick={() => setExtensionsOpen(true)}>Extensions</button>
+        {/* Réglage fin, réservé au mode avancé (ADR 0048). */}
+        {advanced && <button onClick={() => setModelsOpen(true)}>Modèles des agents</button>}
         {models.models.length > 0 && (
           <label className="model-pick">
             <span>Modèle</span>
@@ -296,6 +300,7 @@ export function ChatScreen(props: {
         <div className="row end">
           <span className="hint">Entrée pour envoyer, Maj+Entrée pour aller à la ligne</span>
           <ExtensionsPanel open={extensionsOpen} onClose={() => setExtensionsOpen(false)} developerMode={props.profile?.developerMode ?? false} />
+          <ModelsPanel open={modelsOpen} onClose={() => setModelsOpen(false)} />
           {busy ? (
             <button type="button" onClick={() => void api.call("chat:abort", {})}>
               Arrêter l'agent

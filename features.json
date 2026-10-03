@@ -540,7 +540,7 @@
       "title": "Chaque agent de tâche reçoit le modèle de sa classe de rôle, choisi par le projet parmi ceux de l’abonnement (ADR 0048)",
       "verify": "pnpm vitest run --project core test/model-class.test.ts && pnpm vitest run --project ext-skraft test/manifest.test.ts -t \"classes de modèle\"",
       "passes": true,
-      "notes": "Le CLI honore le modèle demandé depuis le 03/10 (ADR 0020). Classes strong/standard/light dans le manifeste, association par projet (`modelClasses`), modèle indisponible ignoré. Pas d’interface de réglage ; non éprouvé sur un run réel."
+      "notes": "Le CLI honore le modèle demandé depuis le 03/10 (ADR 0020). Classes strong/standard/light dans le manifeste, association par projet (`modelClasses`), modèle indisponible ignoré. Panneau « Modèles des agents » en mode avancé (testé par rendu, pas vu dans la vraie fenêtre). Non éprouvé sur un run réel."
     }
   ]
 }

@@ -212,8 +212,10 @@ ignore un modèle que `listModels()` ne propose pas. skraft : architectes `stron
 - **Constat en route** : le choix par projet de l'ADR 0020 ne s'appliquait qu'à la conversation
   principale, jamais aux agents des tâches. Désormais il sert de repli.
 - Banc : `--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini` ; le rapport note les modèles par étape.
-- Reste : aucune interface de réglage ; association par défaut d'après le multiplicateur, quand le
-  runtime le renseigne.
+- **Interface ajoutée** : panneau « Modèles des agents », en mode avancé seulement, une liste par
+  classe avec « Par défaut (modèle du projet) ». Testé par rendu (jsdom), pas encore regardé dans la
+  vraie fenêtre Electron.
+- Reste : association par défaut d'après le multiplicateur, quand le runtime le renseigne.
 
 ---
 

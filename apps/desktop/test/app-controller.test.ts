@@ -357,6 +357,25 @@ describe("AppController — choix du modèle (D38, ADR 0020)", () => {
     expect(await ctx.getServicesArgs()!.modelFor!("light")).toBe("claude-sonnet-5");
   });
 
+  it("réglage des modèles par classe : lu et écrit par projet, une classe vidée retombe sur le défaut (ADR 0048)", async () => {
+    const ctx = setup();
+    ctx.runtime.models = [{ id: "gpt-5-mini", name: "GPT-5 mini" }, { id: "claude-sonnet-5.5", name: "Claude Sonnet 5.5" }];
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    expect(await ctx.controller["model-classes:list"]({})).toEqual({ models: ctx.runtime.models, classes: {} });
+
+    await ctx.controller["model-class:set"]({ modelClass: "light", id: "gpt-5-mini" });
+    await ctx.controller["model-class:set"]({ modelClass: "strong", id: "claude-sonnet-5.5" });
+    expect((await ctx.controller["model-classes:list"]({})).classes).toEqual({ light: "gpt-5-mini", strong: "claude-sonnet-5.5" });
+    expect(await ctx.getServicesArgs()!.modelFor!("light")).toBe("gpt-5-mini");
+
+    await ctx.controller["model-class:set"]({ modelClass: "light", id: null });
+    expect((await ctx.controller["model-classes:list"]({})).classes).toEqual({ strong: "claude-sonnet-5.5" });
+
+    // Un autre projet a ses propres réglages.
+    await ctx.controller["workspace:open"]({ path: "/projets/b" });
+    expect((await ctx.controller["model-classes:list"]({})).classes).toEqual({});
+  });
+
   it("le modèle choisi est retenu par projet et transmis aux sessions suivantes", async () => {
     const ctx = setup();
     await ctx.controller["workspace:open"]({ path: "/projets/a" });

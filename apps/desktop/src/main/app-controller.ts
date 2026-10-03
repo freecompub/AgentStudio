@@ -299,6 +299,32 @@ export function createAppController(deps: AppControllerDeps): AppController {
       }
     },
 
+    "model-classes:list": async () => {
+      const ws = requireWorkspace();
+      const classes = (await deps.settings.load()).modelClasses?.[ws.root] ?? {};
+      try {
+        const rt = await ensureRuntime();
+        return { models: (await rt.listModels?.()) ?? [], classes };
+      } catch (err) {
+        deps.logger?.info("modèles indisponibles", { error: String(err) });
+        return { models: [], classes };
+      }
+    },
+
+    // Modèle d'une classe de rôle pour le projet courant (ADR 0048) ; `null` = retour au modèle du projet.
+    "model-class:set": async ({ modelClass, id }) => {
+      const ws = requireWorkspace();
+      const reglages = await deps.settings.load();
+      const projet = { ...(reglages.modelClasses?.[ws.root] ?? {}) };
+      if (id === null) delete projet[modelClass];
+      else projet[modelClass] = id;
+      const modelClasses = { ...(reglages.modelClasses ?? {}) };
+      if (Object.keys(projet).length) modelClasses[ws.root] = projet;
+      else delete modelClasses[ws.root];
+      await deps.settings.save({ ...reglages, modelClasses });
+      deps.logger?.info("modèle de classe choisi", { root: ws.root, modelClass, model: id });
+    },
+
     "model:set": async ({ id }) => {
       const ws = requireWorkspace();
       const reglages = await deps.settings.load();

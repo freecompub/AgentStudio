@@ -109,6 +109,19 @@ const modelListingSchema = z
   .strict();
 export type ModelListingDto = z.infer<typeof modelListingSchema>;
 
+/** Classes de rôle des agents de tâche (ADR 0048) ; doit rester aligné sur `MODEL_CLASSES` du cœur. */
+export const modelClassSchema = z.enum(["strong", "standard", "light"]);
+export type ModelClassDto = z.infer<typeof modelClassSchema>;
+
+/** Modèles de l'abonnement, et modèle retenu par classe pour le projet (absent = modèle du projet). */
+const modelClassesSchema = z
+  .object({
+    models: modelListingSchema.shape.models,
+    classes: z.object({ strong: text(200), standard: text(200), light: text(200) }).partial().strict(),
+  })
+  .strict();
+export type ModelClassesDto = z.infer<typeof modelClassesSchema>;
+
 export const uiModeSchema = z.enum(["simple", "advanced"]);
 export type UiMode = z.infer<typeof uiModeSchema>;
 
@@ -169,6 +182,8 @@ export const requests = {
   "workspace:sync": { input: empty, output: z.object({ pulled: z.number(), pushed: z.number() }) },
   "models:list": { input: empty, output: modelListingSchema },
   "model:set": { input: z.object({ id: text(200).min(1).nullable() }).strict(), output: z.void() },
+  "model-classes:list": { input: empty, output: modelClassesSchema },
+  "model-class:set": { input: z.object({ modelClass: modelClassSchema, id: text(200).min(1).nullable() }).strict(), output: z.void() },
   "chat:start": { input: empty, output: z.array(chatMessageSchema) },
   "chat:send": { input: z.object({ text: text(100_000).min(1) }).strict(), output: z.void() },
   "chat:undo": { input: z.object({ messageId: text(200).min(1) }).strict(), output: z.void() },
