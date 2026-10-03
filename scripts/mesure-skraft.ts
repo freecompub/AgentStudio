@@ -4,7 +4,7 @@
  * Hors CI, consomme de vraies requêtes Copilot. Travaille sur une **copie** du projet d'essai :
  * le dépôt d'origine n'est jamais touché.
  *
- *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--pousser]
+ *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--pousser]
  *
  * `--pousser` : pousse le travail de la copie sur une branche `run/<story>-<date>-<id>` du dépôt
  * GitHub du projet, après chaque phase commitée puis à la fin. C'est le banc qui pousse, jamais
@@ -61,6 +61,10 @@ const args = process.argv.slice(2);
 // faites. Sert à réessayer une phase tardive sans repayer celles d'avant — le dépôt source doit
 // alors DÉJÀ contenir leurs livrables, le banc ne les fabrique pas.
 const pousser = args.includes("--pousser");
+// `--base=<branche>` : partir d'une branche du dépôt source plutôt que de `main` — typiquement la
+// branche `run/…` poussée par un run précédent, pour reprendre avec `--depuis` sans repayer les
+// phases déjà validées.
+const base = args.find((a) => a.startsWith("--base="))?.slice("--base=".length) ?? "main";
 const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
 const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
 if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE]");
@@ -77,7 +81,7 @@ const phaseOrder = depuis ? PHASE_ORDER.slice(iDepuis) : undefined;
 // refuser à l'agent la lecture de ses propres livrables. Le banc doit mesurer skraft, pas ça.
 const root = await realpath(await mkdtemp(join(tmpdir(), "mesure-skraft-")));
 execFileSync("git", ["clone", "-q", "--no-hardlinks", source, root]);
-execFileSync("git", ["checkout", "-q", "main"], { cwd: root });
+execFileSync("git", ["checkout", "-q", base], { cwd: root });
 console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}`);
 
 // ---------- Branche de run sur GitHub (--pousser) ---------------------------------------------

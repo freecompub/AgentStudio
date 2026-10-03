@@ -45,7 +45,29 @@ rollback efface l'arbre de travail, pas eux.
 - .NET n'était pas installé : SDK 10 dans `~/.dotnet` (`dotnet-install.sh`, sans sudo). Lancer le
   banc avec `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`.
 
-**Prochaine étape.** Relancer US-2 avec la porte corrigée, et regarder enfin DISTILL puis DELIVER.
+**La relance, porte corrigée : premier run à atteindre DELIVER.** 14 min, 404 requêtes. RESEARCH
+sans rejet (19,9 requêtes) ; DESIGN rejetée une fois, à raison (`PalierApplicable` inventé dans
+`contracts.md`), 130,7 ; DISTILL validée du premier coup par ses portes, puis une fois recalée par
+la revue (`Facture.ATPayer` ne soustrait pas la remise). Rapport : `docs/runs/2026-10-03-us-2-e05269c1/`.
+
+**Puis DELIVER a refusé de démarrer — l'ADR 0041, une seconde fois.** « La suite est rouge avant
+DELIVER » pour `Ac2` et `Ac3`, les tests que DISTILL **doit** laisser rouges. `deliver-effects.ts`
+reconnaissait l'acceptance aux globs de chemins appliqués à `r.file`, qu'un rapport JUnit rend comme
+un nom de classe. Le correctif du 29/09 n'avait touché que DISTILL ; quatre usages identiques
+restaient dans DELIVER. Les tests de bout en bout tournent sur le faux lanceur Swift, qui rend de
+vrais chemins : rien ne pouvait le montrer avant un vrai run .NET.
+→ Le progress.md du 26/09 le disait déjà : un défaut corrigé à un endroit se réintroduit ailleurs
+dans la semaine. Après un correctif de ce genre, **chercher l'idiome dans tout le dépôt** (ici
+`grep "r.file"`), pas seulement là où il a mordu.
+
+**Le banc a fait ce qu'on lui demandait** : trois escalades identiques, abandon, zéro requête
+gaspillée. Lacune : le rapport ne liste pas les escalades pour panne d'environnement (ce ne sont pas
+des rejets de porte) ; seul le suivi en direct les montre.
+
+`--base=<branche>` reprend depuis une branche `run/…` poussée, avec `--depuis=PHASE`, sans repayer
+les phases validées.
+
+**Prochaine étape.** Reprendre US-2 à DELIVER depuis `run/us-2-2026-10-03-2973`.
 
 ---
 

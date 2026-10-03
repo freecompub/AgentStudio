@@ -196,3 +196,37 @@ describe("Barre de qualité hors de portée des agents", () => {
     expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS\]/);
   });
 });
+
+/**
+ * Run réel US-2 du 03/10 : DESIGN et DISTILL validées, puis DELIVER refusée trois fois avant même
+ * le premier tour, « La suite est rouge avant DELIVER » — pour les deux tests d'acceptance que
+ * DISTILL venait de laisser rouges, exactement comme sa porte RED l'exige. C'est l'ADR 0041 une
+ * seconde fois : un rapport JUnit rend `file` comme un nom de classe, et les globs de
+ * `layout.acceptanceTests` sont des chemins. Le correctif d'alors n'avait touché que DISTILL.
+ */
+describe("planDeliver — tests d'acceptance d'un rapport JUnit (.NET)", async () => {
+  const { planDeliver } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const classe = "Tarification.Tests.RemiseParPalierAcceptanceTests";
+  const acceptance = (n: number, status: "passed" | "failed") => ({ id: `${classe}.Ac${n}_Scenario_${n}`, file: classe, name: `Ac${n}_Scenario_${n}`, status, ...(status === "failed" ? { failureKind: "assertion", message: "Assert.Equal() Failure" } : {}) });
+  const unitaire = (nom: string, status: "passed" | "failed" = "passed") => ({ id: `Tarification.Tests.CalculDuPanierTests.${nom}`, file: "Tarification.Tests.CalculDuPanierTests", name: nom, status, ...(status === "failed" ? { failureKind: "assertion", message: "x" } : {}) });
+
+  const ctx = (results: unknown[]) =>
+    ({
+      workspace: { fingerprint: async () => "h", readFile: async () => { throw new Error("absent"); } },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results }) },
+    }) as never;
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" };
+  const run = (results: unknown[]) => planDeliver({ ctx: ctx(results), state, taskId: "t", signal: new AbortController().signal });
+
+  it("les tests d'acceptance rouges laissés par DISTILL ne bloquent pas DELIVER, et deviennent ses scénarios", async () => {
+    const ev = await run([unitaire("Un_panier_vide_vaut_zero"), acceptance(1, "passed"), acceptance(2, "failed"), acceptance(3, "failed")]);
+    expect(ev.type).toBe("DELIVER_PLANNED");
+    if (ev.type !== "DELIVER_PLANNED") return;
+    expect(ev.scenarios.map((s) => s.id).sort()).toEqual(["ac-1", "ac-2", "ac-3"]);
+  });
+
+  it("un test unitaire rouge bloque toujours DELIVER", async () => {
+    await expect(run([unitaire("Un_panier_vide_vaut_zero", "failed"), acceptance(2, "failed")])).rejects.toThrow(/La suite est rouge avant DELIVER : Tarification\.Tests\.CalculDuPanierTests\.Un_panier_vide_vaut_zero\./);
+  });
+});

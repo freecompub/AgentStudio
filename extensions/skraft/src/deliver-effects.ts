@@ -2,7 +2,7 @@ import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
-import { featureScenarios } from "./distill.js";
+import { acOf, featureScenarios } from "./distill.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 
@@ -19,12 +19,23 @@ const fail = (reason: string): Ev => ({ type: "STEP_FAIL", reason });
 const firstLine = (msg?: string) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs: string[]) => [...new Set(xs)];
 
-/** Classement des fichiers selon la disposition de la stack : tests d'acceptance, tests unitaires, production. */
+/**
+ * Classement des fichiers selon la disposition de la stack : tests d'acceptance, tests unitaires,
+ * production. Les globs de `layout` sont des **chemins** : ils classent des fichiers, jamais des
+ * résultats de tests — voir `acceptanceResult`.
+ */
 function kinds(ctx: ExtensionContext) {
   const { acceptanceTests, unitTests } = ctx.stack.layout;
   const acceptance = (p: string) => matchesAny(acceptanceTests, p);
   const unit = (p: string) => !acceptance(p) && (matchesAny(unitTests, p) || ctx.stack.isTestFile(p));
-  return { acceptance, unit, production: (p: string) => !acceptance(p) && !unit(p) };
+  /**
+   * Un RÉSULTAT est d'acceptance s'il porte la marque `ac-<n>` que DISTILL impose dans le nom du
+   * test (ADR 0041). Un rapport JUnit rend `file` comme un nom de classe, que les globs de chemins
+   * ne reconnaissent jamais : le 03/10, DELIVER a pris les tests rouges de DISTILL pour une suite
+   * cassée et refusé de démarrer. Le chemin reste admis pour les lanceurs qui en rendent un.
+   */
+  const acceptanceResult = (r: TestResult) => acOf(r.id) !== null || acceptance(r.file);
+  return { acceptance, acceptanceResult, unit, production: (p: string) => !acceptance(p) && !unit(p) };
 }
 
 async function acceptanceFrozen(ctx: ExtensionContext, state: SkraftState): Promise<boolean> {
@@ -46,10 +57,10 @@ export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_BASELINE" } });
   if (run.timedOut) throw new EnvFailureError("Les tests ont dépassé le délai avant le début de DELIVER.");
   const k = kinds(ctx);
-  const broken = run.results.filter((r) => r.status === "failed" && !k.acceptance(r.file));
+  const broken = run.results.filter((r) => r.status === "failed" && !k.acceptanceResult(r));
   if (broken.length) throw new EnvFailureError(`La suite est rouge avant DELIVER : ${broken.map((r) => r.id).join(", ")}. Corrigez-la avant de relancer.`);
   const implPlan = (await readOr(ctx, `.skraft/${state.slug}/distill/impl-plan.md`)) ?? "";
-  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter((r) => k.acceptance(r.file)).map((r) => r.id), regressions: state.regressions });
+  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter(k.acceptanceResult).map((r) => r.id), regressions: state.regressions });
   return { type: "DELIVER_PLANNED", scenarios, all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) };
 }
 
@@ -100,7 +111,7 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
   const known = new Set(e.baseline.all);
-  const fresh = run.results.filter((r) => !known.has(r.id) && !k.acceptance(r.file));
+  const fresh = run.results.filter((r) => !known.has(r.id) && !k.acceptanceResult(r));
   if (fresh.length === 0) return fail("Aucun nouveau test unitaire détecté.");
   if (fresh.length > 1) return fail(`Un seul nouveau test unitaire par pas ; trouvés : ${fresh.map((r) => r.id).join(", ")}.`);
   const t = fresh[0]!;
@@ -128,7 +139,7 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   const phase = e.mode === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN";
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase, stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le code boucle-t-il ?");
-  const suite = suiteProblems(run.results, e.pending, k.acceptance);
+  const suite = suiteProblems(run.results, e.pending, k.acceptanceResult);
   if (suite.length) return fail(suite.join(" "));
   if (e.newTest) {
     const own = run.results.filter((r) => concerns(r.id, e.newTest!) || r.file === e.newTest);
@@ -150,10 +161,10 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
 }
 
 /** Suite complète : verte, sauf les tests d'acceptance des scénarios pas encore livrés ; aucun test ignoré. */
-function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (p: string) => boolean): string[] {
+function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (r: TestResult) => boolean): string[] {
   const waiting = (r: TestResult) => pending.some((p) => concerns(r.id, p));
   const failing = results.filter((r) => r.status === "failed" && !waiting(r));
-  const skipped = results.filter((r) => r.status === "skipped" && !(isAcceptance(r.file) && waiting(r)));
+  const skipped = results.filter((r) => r.status === "skipped" && !(isAcceptance(r) && waiting(r)));
   const out: string[] = [];
   if (failing.length) out.push(`Tests en échec : ${failing.map((r) => `${r.id} (${firstLine(r.message)})`).join("; ")}.`);
   if (skipped.length) out.push(`Tests ignorés (interdit) : ${skipped.map((r) => r.id).join(", ")}.`);
@@ -176,7 +187,7 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   if (run.timedOut) return { type: "SCENARIO_FAIL", reasons: ["Les tests ont dépassé le délai à la fin du scénario."] };
   const own = run.results.find((r) => r.id === sc.acceptanceTestId);
   if (own?.status !== "passed") reasons.push(`Le test d'acceptance du scénario n'est pas vert : ${sc.acceptanceTestId}.`);
-  reasons.push(...suiteProblems(run.results, e.pending, k.acceptance));
+  reasons.push(...suiteProblems(run.results, e.pending, k.acceptanceResult));
 
   const evidence = (await ctx.evidence.list(taskId)).filter((x) => x.stepId === e.scenarioId);
   reasons.push(...checkRedGreenSequence(evidence, e.unitTests));
