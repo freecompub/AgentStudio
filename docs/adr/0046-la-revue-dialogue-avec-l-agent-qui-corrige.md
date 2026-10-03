@@ -32,9 +32,17 @@ Trois défauts de la machine, pas des agents :
 
 `submit_lens_verdict` (JSON validé par schéma) exige pour chaque défaut une **cible** :
 `test`, `code` ou `deliverable`. Un défaut, un seul sujet : celui qui touche à la fois un test et le
-code est scindé. La lentille propose, **le code vérifie** : quand un fichier est cité, sa nature
-(selon la disposition de la stack) fait foi, et l'écart est noté (`targetNote`). Une erreur de
-routage coûte un tour entier ; la vérifier ne coûte rien.
+code est scindé. La lentille propose, **le code vérifie**, dans un seul sens : un défaut qui cite un
+**fichier de test** va au testeur, quelle que soit sa cible déclarée (le développeur ne peut pas y
+toucher), et l'écart est noté (`targetNote`). Un défaut déclaré `test` reste au testeur, même s'il
+cite du code de production.
+
+> **Amendé le 03/10, après le premier run réel.** La première version faisait foi au fichier dans
+> les deux sens. Or un défaut « aucun test ne couvre `Facture.ATPayer` » cite naturellement le code
+> non couvert (`CalculDuPanier.cs`) : il a été reclassé `code` et envoyé au développeur, tests gelés.
+> Celui-ci l'a contesté à juste titre, la lentille l'a maintenu à juste titre, puis le développeur
+> l'a « corrigé » en **supprimant le code non testé** — régression aussitôt bloquée par la revue
+> suivante, mais budget épuisé.
 
 **L'identifiant de chaque défaut est attribué par le code** (`lentille#tour.n`), jamais par le
 modèle : tout le mécanisme repose sur sa stabilité d'un tour à l'autre.
@@ -95,4 +103,10 @@ précédents, à ne pas défaire.
   lisibles (champs facultatifs à la lecture).
 - Le banc de mesure répond à toute interaction par la première option : en arbitrage, il donne
   raison à l'agent. À garder en tête en lisant un run de banc.
-- Non éprouvé sur un run réel au moment de l'écriture.
+- **Éprouvé le 03/10 sur US-2** (`docs/runs/2026-10-03-us-2-deliver-adr45-46/`) : contestation
+  argumentée par le développeur, arbitrages motivés des lentilles (accepted et maintained), rappel
+  des demandes corrigées. A révélé le défaut de routage amendé ci-dessus.
+- **Reste ouvert** : un agent peut déclarer « corrigé » un défaut de couverture en supprimant le
+  comportement non couvert. La revue l'a attrapé (contrat ratifié non respecté), mais rien dans les
+  portes ne l'interdit : une piste est de vérifier, en correction, que les symboles exigés par le
+  contrat ratifié de DESIGN existent toujours.

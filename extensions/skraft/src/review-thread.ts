@@ -63,13 +63,16 @@ export const isActive = (t: DefectThread): boolean => ACTIVE.includes(t.status);
 const LIBELLE: Record<DefectTarget, string> = { test: "test", code: "code", deliverable: "livrable" };
 
 /**
- * Cible effective d'un défaut. La lentille la déclare ; quand elle cite un fichier, la nature de ce
- * fichier fait foi — une erreur de routage coûte un tour entier, la vérifier ne coûte rien.
+ * Cible effective d'un défaut. La lentille la déclare ; le fichier cité ne la corrige que dans UN
+ * sens : un défaut qui cite un fichier de test va au testeur, puisque le développeur ne peut pas y
+ * toucher. L'inverse est faux : un défaut « test manquant » cite naturellement le code qu'aucun test
+ * ne couvre. Le 03/10, la règle symétrique (« le fichier fait foi ») a envoyé un tel défaut au
+ * développeur, tests gelés ; il a fini par supprimer le code non testé pour satisfaire la revue.
  */
 export function effectiveTarget(d: LensDefect, classify: (file: string) => DefectTarget | null): { target: DefectTarget; note?: string } {
   const declared = d.target ?? "code";
   const k = d.file ? classify(d.file) : null;
-  if (k && k !== declared) return { target: k, note: `cible déclarée « ${declared} », fichier de ${LIBELLE[k]} : routé vers « ${k} »` };
+  if (k === "test" && declared !== "test") return { target: "test", note: `cible déclarée « ${declared} », fichier de ${LIBELLE[k]} : routé vers « test »` };
   return { target: declared };
 }
 

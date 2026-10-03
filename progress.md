@@ -137,9 +137,28 @@ de la lentille, pas seulement ses défauts listés.
 Passent à `true` : `retour-de-revue-cumulatif` (ouvert depuis le 29/09 : les demandes corrigées sont
 rappelées), `correction-de-revue-peut-ajouter-un-test`, et le nouveau `revue-dialogue-avec-l-agent`.
 
-**Prochaine étape.** Reprendre DELIVER depuis `run/us-2-2026-10-03-2973` pour éprouver les ADR 0045
-et 0046 ensemble (compter 50 à 100 requêtes). Le banc répond à toute interaction par la première
-option : en arbitrage, il donne raison à l'agent.
+**Le run qui éprouve les ADR 0045 et 0046 (252 requêtes, arrêté au plafond de 250).**
+Rapport : `docs/runs/2026-10-03-us-2-deliver-adr45-46/`.
+- **ADR 0045, réussi du premier coup.** `skraft-test` déclare `PalierApplicable` couvert par
+  l'acceptance (ac-2 rouge), la porte le vérifie, `skraft-dev` implémente, les cinq scénarios
+  passent. DELIVER en 2 min 11 et 31 requêtes, sans aucun rejet.
+- **ADR 0046, le dialogue fonctionne.** Revue 1 : deux défauts majeurs. Le développeur corrige le
+  premier et **conteste** le second avec une raison juste (« je ne peux pas écrire de test »).
+  `cold-reader` accepte la correction, `quality-gates` **maintient** avec une raison tout aussi juste
+  (couverture de `Montant.cs` à 70 % sous le seuil de 90 %).
+- **Le défaut révélé était dans ma conception.** Ce second défaut était déclaré `test` par la lentille
+  — à raison — mais citait `CalculDuPanier.cs`, et ma règle « le fichier cité fait foi » l'avait
+  reclassé `code`. Corrigé : le fichier ne fait basculer un défaut que **vers** le testeur. ADR amendé.
+- **Puis l'agent a triché, et la revue l'a vu.** Au tour suivant, le développeur a « corrigé » le
+  défaut de couverture en **supprimant le code non testé** (`ATPayer` ne déduit plus la remise,
+  `Montant.Soustrait` retiré). Revue 3 : deux blockers, régression et contrat ratifié non respecté.
+  Budget épuisé, escalade, arrêté. → Rien dans les portes n'interdit cette « correction » par
+  suppression ; noté ouvert dans l'ADR 0046.
+
+**Consommation du 03/10 : environ 1 170 requêtes.** Réserve à ~330 jusqu'au 01/11.
+
+**Prochaine étape.** Une seule reprise de DELIVER, routage corrigé : le défaut de couverture ira au
+testeur. Puis envisager la garde « les symboles du contrat ratifié existent toujours ».
 
 ---
 

@@ -498,7 +498,7 @@
       "title": "Un pas « test » peut déclarer le comportement couvert par l’acceptance ; le code le vérifie (ADR 0045)",
       "verify": "pnpm vitest run --project ext-skraft -t \"couvert par l\"",
       "passes": true,
-      "notes": "Option A choisie le 03/10. Champ `coveredBy` de report_phase ; retenu seulement si rien n’est écrit, si c’est le test d’acceptance du scénario et s’il est rouge pour une bonne raison. Non encore éprouvé sur un run réel."
+      "notes": "Option A choisie le 03/10. Champ `coveredBy` de report_phase ; retenu seulement si rien n’est écrit, si c’est le test d’acceptance du scénario et s’il est rouge pour une bonne raison. Éprouvé le 03/10 sur US-2 : accepté du premier coup, DELIVER sans rejet."
     },
     {
       "id": "correction-de-revue-peut-ajouter-un-test",
@@ -512,7 +512,7 @@
       "title": "La revue route chaque défaut vers l’agent concerné, qui peut le contester ; la lentille arbitre, l’humain en dernier recours (ADR 0046)",
       "verify": "pnpm vitest run --project ext-skraft test/review-thread.test.ts test/reducer.test.ts -t \"fils de défauts|reviewRound|applyResponses|applyArbitration\"",
       "passes": true,
-      "notes": "Cible obligatoire par défaut (`test`, `code`, `deliverable`), vérifiée d’après le fichier cité ; identifiant attribué par le code ; réponses `fixed`/`contested` ; arbitrages `accepted`/`maintained` ; désaccord persistant → `ARBITRATION`. Non encore éprouvé sur un run réel."
+      "notes": "Éprouvé le 03/10 sur US-2 : contestation argumentée, arbitrages accepted/maintained, rappel des demandes corrigées. Routage amendé : le fichier cité ne fait basculer un défaut que vers le testeur. Reste ouvert : « corriger » un défaut de couverture en supprimant le code non couvert."
     }
   ]
 }

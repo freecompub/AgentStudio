@@ -26,13 +26,20 @@ describe("numberDefects et effectiveTarget", () => {
     expect(v!.defects.map((d) => d.id)).toEqual(["cold-reader#2.1", "cold-reader#2.2"]);
   });
 
-  it("quand un fichier est cité, sa nature fait foi sur la cible déclarée, et l'écart est noté", () => {
+  it("un défaut déclaré « code » qui cite un fichier de test va au testeur, et l'écart est noté", () => {
     const kind = (f: string) => (f.startsWith("tests/") ? "test" : f.startsWith("src/") ? "code" : "deliverable");
     expect(effectiveTarget({ severity: "major", description: "x", target: "code", file: "tests/A.cs" }, kind)).toEqual({ target: "test", note: "cible déclarée « code », fichier de test : routé vers « test »" });
     expect(effectiveTarget({ severity: "major", description: "x", target: "code", file: "src/A.cs" }, kind)).toEqual({ target: "code" });
-    expect(effectiveTarget({ severity: "major", description: "x", target: "test" }, kind)).toEqual({ target: "test" });
     // Un verdict d'avant l'ADR 0046 n'a pas de cible : le code par défaut.
     expect(effectiveTarget({ severity: "major", description: "x" }, kind)).toEqual({ target: "code" });
+  });
+
+  it("un défaut déclaré « test » reste au testeur, même s'il cite le code qu'aucun test ne couvre", () => {
+    // Run réel US-2 du 03/10 : « aucun test ne couvre Facture.ATPayer » citait CalculDuPanier.cs. Le
+    // fichier l'avait reclassé « code » : le développeur, tests gelés, ne pouvait que contester —
+    // puis il a supprimé le code non testé pour satisfaire la revue.
+    const kind = (f: string) => (f.startsWith("tests/") ? "test" : f.startsWith("src/") ? "code" : "deliverable");
+    expect(effectiveTarget({ severity: "major", description: "aucun test ne couvre ATPayer", target: "test", file: "src/CalculDuPanier.cs" }, kind)).toEqual({ target: "test" });
   });
 });
 
