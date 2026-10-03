@@ -485,6 +485,13 @@
       "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"planDeliver\"",
       "passes": true,
       "notes": "Run réel US-2 du 03/10 : DISTILL validée, puis DELIVER refusée trois fois avant le premier tour (« suite rouge ») pour les tests d’acceptance que DISTILL venait de laisser rouges. Même cause que l’ADR 0041, qui n’avait corrigé que DISTILL : `file` est un nom de classe en JUnit."
+    },
+    {
+      "id": "rouge-de-compilation-suivi-jusqu-au-vert",
+      "title": "Un test unitaire rouge par compilation (désigné par son fichier) est reconnu au vert sous son nom JUnit",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"concerns\"",
+      "passes": true,
+      "notes": "Run réel US-2 du 03/10, deuxième pas de DELIVER : « test du pas introuvable » sur un test vert. `concerns` ne connaissait que les identifiants `chemin > test` ; un fichier `…/QuantiteTests.cs` désigne désormais les tests de la classe `….QuantiteTests`."
     }
   ]
 }

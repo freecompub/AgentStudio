@@ -67,7 +67,22 @@ des rejets de porte) ; seul le suivi en direct les montre.
 `--base=<branche>` reprend depuis une branche `run/…` poussée, avec `--depuis=PHASE`, sans repayer
 les phases validées.
 
-**Prochaine étape.** Reprendre US-2 à DELIVER depuis `run/us-2-2026-10-03-2973`.
+**Reprise à DELIVER (100 requêtes) : la boucle TDD tourne pour de vrai.** Premier pas complet :
+`skraft-test` écrit un test rouge sur assertion, `skraft-dev` le passe au vert, nos portes le
+confirment. Puis deux constats :
+- **Troisième variante du même défaut chemin ↔ classe.** Un test rouge **par compilation** est
+  désigné par son fichier (`tests/…/QuantiteTests.cs`, lecteur `buildErrors`), puis par son nom
+  JUnit au vert (`….QuantiteTests.AtteintLeSeuil_…`). `concerns` ne connaissait que `chemin > test`.
+  La porte GREEN a déclaré « introuvable » un test vert. Corrigé dans `concerns` lui-même, ce qui
+  couvre aussi `checkRedGreenSequence` et la suite en attente.
+- **Un conflit de conception, non tranché.** Pour le comportement suivant, `skraft-test` a refusé
+  d'écrire un test unitaire : le mandat 4 de son plan de test le dit « saturé par l'acceptance »,
+  conformément à la skill `test-design-mandates`. La machine DELIVER exige un nouveau test rouge à
+  chaque pas et n'a **aucun chemin** « déjà couvert par l'acceptance, passe au code ». Rejet. Au
+  réessai l'agent a cédé et écrit un test (`QuantiteTests`). C'est une décision à prendre (ADR),
+  pas un défaut à corriger en silence.
+
+**Prochaine étape.** Reprendre DELIVER avec `concerns` corrigé ; trancher le conflit ci-dessus.
 
 ---
 

@@ -230,3 +230,37 @@ describe("planDeliver — tests d'acceptance d'un rapport JUnit (.NET)", async (
     await expect(run([unitaire("Un_panier_vide_vaut_zero", "failed"), acceptance(2, "failed")])).rejects.toThrow(/La suite est rouge avant DELIVER : Tarification\.Tests\.CalculDuPanierTests\.Un_panier_vide_vaut_zero\./);
   });
 });
+
+/**
+ * Run réel US-2 du 03/10, deuxième pas de DELIVER : le test rouge appelait `AtteintLeSeuil`, qui
+ * n'existait pas — en C#, une erreur de COMPILATION. Le lecteur d'erreurs de compilation désigne
+ * alors le test par son fichier ; au vert, le rapport JUnit le nomme par sa classe qualifiée. La
+ * porte GREEN a conclu « test du pas introuvable » sur un test bel et bien vert.
+ */
+describe("concerns — un test désigné par son fichier (rouge de compilation)", async () => {
+  const { concerns, checkRedGreenSequence } = await import("../src/deliver.js");
+  const fichier = "tests/Tarification.Tests/QuantiteTests.cs";
+  const nom = "Tarification.Tests.QuantiteTests.AtteintLeSeuil_est_vrai_quand_la_quantite_est_egale_au_seuil";
+
+  it("le fichier désigne les tests de la classe du même nom, dans les deux sens", () => {
+    expect(concerns(nom, fichier)).toBe(true);
+    expect(concerns(fichier, nom)).toBe(true);
+  });
+
+  it("mais pas ceux d'une autre classe, ni d'une classe dont le nom ne fait que le contenir", () => {
+    expect(concerns("Tarification.Tests.MontantTests.Multiplie", fichier)).toBe(false);
+    expect(concerns("Tarification.Tests.QuantiteTestsBis.X", fichier)).toBe(false);
+  });
+
+  it("les identifiants `chemin > test` gardent leur sens", () => {
+    expect(concerns("Tests/A.swift", "Tests/A.swift > A.testX")).toBe(true);
+    expect(concerns("Tests/A.swift > A.testX", "Tests/A.swift > A.testY")).toBe(false);
+  });
+
+  it("la séquence rouge puis vert est reconnue quand le rouge vient du compilateur et le vert de JUnit", () => {
+    const preuve = (o: Partial<Evidence>): Evidence => ({ id: "e", taskId: "t", phase: "DELIVER_RED", source: "gate", at: "", exitCode: 1, timedOut: false, durationMs: 1, counts: { passed: 0, failed: 0, skipped: 0 }, testIds: [], failing: [], testsHash: "", head: "", ...o }) as Evidence;
+    const rouge = preuve({ testIds: [fichier], failing: [{ id: fichier, failureKind: "missing_symbol", message: "CS1061" }] });
+    const vert = preuve({ phase: "DELIVER_GREEN", exitCode: 0, testIds: [nom] });
+    expect(checkRedGreenSequence([rouge, vert], [fichier])).toEqual([]);
+  });
+});

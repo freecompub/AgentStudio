@@ -50,8 +50,23 @@ export function planScenarios(input: { implPlan: string; acceptanceTestIds: stri
   });
 }
 
-/** Un résultat désigne-t-il ce test ? (un fichier qui ne compile plus apparaît sous son seul nom). */
-export const concerns = (resultId: string, testId: string) => resultId === testId || testId.startsWith(`${resultId} > `) || resultId.startsWith(`${testId} > `);
+/**
+ * Un résultat désigne-t-il ce test ? Un fichier qui ne compile plus apparaît sous son seul nom :
+ * - en `chemin > test` (Vitest, Swift), le chemin est un préfixe de l'identifiant ;
+ * - en JUnit, l'identifiant est une classe qualifiée (`Projet.Tests.QuantiteTests.Methode`) : le
+ *   fichier `…/QuantiteTests.cs` désigne alors les tests de la classe du même nom. Le 03/10, faute
+ *   de cette règle, la porte GREEN a déclaré introuvable un test rouge par compilation devenu vert.
+ */
+export const concerns = (resultId: string, testId: string) =>
+  resultId === testId || testId.startsWith(`${resultId} > `) || resultId.startsWith(`${testId} > `) || fileDesignatesClass(testId, resultId) || fileDesignatesClass(resultId, testId);
+
+/** `tests/X/QuantiteTests.cs` désigne `A.B.QuantiteTests.M` : le nom du fichier est un segment de classe de l'identifiant. */
+function fileDesignatesClass(path: string, id: string): boolean {
+  const m = /[/\\]([^/\\]+)\.[A-Za-z0-9]+$/.exec(path);
+  if (!m || /[/\\]/.test(id)) return false;
+  // Tous les segments sauf le dernier, qui est le nom de la méthode.
+  return id.split(".").slice(0, -1).includes(m[1]!);
+}
 
 /** Porte de fin de scénario : au moins un rouge (bonne raison) puis un vert par test unitaire ajouté. */
 export function checkRedGreenSequence(evidence: Evidence[], unitTests: string[]): string[] {
