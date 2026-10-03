@@ -1,4 +1,4 @@
-import { EnvFailureError, WorkDefectError, type Clock, type IdGenerator, type Logger, type UsageRecorder } from "@agent-studio/core";
+import { EnvFailureError, WorkDefectError, type Clock, type IdGenerator, type Logger, type TraceBody, type TraceStore, type UsageRecorder } from "@agent-studio/core";
 import type { SystemEvent, TaskCheckpoints, TaskDefinition, TaskEvent, TaskRecord, TaskStore } from "./protocols.js";
 
 export interface TaskEngineDeps {
@@ -9,7 +9,32 @@ export interface TaskEngineDeps {
   logger?: Logger;
   /** Durée et nombre d'effets par état (D37). */
   usage?: UsageRecorder;
+  /**
+   * Trace d'exécution (ADR 0032) : chaque transition, et chaque rejet avec ses motifs. Sans elle,
+   * le nombre de rejeux d'une phase et leurs causes ne se lisaient nulle part.
+   */
+  trace?: TraceStore;
 }
+
+/**
+ * Champs que le moteur lit dans l'état **par convention**, comme `phase` (D37). Tous facultatifs :
+ * une tâche qui ne les porte pas est tracée sans eux.
+ *
+ * Un rejet se repère au compteur `rejections`, pas à `lastRejection` : les motifs restent posés
+ * pendant tout le réessai, et deux rejets identiques de suite sont bien deux rejets. Comparer des
+ * références ne marcherait pas non plus — l'état d'une extension isolée revient sérialisé.
+ */
+interface TracedState {
+  stage?: unknown;
+  attempts?: unknown;
+  rejections?: unknown;
+  lastRejection?: { gate?: unknown; reasons?: unknown } | null;
+}
+
+const effectKind = (f: unknown): string => {
+  const k = (f as { kind?: unknown; type?: unknown } | null)?.kind ?? (f as { type?: unknown } | null)?.type;
+  return typeof k === "string" ? k : "?";
+};
 
 export interface TaskEngine {
   register<S, E extends { type: string }, F, D>(def: TaskDefinition<S, E, F, D>, deps: D): void;
@@ -73,12 +98,44 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
   }
 
   async function apply(t: Live, event: TaskEvent<{ type: string }>): Promise<void> {
+    const before = t.record.state as TracedState | null;
     const { state, effects } = await t.def.transition(t.record.state, event);
     t.record.state = state;
     if (event.type === "ABORT") t.record.pending = [];
     t.record.pending.push(...effects);
     deps.logger?.debug("transition", { taskId: t.record.id, event: event.type, effects: effects.length });
     await persist(t);
+    await traceTransition(t, event, before, effects);
+  }
+
+  async function traceTransition(t: Live, event: { type: string }, before: TracedState | null, effects: unknown[]): Promise<void> {
+    if (!deps.trace) return;
+    const after = t.record.state as TracedState | null;
+    const bodies: TraceBody[] = [
+      {
+        kind: "transition",
+        événement: event.type,
+        phase: t.record.phase ?? "?",
+        ...(typeof after?.stage === "string" ? { stade: after.stage } : {}),
+        ...(typeof after?.attempts === "number" ? { essais: after.attempts } : {}),
+        effets: effects.map(effectKind),
+      },
+    ];
+    const n = (s: TracedState | null) => (typeof s?.rejections === "number" ? s.rejections : 0);
+    if (n(after) > n(before)) {
+      const r = after?.lastRejection;
+      bodies.push({
+        kind: "rejet",
+        porte: typeof r?.gate === "string" ? r.gate : "?",
+        motifs: Array.isArray(r?.reasons) ? r.reasons.map(String) : [],
+      });
+    }
+    for (const b of bodies) {
+      // La trace raconte, elle n'atteste rien : son échec ne doit jamais arrêter la tâche.
+      await deps.trace.append({ taskId: t.record.id, at: now(), ...b } as Parameters<TraceStore["append"]>[0]).catch((err: unknown) => {
+        deps.logger?.warn("trace : écriture impossible", { taskId: t.record.id, error: String(err) });
+      });
+    }
   }
 
   function toSystemEvent(err: unknown): SystemEvent {

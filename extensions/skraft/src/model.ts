@@ -157,6 +157,11 @@ export interface SkraftState {
   skillsLoaded?: { phase: Phase | null; role: Role; skills: string[] }[];
   /** Réessais par phase (mesures d'usage, §12) ; absent d'un état persisté avant S6. */
   retries?: Record<string, number>;
+  /**
+   * Rejets cumulés, toutes phases (porte, revue, scénario). Ne fait que croître : le moteur de
+   * tâches y repère chaque nouveau rejet pour le tracer avec `lastRejection` (ADR 0032).
+   */
+  rejections?: number;
 }
 
 export type SkraftEvent =
@@ -262,6 +267,7 @@ const stateSchema = z.object({
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),
+  rejections: z.number().int().min(0).optional(),
   skillsLoaded: z.array(z.object({ phase: phase.nullable(), role: z.string(), skills: z.array(z.string()) })).optional(),
   deliver: z
     .object({

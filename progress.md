@@ -5,6 +5,50 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 03/10 — Suivre un run étape par étape, et la porte qui recalait une conception juste
+
+**Fait.** Branche `feat/suivi-run`, partie de `main`. Le banc `scripts/mesure-skraft.ts` annonce en
+direct chaque étape, rejet (avec ses motifs) et fin de tour anormale — lignes `§` —, pousse le
+travail sur une branche `run/<story>-<date>-<id>` du projet d'essai (`--pousser`, jamais `main`,
+jamais l'agent), et verse un rapport dans `docs/runs/`. Le tout est lu dans la **trace** : le bilan
+ne peut pas raconter autre chose que ce qui a été enregistré.
+
+**Le trou trouvé en route.** Les entrées `transition` et `rejet` de la trace étaient déclarées
+depuis l'ADR 0032, et **rien ne les écrivait**. Le nombre de rejeux d'une phase et leurs motifs
+n'étaient lisibles nulle part. Le moteur les écrit maintenant. Un rejet se repère à un compteur
+croissant `rejections`, pas à `lastRejection` : les motifs restent posés pendant tout le réessai, et
+l'état d'une extension isolée revient sérialisé, donc comparer des références ne marche pas.
+
+**Crédits : `nanoAiu / 1e9` est le nombre exact de requêtes premium.** Mon estimation « une requête
+par tour » était fausse d'un facteur 18 : Copilot facture chaque **appel** au modèle, et un tour en
+fait des dizaines. Le champ `nanoAiu` que le SDK joint à chaque `usage` donnait déjà la réponse :
+35,99 × 10⁹ sur CLASSIFY + RESEARCH, pour un écart de réserve de 36. La réserve
+(`/copilot_internal/user`) se met à jour avec retard — CLASSIFY y apparaissait à 0.
+
+**Le run sur US-2 (machine Linux, `claude-sonnet-5`).** RESEARCH en 1 min 52 (1 rejet justifié :
+citation `adr-001-...md` abrégée), 36 requêtes. Puis DESIGN rejetée **trois fois** par la porte
+cohérence pour `AppliqueA`, environ 200 requêtes, escalade. Arrêté là.
+- Essai 1 : le nom manquait vraiment du modèle. Rejet juste.
+- Essais 2 et 3 : `domain-model.md` le définissait — signature dans un bloc de code, appel
+  `palier.Taux.AppliqueA(SousTotal)`. La porte ne reconnaissait qu'un nom **seul entre backticks**.
+→ L'agent avait corrigé dès l'essai 2 ; c'est la porte qui l'a recalé. Corrigé : un nom est
+**défini** s'il figure n'importe où dans le code du modèle, il est **cité** s'il est seul entre
+backticks. Rejoué sur les trois instantanés (refs `refs/agent-studio/checkpoints/`) : seul l'essai 1
+reste rejeté. Les instantanés de checkpoint sont la meilleure source pour rejouer une porte : le
+rollback efface l'arbre de travail, pas eux.
+
+**Deux pièges d'environnement.**
+- `gh` sur ce Linux était connecté par **PAT classique** : Copilot rend `400 Bad Request` à chaque
+  tour, et le banc relançait l'escalade **en boucle**. Le banc refuse désormais de démarrer sans
+  jeton accepté, et abandonne au troisième motif d'escalade identique. Les blocages de J1 avaient
+  été levés sur le Mac ; ils ne voyagent pas avec le dépôt.
+- .NET n'était pas installé : SDK 10 dans `~/.dotnet` (`dotnet-install.sh`, sans sudo). Lancer le
+  banc avec `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`.
+
+**Prochaine étape.** Relancer US-2 avec la porte corrigée, et regarder enfin DISTILL puis DELIVER.
+
+---
+
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)
 
 **Le dispositif.** skraft-plugin v1.6.1 chargé par `--plugin-dir`, leur `skraft-orchestrator`, la

@@ -4,6 +4,7 @@ export type * from "./protocols/interaction.js";
 export type * from "./protocols/logger.js";
 export { listFilesTool, LIMITE_CHEMINS, type ProjectFiles } from "./agents/list-files-tool.js";
 export { createJsonlTraceStore, tronquer, LIMITE_TEXTE } from "./trace/jsonl-trace-store.js";
+export { resumerTrace, type ResumeEtape, type ResumeRun } from "./trace/run-summary.js";
 export type { TraceEntry, TraceBody, TraceStore, TurnEnd } from "./protocols/trace.js";
 export { createHeartbeat, runTurn, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, EnvFailureError, WorkDefectError, type Heartbeat, type RunTurnOptions } from "./turns/run-turn.js";
 export { createMainSession, type MainSession, type MainSessionDeps, type MainSessionEvent } from "./session/main-session.js";

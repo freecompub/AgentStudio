@@ -204,6 +204,8 @@ describe.skipIf(!toolchain)("skraft — bout en bout 13.3 (Swift)", () => {
 
     // Bilan : réessais par phase ; usage par état (D37).
     expect(s.retries).toEqual({ RESEARCH: 1, DESIGN: 1, DISTILL: 1, DELIVER: 2 });
+    // Le compteur que le moteur lit pour tracer chaque rejet : la somme des réessais, toutes phases.
+    expect(s.rejections).toBe(5);
     expect(app.posted.at(-1)).toContain("Réessais par phase : RESEARCH 1, DESIGN 1, DISTILL 1, DELIVER 2.");
     const usage = await app.usage.report(id);
     for (const phase of ["CLASSIFY", "RESEARCH", "DESIGN", "DISTILL", "DELIVER", "REVIEW"]) expect(usage.find((r) => r.phase === phase)?.requests, phase).toBeGreaterThan(0);

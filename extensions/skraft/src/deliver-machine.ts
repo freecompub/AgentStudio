@@ -5,10 +5,13 @@ import type { Ev } from "./reducer.js";
 type Out = { state: SkraftState; effects: SkraftEffect[] };
 type AgentStep = "test" | "dev" | "green" | "refactor" | "fix";
 
-/** Réessais par phase, pour les mesures d'usage (§12). */
+/**
+ * Réessais par phase, pour les mesures d'usage (§12). Tout rejet passe par ici, ce qui en fait
+ * aussi le seul endroit où compter `rejections`, que le moteur lit pour tracer chaque rejet.
+ */
 export function bumpRetries(s: SkraftState, key: string): SkraftState {
   const retries = s.retries ?? {};
-  return { ...s, retries: { ...retries, [key]: (retries[key] ?? 0) + 1 } };
+  return { ...s, retries: { ...retries, [key]: (retries[key] ?? 0) + 1 }, rejections: (s.rejections ?? 0) + 1 };
 }
 
 /**

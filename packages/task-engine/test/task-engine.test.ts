@@ -1,4 +1,4 @@
-import { EnvFailureError, TurnTimeoutError, WorkDefectError } from "@agent-studio/core";
+import { EnvFailureError, TurnTimeoutError, WorkDefectError, type TraceEntry } from "@agent-studio/core";
 import { fixedClock, RecordingCheckpoints, sequentialIds } from "@agent-studio/core/testing";
 import { describe, expect, it } from "vitest";
 import { createTaskEngine } from "../src/task-engine.js";
@@ -362,3 +362,79 @@ describe("Moteur de tâches — reprise après plantage (D23)", () => {
   });
 });
 
+
+/**
+ * Trace des transitions et des rejets (ADR 0032). Le type les déclarait depuis l'origine, et rien
+ * ne les écrivait : le nombre de rejeux d'une phase et leurs motifs n'étaient lisibles nulle part.
+ */
+describe("Moteur de tâches — trace", () => {
+  interface R {
+    phase: string;
+    stage: string;
+    attempts: number;
+    rejections: number;
+    lastRejection: { gate: string; reasons: string[] } | null;
+  }
+  type RE = { type: "FAIL"; gate: string; reasons: string[] } | { type: "PASS" };
+  const rejectingTask = (events: RE[]): TaskDefinition<R, RE, { kind: "work" }, unknown> => ({
+    name: "rejets",
+    initialState: () => ({ phase: "DESIGN", stage: "SPECIALIST", attempts: 0, rejections: 0, lastRejection: null }),
+    initialEffects: () => [{ kind: "work" }],
+    transition(s, e) {
+      if (e.type === "FAIL") return { state: { ...s, attempts: s.attempts + 1, rejections: s.rejections + 1, lastRejection: { gate: e.gate, reasons: e.reasons } }, effects: [{ kind: "work" }] };
+      if (e.type === "PASS") return { state: { ...s, phase: "DONE", stage: "DONE" }, effects: [] };
+      return { state: s, effects: [] };
+    },
+    runEffect: async () => events.shift(),
+    isTerminal: (s) => s.phase === "DONE",
+  });
+
+  async function run(events: RE[]) {
+    const entries: TraceEntry[] = [];
+    const trace = { append: async (e: TraceEntry) => void entries.push(e), list: async () => entries, archive: async () => undefined };
+    const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t"), trace });
+    engine.register(rejectingTask(events), {});
+    const id = await engine.start("rejets", {});
+    await engine.idle(id);
+    return entries;
+  }
+
+  it("trace chaque transition avec l'événement, la phase, le stade et les essais", async () => {
+    const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["model.md absent"] }, { type: "PASS" }]);
+    const transitions = entries.filter((e) => e.kind === "transition");
+    expect(transitions).toEqual([
+      expect.objectContaining({ taskId: "t1", événement: "FAIL", phase: "DESIGN", stade: "SPECIALIST", essais: 1, effets: ["work"] }),
+      expect.objectContaining({ événement: "PASS", phase: "DONE", stade: "DONE", effets: [] }),
+    ]);
+  });
+
+  it("trace un rejet avec sa porte et ses motifs entiers, une fois par rejet", async () => {
+    const entries = await run([
+      { type: "FAIL", gate: "documents", reasons: ["model.md absent", "decisions.md vide"] },
+      { type: "FAIL", gate: "documents", reasons: ["model.md absent", "decisions.md vide"] },
+      { type: "PASS" },
+    ]);
+    // Deux rejets identiques restent deux rejets : c'est le nombre de rejeux qu'on veut compter.
+    expect(entries.filter((e) => e.kind === "rejet")).toEqual([
+      expect.objectContaining({ porte: "documents", motifs: ["model.md absent", "decisions.md vide"] }),
+      expect.objectContaining({ porte: "documents", motifs: ["model.md absent", "decisions.md vide"] }),
+    ]);
+  });
+
+  it("un motif conservé d'un rejet précédent ne compte pas comme un nouveau rejet", async () => {
+    // `lastRejection` reste posé pendant tout le réessai : seul le compteur dit qu'un rejet a eu lieu.
+    const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["x"] }, { type: "PASS" }]);
+    expect(entries.filter((e) => e.kind === "rejet")).toHaveLength(1);
+  });
+
+  it("une trace qui échoue n'arrête pas la tâche", async () => {
+    // La trace raconte, elle n'atteste rien (ADR 0032) : elle ne doit jamais faire échouer le travail.
+    const trace = { append: async () => { throw new Error("disque plein"); }, list: async () => [], archive: async () => undefined };
+    const store = new MemoryTaskStore();
+    const engine = createTaskEngine({ store, checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t"), trace });
+    engine.register(rejectingTask([{ type: "PASS" }]), {});
+    const id = await engine.start("rejets", {});
+    await engine.idle(id);
+    expect((await store.load(id))?.status).toBe("finished");
+  });
+});

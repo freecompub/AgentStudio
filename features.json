@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-09-29",
-  "branch": "feat/skraft-agents-skills-md",
+  "updated": "2026-10-03",
+  "branch": "feat/suivi-run",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -457,6 +457,27 @@
       "verify": "MANUEL : charger extensions/skraft comme plugin dans Claude Code (.claude-plugin/plugin.json) et dans Copilot CLI (plugin.json), vérifier que les agents skraft-* et les skills apparaissent",
       "passes": false,
       "notes": "Manifestes écrits d'après la structure de skraft-plugin, jamais éprouvés sur les versions installées (point À VÉRIFIER de l'ADR 0024). Sans agent-studio, aucune garantie : ni porte, ni preuve, ni test gelé."
+    },
+    {
+      "id": "trace-transitions-et-rejets",
+      "title": "La trace enregistre chaque transition et chaque rejet avec ses motifs entiers",
+      "verify": "pnpm vitest run --project task-engine -t \"trace\"",
+      "passes": true,
+      "notes": "Les entrées `transition` et `rejet` étaient déclarées depuis l’ADR 0032 mais rien ne les écrivait. Le moteur lit par convention `stage`, `attempts`, `rejections` (compteur croissant) et `lastRejection` ; skraft compte ses rejets dans `bumpRetries`."
+    },
+    {
+      "id": "bilan-de-run-par-etape",
+      "title": "Un run se résume par étape depuis sa trace : durée, tours, rejets et causes, requêtes premium",
+      "verify": "pnpm vitest run --project core test/run-summary.test.ts",
+      "passes": true,
+      "notes": "`resumerTrace`, pur. Le banc s’en sert en direct (lignes `§`) et pour `docs/runs/<date>-<story>/rapport.md`. Les requêtes premium viennent de `nanoAiu / 1e9`, vérifié contre l’écart de réserve (36 = 36)."
+    },
+    {
+      "id": "coherence-noms-definis-en-code",
+      "title": "La porte cohérence reconnaît un nom défini dans le code du modèle (bloc, signature, appel)",
+      "verify": "pnpm vitest run --project ext-skraft test/design-gate.test.ts",
+      "passes": true,
+      "notes": "Run réel du 03/10 : DESIGN rejetée deux fois à tort (`AppliqueA` défini en signature dans un bloc de code), environ 200 requêtes. Rejoué sur les trois instantanés : seul l’essai 1, où le nom manquait vraiment, est encore rejeté."
     }
   ]
 }

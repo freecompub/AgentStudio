@@ -511,7 +511,7 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const fix = play([...delivered, LENSES(major)]);
     const defect = "[cold-reader, major] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
     expect(fix.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect] }]);
-    expect(fix.state).toMatchObject({ stage: "SPECIALIST", attempts: 1, retries: { DELIVER: 1 } });
+    expect(fix.state).toMatchObject({ stage: "SPECIALIST", attempts: 1, retries: { DELIVER: 1 }, rejections: 1 });
     expect(fix.state.deliver!.scenarios[0]!.unitTests).toEqual(["U > t1"]);
     const verify = transition(fix.state, REP_DEV);
     expect(verify.effects).toEqual([{ kind: "verifyUnitGreen", mode: "fix", scenarioId: "ac-2", since: "cp-s2", newTest: null, unitTestsHash: "h1", pending: [] }]);
