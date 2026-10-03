@@ -218,8 +218,11 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail, ...fail, ...fail]);
     expect(state.stage).toBe("ESCALATED");
     expect(state.attempts).toBe(3);
+    // Le dépôt est rembobiné ET la mémoire des agents de la phase est oubliée (ADR 0050) : les
+    // deux décrivent le même travail, les séparer laisse l'agent corriger un dépôt qui n'existe plus.
     expect(effects).toEqual([
       { kind: "rollback", to: "cp-RESEARCH" },
+      { kind: "forgetSessions", roles: ["skraft-researcher"] },
       { kind: "askEscalation", reason: "citations : fichier de 55 lignes", options: ["retry", "skip", "abort"] },
     ]);
   });
@@ -238,6 +241,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(state).toMatchObject({ stage: "ESCALATED", attempts: 0 });
     expect(effects).toEqual([
       { kind: "rollback", to: "cp-RESEARCH" },
+      { kind: "forgetSessions", roles: ["skraft-researcher"] },
       { kind: "askEscalation", reason: "quota épuisé", options: ["retry", "skip", "abort"] },
     ]);
   });
@@ -359,7 +363,11 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     expect(play([...escalated, DECIDE("retry")]).effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 1, feedback: [] }]);
     const skipped = play([...escalated, DECIDE("skip")]);
     expect(skipped.state.skipPhases).toEqual(["RESEARCH"]);
-    expect(skipped.effects).toEqual([{ kind: "rollback", to: "cp-RESEARCH" }, { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
+    expect(skipped.effects).toEqual([
+      { kind: "rollback", to: "cp-RESEARCH" },
+      { kind: "forgetSessions", roles: ["skraft-researcher"] },
+      { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
+    ]);
     expect(play([...escalated, DECIDE("abort")]).state.stage).toBe("ABORTED");
   });
 
@@ -944,5 +952,54 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(kinds(r.effects)).toEqual(["scenarioGate"]);
       expect(r.state.reviewThreads?.[0]).toMatchObject({ status: "contested", contestation: "couvert par ac-5" });
     });
+  });
+});
+
+/**
+ * Rembobiner sans faire oublier, c'est garder le souvenir et retirer la chose (ADR 0050).
+ *
+ * L'ADR 0040 a levé cette incohérence pour le RÉESSAI, en cessant d'annuler. Elle restait entière
+ * sur le chemin d'ESCALADE, où l'ADR 0029 (point 3) veut au contraire que le dépôt redevienne
+ * propre pour l'humain : le rollback partait, la conversation des agents restait. À la relance,
+ * l'architecte revenait avec, dans sa mémoire, les appels d'outils qui avaient créé
+ * `contracts.md`, `event-model.md`, `domain-model.md` — et un disque qui ne les contenait plus.
+ *
+ * Jamais observé dans un run, pour une mauvaise raison : le banc répondait « po » à une escalade
+ * qui exige développeur ou architecte, la réponse était refusée en silence, et la relance n'avait
+ * jamais lieu.
+ */
+describe("Réducteur skraft — le dépôt et la mémoire reviennent au même point", () => {
+  const oubli = (roles: string[]) => ({ kind: "forgetSessions", roles });
+  const paire = (e: SkraftEffect[]) => e.filter((x) => x.kind === "rollback" || x.kind === "forgetSessions").map((x) => x.kind);
+
+  it("budget épuisé : le rollback est immédiatement suivi de l'oubli", () => {
+    const fail = [REPORTED, GATE_FAIL];
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail, ...fail, ...fail]);
+    expect(paire(effects)).toEqual(["rollback", "forgetSessions"]);
+    expect(effects).toContainEqual(oubli(["skraft-researcher"]));
+  });
+
+  it("panne d'environnement : même paire", () => {
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), { type: "ENV_FAILURE", reason: "quota épuisé" }]);
+    expect(paire(effects)).toEqual(["rollback", "forgetSessions"]);
+  });
+
+  it("phase sautée : même paire — le travail écarté ne doit pas survivre en mémoire", () => {
+    const fail = [REPORTED, GATE_FAIL];
+    const escalade = [...toFirstPhase(), CP("RESEARCH"), ...fail, ...fail, ...fail];
+    expect(paire(play([...escalade, DECIDE("skip")]).effects)).toEqual(["rollback", "forgetSessions"]);
+  });
+
+  it("DESIGN a DEUX rôles : les deux sont oubliés, pas seulement celui du tour en cours", () => {
+    // L'architecte modélise puis décide. Escalader en n'oubliant que le second laisserait au
+    // premier la mémoire de fichiers effacés.
+    const fail = [REPORTED, REPORTED, GATE_FAIL];
+    const { effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), ...fail, ...fail, ...fail]);
+    expect(effects).toContainEqual(oubli(["skraft-architect-model", "skraft-architect-decide"]));
+  });
+
+  it("un REESSAI, lui, n'oublie rien : rien n'a été rembobiné (ADR 0040)", () => {
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL]);
+    expect(paire(effects)).toEqual([]);
   });
 });

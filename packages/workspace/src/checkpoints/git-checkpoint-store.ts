@@ -5,6 +5,42 @@ import { APP_IDENTITY } from "../git/cli-git-runner.js";
 import type { Checkpoint, CheckpointStore, FileChange, FileChangeStatus, GitRunner } from "../protocols.js";
 
 const CHECKPOINT_REFS = "refs/agent-studio/checkpoints";
+
+/**
+ * Fichiers que le système d'exploitation sème tout seul (ADR 0051).
+ *
+ * Ils entrent dans l'instantané d'un checkpoint quand le dépôt ne les ignore pas — et rien ne
+ * garantit qu'il les ignore : c'est une configuration de l'utilisateur, souvent globale à sa
+ * machine. Sans exclusion, un run enregistrerait un `.DS_Store` comme artefact « produit par »
+ * l'agent, et le même travail rendrait des empreintes différentes selon le poste.
+ *
+ * Écrit ici parce que le Workspace est le seul service qui touche le disque, et parce que c'est une
+ * connaissance de PLATEFORME, pas de langage : elle n'a rien à faire dans un adaptateur de stack.
+ */
+export const FICHIERS_DU_SYSTEME = [
+  ".DS_Store", // macOS, Finder
+  "._*", // macOS, AppleDouble sur les systèmes de fichiers étrangers
+  ".Spotlight-V100",
+  ".Trashes",
+  ".fseventsd",
+  "Thumbs.db", // Windows, Explorateur
+  "ehthumbs.db",
+  "desktop.ini",
+  "$RECYCLE.BIN",
+] as const;
+
+/**
+ * Pathspecs visant ces fichiers, à la racine et à tout niveau (`:(glob)x` ne couvre pas `sous/x`).
+ *
+ * On les retire de l'index APRÈS l'ajout, par `reset HEAD`, et non par exclusion de `git add` :
+ * dès qu'un pathspec explicite désigne un fichier ignoré par un `.gitignore`, `git add` échoue —
+ * y compris quand ce même fichier est exclu par un autre pathspec.
+ *
+ * `reset HEAD` a par ailleurs la bonne sémantique aux deux bouts : un fichier absent de HEAD sort
+ * de l'index, un fichier DÉJÀ suivi y revient dans sa version de HEAD. On refuse de les
+ * enregistrer, on ne les supprime dans le dos de personne.
+ */
+const PATHSPECS = FICHIERS_DU_SYSTEME.flatMap((m) => [`:(glob)${m}`, `:(glob)**/${m}`]);
 const CHECKPOINT_ID = /^\d{13,}-[0-9a-f]{8}$/;
 
 export class UnknownCheckpointError extends Error {
@@ -25,6 +61,7 @@ export function createGitCheckpointStore(git: GitRunner, gitDir: string): Checkp
     try {
       await git.run(["read-tree", "HEAD"], { env });
       await git.run(["add", "-A"], { env });
+      await git.run(["reset", "-q", "HEAD", "--", ...PATHSPECS], { env });
       return (await git.run(["write-tree"], { env })).trim();
     } finally {
       await rm(env.GIT_INDEX_FILE, { force: true });

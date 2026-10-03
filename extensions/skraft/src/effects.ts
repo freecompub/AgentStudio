@@ -226,6 +226,12 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       });
       return;
 
+    // Indissociable du rollback qui le précède (ADR 0050) : le dépôt et la mémoire des agents
+    // doivent revenir au même point. Émis aussi quand une phase est sautée.
+    case "forgetSessions":
+      await ctx.agents.forget(taskId, effect.roles);
+      return;
+
     case "rollback": {
       // Archiver AVANT (ADR 0038) : le rollback efface le livrable en même temps que le verdict qui
       // le condamne, et on ne peut plus examiner ce qu'un agent a produit au moment précis où on

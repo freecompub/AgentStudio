@@ -24,6 +24,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/**
+ * `FakeApi.emit` ne garde rien : un événement émis avant que `TaskPanel` ne se soit abonné est
+ * perdu en silence. Attendre « Votre message » ne prouve que le montage de la conversation ; le
+ * panneau s'abonne puis demande ses instantanés, donc voir l'appel prouve l'abonnement.
+ */
+const panneauAbonne = () => waitFor(() => expect(api.calls.some((c) => c.channel === "interactions:list")).toBe(true));
+
+
 const user = (id: string, text: string, extra: Partial<ChatMessageDto> = {}): ChatMessageDto => ({
   id,
   role: "user",
@@ -145,6 +153,7 @@ describe("Renderer — tâches et décisions (J2)", () => {
     chatReady();
     render(<App />);
     await screen.findByLabelText("Votre message");
+    await panneauAbonne();
     const card = { id: "t1", title: "Cycle TDD : Plafonner", phase: "RED", phaseLabel: "Écriture du test", status: "running" as const, alert: false, milestone: false, step: { index: 1, total: 2, behavior: "plafonne" }, updatedAt: new Date().toISOString() };
     act(() => api.emit("task:update", card));
     expect(await screen.findByText("Cycle TDD : Plafonner")).toBeTruthy();
@@ -170,6 +179,7 @@ describe("Renderer — tâches et décisions (J2)", () => {
     chatReady();
     render(<App />);
     await screen.findByLabelText("Votre message");
+    await panneauAbonne();
     const row = (phase: string, label: string, requests: number, retries = 0) => ({ phase, label, requests, inputTokens: 1000, outputTokens: 100, retries, durationMs: 65_000 });
     act(() =>
       api.emit("task:update", {

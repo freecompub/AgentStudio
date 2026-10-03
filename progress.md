@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 03/10 (soir) — Trois correctifs du 29/09 restés hors de `main`, intégrés
+
+`fix/plafond-duree-tour` portait trois commits poussés **après** la fusion de la PR #9, donc jamais
+arrivés dans `main` : à l'escalade, le dépôt et la mémoire reviennent au même point ; un événement
+reçu pendant le chargement n'est plus perdu ; un checkpoint n'enregistre pas les fichiers que le
+système sème (et `--en-place` pour le banc). Rejoués sur `main`, conflits résolus :
+- **Numéros d'ADR en collision** : leurs 0045 et 0046 existaient déjà dans `main` (couvert par
+  l'acceptance ; la revue dialogue). Renumérotés **0050** et **0051**, renvois corrigés dans leurs
+  seules lignes, et noté dans les messages de commit.
+- **Interaction découverte en fusionnant** : `--en-place` + `--pousser` aurait ajouté un remote
+  `github` au vrai dépôt de l'utilisateur. En place, le banc pousse désormais par son `origin` ;
+  `--base` et `--en-place` sont incompatibles et refusés ensemble.
+- `scripts/` entre dans le typecheck (leur commit) : mon banc du 03/10 y passe sans erreur.
+- **Piège** : au premier rejeu, j'ai validé `progress.md` avec ses marqueurs de conflit — ma liste
+  des fichiers en conflit était tronquée par un `head`. Vu avant de pousser. Après une résolution,
+  `git grep "^<<<<<<< "` sur tout le dépôt, pas une liste partielle.
+
+---
+
 ## 03/10 — Suivre un run étape par étape, et la porte qui recalait une conception juste
 
 > Synthèse de la journée, problème par problème (symptôme, cause, solution, vérification) :
@@ -269,6 +288,118 @@ configurée avec `quality.yaml`, la commande Stryker et `dotnet-tools.json`) : `
 100 %, `Montant.cs` sous le seuil → **refus**, alors que la revue avait approuvé. Les deux survivants
 restants sont de vrais trous : aucun test ne vérifie qu'un facteur négatif est refusé, ni qu'un
 facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas vu.
+
+---
+
+## 29/09 — Les fichiers du système, et un banc qui peut travailler chez toi
+
+**Ce que j'avais affirmé à tort.** J'ai annoncé ce matin que les `.DS_Store` apparus dans
+`.skraft/<slug>/` étaient enregistrés comme artefacts « produits par » l'agent. Faux sur ce poste :
+un `~/.gitignore_global` les couvre, et l'instantané d'un checkpoint passe par `git add -A`, qui
+respecte `.gitignore`. Je n'avais pas suivi la chaîne avant de le dire.
+
+**Le risque restait, conditionné à la configuration de l'utilisateur.** Un poste neuf, la CI, un
+collègue sous Windows avec `Thumbs.db` et `desktop.ini` : là ils entrent dans l'instantané, donc
+dans les artefacts, donc dans le commit de la phase. Le même travail rendrait des empreintes
+différentes selon la machine. C'est une garantie du produit qui dépendait d'un réglage personnel.
+
+**Où je l'ai écrit, et pourquoi.** Dans le Workspace, seul service qui touche le disque, et parce
+que c'est une connaissance de **plateforme** — pas de langage, donc pas dans un adaptateur de stack.
+
+**Le détail qui a changé l'implémentation.** J'ai d'abord exclu ces fichiers du `git add` par
+pathspec. `git add` **échoue** dès qu'un pathspec explicite désigne un fichier ignoré par un
+`.gitignore`, même si ce même fichier est exclu par un autre pathspec du même appel. Mesuré dans un
+dépôt jetable avant de recoder. La bonne voie est `reset HEAD` après l'ajout, qui a en prime la
+sémantique voulue aux deux bouts : absent de HEAD il sort de l'index, déjà suivi il y revient — donc
+un `desktop.ini` commité volontairement est préservé.
+
+**Ce que mes tests prouvent vraiment.** Trois tests, un seul discrimine le correctif. Les deux
+autres gardent contre une *mauvaise* correction — supprimer le fichier, ou retirer un fichier
+volontairement suivi — et passent sans lui. Vérifié par mutation, et dit tel quel dans l'ADR.
+
+**`--en-place` pour le banc.** Il clonait toujours vers un dossier temporaire : le dépôt était
+protégé, mais les livrables restaient hors de vue, à chercher dans `/private/var/folders/...`.
+L'option renverse le choix, avec deux garde-fous, parce que le pipeline commite, branche et
+rembobine : un arbre de travail **sale** fait échouer le lancement en nommant les fichiers, et le
+banc annonce en clair que le dépôt sera modifié. Les deux branches essayées à la main ; pas de test
+automatisé, `scripts/` n'a pas de suite.
+
+---
+
+## 29/09 — Le test instable, et les deux défauts derrière lui
+
+**Comment je l'ai trouvé.** Pas en lisant : en rejouant la suite **huit fois**. Un échec, un seul,
+au quatrième passage — « le texte saisi accompagne la réponse », dans `j6.test.tsx`. Je l'avais
+signalé plus tôt sans son nom, faute d'avoir capturé la sortie au moment où il était tombé ; c'est
+la seule raison qui m'a coûté ces huit exécutions.
+
+**Deux causes distinctes, un seul symptôme** — le panneau reste vide après l'émission.
+
+**Dans le produit.** `TaskPanel` s'abonne aux événements **et** demande un instantané au montage :
+
+```ts
+api.on("interactions:changed", ({ pending }) => setPending(pending));   // synchrone
+api.call("interactions:list", {}).then(setPending, () => undefined);    // promesse
+```
+
+Un événement reçu pendant le chargement était écrasé, à la résolution, par une liste déjà périmée.
+Même schéma pour `tasks:list` / `task:update`, en pire : la liste **remplace** la Map là où
+l'événement y **fusionne**. Corrigé par un garde de fraîcheur — l'instantané ne s'applique que si
+rien de plus récent n'est arrivé.
+
+**Dans les tests.** `FakeApi.emit` parcourt les auditeurs enregistrés et ne garde rien : un
+événement émis avant le montage du panneau est perdu **en silence**. Attendre « (PO / BA) » ou
+« Votre message » ne prouve que le montage d'un *autre* composant. Les tests attendent désormais que
+le panneau soit abonné — son effet s'abonne puis appelle `interactions:list`, donc voir l'appel
+suffit à le prouver.
+
+**Ce qui m'a évité de m'arrêter trop tôt.** Après le premier correctif, j'ai rejoué dix fois : échec
+au neuvième. Sans ça j'aurais conclu « réglé » sur une seule exécution verte, alors que je n'avais
+traité qu'une des deux causes. Les deux tests de course sont d'ailleurs vérifiés par mutation.
+
+**Stabilité mesurée** : 15 exécutions du fichier et 5 de la suite complète sans échec, contre 2
+échecs sur 12 avant.
+
+**Et `scripts/` est entré dans le typecheck**, ce qui a trouvé deux défauts immédiatement : un
+doublon d'import que je venais d'introduire dans le banc — le paquet exportait déjà `createGhAuth`
+et un `createNodeCommandRunner` que j'avais réécrit à la main — et, plus ancien, un confirmateur de
+garde rendant `false` dans `smoke-copilot.ts` là où `ConfirmAnswer` attend une des trois réponses.
+L'essai réel contre Copilot tournait avec une garde qui ne disait rien de valide.
+
+---
+
+## 29/09 — Le dépôt revenait en arrière, la mémoire non (ADR 0050, numéroté 0045 à l’origine)
+
+**L'incohérence que j'avais laissée derrière moi.** L'ADR 0040 du matin cesse de rembobiner sur un
+réessai, précisément parce que l'agent garde sa session. Je n'ai pas regardé ce que devenait cette
+session sur le chemin d'**escalade**, où l'ADR 0029 veut au contraire que le dépôt redevienne
+propre. Le rollback partait ; la conversation restait. À la relance, l'architecte revenait avec la
+mémoire de fichiers que le rollback venait d'effacer.
+
+Même phrase que le matin, un cran plus loin : **garder le souvenir et retirer la chose**.
+
+**Pourquoi on ne l'avait jamais vu.** Le banc répondait `po` à une escalade qui exige développeur
+ou architecte ; le refus était avalé en silence et la relance n'avait jamais lieu (ADR 0044). Deux
+runs gelés là-dessus. Le défaut était derrière un autre défaut.
+
+**Ce que j'ai fait.** Une fonction unique du réducteur fabrique la paire `rollback` +
+`forgetSessions`, et les trois chemins qui rembobinent l'utilisent. L'oubli porte sur **tous les
+rôles de la phase** (`phaseRoles`), pas celui du tour en cours : DESIGN en a deux, DELIVER aussi,
+et n'en oublier qu'un reconstituerait exactement le défaut.
+
+**Ce que ça a coûté de traverser la frontière d'extension.** `ctx.agents.forget(taskId, noms)` :
+seuls des noms de rôles franchissent, jamais un objet de session (règle de sécurité n°1). Il a
+fallu câbler l'API, le port du cœur, l'hôte en processus, le RPC de l'hôte isolé et l'enfant — le
+typecheck a listé chacun des points, y compris les doubles de test à compléter.
+
+**Le détail qui rend la correction petite** : la clé de continuité `<taskId>/<extension>/<rôle>`
+n'avait pas été conçue pour filtrer, et elle s'y prête sans changement.
+
+**Trois tests affirmaient le rollback seul** à l'escalade. Réécrits pour exiger la paire.
+
+**Reste à vérifier sur un vrai run** : ce chemin n'a jamais été parcouru de bout en bout. Le banc
+est corrigé pour y arriver, mais tant qu'aucune escalade n'aura été relancée pour de vrai, le
+comportement est une déduction.
 
 ---
 

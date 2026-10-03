@@ -55,6 +55,14 @@ export interface TaskAgentRunner {
    * éphémères, mais à l'échelle de la **tâche** et non du tour.
    */
   releaseTask(taskId: string): Promise<void>;
+  /**
+   * Libère les sessions de certains rôles d'une tâche en cours (ADR 0050).
+   *
+   * `releaseTask` clôt la tâche entière ; ici la tâche continue, mais le travail de ces rôles a été
+   * rembobiné. Garder leur conversation reviendrait à leur faire corriger des fichiers effacés —
+   * l'incohérence que l'ADR 0040 a levée pour le réessai, et qui restait sur le chemin d'escalade.
+   */
+  releaseRoles(taskId: string, roles: readonly string[]): Promise<void>;
 }
 
 export interface TaskAgentRunnerDeps {
@@ -97,6 +105,19 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
       }
     },
+    async releaseRoles(taskId, roles) {
+      for (const role of roles) {
+        // Clé de continuité : `<taskId>/<extension>/<rôle>` (voir `resumeKey`). Le suffixe suffit
+        // à viser un rôle sans connaître l'extension qui le déclare.
+        const suffixe = `/${role}`;
+        for (const [cle, id] of [...reprenables]) {
+          if (!cle.startsWith(`${taskId}/`) || !cle.endsWith(suffixe)) continue;
+          reprenables.delete(cle);
+          await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
+        }
+      }
+    },
+
     async run(spec, prompt, opts = {}) {
       let output: TerminalOutput<typeof spec.output> | undefined;
       let blocker: TerminalOutput<"report_blocker"> | undefined;

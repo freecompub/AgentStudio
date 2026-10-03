@@ -40,7 +40,9 @@ const deps: MainSessionDeps = {
   checkpoints: ws.checkpoints,
   workspaceRoot: ws.root,
   systemPrompt: "Tu travailles dans un dépôt Git. Réponds en français, brièvement.",
-  guard: createWorkspaceGuard({ root: ws.root, confirmer: { confirm: async () => false } }),
+  // `ConfirmAnswer`, pas un booléen : `false` n'est aucune des trois réponses, et le refus
+  // que cet essai veut exprimer s'écrit « deny ».
+  guard: createWorkspaceGuard({ root: ws.root, confirmer: { confirm: async () => "deny" as const } }),
   clock: { now: () => new Date() },
   ids: { next: () => randomUUID() },
   idleMs: 120_000,

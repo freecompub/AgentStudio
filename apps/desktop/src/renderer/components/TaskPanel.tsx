@@ -16,12 +16,28 @@ export function TaskPanel() {
   const advanced = useAdvanced();
 
   useEffect(() => {
+    // L'instantané initial est ASYNCHRONE, les événements ne le sont pas : un événement arrivé
+    // pendant que la liste se charge serait écrasé par elle à sa résolution. On n'applique donc
+    // l'instantané que si rien de plus frais n'est arrivé entre-temps.
+    let tachesRecues = false;
+    let demandesRecues = false;
     const offs = [
-      api.on("task:update", (card) => setTasks((m) => new Map(m).set(card.id, card))),
-      api.on("interactions:changed", ({ pending }) => setPending(pending)),
+      api.on("task:update", (card) => {
+        tachesRecues = true;
+        setTasks((m) => new Map(m).set(card.id, card));
+      }),
+      api.on("interactions:changed", ({ pending }) => {
+        demandesRecues = true;
+        setPending(pending);
+      }),
     ];
-    api.call("tasks:list", {}).then((list) => setTasks(new Map(list.map((c) => [c.id, c]))), () => undefined);
-    api.call("interactions:list", {}).then(setPending, () => undefined);
+    api.call("tasks:list", {}).then((list) => {
+      // `task:update` fusionne, la liste remplace : appliquée après coup, elle perdrait la carte.
+      if (!tachesRecues) setTasks(new Map(list.map((c) => [c.id, c])));
+    }, () => undefined);
+    api.call("interactions:list", {}).then((list) => {
+      if (!demandesRecues) setPending(list);
+    }, () => undefined);
     return () => offs.forEach((off) => off());
   }, []);
 

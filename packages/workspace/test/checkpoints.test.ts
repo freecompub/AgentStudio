@@ -125,4 +125,49 @@ describe("Workspace — checkpoints, diff, rollback", () => {
     await git(root, "config", "user.name", "");
     await expect(ws.checkpoints.create("x")).resolves.toBeDefined();
   });
+
+  /**
+   * Les fichiers que le système sème n'entrent pas dans un checkpoint (ADR 0051).
+   *
+   * Observé le 29/09 : des `.DS_Store` apparaissent dans `.skraft/<slug>/` pendant un run, créés par
+   * macOS et non par l'agent. Sur le poste de développement ils étaient invisibles — un
+   * `~/.gitignore_global` les couvrait — mais rien ne garantit cette configuration : sur un poste
+   * neuf, en CI, ou sous Windows avec `Thumbs.db` et `desktop.ini`, ils entreraient dans l'instantané.
+   * La porte les enregistrerait alors comme artefacts « produits par » l'agent, et le même travail
+   * rendrait des empreintes différentes selon la machine.
+   *
+   * Le dépôt de ce test n'ignore RIEN de tout ça : c'est la condition qui rend le défaut visible.
+   */
+  describe("Un checkpoint ignore ce que le système d'exploitation sème", () => {
+    const bruits = [".DS_Store", "sous/.DS_Store", "Thumbs.db", "sous/desktop.ini", "._resource"];
+
+    it("ni dans le diff, ni dans les changements rapportés", async () => {
+      const cp = await ws.checkpoints.create("avant");
+      for (const b of bruits) await put(root, b, "bruit du système");
+      await put(root, "src/vrai.ts", "un vrai changement\n");
+
+      const { files } = await ws.checkpoints.diff(cp.id);
+      expect(files.map((f) => f.path)).toEqual(["src/vrai.ts"]);
+    });
+
+    it("le fichier reste bien sur le disque : on refuse de l'enregistrer, pas de le supprimer", async () => {
+      const cp = await ws.checkpoints.create("avant");
+      await put(root, ".DS_Store", "bruit");
+      await ws.checkpoints.diff(cp.id);
+      expect(existsSync(join(root, ".DS_Store"))).toBe(true);
+    });
+
+    it("un fichier de même nom DÉJÀ suivi n'est pas retiré dans le dos de l'utilisateur", async () => {
+      // Quelqu'un a commité un `desktop.ini` volontairement : l'exclure de l'ajout laisse la version
+      // de HEAD dans l'index, donc le diff ne le voit pas disparaître.
+      await put(root, "desktop.ini", "contenu voulu\n");
+      await git(root, "add", "-f", "desktop.ini");
+      await git(root, "commit", "-m", "desktop.ini volontaire");
+      const cp = await ws.checkpoints.create("avant");
+      await put(root, "src/b.ts", "b\n");
+      const { files } = await ws.checkpoints.diff(cp.id);
+      expect(files.map((f) => f.path)).toEqual(["src/b.ts"]);
+      expect(await read("desktop.ini")).toBe("contenu voulu\n");
+    });
+  });
 });

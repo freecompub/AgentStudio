@@ -122,6 +122,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     },
 
     agents: {
+      // L'extension nomme ses rôles ; le cœur connaît leurs sessions (ADR 0050).
+      forget: (taskId: string, names: readonly string[]) => deps.agents.releaseRoles(taskId, names.map((n) => `${manifest.id}/${n}`)),
       async run(name, prompt, opts) {
         perm.require("copilot:sessions");
         const a = declared.agents.get(name);

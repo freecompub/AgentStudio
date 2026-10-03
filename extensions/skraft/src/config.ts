@@ -23,6 +23,26 @@ export function specialistRole(phase: Phase, designStep: "model" | "decide"): Ro
   }
 }
 
+/**
+ * Tous les rôles qui travaillent dans une phase (ADR 0050).
+ *
+ * `specialistRole` rend celui du tour en cours ; ici on veut l'ensemble, parce qu'une escalade
+ * rembobine le travail de la phase entière et doit faire oublier toutes les conversations qui le
+ * décrivent — DESIGN en a deux, DELIVER aussi.
+ */
+export function phaseRoles(phase: Phase): Role[] {
+  switch (phase) {
+    case "RESEARCH":
+      return ["skraft-researcher"];
+    case "DESIGN":
+      return ["skraft-architect-model", "skraft-architect-decide"];
+    case "DISTILL":
+      return ["skraft-acceptance"];
+    case "DELIVER":
+      return ["skraft-test", "skraft-dev"];
+  }
+}
+
 /** Message de commit d'une phase (§5.2, COMMIT). */
 export function commitMessage(phase: Phase, slug: string): string {
   return phase === "DELIVER" ? `feat(${slug}): livraison de la story` : `docs(skraft): ${phase.toLowerCase()} de ${slug}`;
