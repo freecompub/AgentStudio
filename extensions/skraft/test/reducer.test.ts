@@ -4,6 +4,7 @@ import type { SkraftEffect, SkraftState } from "../src/model.js";
 import { validateState } from "../src/model.js";
 import { initialEffects, initialState, transition, type Ev } from "../src/reducer.js";
 import type { LensVerdict } from "../src/review.js";
+import { RESPONSE_INSTRUCTION } from "../src/review-thread.js";
 import { parseStory } from "../src/story.js";
 import { US12 } from "./story.test.js";
 
@@ -264,7 +265,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   it("REVIEW : CHANGES_REQUESTED → relance avec les seuls défauts blocker et major", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL"), REPORTED, GATE_OK, LENSES(lens("APPROVED", ["major", "minor"]))]);
     expect(state.stage).toBe("SPECIALIST");
-    expect(effects).toEqual([{ kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader, major] défaut major (Sources/A.swift:3)"] }]);
+    expect(effects).toEqual([{ kind: "runSpecialist", phase: "DISTILL", role: "skraft-acceptance", attempt: 2, feedback: ["[cold-reader#1.1, major, code] défaut major (Sources/A.swift:3)", RESPONSE_INSTRUCTION] }]);
   });
 
   it("REVIEW : REJECTED → ESCALATED", () => {
@@ -526,8 +527,8 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     ];
     const major: LensVerdict = { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 2 }, { severity: "minor", description: "nom" }] };
     const fix = play([...delivered, LENSES(major)]);
-    const defect = "[cold-reader, major] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
-    expect(fix.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect] }]);
+    const defect = "[cold-reader#1.1, major, code] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
+    expect(fix.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);
     expect(fix.state).toMatchObject({ stage: "SPECIALIST", attempts: 1, retries: { DELIVER: 1 }, rejections: 1 });
     expect(fix.state.deliver!.scenarios[0]!.unitTests).toEqual(["U > t1"]);
     const verify = transition(fix.state, REP_DEV);
@@ -546,25 +547,25 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
       ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
       { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
     ];
-    const defect = "[cold-reader, major] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
+    const defect = "[cold-reader#1.1, major, code] MaxBolus accepte une valeur négative (Sources/Domain/BolusCap.swift:2)";
     const major = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 2 }] });
 
     it("pas de correction refusé : relance avec les défauts de revue ET le motif du refus", () => {
       const r = play([...delivered, major, REP_DEV, FAIL("Tests en échec : U > t1.")]);
       expect(r.effects).toEqual([
         { kind: "rollback", to: "cp-s2" },
-        { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 2, feedback: [defect, "Tests en échec : U > t1."] },
+        { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 2, feedback: [defect, RESPONSE_INSTRUCTION, "Tests en échec : U > t1."] },
       ]);
     });
 
     it("porte de fin de scénario refusée après correction : les défauts de revue restent transmis", () => {
       const r = play([...delivered, major, REP_DEV, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true }, { type: "SCENARIO_FAIL", reasons: ["Mutation : 90 %"] }]);
-      expect(r.effects.at(-1)).toEqual({ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, "Mutation : 90 %"] });
+      expect(r.effects.at(-1)).toEqual({ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION, "Mutation : 90 %"] });
     });
 
     it("blocage pendant la correction : la réponse relance la correction avec ses défauts", () => {
       const blocked = play([...delivered, major, { type: "BLOCKER_REPORTED", question: "Valeur minimale ?", choices: [] }]);
-      expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect] }]);
+      expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);
     });
 
     it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
@@ -780,5 +781,95 @@ describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les
   it("un verdict REJECTED escalade toujours, budget ou non : ce n'est pas une demande de changement", () => {
     const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
     expect(state.stage).toBe("ESCALATED");
+  });
+});
+
+/**
+ * ADR 0046 — fils de défauts : routage, réponses des agents, arbitrage des lentilles, et l'humain
+ * en dernier recours. Run réel US-2 du 03/10 : la revue réclamait deux fois des tests que le
+ * testeur jugeait redondants et qu'une correction ne pouvait pas écrire.
+ */
+describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
+  const distill = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL"), REPORTED, GATE_OK];
+  const archi = (description: string, rulings: LensVerdict["rulings"] = []): LensVerdict => ({ lens: "architecture", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description, target: "deliverable" }], rulings });
+  const respond = (responses: { defect: string; status: "fixed" | "contested"; reason?: string }[]): Ev => ({ type: "AGENT_REPORTED", role: "skraft-acceptance", summary: "s", files: [], responses });
+  const feedbackOf = (effects: SkraftEffect[]) => (effects.find((x) => x.kind === "runSpecialist") as { feedback: string[] } | undefined)?.feedback.join("\n") ?? "";
+
+  it("après un rejet de revue, le retour conserve les demandes des rejets précédents, en rappel", () => {
+    const r = play([...distill, LENSES(archi("calcul pur modélisé en événement")), respond([{ defect: "architecture#1.1", status: "fixed" }]), GATE_OK,
+      LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "la grille n'a pas de source", target: "deliverable" }] })]);
+    const fb = feedbackOf(r.effects);
+    expect(fb).toMatch(/\[cold-reader#2\.1, major, deliverable\] la grille n'a pas de source/);
+    expect(fb).toMatch(/Rappel.*\[architecture#1\.1\] calcul pur modélisé en événement/s);
+  });
+
+  it("une contestation acceptée par la lentille fait tomber le défaut : la phase est approuvée", () => {
+    const r = play([...distill, LENSES(archi("modèle trop riche")), respond([{ defect: "architecture#1.1", status: "contested", reason: "imposé par l'ADR-002" }]), GATE_OK,
+      LENSES({ lens: "architecture", verdict: "APPROVED", defects: [], rulings: [{ defect: "architecture#1.1", decision: "accepted", reason: "en effet" }] })]);
+    expect(kinds(r.effects)).toEqual(["commitPhase"]);
+    expect(r.state.reviewThreads?.[0]).toMatchObject({ status: "accepted", ruling: "en effet" });
+  });
+
+  it("maintenu une fois : à corriger ; contesté encore puis maintenu : l'humain arbitre, et sa décision s'applique", () => {
+    const maintained = { lens: "architecture", verdict: "CHANGES_REQUESTED" as const, defects: [], rulings: [{ defect: "architecture#1.1", decision: "maintained" as const, reason: "non" }] };
+    const round2 = play([...distill, LENSES(archi("modèle trop riche")), respond([{ defect: "architecture#1.1", status: "contested", reason: "x" }]), GATE_OK, LENSES(maintained)]);
+    expect(feedbackOf(round2.effects)).toMatch(/maintenu par la lentille après ta contestation \(non\) : à corriger/);
+
+    const round3 = play([...distill, LENSES(archi("modèle trop riche")), respond([{ defect: "architecture#1.1", status: "contested", reason: "x" }]), GATE_OK, LENSES(maintained),
+      respond([{ defect: "architecture#1.1", status: "contested", reason: "toujours x" }]), GATE_OK, LENSES(maintained)]);
+    expect(round3.state.stage).toBe("ARBITRATION");
+    expect(round3.effects).toEqual([{ kind: "askArbitration", thread: expect.objectContaining({ id: "architecture#1.1", contestation: "toujours x" }) }]);
+
+    const agent = transition(round3.state, DECIDE("accept:architecture#1.1"));
+    expect(kinds(agent.effects)).toEqual(["commitPhase"]);
+    const lentille = transition(round3.state, DECIDE("maintain:architecture#1.1"));
+    expect(lentille.state.stage).toBe("SPECIALIST");
+    expect(feedbackOf(lentille.effects)).toMatch(/tranché par l'humain en faveur de la lentille/);
+  });
+
+  describe("DELIVER : chaque défaut va à l'agent qu'il concerne", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const delivered = [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
+    ];
+    const review = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [
+      { severity: "major", description: "grille vide non testée", target: "test", file: "Tests/GrilleTests.swift" },
+      { severity: "major", description: "taux négatif accepté", target: "code" },
+    ] });
+
+    it("les défauts de test d'abord, à l'agent des tests, qui ne reçoit qu'eux", () => {
+      const r = play([...delivered, review]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(run.feedback.join("\n")).toMatch(/grille vide non testée/);
+      expect(run.feedback.join("\n")).not.toMatch(/taux négatif/);
+    });
+
+    it("correction côté tests : vérifiée par le code, puis le développeur fait passer les tests rouges et traite ses défauts", () => {
+      const verify = play([...delivered, review, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev]);
+      expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object) }]);
+      expect(verify.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("fixed");
+
+      const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h9", fixTargets: ["U > t9"] };
+      const dev = transition(verify.state, fixTestOk);
+      const run = dev.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix");
+      expect(run.feedback.join("\n")).toMatch(/taux négatif accepté/);
+      expect(run.feedback.join("\n")).toMatch(/Tests ajoutés par la correction côté tests, rouges : fais-les passer\. U > t9/);
+
+      const green = transition(dev.state, REP_DEV);
+      expect(green.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "fix", targets: ["U > t9"], unitTestsHash: "h9" })]);
+      const gate = transition(green.state, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true });
+      expect(gate.effects).toEqual([expect.objectContaining({ kind: "scenarioGate", unitTests: ["U > t9"] })]);
+    });
+
+    it("tout contesté côté tests, rien côté code : directement la porte de fin de scénario, puis la revue", () => {
+      const onlyTest = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "grille vide non testée", target: "test" }] });
+      const r = play([...delivered, onlyTest, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "contested", reason: "couvert par ac-5" }] } as Ev,
+        { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h1", fixTargets: [] } as Ev]);
+      expect(kinds(r.effects)).toEqual(["scenarioGate"]);
+      expect(r.state.reviewThreads?.[0]).toMatchObject({ status: "contested", contestation: "couvert par ac-5" });
+    });
   });
 });

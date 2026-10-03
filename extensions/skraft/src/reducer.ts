@@ -2,7 +2,8 @@ import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
-import { actionableDefects, synthesize, type LensVerdict } from "./review.js";
+import { synthesize, type LensVerdict } from "./review.js";
+import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, reviewRound } from "./review-thread.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
@@ -114,12 +115,14 @@ export function transition(s0: SkraftState, e: Ev): Out {
         return { state: ns, effects: [specialist(ns, [])] };
       }
       if (e.type === "AGENT_REPORTED") {
-        if (p === "DESIGN" && s.designStep === "model") {
+        // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
+        const s1: SkraftState = e.responses?.length && s.reviewThreads ? { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, () => true) } : s;
+        if (p === "DESIGN" && s1.designStep === "model") {
           // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
-          const ns: SkraftState = { ...s, designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };
+          const ns: SkraftState = { ...s1, designStep: "decide" };
+          return { state: ns, effects: [specialist(ns, s1.lastRejection?.reasons ?? [])] };
         }
-        return { state: { ...s, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s.attempts + 1 }] };
+        return { state: { ...s1, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s1.attempts + 1 }] };
       }
       if (e.type === "BLOCKER_REPORTED")
         return { state: { ...s, stage: "BLOCKED", blocker: { question: e.question, choices: e.choices } }, effects: [{ kind: "askBlocker", question: e.question, choices: e.choices }] };
@@ -163,22 +166,18 @@ export function transition(s0: SkraftState, e: Ev): Out {
       const p = s.phase;
       if (!p) break;
       if (e.type === "LENSES_DONE") {
-        const verdict = synthesize(e.lenses);
-        const ns: SkraftState = { ...s, reviews: { ...s.reviews, [p]: [...s.reviews[p], { attempt: s.attempts + 1, lenses: e.lenses, verdict, reportPath: e.reportPath }] } };
-        if (verdict === "APPROVED") {
-          const proposed = ns.adrs.filter((a) => a.status === "Proposed");
-          if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
-          return commit(ns);
-        }
-        if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
-        // DELIVER : correction ciblée depuis le dernier vert, avec les seuls défauts blocker et major (§9.3).
-        const defects = actionableDefects(e.lenses);
-        if (p === "DELIVER" && defects.length && ns.deliver?.stepCheckpoint && ns.attempts + 1 < ns.budget.maxAttemptsPerPhase) return startReviewFix(ns, defects);
-        // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
-        // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
-        // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
-        // sans que personne n'ait eu l'occasion d'y répondre.
-        return failure(ns, "revue", defects.length ? defects : [unactionableReview(e.lenses)], ns.reviews[p].length === 1);
+        // Fils de défauts (ADR 0046) : arbitrages des contestations, nouveaux défauts, et verdicts
+        // où un défaut maintenu figure même si la lentille a omis de le relister.
+        const round = s.reviews[p].length + 1;
+        const r = reviewRound(s.reviewThreads ?? [], e.lenses, round);
+        const ns: SkraftState = {
+          ...s,
+          reviewThreads: r.threads,
+          reviews: { ...s.reviews, [p]: [...s.reviews[p], { attempt: s.attempts + 1, lenses: e.lenses, verdict: synthesize(r.lenses), reportPath: e.reportPath }] },
+        };
+        // Contesté deux fois, maintenu deux fois : ni l'agent ni la lentille ne trancheront seuls.
+        if (r.persistent.length) return { state: { ...ns, stage: "ARBITRATION" }, effects: r.persistent.map((thread) => ({ kind: "askArbitration", thread })) };
+        return resolveReview(ns, r.lenses, false);
       }
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
@@ -220,18 +219,55 @@ export function transition(s0: SkraftState, e: Ev): Out {
 
     case "COMMIT":
       if (e.type === "COMMITTED" && s.phase) {
-        return route({ ...s, phasesCompleted: [...s.phasesCompleted, s.phase], attempts: 0, lastRejection: null, designStep: "model" });
+        return route({ ...s, phasesCompleted: [...s.phasesCompleted, s.phase], attempts: 0, lastRejection: null, designStep: "model", reviewThreads: [] });
       }
       break;
 
     case "ESCALATED":
       if (e.type === "HUMAN_DECISION" && s.escalation) return decide(s, e.decision);
       break;
+
+    case "ARBITRATION": {
+      const p = s.phase;
+      if (e.type !== "HUMAN_DECISION" || !p) break;
+      const threads = applyArbitration(s.reviewThreads ?? [], e.decision);
+      const ns: SkraftState = { ...s, reviewThreads: threads };
+      if (threads.some((t) => t.status === "recontested")) return { state: ns, effects: [] };
+      // Tous les désaccords tranchés : la revue reprend son cours avec les décisions humaines. Un
+      // défaut maintenu par l'humain a droit à sa correction, budget épuisé ou non.
+      const last = ns.reviews[p].at(-1)?.lenses ?? [];
+      return resolveReview(ns, lensesAfterThreads(last, threads), threads.some((t) => t.status === "humanMaintained"));
+    }
   }
   return same;
 }
 
 // ---------- aides -------------------------------------------------------------------
+
+/**
+ * Suite d'une revue, une fois les fils à jour : approbation, rejet, correction ciblée (DELIVER) ou
+ * réessai de la phase. `decidedByHuman` : un arbitrage humain a maintenu un défaut — il a droit à
+ * sa correction même si le budget de la phase est épuisé.
+ */
+function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: boolean): Out {
+  const p = ns.phase!;
+  const verdict = synthesize(lenses);
+  if (verdict === "APPROVED") {
+    const proposed = ns.adrs.filter((a) => a.status === "Proposed");
+    if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
+    return commit(ns);
+  }
+  if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
+  const threads = ns.reviewThreads ?? [];
+  const active = threads.filter(isActive);
+  // DELIVER : correction ciblée depuis le dernier vert, routée vers l'agent concerné (§9.3, ADR 0046).
+  if (p === "DELIVER" && active.length && ns.deliver?.stepCheckpoint && (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || decidedByHuman)) return startReviewFix(ns, threads);
+  // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
+  // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
+  // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
+  // sans que personne n'ait eu l'occasion d'y répondre.
+  return failure(ns, "revue", active.length ? agentFeedback(threads, () => true) : [unactionableReview(lenses)], ns.reviews[p].length === 1 || decidedByHuman);
+}
 
 /** Motif d'une revue « changements demandés » sans défaut blocker ni major (mineurs seuls, lentille rejetant, aucune lentille). */
 function unactionableReview(lenses: LensVerdict[]): string {

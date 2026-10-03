@@ -321,3 +321,48 @@ describe("verifyUnitRed — couvert par l'acceptance", async () => {
     expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/couvert.*aucun fichier/i) });
   });
 });
+
+/**
+ * ADR 0046 — porte de la correction côté tests. Un test réclamé par la revue sur du code existant
+ * passe souvent d'emblée : il est accepté ; un rouge doit l'être pour une bonne raison et devient
+ * une cible du développeur ; rien d'existant ne doit disparaître ni casser.
+ */
+describe("verifyFixTests — correction de revue côté tests", async () => {
+  const { verifyFixTests } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const res = (id: string, status: "passed" | "failed", failureKind?: string) => ({ id, file: "Tarification.Tests.GrilleTests", name: id, status, ...(failureKind ? { failureKind, message: "m" } : {}) });
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" } as never;
+  const baseline = { all: ["T.Grille.Existant", "T.Accept.Ac1_x"], passed: ["T.Grille.Existant", "T.Accept.Ac1_x"] };
+  function run(o: { changed?: string[]; results: unknown[] }) {
+    const commits: string[] = [];
+    const ctx = {
+      workspace: { changedFiles: async () => (o.changed ?? ["tests/T/GrilleTests.cs"]).map((path) => ({ path, status: "modified" })), fingerprint: async () => "h", checkpoint: async () => ({ id: "cp-ft" }) },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: o.results }) },
+      git: { commit: async (m: string) => void commits.push(m) },
+    } as never;
+    return verifyFixTests({ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp", baseline } as never, { ctx, state, taskId: "t", signal: new AbortController().signal });
+  }
+  const existing = [res("T.Grille.Existant", "passed"), res("T.Accept.Ac1_x", "passed")];
+
+  it("un test ajouté qui passe d'emblée (caractérisation) est accepté, sans cible pour le développeur", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.Grille_vide", "passed")] })).toMatchObject({ type: "STEP_OK", fixTargets: [] });
+  });
+
+  it("un test ajouté rouge sur assertion devient une cible du développeur", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.Taux_negatif", "failed", "assertion")] })).toMatchObject({ type: "STEP_OK", fixTargets: ["T.Grille.Taux_negatif"] });
+  });
+
+  it("un test ajouté rouge pour une mauvaise raison est refusé", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.X", "failed", "other_error")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/mauvaise raison/) });
+  });
+
+  it("un test existant disparu ou cassé est refusé : ajouter, jamais retirer ni affaiblir", async () => {
+    expect(await run({ results: [res("T.Accept.Ac1_x", "passed")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/ont disparu.*T\.Grille\.Existant/) });
+    expect(await run({ results: [res("T.Grille.Existant", "failed", "assertion"), res("T.Accept.Ac1_x", "passed")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/ne passent plus/) });
+  });
+
+  it("un fichier hors tests unitaires est refusé ; ne rien écrire est permis (tout a pu être contesté)", async () => {
+    expect(await run({ changed: ["src/Grille.cs"], results: existing })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/hors tests unitaires/) });
+    expect(await run({ changed: [], results: existing })).toMatchObject({ type: "STEP_OK", fixTargets: [] });
+  });
+});

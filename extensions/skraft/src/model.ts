@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { DeliverScenario, Granularity } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
+import type { DefectResponse, DefectThread } from "./review-thread.js";
 import type { Story } from "./story.js";
 
 export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
@@ -23,6 +24,8 @@ export type Stage =
   | "COMMIT"
   | "BLOCKED"
   | "ESCALATED"
+  /** Désaccord persistant entre un agent et une lentille, soumis à l'humain (ADR 0046). */
+  | "ARBITRATION"
   | "DONE"
   | "ABORTED";
 
@@ -57,7 +60,7 @@ export interface AdrRecord {
 }
 
 /** Pas de la sous-machine DELIVER : test unitaire, puis code (un tour) ou vert et nettoyage (sessions séparées). */
-export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix" | "scenario-gate";
+export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate";
 
 /** Sous-machine DELIVER (§7.4). Les champs après `scenarioCheckpoint` sont internes au réducteur. */
 export interface DeliverState {
@@ -96,6 +99,10 @@ export interface DeliverState {
   fixing?: boolean;
   /** Défauts blocker et major de la revue, retransmis à chaque relance de la correction. */
   reviewDefects?: string[];
+  /** Retour de revue routé (ADR 0046) : défauts adressés à l'agent des tests, et au développeur. */
+  reviewFeedback?: { test: string[]; code: string[] };
+  /** Tests ajoutés par la correction côté tests et encore rouges : le développeur doit les faire passer. */
+  fixTargets?: string[];
 }
 
 export interface SkraftInput {
@@ -157,6 +164,8 @@ export interface SkraftState {
   skillsLoaded?: { phase: Phase | null; role: Role; skills: string[] }[];
   /** Réessais par phase (mesures d'usage, §12) ; absent d'un état persisté avant S6. */
   retries?: Record<string, number>;
+  /** Fils des défauts de revue de la phase en cours (ADR 0046) ; vidés au commit de la phase. */
+  reviewThreads?: DefectThread[];
   /**
    * Rejets cumulés, toutes phases (porte, revue, scénario). Ne fait que croître : le moteur de
    * tâches y repère chaque nouveau rejet pour le tracer avec `lastRejection` (ADR 0032).
@@ -176,7 +185,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
@@ -194,6 +203,8 @@ export type SkraftEvent =
       acceptanceGreen?: boolean;
       /** Pas « test » sans test unitaire : le comportement est couvert par l'acceptance (ADR 0045). */
       viaAcceptance?: boolean;
+      /** Correction côté tests : tests ajoutés encore rouges, à faire passer par le développeur (ADR 0046). */
+      fixTargets?: string[];
     }
   | { type: "STEP_FAIL"; reason: string }
   | { type: "SCENARIO_OK"; notes: string[]; facts?: string[] }
@@ -212,12 +223,14 @@ export type SkraftEffect =
   | { kind: "askBlocker"; question: string; choices: string[] }
   | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
+  | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "rollback"; to: string }
   | { kind: "commitPhase"; phase: Phase; message: string }
   | { kind: "finalReport" }
   | { kind: "planDeliver" }
   | { kind: "startScenario"; scenarioId: string }
-  | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
+  | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix-test" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
+  | { kind: "verifyFixTests"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] } }
   | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[]; coveredBy?: string }
   | {
       kind: "verifyUnitGreen";
@@ -227,6 +240,8 @@ export type SkraftEffect =
       newTest: string | null;
       unitTestsHash: string | null;
       pending: string[];
+      /** Correction : tests rouges ajoutés côté tests, qui doivent passer (ADR 0046). */
+      targets?: string[];
     }
   | { kind: "scenarioGate"; scenarioId: string; since: string; unitTests: string[]; pending: string[] };
 
@@ -246,6 +261,7 @@ export const STAGE_LABELS: Record<string, string> = {
   COMMIT: "Enregistrement de la phase",
   BLOCKED: "Question en attente",
   ESCALATED: "Décision requise",
+  ARBITRATION: "Désaccord de revue à arbitrer",
   DONE: "Terminé",
   ABORTED: "Annulé",
 };
@@ -259,7 +275,7 @@ const stateSchema = z.object({
   schemaVersion: z.literal(1),
   slug: z.string(),
   storyPath: z.string().min(1),
-  stage: z.enum(["INIT", "CLASSIFY", "CONFIRM_DIFFICULTY", "ROUTE", "SPECIALIST", "ARTIFACT_GATE", "REVIEW", "VERDICT_GATE", "RATIFICATION", "COMMIT", "BLOCKED", "ESCALATED", "DONE", "ABORTED"]),
+  stage: z.enum(["INIT", "CLASSIFY", "CONFIRM_DIFFICULTY", "ROUTE", "SPECIALIST", "ARTIFACT_GATE", "REVIEW", "VERDICT_GATE", "RATIFICATION", "COMMIT", "BLOCKED", "ESCALATED", "ARBITRATION", "DONE", "ABORTED"]),
   phase: phase.nullable(),
   phaseOrder: z.array(phase).min(1),
   skipPhases: z.array(phase),

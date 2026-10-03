@@ -57,8 +57,8 @@ export interface LensFiles {
 
 const list = (title: string, xs: string[]) => (xs.length ? [title, ...xs.map((x) => `  - ${x}`)] : []);
 
-export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, files: LensFiles, facts: string[]): string {
-  const lines = [`Revue de la phase ${phase}.`];
+export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, files: LensFiles, facts: string[], history: string[] = []): string {
+  const lines = [`Revue de la phase ${phase}.`, ...history];
   const factBlock = list("Faits établis par le code (acquis : ne les revérifie pas) :", facts);
   switch (lens) {
     case "cold-reader":

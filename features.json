@@ -441,8 +441,8 @@
       "id": "retour-de-revue-cumulatif",
       "title": "Le retour donné à l'agent après un rejet de revue conserve les demandes des rejets précédents",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'rejet'",
-      "passes": false,
-      "notes": "Observé le 29/09, run 3 : essai 1 recalé par la lentille `architecture` (modélisation en commande/événement pour un calcul pur), essai 2 par `cold-reader` (la grille n'a ni source ni cycle de vie). L'agent corrige l'un et attire l'autre. `lastRejection` n'en garde qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois essais, une phase peut épuiser son budget en satisfaisant chaque critique à son tour sans jamais les satisfaire ensemble — le budget devient une loterie. C'est le plus sérieux des trois défauts du run."
+      "passes": true,
+      "notes": "Observé le 29/09, run 3 : essai 1 recalé par la lentille `architecture` (modélisation en commande/événement pour un calcul pur), essai 2 par `cold-reader` (la grille n'a ni source ni cycle de vie). L'agent corrige l'un et attire l'autre. `lastRejection` n'en garde qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois essais, une phase peut épuiser son budget en satisfaisant chaque critique à son tour sans jamais les satisfaire ensemble — le budget devient une loterie. C'est le plus sérieux des trois défauts du run. — RÉSOLU le 03/10 par les fils de défauts (ADR 0046) : les demandes déjà corrigées sont rappelées à chaque retour."
     },
     {
       "id": "skraft-agents-skills-md",
@@ -503,9 +503,16 @@
     {
       "id": "correction-de-revue-peut-ajouter-un-test",
       "title": "Une correction de revue peut ajouter un test (rouge vérifié) au lieu de trouver les tests gelés",
-      "verify": "MANUEL : à concevoir (ADR 0045, « Reste ouvert »)",
-      "passes": false,
-      "notes": "Révélé le 03/10 sur US-2 : un défaut « test manquant » est impossible à corriger en mode fix, les tests unitaires étant gelés par empreinte."
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"verifyFixTests\"",
+      "passes": true,
+      "notes": "ADR 0046 : correction en deux temps, côté tests (`fix-test`, tests ajoutés verts ou rouges pour une bonne raison) puis côté code. Non encore éprouvé sur un run réel."
+    },
+    {
+      "id": "revue-dialogue-avec-l-agent",
+      "title": "La revue route chaque défaut vers l’agent concerné, qui peut le contester ; la lentille arbitre, l’humain en dernier recours (ADR 0046)",
+      "verify": "pnpm vitest run --project ext-skraft test/review-thread.test.ts test/reducer.test.ts -t \"fils de défauts|reviewRound|applyResponses|applyArbitration\"",
+      "passes": true,
+      "notes": "Cible obligatoire par défaut (`test`, `code`, `deliverable`), vérifiée d’après le fichier cité ; identifiant attribué par le code ; réponses `fixed`/`contested` ; arbitrages `accepted`/`maintained` ; désaccord persistant → `ARBITRATION`. Non encore éprouvé sur un run réel."
     }
   ]
 }

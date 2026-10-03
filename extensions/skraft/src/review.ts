@@ -15,17 +15,34 @@
 import { z } from "zod";
 export type Verdict = "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 
+/** À qui revient un défaut (ADR 0046) : à l'agent des tests, à celui du code, ou au livrable de la phase. */
+export type DefectTarget = "test" | "code" | "deliverable";
+
 export interface LensDefect {
   severity: "blocker" | "major" | "minor";
   file?: string | undefined;
   line?: number | undefined;
   description: string;
+  /** Cible déclarée par la lentille, puis corrigée par le code d'après le fichier cité. */
+  target?: DefectTarget | undefined;
+  /** Identifiant attribué par le code (`lentille#tour.n`), jamais par le modèle. */
+  id?: string | undefined;
+  /** Écart entre la cible déclarée et la nature du fichier cité, pour la trace. */
+  targetNote?: string | undefined;
+}
+
+/** Arbitrage d'une lentille sur un de ses défauts que l'agent a contesté (ADR 0046). */
+export interface LensRuling {
+  defect: string;
+  decision: "accepted" | "maintained";
+  reason?: string | undefined;
 }
 
 export interface LensVerdict {
   lens: string;
   verdict: Verdict;
   defects: LensDefect[];
+  rulings?: LensRuling[] | undefined;
 }
 
 /**
@@ -127,7 +144,9 @@ export function reviewReport(phase: string, attempt: number, lenses: LensVerdict
   for (const v of lenses) {
     lines.push(`## Lentille ${v.lens} : ${v.verdict}`, "");
     if (!v.defects.length) lines.push("Aucun défaut.", "");
-    for (const d of v.defects) lines.push(`- **${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+    for (const d of v.defects)
+      lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+    for (const r of v.rulings ?? []) lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
     lines.push("");
   }
   return lines.join("\n");
@@ -137,7 +156,18 @@ const lensesSchema = z.array(
   z.object({
     lens: z.string(),
     verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
-    defects: z.array(z.object({ severity: z.enum(["blocker", "major", "minor"]), description: z.string(), file: z.string().optional(), line: z.number().optional() })),
+    defects: z.array(
+      z.object({
+        severity: z.enum(["blocker", "major", "minor"]),
+        description: z.string(),
+        file: z.string().optional(),
+        line: z.number().optional(),
+        target: z.enum(["test", "code", "deliverable"]).optional(),
+        id: z.string().optional(),
+        targetNote: z.string().optional(),
+      }),
+    ),
+    rulings: z.array(z.object({ defect: z.string(), decision: z.enum(["accepted", "maintained"]), reason: z.string().optional() })).optional(),
   }),
 );
 

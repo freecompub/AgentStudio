@@ -113,8 +113,33 @@ ont la consigne de chercher dans l'acceptance avant de réclamer un test.
 Reste ouvert, critère `correction-de-revue-peut-ajouter-un-test` : une correction de revue ne peut
 toujours pas ajouter de test (gel par empreinte en mode `fix`).
 
-**Prochaine étape.** Reprendre DELIVER depuis `run/us-2-2026-10-03-2973` pour éprouver l'ADR 0045
-(compter 50 à 100 requêtes) ; puis concevoir l'ajout de test en correction de revue.
+**Puis la revue qui dialogue (ADR 0046), proposée par le responsable.** Chaque défaut de lentille
+porte une cible obligatoire (`test`, `code`, `deliverable`), vérifiée par le code d'après le fichier
+cité, et un identifiant attribué par le code (`lentille#tour.n`). Il devient un **fil**
+(`review-thread.ts`, pur) : routé vers l'agent concerné, auquel l'agent répond (`fixed` ou
+`contested` avec raison, champ `responses` de `report_phase`), que la lentille arbitre au tour
+suivant (`rulings` : accepted / maintained), et soumis à l'humain s'il est contesté puis maintenu
+deux fois (étape `ARBITRATION`). En DELIVER, la correction se fait en deux temps : côté tests
+(`fix-test`) puis côté code (`fix`).
+
+**Le piège évité de justesse.** J'allais exiger qu'un test ajouté en correction soit rouge, comme au
+pas TDD. Or un test réclamé par la revue sur du code existant passe **d'emblée** : sur US-2,
+`PalierApplicable` gérait déjà les quatre branches que `cold-reader` voulait voir testées. La porte
+`verifyFixTests` accepte donc un test vert (caractérisation) ou rouge pour une bonne raison ; les
+rouges deviennent les cibles du développeur. Ce qu'elle exige : tests unitaires seulement, aucun test
+existant disparu ni cassé.
+
+**Un défaut de ma première version, attrapé par le test d'arbitrage.** Quand l'humain donne raison à
+l'agent, la lentille gardait « changements demandés » sans plus aucun défaut : le défaut contesté ne
+figurait que dans ses arbitrages, pas dans sa liste. `lensesAfterThreads` regarde désormais les fils
+de la lentille, pas seulement ses défauts listés.
+
+Passent à `true` : `retour-de-revue-cumulatif` (ouvert depuis le 29/09 : les demandes corrigées sont
+rappelées), `correction-de-revue-peut-ajouter-un-test`, et le nouveau `revue-dialogue-avec-l-agent`.
+
+**Prochaine étape.** Reprendre DELIVER depuis `run/us-2-2026-10-03-2973` pour éprouver les ADR 0045
+et 0046 ensemble (compter 50 à 100 requêtes). Le banc répond à toute interaction par la première
+option : en arbitrage, il donne raison à l'agent.
 
 ---
 
