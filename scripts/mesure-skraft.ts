@@ -5,6 +5,10 @@
  * le dépôt d'origine n'est jamais touché.
  *
  *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--pousser]
+ *                                     [--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini]
+ *
+ * `--modeles` associe des classes de rôle à des modèles (ADR 0048) ; une classe absente laisse le
+ * runtime décider.
  *
  * `--pousser` : pousse le travail de la copie sur une branche `run/<story>-<date>-<id>` du dépôt
  * GitHub du projet, après chaque phase commitée puis à la fin. C'est le banc qui pousse, jamais
@@ -35,6 +39,9 @@ import {
   createJsonlTraceStore,
   createJsonLogger,
   resumerTrace,
+  resolveModel,
+  MODEL_CLASSES,
+  type ModelClass,
   type AgentEvent,
   type AgentRuntime,
   type ResumeEtape,
@@ -65,6 +72,15 @@ const pousser = args.includes("--pousser");
 // branche `run/…` poussée par un run précédent, pour reprendre avec `--depuis` sans repayer les
 // phases déjà validées.
 const base = args.find((a) => a.startsWith("--base="))?.slice("--base=".length) ?? "main";
+// `--modeles=strong:x,light:y` : modèle réel par classe de rôle (ADR 0048).
+const classesModeles = Object.fromEntries(
+  (args.find((a) => a.startsWith("--modeles="))?.slice("--modeles=".length) ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map((p) => p.split(":") as [string, string]),
+) as Partial<Record<ModelClass, string>>;
+for (const k of Object.keys(classesModeles))
+  if (!(MODEL_CLASSES as readonly string[]).includes(k)) throw new Error(`--modeles : classe inconnue « ${k} » (attendu : ${MODEL_CLASSES.join(", ")})`);
 const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
 const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
 if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE]");
@@ -310,9 +326,11 @@ const hostDeps: HostDeps = {
   evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
   hooks: createHookRegistry(),
   usage,
+  modelFor: (cls) => resolveModel(cls, { classes: classesModeles }),
   clock: { now: () => new Date() },
   ids: { next: () => randomUUID() },
 };
+if (Object.keys(classesModeles).length) console.log(`Modèles par classe : ${Object.entries(classesModeles).map(([k, v]) => `${k} → ${v}`).join(", ")}`);
 await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
 
 // ---------- Lancement ------------------------------------------------------------------------
@@ -377,7 +395,7 @@ const resume = resumerTrace(await traceBrute.list(taskId));
 const r0 = releves[0]?.restantes;
 const consoReelle = typeof r0 === "number" && reserveFin ? r0 - reserveFin.restantes : null;
 console.log("\n===== ÉTAPES (lues dans la trace) =====");
-console.table(resume.etapes.map((et) => ({ etape: et.phase, duree: hms(et.duréeMs), tours: et.tours, rejets: et.rejets.length, anormales: et.finsAnormales.length, appels: et.appels, requetes: requetes(et.nanoAiu), entree: et.entrée })));
+console.table(resume.etapes.map((et) => ({ etape: et.phase, duree: hms(et.duréeMs), tours: et.tours, rejets: et.rejets.length, anormales: et.finsAnormales.length, appels: et.appels, requetes: requetes(et.nanoAiu), modeles: et.modèles.join(", "), entree: et.entrée })));
 console.log("Par phase :");
 console.table(resume.parPhase.map((et) => ({ phase: et.phase, duree: hms(et.duréeMs), tours: et.tours, rejets: et.rejets.length, requetes: requetes(et.nanoAiu), causes: [...new Set(et.rejets.map((r) => r.porte))].join(", ") })));
 console.log(
@@ -399,9 +417,9 @@ const md = [
   "",
   "## Étapes",
   "",
-  "| Étape | Durée | Tours | Rejets | Fins anormales | Appels | Requêtes premium | Tokens entrée |",
-  "|---|---|---|---|---|---|---|---|",
-  ...resume.etapes.map((et) => `| ${et.phase} | ${hms(et.duréeMs)} | ${et.tours} | ${et.rejets.length} | ${et.finsAnormales.map((f) => f.fin).join(", ")} | ${et.appels} | ${requetes(et.nanoAiu)} | ${et.entrée} |`),
+  "| Étape | Durée | Tours | Rejets | Fins anormales | Appels | Requêtes premium | Modèles | Tokens entrée |",
+  "|---|---|---|---|---|---|---|---|---|",
+  ...resume.etapes.map((et) => `| ${et.phase} | ${hms(et.duréeMs)} | ${et.tours} | ${et.rejets.length} | ${et.finsAnormales.map((f) => f.fin).join(", ")} | ${et.appels} | ${requetes(et.nanoAiu)} | ${et.modèles.join(", ")} | ${et.entrée} |`),
   "",
   "## Rejets et leurs motifs",
   "",

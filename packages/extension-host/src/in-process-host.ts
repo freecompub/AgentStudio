@@ -18,7 +18,7 @@ import { matchesAny } from "@agent-studio/core";
 import { PermissionDeniedError, permissionChecker } from "./permissions.js";
 import { createTestRunService, readOnlyGuard, runTestsTool, testFreezeGuard } from "./test-runs.js";
 import { runLintTool } from "./lint-tool.js";
-import { listFilesTool, type TraceStore } from "@agent-studio/core";
+import { listFilesTool, type ModelClass, type TraceStore } from "@agent-studio/core";
 import { extensionFileReader, loadAgentPrompts, loadSkillTool } from "./agent-prompts.js";
 
 /** Sortie des messages d'extension vers la conversation, origine comprise (D34). */
@@ -38,6 +38,11 @@ export interface HostDeps {
   hooks: HookRegistry;
   /** Usage des agents, attribué à la tâche et à son état courant (D37). */
   usage?: UsageRecorder;
+  /**
+   * Modèle réel d'une classe de rôle (ADR 0048), résolu par l'application d'après les réglages du
+   * projet. Absent, ou `undefined` en retour : aucun modèle demandé, le runtime décide.
+   */
+  modelFor?: (cls: ModelClass | undefined) => Promise<string | undefined> | string | undefined;
   /** Trace d'exécution (ADR 0032). Absente, rien n'est tracé — le fonctionnement n'en dépend pas. */
   trace?: TraceStore;
   chat: ExtensionChatSink;
@@ -126,8 +131,16 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         const composed = promptOf(name);
         const taskId = opts?.evidence?.taskId;
         const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
+        const model = await deps.modelFor?.(a.modelClass);
         const r = await deps.agents.run(
-          { role: `${manifest.id}/${name}`, systemPrompt: composed.systemPrompt, writable: resolveGlobs(a.write ?? []), output: a.output, blocker: a.tools?.includes("report_blocker") ?? false },
+          {
+            role: `${manifest.id}/${name}`,
+            systemPrompt: composed.systemPrompt,
+            writable: resolveGlobs(a.write ?? []),
+            output: a.output,
+            blocker: a.tools?.includes("report_blocker") ?? false,
+            ...(model ? { model } : {}),
+          },
           prompt,
           {
             ...(opts?.signal ? { signal: opts.signal } : {}),

@@ -1,6 +1,6 @@
 import type { ExtensionManifest } from "@agent-studio/extension-api";
 import { STAGE_LABELS } from "./model.js";
-import { LENS_FOCUS, ROLE_SKILLS, ROLES, SKILLS } from "./roles.js";
+import { LENS_FOCUS, LENS_MODEL_CLASS, ROLE_MODEL_CLASS, ROLE_SKILLS, ROLES, SKILLS } from "./roles.js";
 
 /** Fichier de rôle d'un agent, relatif au dossier de l'extension. */
 const agentFile = (name: string) => `agents/${name}.agent.md`;
@@ -44,13 +44,14 @@ export const manifest: ExtensionManifest = {
     // Contenu des rôles dans agents/*.agent.md (partagé avec Copilot CLI et Claude Code) ; ici,
     // l'orchestration propre à agent-studio : consignes, outil de fin, périmètre, outils, skills (ADR 0024).
     agents: [
-      { name: "skraft-classifier", title: "Évaluation de la difficulté", prompt: agentFile("skraft-classifier"), role: ROLES.classifier, output: "submit_difficulty" },
+      { name: "skraft-classifier", title: "Évaluation de la difficulté", prompt: agentFile("skraft-classifier"), role: ROLES.classifier, output: "submit_difficulty", modelClass: ROLE_MODEL_CLASS.classifier },
       {
         name: "skraft-researcher",
         title: "Chercheur",
         prompt: agentFile("skraft-researcher"),
         role: ROLES.researcher,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.researcher,
         write: [SKRAFT_DIR],
         tools: ["list_files", "report_blocker"],
       },
@@ -60,6 +61,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile("skraft-architect-model"),
         role: ROLES.architectModel,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.architectModel,
         write: [SKRAFT_DIR],
         tools: ["list_files", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.architectModel),
@@ -71,6 +73,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile("skraft-architect-decide"),
         role: ROLES.architectDecide,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.architectDecide,
         write: [SKRAFT_DIR],
         tools: ["list_files", "render_adr", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.architectDecide),
@@ -81,6 +84,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile("skraft-acceptance"),
         role: ROLES.acceptance,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.acceptance,
         write: [SKRAFT_DIR, ACCEPTANCE, SOURCES],
         tools: ["list_files", "run_tests", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.acceptance),
@@ -91,6 +95,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile("skraft-test"),
         role: ROLES.test,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.test,
         write: [UNIT_TESTS],
         tools: ["list_files", "run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.test),
@@ -101,6 +106,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile("skraft-dev"),
         role: ROLES.dev,
         output: "report_phase",
+        modelClass: ROLE_MODEL_CLASS.dev,
         write: [SOURCES],
         tools: ["list_files", "run_tests", "run_lint", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.dev),
@@ -111,6 +117,7 @@ export const manifest: ExtensionManifest = {
         prompt: agentFile(`skraft-lens-${name}`),
         role: ROLES.lens,
         output: "submit_lens_verdict" as const,
+        modelClass: LENS_MODEL_CLASS[name],
         skills: skillsOf(ROLE_SKILLS.lens),
       })),
     ],

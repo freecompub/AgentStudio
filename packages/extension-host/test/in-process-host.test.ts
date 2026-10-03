@@ -104,6 +104,26 @@ describe("Hôte d'extension en processus", () => {
     await expect(activateWith((ctx) => void ctx.chat.registerCommand("pirate", async () => {}))).rejects.toThrow(/non déclarée/);
   });
 
+  it("agents.run : le modèle est résolu par le cœur depuis la classe déclarée (ADR 0048)", async () => {
+    const manifest = {
+      ...MANIFEST,
+      contributes: { ...MANIFEST.contributes, agents: [{ name: "writer", title: "Rédacteur", role: "r", output: "report_phase", write: ["tests/**"], modelClass: "light" as const }] },
+    } as ExtensionManifest;
+    const { ctx, deps, runs } = await activateWith(() => {}, manifest);
+    const demandes: (string | undefined)[] = [];
+    deps.modelFor = async (cls) => (demandes.push(cls), cls === "light" ? "gpt-5-mini" : undefined);
+    await ctx.agents.run("writer", "x");
+    expect(demandes).toEqual(["light"]);
+    expect(runs[0]?.spec).toMatchObject({ model: "gpt-5-mini" });
+  });
+
+  it("agents.run : modèle non résolu, aucun modèle n'est demandé (le runtime décide)", async () => {
+    const { ctx, deps, runs } = await activateWith(() => {});
+    deps.modelFor = async () => undefined;
+    await ctx.agents.run("writer", "x");
+    expect(runs[0]?.spec).not.toHaveProperty("model");
+  });
+
   it("agents.run : agent déclaré, rôle, périmètre et sortie du manifeste ; résultat sérialisé uniquement", async () => {
     const { ctx, runs } = await activateWith(() => {});
     const r = await ctx.agents.run("writer", "Écris un test");

@@ -12,6 +12,7 @@ const schema = z.object({
   lastWorkspace: z.string().optional(),
   uiMode: z.enum(["simple", "advanced"]).optional(),
   models: z.record(z.string(), z.string()).optional(),
+  modelClasses: z.record(z.string(), z.object({ strong: z.string(), standard: z.string(), light: z.string() }).partial()).optional(),
   authHostname: z.string().optional(),
 });
 

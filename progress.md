@@ -203,6 +203,18 @@ expose 15 modèles, et le modèle demandé à l'ouverture de session est celui q
 `usage` : `claude-haiku-4.5` (2,04 requêtes pour un mot), `gpt-5-mini` (0,33). Le 24/09, seul `auto`
 existait et la demande était ignorée. Le choix **par rôle** redevient possible : à concevoir (ADR).
 
+**Fait dans la foulée : un modèle par classe de rôle (ADR 0048).** Une extension déclare la classe
+d'un agent (`strong`, `standard`, `light`), jamais un modèle — la disponibilité dépend de
+l'abonnement, remarque du responsable qui a fixé ce principe. Le projet associe chaque classe à un
+modèle (`modelClasses`) ; le cœur résout à chaque tour (classe, puis modèle du projet, puis rien) et
+ignore un modèle que `listModels()` ne propose pas. skraft : architectes `strong`, classifieur et
+`quality-gates` `light`, le reste `standard`.
+- **Constat en route** : le choix par projet de l'ADR 0020 ne s'appliquait qu'à la conversation
+  principale, jamais aux agents des tâches. Désormais il sert de repli.
+- Banc : `--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini` ; le rapport note les modèles par étape.
+- Reste : aucune interface de réglage ; association par défaut d'après le multiplicateur, quand le
+  runtime le renseigne.
+
 ---
 
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)

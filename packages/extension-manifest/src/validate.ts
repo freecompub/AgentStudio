@@ -39,6 +39,8 @@ const schema = z.object({
           output: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"]),
           write: z.array(z.string().min(1)).optional(),
           tools: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)).optional(),
+          // Classe de modèle (ADR 0048) : jamais un identifiant — le projet choisit le modèle réel.
+          modelClass: z.enum(["strong", "standard", "light"]).optional(),
         }),
       )
       .optional(),

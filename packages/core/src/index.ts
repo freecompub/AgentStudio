@@ -38,6 +38,7 @@ export {
   type NewInteraction,
 } from "./interactions/interaction-service.js";
 export { createLazyRuntime } from "./agents/lazy-runtime.js";
+export { MODEL_CLASSES, resolveModel, type ModelClass, type ModelPreferences } from "./agents/model-class.js";
 export { MemoryInteractionStore } from "./testing/memory-doubles.js";
 export { createJsonInteractionStore } from "./interactions/json-interaction-store.js";
 export type * from "./protocols/evidence.js";

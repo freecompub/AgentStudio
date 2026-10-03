@@ -78,6 +78,29 @@ export const LENS_FOCUS = {
 } as const;
 
 /**
+ * Classe de modèle par rôle (ADR 0048). Le projet associe chaque classe à un modèle réel ; skraft ne
+ * nomme jamais un modèle. Concevoir demande le plus de jugement ; produire, un bon modèle courant ;
+ * classer une story ou confronter des livrables à des faits déjà mesurés, un modèle léger.
+ */
+export const ROLE_MODEL_CLASS = {
+  classifier: "light",
+  researcher: "standard",
+  architectModel: "strong",
+  architectDecide: "strong",
+  acceptance: "standard",
+  test: "standard",
+  dev: "standard",
+} as const;
+
+/** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */
+export const LENS_MODEL_CLASS = {
+  "cold-reader": "standard",
+  "test-integrity": "standard",
+  architecture: "standard",
+  "quality-gates": "light",
+} as const satisfies Record<keyof typeof LENS_FOCUS, "strong" | "standard" | "light">;
+
+/**
  * Skills par rôle (SPEC-skraft §6.4) : injectées dans la session, ou chargées à la demande par
  * `load_skill`. `nom#Titre` injecte une seule section (économie de tokens).
  */

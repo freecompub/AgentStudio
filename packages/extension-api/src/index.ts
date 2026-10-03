@@ -59,6 +59,12 @@ export interface ManifestAgent {
    * `shell:test`) ou outils de l'extension déclarés dans `contributes.tools`.
    */
   tools?: string[];
+  /**
+   * Classe de modèle du rôle (ADR 0048) : `strong` pour concevoir, `standard` pour produire,
+   * `light` pour classer ou confronter des faits. Jamais un identifiant de modèle : le projet
+   * associe chaque classe à un modèle réel. Absente : le modèle du projet, ou le runtime décide.
+   */
+  modelClass?: "strong" | "standard" | "light";
 }
 
 /** Skill : dossier contenant `SKILL.md` (ou fichier `.md`), relatif au dossier de l'extension. */

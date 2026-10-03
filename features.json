@@ -534,6 +534,13 @@
       "verify": "MANUEL : docs/runs/2026-10-03-us-2-836c8392/rapport.md (État final : DONE) et branche run/us-2-2026-10-03-9362 du projet d’essai, dotnet test vert",
       "passes": true,
       "notes": "03/10, repris à DELIVER depuis run/us-2-2026-10-03-2973 (RESEARCH, DESIGN, DISTILL validées par le run précédent). 152,5 requêtes pour la reprise. Un run complet sans reprise reste à faire."
+    },
+    {
+      "id": "modele-par-classe-de-role",
+      "title": "Chaque agent de tâche reçoit le modèle de sa classe de rôle, choisi par le projet parmi ceux de l’abonnement (ADR 0048)",
+      "verify": "pnpm vitest run --project core test/model-class.test.ts && pnpm vitest run --project ext-skraft test/manifest.test.ts -t \"classes de modèle\"",
+      "passes": true,
+      "notes": "Le CLI honore le modèle demandé depuis le 03/10 (ADR 0020). Classes strong/standard/light dans le manifeste, association par projet (`modelClasses`), modèle indisponible ignoré. Pas d’interface de réglage ; non éprouvé sur un run réel."
     }
   ]
 }

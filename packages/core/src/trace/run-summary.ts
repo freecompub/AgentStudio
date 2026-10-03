@@ -16,6 +16,8 @@ export interface ResumeEtape {
   entrée: number;
   sortie: number;
   nanoAiu: number;
+  /** Modèles réellement utilisés par les appels de l'étape (ADR 0048). */
+  modèles: string[];
 }
 
 export interface ResumeRun {
@@ -23,7 +25,7 @@ export interface ResumeRun {
   etapes: ResumeEtape[];
   /** Les mêmes, additionnées par nom de phase, dans l'ordre de première apparition. */
   parPhase: ResumeEtape[];
-  total: Omit<ResumeEtape, "phase" | "début" | "essaisMax" | "rejets" | "finsAnormales"> & { rejets: number };
+  total: Omit<ResumeEtape, "phase" | "début" | "essaisMax" | "rejets" | "finsAnormales" | "modèles"> & { rejets: number };
 }
 
 const NORMALES: readonly TurnEnd[] = ["output", "blocker"];
@@ -40,6 +42,7 @@ const vide = (phase: string, début: string): ResumeEtape => ({
   entrée: 0,
   sortie: 0,
   nanoAiu: 0,
+  modèles: [],
 });
 
 /**
@@ -85,6 +88,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
       et.entrée += e.entrée ?? 0;
       et.sortie += e.sortie ?? 0;
       et.nanoAiu += e.nanoAiu ?? 0;
+      if (e.modèle && !et.modèles.includes(e.modèle)) et.modèles.push(e.modèle);
     }
   }
 
@@ -97,7 +101,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
   for (const et of etapes) {
     const p = parPhase.find((x) => x.phase === et.phase);
     if (!p) {
-      parPhase.push({ ...et, rejets: [...et.rejets], finsAnormales: [...et.finsAnormales] });
+      parPhase.push({ ...et, rejets: [...et.rejets], finsAnormales: [...et.finsAnormales], modèles: [...et.modèles] });
       continue;
     }
     p.duréeMs += et.duréeMs;
@@ -109,6 +113,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
     p.entrée += et.entrée;
     p.sortie += et.sortie;
     p.nanoAiu += et.nanoAiu;
+    for (const m of et.modèles) if (!p.modèles.includes(m)) p.modèles.push(m);
   }
 
   const somme = (k: "duréeMs" | "tours" | "appels" | "entrée" | "sortie" | "nanoAiu") => etapes.reduce((n, et) => n + et[k], 0);

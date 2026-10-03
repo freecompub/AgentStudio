@@ -11,7 +11,7 @@ import {
   type Logger,
   type MainSession,
 } from "@agent-studio/core";
-import { ROLE_LABELS, type Profile } from "@agent-studio/core";
+import { resolveModel, ROLE_LABELS, type Profile } from "@agent-studio/core";
 import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
@@ -139,6 +139,16 @@ export function createAppController(deps: AppControllerDeps): AppController {
       // Même canal que l'arbitre de permissions : écrire un profil de stack élargit ce que
       // l'application a le droit de lancer, et se confirme donc dans la fenêtre (§8.5).
       confirmer,
+      // Modèle des agents de tâche (ADR 0048) : classe du rôle, puis modèle du projet (ADR 0020),
+      // relus à chaque appel pour qu'un changement de réglage vaille dès le tour suivant.
+      // Un modèle que l'abonnement ne propose pas (ou plus) est ignoré ; liste illisible = pas de filtre.
+      modelFor: async (cls) => {
+        const reglages = await deps.settings.load();
+        const available = await ensureRuntime()
+          .then(async (rt) => (await rt.listModels?.())?.map((m) => m.id))
+          .catch(() => undefined);
+        return resolveModel(cls, { classes: reglages.modelClasses?.[ws.root], fallback: reglages.models?.[ws.root], available });
+      },
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
         if (session) void session.record("notice", markdown, extensionId);

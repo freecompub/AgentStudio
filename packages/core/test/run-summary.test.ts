@@ -64,6 +64,20 @@ describe("resumerTrace", () => {
     expect(total).toMatchObject({ entrée: 157, sortie: 16, nanoAiu: 7, appels: 3, tours: 2, rejets: 0 });
   });
 
+  it("note les modèles réellement utilisés par étape (ADR 0048)", () => {
+    const { etapes } = resumerTrace([
+      e({ kind: "tour-début", sessionId: "s1", phase: "CLASSIFY", prompt: "", repris: false }, 0),
+      e({ kind: "usage", sessionId: "s1", modèle: "gpt-5-mini", entrée: 1 }, 1),
+      e({ kind: "tour-début", sessionId: "s2", phase: "DESIGN", prompt: "", repris: false }, 2),
+      e({ kind: "usage", sessionId: "s2", modèle: "claude-sonnet-5.5", entrée: 1 }, 3),
+      e({ kind: "usage", sessionId: "s2", modèle: "claude-sonnet-5.5", entrée: 1 }, 4),
+    ]);
+    expect(etapes.map((x) => [x.phase, x.modèles])).toEqual([
+      ["CLASSIFY", ["gpt-5-mini"]],
+      ["DESIGN", ["claude-sonnet-5.5"]],
+    ]);
+  });
+
   it("additionne par phase les étapes qui reviennent", () => {
     const { parPhase } = resumerTrace([
       e({ kind: "transition", événement: "A", phase: "DESIGN", effets: [] }, 0),

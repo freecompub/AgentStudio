@@ -31,3 +31,22 @@ describe("Manifeste et commande skraft", () => {
     expect(parseSkraftArgs("")).toBeNull();
   });
 });
+
+describe("classes de modèle des rôles (ADR 0048)", async () => {
+  const { manifest } = await import("../src/manifest.js");
+  const classe = (name: string) => manifest.contributes.agents?.find((a) => a.name === name)?.modelClass;
+
+  it("chaque agent déclare une classe, jamais un modèle", () => {
+    for (const a of manifest.contributes.agents ?? []) expect(["strong", "standard", "light"], a.name).toContain(a.modelClass);
+  });
+
+  it("concevoir : fort ; produire : standard ; classer ou confronter des faits : léger", () => {
+    expect(classe("skraft-architect-model")).toBe("strong");
+    expect(classe("skraft-architect-decide")).toBe("strong");
+    expect(classe("skraft-dev")).toBe("standard");
+    expect(classe("skraft-lens-cold-reader")).toBe("standard");
+    // quality-gates ne fait que confronter les livrables aux faits mesurés par le code (ADR 0028).
+    expect(classe("skraft-classifier")).toBe("light");
+    expect(classe("skraft-lens-quality-gates")).toBe("light");
+  });
+});

@@ -337,6 +337,26 @@ describe("AppController — choix du modèle (D38, ADR 0020)", () => {
     });
   });
 
+  it("agents des tâches : modèle par classe de rôle, puis modèle du projet, puis rien (ADR 0048)", async () => {
+    const ctx = setup({ settings: { modelClasses: { "/projets/a": { light: "gpt-5-mini" } } } });
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    await ctx.controller["model:set"]({ id: "claude-sonnet-5" });
+    const modelFor = ctx.getServicesArgs()!.modelFor!;
+    expect(await modelFor("light")).toBe("gpt-5-mini");
+    // Classe non associée, agent sans classe : le modèle du projet, relu à chaque appel.
+    expect(await modelFor("strong")).toBe("claude-sonnet-5");
+    expect(await modelFor(undefined)).toBe("claude-sonnet-5");
+    await ctx.controller["model:set"]({ id: null });
+    expect(await modelFor("strong")).toBeUndefined();
+  });
+
+  it("agents des tâches : un modèle que l'abonnement ne propose pas est ignoré (ADR 0048)", async () => {
+    const ctx = setup({ settings: { modelClasses: { "/projets/a": { light: "gpt-5-mini" } }, models: { "/projets/a": "claude-sonnet-5" } } });
+    ctx.runtime.models = [{ id: "claude-sonnet-5", name: "Claude Sonnet 5" }];
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    expect(await ctx.getServicesArgs()!.modelFor!("light")).toBe("claude-sonnet-5");
+  });
+
   it("le modèle choisi est retenu par projet et transmis aux sessions suivantes", async () => {
     const ctx = setup();
     await ctx.controller["workspace:open"]({ path: "/projets/a" });

@@ -27,6 +27,7 @@ describe("JsonSettingsStore", () => {
       lastWorkspace: "/projets/demo",
       uiMode: "simple" as const,
       models: { "/projets/demo": "claude-sonnet-4.5" },
+      modelClasses: { "/projets/demo": { strong: "claude-sonnet-5.5", light: "gpt-5-mini" } },
       authHostname: "github.exemple.fr",
     };
     await createJsonSettingsStore(file).save(tout);
