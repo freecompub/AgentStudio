@@ -196,7 +196,17 @@ export type SkraftEvent =
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
   | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
-  | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
+  | {
+      type: "GATE_OK";
+      artifacts: ArtifactRecord[];
+      adrs?: AdrRecord[];
+      openQuestions?: string[];
+      acceptanceHash?: string;
+      regressions?: string[];
+      /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
+      facts?: string[];
+      notes?: string[];
+    }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
   | {
       type: "LENSES_DONE";

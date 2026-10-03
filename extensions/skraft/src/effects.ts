@@ -17,7 +17,7 @@ import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./revie
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
-import { contractSymbolsPresent, defectTargetOf, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { contractSymbolsPresent, defectTargetOf, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
@@ -286,7 +286,12 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   const producedBy = phase;
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
-  return { type: "GATE_OK", artifacts };
+  if (phase !== "DELIVER") return { type: "GATE_OK", artifacts };
+  // Mutation de fin de DELIVER (ADR 0049) : un mutant survivant est un test trop faible ; le
+  // réducteur en fait des défauts adressés au testeur, sans relancer la phase.
+  const m = await phaseEndMutation(ctx, state, signal);
+  if (m.reasons.length) return { type: "GATE_FAIL", gate: "mutation", reasons: m.reasons };
+  return { type: "GATE_OK", artifacts, ...(m.facts.length ? { facts: m.facts } : {}), ...(m.notes.length ? { notes: m.notes } : {}) };
 }
 
 /**
@@ -298,7 +303,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
  * lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi. C'est le contraire du
  * principe du projet — le LLM propose, le code décide et vérifie.
  */
-export const GELÉS = [".skraft/quality.json"] as const;
+export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml"] as const;
 
 /**
  * Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037).

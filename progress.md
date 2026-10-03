@@ -231,6 +231,25 @@ ignore un modèle que `listModels()` ne propose pas. skraft : architectes `stron
 → Les deux premiers sont des cas que mes tests ne couvraient pas parce que mes doubles d'agents
 répondaient toujours : un champ facultatif doit être testé **absent**.
 
+**La barre de qualité appartient au projet (ADR 0049).** En vérifiant si skraft fait de la mutation
+(oui, mais seul `muter-json` est lu : rien sur .NET), trouvé que `Montant.cs`, dans
+`Tarification.Domaine`, était jugé au seuil du **reste** (70 %) au lieu du cœur (90 %) : le cœur se
+reconnaissait au segment `Domain`. Demande du responsable : que l'utilisateur décide des seuils, de
+la mutation et de la définition du cœur, hors de `stack.yaml`.
+- `.agent-studio/quality.yaml`, commun aux extensions, cœur par chemins, seuils par couche (domaine,
+  application, reste), `mutation.active`, `mutation.moment` ; validation stricte.
+- **Désaccord retenu par le responsable** : la commande de mutation reste dans `stack.yaml`
+  (vérification des programmes autorisés, format du rapport).
+- Mutation **en fin de DELIVER** par défaut. Un échec de la porte de fin de phase relançait toute la
+  phase, sans qu'aucun agent puisse tuer les mutants : un mutant survivant devient un défaut adressé
+  au testeur (correction de l'ADR 0046), `outOfScope` vers le développeur pour du code superflu.
+- **Je m'étais trompé** en annonçant `.skraft/quality.json` modifiable par les agents : il est dans
+  `GELÉS` depuis l'ADR 0034. Le nouveau fichier y est ajouté.
+- **Faux positif attrapé par les tests de bout en bout** : la note « couche du cœur sans fichier » se
+  déclenchait sur les noms par défaut (un projet sans couche `Application`) ; elle ne porte plus que
+  sur les couches déclarées.
+- Reste : lecteur Stryker ; interface ; migration du projet d'essai ; `tdd` à brancher sur la barre.
+
 ---
 
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)

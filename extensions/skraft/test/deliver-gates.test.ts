@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
+/** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
-  const r = parseQualityBar(raw);
+  const r = parseQualityBar(raw === null ? {} : { legacyJson: raw });
   if ("error" in r) throw new Error(r.error);
   return r.bar;
 };
@@ -62,10 +63,10 @@ describe("checkRedGreenSequence", () => {
 });
 
 describe("barre de qualité", () => {
-  it("valeurs par défaut ; surcharge partielle ; JSON invalide signalé", () => {
-    expect(bar().mutation).toEqual({ coreLayers: ["Domain", "Application"], core: 100, edge: 90 });
-    expect(parseQualityBar("{")).toEqual({ error: "`.skraft/quality.json` n'est pas du JSON valide." });
-    expect(parseQualityBar('{"mutation":{"core":120}}')).toMatchObject({ error: expect.stringMatching(/mutation\.core/) });
+  it("valeurs par défaut ; ancien JSON invalide signalé", () => {
+    expect(bar().mutation).toEqual({ active: true, domain: 100, application: 100, rest: 90, moment: "phase-end" });
+    expect(parseQualityBar({ legacyJson: "{" })).toEqual({ error: "`.skraft/quality.json` n'est pas du JSON valide." });
+    expect(parseQualityBar({ legacyJson: '{"mutation":{"core":120}}' })).toMatchObject({ error: expect.stringMatching(/mutation\.core/) });
   });
 
   it("mutation : 100 % exigé dans le domaine, 90 % ailleurs ; survivants listés", () => {
@@ -142,7 +143,7 @@ describe("Qualité de forme : le linter du projet, pas un analyseur maison", () 
  */
 describe("Seuils de couverture", () => {
   const bar = (over: Record<string, unknown> = {}) => {
-    const r = parseQualityBar(JSON.stringify({ coverage: { core: 90, edge: 70 }, ...over }));
+    const r = parseQualityBar({ legacyJson: JSON.stringify({ coverage: { core: 90, edge: 70 }, ...over }) });
     if ("error" in r) throw new Error(r.error);
     return r.bar;
   };
@@ -171,7 +172,7 @@ describe("Seuils de couverture", () => {
   });
 
   it("par défaut, aucun seuil : la couverture est rapportée, pas exigée", () => {
-    const defaut = parseQualityBar(null);
+    const defaut = parseQualityBar({});
     if ("error" in defaut) throw new Error(defaut.error);
     expect(checkCoverage(rapport([{ file: "src/Domain/Panier.cs", score: 5 }]), ["src/Domain/Panier.cs"], defaut.bar)).toEqual([]);
   });
@@ -402,5 +403,101 @@ describe("verifyUnitGreen — un élément du contrat ratifié ne disparaît pas
 
   it("tous les éléments du contrat toujours présents : la correction passe", async () => {
     expect(await run("public Montant Multiplie(Taux t) => De(Euros * t.Valeur);\npublic Montant Soustrait(Montant a) => De(Euros - a.Euros);")).toMatchObject({ type: "STEP_OK" });
+  });
+});
+
+
+/**
+ * ADR 0049 — barre de qualité du projet : seuils par couche, cœur défini par des chemins, mutation
+ * en fin de DELIVER par défaut. Le 03/10, `Montant.cs` (domaine) est passé au seuil du reste : la
+ * couche `Tarification.Domaine` n'était pas reconnue.
+ */
+describe("barre de qualité du projet (ADR 0049)", async () => {
+  const yaml = (y: string) => {
+    const r = parseQualityBar({ yaml: y });
+    if ("error" in r) throw new Error(r.error);
+    return r.bar;
+  };
+  const rapport = (files: { file: string; score: number }[]) => ({ files: files.map((f) => ({ ...f, covered: 7, total: 10 })) });
+
+  it("le cas réel : Montant.cs, dans Tarification.Domaine, est jugé au seuil du domaine", () => {
+    const b = yaml('coeur:\n  domaine: ["src/Tarification.Domaine/**"]\ncouverture:\n  domaine: 90\n  reste: 70\n');
+    expect(checkCoverage(rapport([{ file: "Tarification.Domaine/Montant.cs", score: 70 }]), ["src/Tarification.Domaine/Montant.cs"], b)).toEqual([
+      expect.stringMatching(/Montant\.cs à 70 % \(minimum 90 %\)/),
+    ]);
+    // Et même sans déclaration, les noms usuels reconnaissent la couche.
+    expect(checkCoverage(rapport([{ file: "Tarification.Domaine/Montant.cs", score: 70 }]), ["src/Tarification.Domaine/Montant.cs"], bar('{"coverage":{"core":90,"edge":70}}'))).toHaveLength(1);
+  });
+
+  it("domaine et application ont chacun leur seuil", () => {
+    const b = yaml("mutation:\n  domaine: 100\n  application: 80\n  reste: 50\n");
+    const report = { score: 85, files: [{ file: "Sources/Application/A.swift", score: 85, survived: [] }, { file: "Sources/Domain/D.swift", score: 85, survived: [] }] };
+    expect(checkMutation(report, ["Sources/Application/A.swift", "Sources/Domain/D.swift"], b)).toEqual([expect.stringMatching(/Domain\/D\.swift à 85 % \(minimum 100 %\)/)]);
+  });
+
+  const { scenarioGate, phaseEndMutation } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+
+  function ctxWith(files: Record<string, string>, mutation: unknown) {
+    let mutations = 0;
+    const ctx = {
+      workspace: {
+        readFile: async (p: string) => {
+          if (p in files) return files[p]!;
+          throw new Error("absent");
+        },
+        listFiles: async () => ["src/Tarification.Domaine/Montant.cs"],
+        changedFiles: async () => [{ path: "src/Tarification.Domaine/Montant.cs", status: "modified" }],
+        fingerprint: async () => "h",
+      },
+      stack: {
+        layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] },
+        isTestFile: () => false,
+        runTests: async () => ({ timedOut: false, results: [{ id: "A.Ac1_x", file: "A", name: "x", status: "passed" }] }),
+        mutation: async () => (mutations++, mutation),
+        lint: async () => null,
+        architecture: async () => null,
+        infrastructureModules: [],
+      },
+      evidence: { list: async () => [] },
+    } as never;
+    return { ctx, mutations: () => mutations };
+  }
+  const state = {
+    ...initialState({ storyPath: "stories/US-2.md" } as never),
+    slug: "us-2",
+    checkpoints: { DELIVER: "cp-d" },
+    deliver: { scenarios: [{ id: "ac-1", acceptanceTestId: "A.Ac1_x" }], baseline: { all: [], passed: [] } },
+  } as never;
+  const survivant = { score: 80, files: [{ file: "Tarification.Domaine/Montant.cs", score: 80, survived: [{ line: 25, operator: "ArithmeticOperatorReplacement" }] }] };
+
+  it("par défaut, la mutation ne tourne pas à chaque scénario", async () => {
+    const { ctx, mutations } = ctxWith({}, survivant);
+    await scenarioGate({ kind: "scenarioGate", scenarioId: "ac-1", since: "cp", unitTests: [], pending: [] } as never, { ctx, state, taskId: "t", signal: new AbortController().signal });
+    expect(mutations()).toBe(0);
+  });
+
+  it("en fin de DELIVER, elle tourne une fois sur les fichiers modifiés, et un mutant survivant est un motif", async () => {
+    const { ctx, mutations } = ctxWith({}, survivant);
+    const r = await phaseEndMutation(ctx, state);
+    expect(mutations()).toBe(1);
+    expect(r.reasons).toEqual([expect.stringMatching(/Montant\.cs à 80 % \(minimum 100 %\) ; mutants survivants : ligne 25/)]);
+  });
+
+  it("mutation par scénario si la barre le demande ; désactivée, elle ne tourne pas et c'est dit", async () => {
+    const parScenario = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  moment: scenario\n" }, survivant);
+    const r = await scenarioGate({ kind: "scenarioGate", scenarioId: "ac-1", since: "cp", unitTests: [], pending: [] } as never, { ctx: parScenario.ctx, state, taskId: "t", signal: new AbortController().signal });
+    expect(parScenario.mutations()).toBe(1);
+    expect(r).toMatchObject({ type: "SCENARIO_FAIL" });
+
+    const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
+    const fin = await phaseEndMutation(inactive.ctx, state);
+    expect(inactive.mutations()).toBe(0);
+    expect(fin).toEqual({ reasons: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+  });
+
+  it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {
+    const { ctx } = ctxWith({ ".agent-studio/quality.yaml": "couverture:\n  domaine: 150\n" }, null);
+    await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/couverture\.domaine/);
   });
 });

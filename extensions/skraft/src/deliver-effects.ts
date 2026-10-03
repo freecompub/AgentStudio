@@ -1,7 +1,8 @@
 import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "./deliver.js";
+import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
 import { declaredIdentifiers } from "./text-analysis.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
@@ -16,7 +17,9 @@ interface Run {
   signal: AbortSignal;
 }
 
-const QUALITY = ".skraft/quality.json";
+/** Barre de qualité du projet (ADR 0049), et son ancien emplacement relu le temps de la transition. */
+export const QUALITY = ".agent-studio/quality.yaml";
+export const QUALITY_LEGACY = ".skraft/quality.json";
 const fail = (reason: string): Ev => ({ type: "STEP_FAIL", reason });
 const firstLine = (msg?: string) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs: string[]) => [...new Set(xs)];
@@ -312,13 +315,58 @@ function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (
   return out;
 }
 
+/**
+ * Barre de qualité du projet (ADR 0049), avec ce qu'il faut en dire : lue à l'ancien emplacement, ou
+ * un cœur déclaré qui ne correspond à aucun fichier — le seuil du reste s'appliquerait en silence.
+ * Une barre invalide est une panne d'environnement : la juger à moitié serait attester à tort.
+ */
+export async function loadQualityBar(ctx: ExtensionContext): Promise<{ bar: QualityBar; notes: string[] }> {
+  const q = parseQualityBar({ yaml: await readOr(ctx, QUALITY), legacyJson: await readOr(ctx, QUALITY_LEGACY) });
+  if ("error" in q) throw new EnvFailureError(q.error);
+  const sources = (await ctx.workspace.listFiles()).filter((f) => matchesAny(ctx.stack.layout.sources, f));
+  // Seules les couches déclarées : un projet sans couche « application », et qui n'a rien déclaré,
+  // n'a rien de suspect.
+  const vides = coreFilesMissing(q.bar, sources, q.declaredCore).map(
+    (c) => `Barre de qualité : la couche « ${c} » du cœur ne correspond à aucun fichier du projet ; ses seuils ne s'appliquent à rien (${q.source}).`,
+  );
+  return { bar: q.bar, notes: [...q.warnings, ...vides] };
+}
+
+/** Mutation des fichiers de production donnés, jugée contre la barre : motifs de rejet, faits, notes. */
+async function mutate(ctx: ExtensionContext, bar: QualityBar, sources: string[], label: string, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+  const mutation = await ctx.stack.mutation({ ...(signal ? { signal } : {}) });
+  if (!mutation) return { reasons: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  const facts = mutation.files
+    .filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`)))
+    .map((f) => `Mutation (${label}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
+  return { reasons: checkMutation(mutation, sources, bar), facts, notes: [] };
+}
+
+/**
+ * Mutation de fin de DELIVER (ADR 0049, moment par défaut) : une seule exécution sur tous les
+ * fichiers de production modifiés depuis le début de la phase. Un outil comme Stryker relance la
+ * suite pour chaque mutant : par scénario, ce serait une exécution complète à chaque fois.
+ */
+export async function phaseEndMutation(ctx: ExtensionContext, state: SkraftState, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+  const { bar, notes } = await loadQualityBar(ctx);
+  if (!bar.mutation.active) return { reasons: [], facts: [], notes: [...notes, "Mutation désactivée par la barre de qualité du projet."] };
+  if (bar.mutation.moment !== "phase-end") return { reasons: [], facts: [], notes };
+  const cp = state.checkpoints.DELIVER;
+  if (!cp) return { reasons: [], facts: [], notes };
+  const k = kinds(ctx);
+  const sources = (await ctx.workspace.changedFiles(cp))
+    .filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(ctx.stack.layout.sources, f.path))
+    .map((f) => f.path);
+  if (sources.length === 0) return { reasons: [], facts: [], notes };
+  const r = await mutate(ctx, bar, sources, "fin de DELIVER", signal);
+  return { reasons: r.reasons, facts: r.facts, notes: [...notes, ...r.notes] };
+}
+
 /** Porte de fin de scénario (§7.4) : acceptance verte, suite verte, séquence des preuves, mutation, dépendances, calisthenics. */
 export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
-  const quality = parseQualityBar(await readOr(ctx, QUALITY));
-  if ("error" in quality) throw new EnvFailureError(quality.error);
-  const bar = quality.bar;
+  const { bar, notes: barNotes } = await loadQualityBar(ctx);
   const reasons: string[] = [];
-  const notes: string[] = [];
+  const notes: string[] = [...barNotes];
   const facts: string[] = [];
   if (!(await acceptanceFrozen(ctx, state))) reasons.push("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL.");
 
@@ -336,12 +384,15 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   const changed = (await ctx.workspace.changedFiles(e.since)).filter((f) => f.status !== "deleted" && k.production(f.path));
   const sources = changed.map((f) => f.path).filter((p) => matchesAny(ctx.stack.layout.sources, p));
   if (sources.length) {
-    const mutation = await ctx.stack.mutation({ signal });
-    if (mutation) {
-      reasons.push(...checkMutation(mutation, sources, bar));
-      for (const f of mutation.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
-        facts.push(`Mutation (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-    } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
+    // Mutation par scénario seulement si la barre le demande (ADR 0049) ; par défaut, une seule
+    // exécution en fin de DELIVER (`phaseEndMutation`). Désactivée : on le dit aux lentilles.
+    if (!bar.mutation.active) notes.push("Mutation désactivée par la barre de qualité du projet.");
+    else if (bar.mutation.moment === "scenario") {
+      const m = await mutate(ctx, bar, sources, e.scenarioId, signal);
+      reasons.push(...m.reasons);
+      facts.push(...m.facts);
+      notes.push(...m.notes);
+    }
 
     // Couverture : plancher de la mutation, produite par la même exécution de la suite. Sans
     // rapport, on le DIT — c'est ce que la lentille `quality-gates` croyait acquis alors qu'aucun

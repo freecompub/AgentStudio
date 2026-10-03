@@ -920,6 +920,23 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect((r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
     });
 
+    it("mutant survivant en fin de DELIVER : défaut adressé au testeur, sans relancer la phase (ADR 0049)", () => {
+      const allDone = [
+        ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+        { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev,
+      ];
+      const r = play([...allDone, { type: "GATE_FAIL", gate: "mutation", reasons: ["Mutation : src/Montant.cs à 80 % (minimum 100 %) ; mutants survivants : ligne 25 (ArithmeticOperatorReplacement)."] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(run.feedback.join("\n")).toMatch(/\[mutation#1\.1, major, test\].*ligne 25.*tue ce mutant/s);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    it("mutation réussie en fin de DELIVER : ses faits vont aux lentilles", () => {
+      const r = play([...delivered.slice(0, -1), { ...GATE_OK, facts: ["Mutation (fin de DELIVER) : src/Montant.cs à 100 %, 0 mutant(s) survivant(s)."] } as Ev]);
+      expect(r.state.deliver?.facts).toContain("Mutation (fin de DELIVER) : src/Montant.cs à 100 %, 0 mutant(s) survivant(s).");
+    });
+
     it("tout contesté côté tests, rien côté code : directement la porte de fin de scénario, puis la revue", () => {
       const onlyTest = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "grille vide non testée", target: "test" }] });
       const r = play([...delivered, onlyTest, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "contested", reason: "couvert par ac-5" }] } as Ev,

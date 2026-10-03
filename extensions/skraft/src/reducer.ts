@@ -3,7 +3,7 @@ import { commitMessage, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./c
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { synthesize, type LensVerdict } from "./review.js";
-import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, reviewRound } from "./review-thread.js";
+import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
@@ -151,12 +151,20 @@ export function transition(s0: SkraftState, e: Ev): Out {
           adrs: p === "DESIGN" ? [...s.adrs, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
           lastRejection: null,
+          // Mutation de fin de DELIVER (ADR 0049) : ses faits et notes vont aux lentilles.
+          ...(p === "DELIVER" && s.deliver && (e.facts?.length || e.notes?.length)
+            ? { deliver: { ...s.deliver, facts: [...new Set([...(s.deliver.facts ?? []), ...(e.facts ?? [])])], notes: [...new Set([...s.deliver.notes, ...(e.notes ?? [])])] } }
+            : {}),
           // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
           ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
       }
+      // Mutant survivant en fin de DELIVER (ADR 0049) : un test trop faible, pas une phase à refaire.
+      // Chaque motif devient un défaut adressé au testeur, par la correction de l'ADR 0046.
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "mutation" && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase)
+        return startReviewFix(s, [...(s.reviewThreads ?? []), ...mutationThreads(e.reasons, s.attempts + 1)]);
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
@@ -244,6 +252,21 @@ export function transition(s0: SkraftState, e: Ev): Out {
 }
 
 // ---------- aides -------------------------------------------------------------------
+
+/** Motifs de la mutation de fin de DELIVER → défauts adressés au testeur (ADR 0049). */
+function mutationThreads(reasons: string[], round: number): DefectThread[] {
+  return reasons.map((description, i) => ({
+    id: `mutation#${round}.${i + 1}`,
+    lens: "mutation",
+    severity: "major" as const,
+    description:
+      `${description} Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. ` +
+      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+    target: "test" as const,
+    status: "open" as const,
+    round,
+  }));
+}
 
 /**
  * Suite d'une revue, une fois les fils à jour : approbation, rejet, correction ciblée (DELIVER) ou

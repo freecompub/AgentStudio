@@ -12,6 +12,8 @@ export const API_VERSION = "0.1.0";
 export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
+// Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
+export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";

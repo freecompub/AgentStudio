@@ -541,6 +541,13 @@
       "verify": "pnpm vitest run --project core test/model-class.test.ts && pnpm vitest run --project ext-skraft test/manifest.test.ts -t \"classes de modèle\"",
       "passes": true,
       "notes": "Le CLI honore le modèle demandé depuis le 03/10 (ADR 0020). Classes strong/standard/light dans le manifeste, association par projet (`modelClasses`), modèle indisponible ignoré. Panneau « Modèles des agents » en mode avancé (testé par rendu, pas vu dans la vraie fenêtre). Non éprouvé sur un run réel."
+    },
+    {
+      "id": "barre-de-qualite-du-projet",
+      "title": "La barre de qualité est décidée par le projet dans .agent-studio/quality.yaml : seuils par couche, cœur par chemins, mutation activable (ADR 0049)",
+      "verify": "pnpm vitest run --project stack-adapters test/quality-bar.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"ADR 0049\"",
+      "passes": true,
+      "notes": "Corrige le seuil cœur non appliqué à Tarification.Domaine (03/10). Mutation en fin de DELIVER par défaut ; mutant survivant = défaut adressé au testeur. Reste : lecteur Stryker, interface, migration du projet d’essai."
     }
   ]
 }
