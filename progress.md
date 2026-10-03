@@ -198,6 +198,11 @@ de conception (0045, 0046, 0047). Environ 1 330 requêtes. Réserve à ~170 jusq
 **Prochaine étape.** Rejouer US-2 de bout en bout (RESEARCH → DONE) après la remise à zéro du 01/11,
 pour un premier run complet sans reprise ; il coûtera de l'ordre de 450 à 550 requêtes.
 
+**Le choix du modèle fonctionne désormais (ADR 0020, mesuré le 03/10, 2,4 requêtes).** `listModels()`
+expose 15 modèles, et le modèle demandé à l'ouverture de session est celui qu'indique l'événement
+`usage` : `claude-haiku-4.5` (2,04 requêtes pour un mot), `gpt-5-mini` (0,33). Le 24/09, seul `auto`
+existait et la demande était ignorée. Le choix **par rôle** redevient possible : à concevoir (ADR).
+
 ---
 
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)
