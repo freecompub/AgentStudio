@@ -31,6 +31,22 @@ export function parseCitations(md: string): { paths: PathCitation[]; urls: strin
   return { paths, urls };
 }
 
+const PASCAL = /\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b/g;
+
+/**
+ * Identifiants `PascalCase` présents **n'importe où dans du code** : blocs délimités par ```, et
+ * segments entre backticks quel que soit leur contenu (`Taux.AppliqueA(x)`). Sert à savoir quels
+ * noms un document DÉFINIT : un modèle déclare ses méthodes en signatures et en appels, pas en
+ * noms isolés. N'en tirer que les `Nom` seuls a fait rejeter trois fois une conception correcte.
+ */
+export function extractCodeIdentifiers(md: string): string[] {
+  const out = new Set<string>();
+  const fences = /```[^\n]*\n([\s\S]*?)```/g;
+  for (const m of md.matchAll(fences)) for (const id of m[1]!.match(PASCAL) ?? []) out.add(id);
+  for (const m of md.replace(fences, "").matchAll(/`([^`\n]+)`/g)) for (const id of m[1]!.match(PASCAL) ?? []) out.add(id);
+  return [...out];
+}
+
 /** Identifiants `PascalCase` entre backticks (convention imposée aux documents de conception). */
 export function extractPascalIdentifiers(md: string): string[] {
   const out: string[] = [];
