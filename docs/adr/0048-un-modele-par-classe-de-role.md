@@ -27,7 +27,8 @@ et elle choisirait ce qu'ils paient.
 3. **Résolution par le cœur** (`resolveModel`, pure), à chaque tour : le modèle de la classe, sinon
    le modèle du projet (ADR 0020), sinon aucun — le runtime décide, comme avant.
 4. **Un modèle que l'abonnement ne propose pas est ignoré** : la résolution passe au suivant. La
-   liste vient de `listModels()` ; illisible, rien n'est filtré.
+   liste vient de `listModels()`, demandée une fois par ouverture de projet (et non à chaque tour) ;
+   illisible, rien n'est filtré et on redemandera.
 5. **skraft** : architectes `strong` ; chercheur, acceptance, testeur, développeur et trois
    lentilles `standard` ; classifieur et lentille `quality-gates` `light` (elle ne rejuge rien,
    ADR 0028).

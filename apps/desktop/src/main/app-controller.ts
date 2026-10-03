@@ -127,7 +127,24 @@ export function createAppController(deps: AppControllerDeps): AppController {
    * Attache un projet. Il n'est exposé qu'une fois ses services prêts : sinon un appel concurrent
    * le croirait ouvert et ses requêtes (commandes, tâches, interactions) échoueraient.
    */
+  /**
+   * Modèles de l'abonnement, demandés une fois par ouverture de projet : une tâche skraft fait des
+   * dizaines de tours, quatre lentilles en parallèle à chaque revue, et chacun attendait sinon un
+   * appel réseau (revue de code du 03/10). Un échec n'est pas mémorisé : on redemandera.
+   */
+  let disponibles: Promise<string[] | undefined> | null = null;
+  function modelesDisponibles(): Promise<string[] | undefined> {
+    disponibles ??= ensureRuntime()
+      .then(async (rt) => (await rt.listModels?.())?.map((m) => m.id))
+      .catch(() => {
+        disponibles = null;
+        return undefined;
+      });
+    return disponibles;
+  }
+
   async function attach(ws: Workspace): Promise<void> {
+    disponibles = null;
     // Les services sont construits avant de toucher à l'existant : si la construction échoue
     // — adaptateur introuvable, extension illisible —, le projet en cours reste utilisable
     // plutôt que de laisser une conversation ouverte sur un contrôleur sans projet.
@@ -144,10 +161,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       // Un modèle que l'abonnement ne propose pas (ou plus) est ignoré ; liste illisible = pas de filtre.
       modelFor: async (cls) => {
         const reglages = await deps.settings.load();
-        const available = await ensureRuntime()
-          .then(async (rt) => (await rt.listModels?.())?.map((m) => m.id))
-          .catch(() => undefined);
-        return resolveModel(cls, { classes: reglages.modelClasses?.[ws.root], fallback: reglages.models?.[ws.root], available });
+        return resolveModel(cls, { classes: reglages.modelClasses?.[ws.root], fallback: reglages.models?.[ws.root], available: await modelesDisponibles() });
       },
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {

@@ -28,10 +28,34 @@ describe("Identifiants PascalCase entre backticks (porte cohérence, §7.2)", ()
   });
 });
 
-describe("Identifiants des blocs de code (garde du contrat ratifié, ADR 0047)", async () => {
-  const { fencedIdentifiers } = await import("../src/text-analysis.js");
+describe("Noms déclarés par un contrat (garde du contrat ratifié, ADR 0047)", async () => {
+  const { declaredIdentifiers } = await import("../src/text-analysis.js");
+
   it("ne retient que les noms des blocs délimités, pas ceux du texte ni des backticks en ligne", () => {
-    const md = "Le `Panier` et `Facture` en ligne.\n\n```\npublic Montant Soustrait(Montant autre);\npublic static Taux De(decimal valeur);\n```\n\nPuis du texte : PalierApplicable.";
-    expect(fencedIdentifiers(md).sort()).toEqual(["De", "Montant", "Soustrait", "Taux"]);
+    const md = "Le `Panier` en ligne.\n\n```\npublic Montant Soustrait(Montant autre);\n```\n\nPuis du texte : PalierApplicable(x).";
+    expect(declaredIdentifiers(md)).toEqual(["Soustrait"]);
+  });
+
+  it("retient les types, méthodes et propriétés DÉCLARÉS, pas les noms seulement utilisés", () => {
+    // Revue de code du 03/10 : prendre tout mot capitalisé gardait `List`, `ArgumentException`…, et
+    // une correction légitime retirant leur dernier usage aurait été refusée.
+    const md = [
+      "```",
+      "public readonly record struct Taux",
+      "{",
+      "    public decimal Valeur { get; }",
+      "    public static Taux De(decimal valeur); // lève ArgumentOutOfRangeException si valeur < 0",
+      "}",
+      "public sealed class GrilleDePaliers",
+      "{",
+      "    public static GrilleDePaliers De(IEnumerable<Palier> paliers);",
+      "    public Palier? PalierApplicable(Quantite quantite);",
+      "}",
+      "public Montant SommeDesRemises(GrilleDePaliers grille) =>",
+      "    _lignes.Aggregate(Montant.Zero, (total, l) => total + l.Remise(grille));",
+      "public Montant ATPayer => SommeDesArticles.Soustrait(Remise) + FraisDePort;",
+      "```",
+    ].join("\n");
+    expect(declaredIdentifiers(md).sort()).toEqual(["ATPayer", "De", "GrilleDePaliers", "PalierApplicable", "SommeDesRemises", "Taux", "Valeur"]);
   });
 });

@@ -105,6 +105,13 @@ export interface DeliverState {
   fixTargets?: string[];
   /** Éléments du contrat ratifié présents dans le code à la revue : aucune correction ne doit les retirer. */
   contractSymbols?: string[];
+  /**
+   * Réponses de l'agent du pas en cours, appliquées aux fils seulement si sa porte valide le pas :
+   * un pas refusé est annulé par rollback, ses « corrigé » avec lui.
+   */
+  pendingResponses?: DefectResponse[];
+  /** Fils à l'entrée en correction : restaurés avec le code si la porte de fin de scénario échoue. */
+  threadsAtFixStart?: DefectThread[];
 }
 
 export interface SkraftInput {

@@ -376,6 +376,18 @@ describe("AppController — choix du modèle (D38, ADR 0020)", () => {
     expect((await ctx.controller["model-classes:list"]({})).classes).toEqual({});
   });
 
+  it("agents des tâches : la liste des modèles n'est pas redemandée à chaque tour (revue de code du 03/10)", async () => {
+    const ctx = setup({ settings: { modelClasses: { "/projets/a": { light: "gpt-5-mini" } } } });
+    ctx.runtime.models = [{ id: "gpt-5-mini", name: "GPT-5 mini" }];
+    let appels = 0;
+    const liste = ctx.runtime.listModels.bind(ctx.runtime);
+    ctx.runtime.listModels = async () => (appels++, liste());
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    const modelFor = ctx.getServicesArgs()!.modelFor!;
+    await Promise.all([modelFor("light"), modelFor("light"), modelFor("strong"), modelFor(undefined)]);
+    expect(appels).toBe(1);
+  });
+
   it("le modèle choisi est retenu par projet et transmis aux sessions suivantes", async () => {
     const ctx = setup();
     await ctx.controller["workspace:open"]({ path: "/projets/a" });

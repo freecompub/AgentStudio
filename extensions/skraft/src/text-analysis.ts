@@ -47,15 +47,32 @@ export function extractCodeIdentifiers(md: string): string[] {
   return [...out];
 }
 
+/** Mots-clés qui précèdent un appel ou une expression, jamais un nom déclaré. */
+const NOT_A_TYPE = new Set(["return", "new", "await", "throw", "yield", "else", "case", "in", "is", "as", "not", "and", "or"]);
+
 /**
- * Identifiants `PascalCase` des seuls blocs délimités par ``` : les signatures qu'un contrat
- * déclare, sans les noms cités en passant dans le texte ou entre backticks (ADR 0047).
+ * Noms que les blocs de code d'un contrat **déclarent** (ADR 0047) : types (`class`, `struct`,
+ * `record`, `interface`, `enum`…), méthodes (`Type Nom(`), propriétés (`Type Nom { get`,
+ * `Type Nom =>`). Ni les noms seulement utilisés — types de paramètres, appels qualifiés
+ * (`liste.Aggregate(`) — ni ceux cités en commentaire. Prendre tout mot capitalisé gardait `List` ou
+ * `ArgumentException`, et une correction légitime retirant leur dernier usage aurait été refusée
+ * (revue de code du 03/10).
  */
-export function fencedIdentifiers(md: string): string[] {
+export function declaredIdentifiers(md: string): string[] {
   const out = new Set<string>();
-  // Tout identifiant capitalisé, d'un seul mot compris (`Montant`, `Soustrait`) : PASCAL, qui exige
-  // un mot composé, laisserait passer exactement les noms qu'une correction supprimerait.
-  for (const m of md.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) for (const id of m[1]!.match(/\b[A-Z][A-Za-z0-9_]*\b/g) ?? []) out.add(id);
+  // Un type précédent : identifiant, générique éventuel, nullable ou tableau éventuels.
+  const typed = (name: string, before: string) => {
+    const m = /([A-Za-z_]\w*)(?:<[^<>]*>)?\??(?:\[\])?\s+$/.exec(before);
+    return m !== null && !NOT_A_TYPE.has(m[1]!) && !/\.\s*$/.test(before) && name.length > 0;
+  };
+  for (const block of md.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) {
+    const code = block[1]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    for (const m of code.matchAll(/\b(?:class|struct|record|interface|enum|trait|protocol|type)\s+([A-Z]\w*)/g)) out.add(m[1]!);
+    for (const m of code.matchAll(/([A-Z]\w*)\s*(?:\(|\{\s*(?:get|set|init)\b|=>)/g)) {
+      const before = code.slice(0, m.index);
+      if (typed(m[1]!, before)) out.add(m[1]!);
+    }
+  }
   return [...out];
 }
 

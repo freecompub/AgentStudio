@@ -92,6 +92,17 @@ l'humain a droit à sa correction même si le budget de la phase est épuisé.
 Le retour à l'agent liste les fils actifs **et rappelle les demandes déjà corrigées** des tours
 précédents, à ne pas défaire.
 
+### 7. Une correction se termine toujours (revue de code du 03/10)
+
+- Les réponses d'un agent ne sont appliquées que si sa porte **valide** le pas : un pas refusé est
+  annulé par rollback, ses « corrigé » avec lui.
+- À la fin du tour d'un agent, ses défauts encore actifs sont tenus pour traités (`endTurn`) : la
+  revue suivante rejuge et signalera ce qui persiste. Sans cela, un agent qui ne remplit pas
+  `responses` faisait rebondir la correction entre testeur et développeur, sans fin.
+- Les fils sont copiés à l'entrée en correction ; si la porte de fin de scénario échoue, le rollback
+  restaure le code **et** les fils, et le premier pas dépend des défauts actifs, pas des lignes de
+  rappel.
+
 ## Conséquences
 
 - Le blocage de US-2 ne peut plus se produire : un défaut « test manquant » va au testeur, qui peut

@@ -217,6 +217,20 @@ ignore un modèle que `listModels()` ne propose pas. skraft : architectes `stron
   vraie fenêtre Electron.
 - Reste : association par défaut d'après le multiplicateur, quand le runtime le renseigne.
 
+**Revue de code de la PR #10 : quatre constats, corrigés.**
+- *La correction de revue pouvait rebondir sans fin* entre testeur et développeur si aucun ne
+  remplissait `responses` (champ facultatif) : chaque pas validé remettait les essais à zéro. Les
+  réponses ne s'appliquent plus qu'au pas validé, et `endTurn` clôt les défauts restés actifs de
+  l'agent dont c'était le tour.
+- *Une reprise après la porte de fin de scénario repartait sur un état périmé* : elle choisissait le
+  testeur d'après les lignes de rappel, et gardait les « corrigé » d'un essai annulé par rollback.
+  Les fils sont copiés à l'entrée en correction et restaurés avec le code.
+- *La garde du contrat retenait tout mot capitalisé* (`List`, `ArgumentException`) : seuls les noms
+  déclarés le sont, 13 au lieu de 27 sur US-2, et la suppression de `Soustrait` reste refusée.
+- *`listModels()` était appelé à chaque tour d'agent* : une fois par ouverture de projet.
+→ Les deux premiers sont des cas que mes tests ne couvraient pas parce que mes doubles d'agents
+répondaient toujours : un champ facultatif doit être testé **absent**.
+
 ---
 
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)

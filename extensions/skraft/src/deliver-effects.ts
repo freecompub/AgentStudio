@@ -3,7 +3,7 @@ import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
 import { acOf, featureScenarios } from "./distill.js";
-import { fencedIdentifiers } from "./text-analysis.js";
+import { declaredIdentifiers } from "./text-analysis.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 import type { DefectTarget } from "./review.js";
@@ -174,7 +174,7 @@ async function sourcesText(ctx: ExtensionContext): Promise<string> {
 const present = (text: string, id: string) => new RegExp(`\\b${id}\\b`).test(text);
 
 /**
- * Éléments du contrat ratifié (`design/contracts.md`, blocs de code) présents dans le code à cet
+ * Noms déclarés par le contrat ratifié (`design/contracts.md`, blocs de code) présents dans le code à cet
  * instant : la référence que la garde de correction compare ensuite (ADR 0047). Relevée au moment
  * de la revue, faute de pouvoir relire le code d'un état passé.
  */
@@ -186,7 +186,7 @@ export async function contractSymbolsPresent(ctx: ExtensionContext, slug: string
     return [];
   }
   const text = await sourcesText(ctx);
-  return fencedIdentifiers(contract).filter((id) => present(text, id));
+  return declaredIdentifiers(contract).filter((id) => present(text, id));
 }
 
 /**

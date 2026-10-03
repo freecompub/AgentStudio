@@ -849,10 +849,12 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
     it("correction côté tests : vérifiée par le code, puis le développeur fait passer les tests rouges et traite ses défauts", () => {
       const verify = play([...delivered, review, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev]);
       expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object) }]);
-      expect(verify.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("fixed");
+      // La réponse attend la validation du pas : un pas refusé est annulé, ses « corrigé » avec lui.
+      expect(verify.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("open");
 
       const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h9", fixTargets: ["U > t9"] };
       const dev = transition(verify.state, fixTestOk);
+      expect(dev.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("fixed");
       const run = dev.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
       expect(run.step).toBe("fix");
       expect(run.feedback.join("\n")).toMatch(/taux négatif accepté/);
@@ -869,8 +871,8 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       const fix = play([...delivered, onlyCode]);
       expect((fix.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
       const reported = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "outOfScope", reason: "il faut un test" }] } as Ev);
-      expect(reported.state.reviewThreads?.[0]).toMatchObject({ target: "test", status: "open", rerouted: true });
       const next = transition(reported.state, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true });
+      expect(next.state.reviewThreads?.[0]).toMatchObject({ target: "test", status: "open", rerouted: true });
       const run = next.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
       expect(run.step).toBe("fix-test");
       expect(run.feedback.join("\n")).toMatch(/aucun test ne couvre ATPayer/);
@@ -881,6 +883,41 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       const fix = play([...delivered, review]);
       const green = transition(fix.state, REP_DEV);
       expect(green.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "fix", contractSymbols: ["Soustrait", "ATPayer"] })]);
+    });
+
+    it("aucun agent ne répond aux défauts : la correction se termine quand même, sans rebondir (revue de code du 03/10)", () => {
+      const r = play([...delivered, review, REP_TEST, { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h1", fixTargets: [] } as Ev]);
+      expect((r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
+      const fin = play([...delivered, review, REP_TEST, { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h1", fixTargets: [] } as Ev,
+        REP_DEV, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true } as Ev]);
+      expect(kinds(fin.effects)).toEqual(["scenarioGate"]);
+    });
+
+    it("porte de fin de scénario refusée pendant la correction : les fils reviennent à leur état d'avant, comme le code", () => {
+      // Le rollback annule le code du développeur ; ses « corrigé » de l'essai annulé ne doivent pas
+      // survivre, sinon la reprise le saute et revérifie un code jamais corrigé.
+      const ok = (cp: string, extra = {}) => ({ type: "STEP_OK", checkpointId: cp, all: [], passed: passedAll, ...extra }) as Ev;
+      const r = play([...delivered, review,
+        { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev, ok("cp-ft", { unitTestsHash: "h1", fixTargets: [] }),
+        { ...REP_DEV, responses: [{ defect: "cold-reader#1.2", status: "fixed" }] } as Ev, ok("cp-fix", { acceptanceGreen: true }),
+        { type: "SCENARIO_FAIL", reasons: ["Mutation : 80 %"] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(r.state.reviewThreads?.map((t) => t.status)).toEqual(["open", "open"]);
+      // Après la reprise côté tests, le développeur doit repasser : son défaut est de nouveau actif.
+      const apresTest = transition(transition(r.state, REP_TEST).state, ok("cp-ft2", { unitTestsHash: "h1", fixTargets: [] }));
+      expect((apresTest.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
+    });
+
+    it("reprise après la porte de fin de scénario : le premier pas dépend des défauts actifs, pas des lignes de rappel", () => {
+      const ok = (cp: string, extra = {}) => ({ type: "STEP_OK", checkpointId: cp, all: [], passed: passedAll, ...extra }) as Ev;
+      const onlyTest = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "grille vide non testée", target: "test" }] });
+      const onlyCode = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "taux négatif accepté", target: "code" }] });
+      // Revue 1 : un défaut de test, corrigé ; revue 2 : un défaut de code seulement. Le défaut de test
+      // corrigé reste en rappel dans le retour du testeur — il ne doit pas le faire relancer.
+      const r = play([...delivered, onlyTest, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev, ok("cp-ft", { unitTestsHash: "h1", fixTargets: [] }),
+        { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK, onlyCode, { type: "SCENARIO_FAIL", reasons: ["Mutation : 80 %"] } as Ev]);
+      expect((r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
     });
 
     it("tout contesté côté tests, rien côté code : directement la porte de fin de scénario, puis la revue", () => {

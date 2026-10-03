@@ -169,6 +169,16 @@ export function applyResponses(
   });
 }
 
+/**
+ * Fin du tour d'un agent en correction : ses défauts encore actifs sont tenus pour traités. La revue
+ * suivante rejuge le livrable et signalera de nouveau ce qui persiste. Sans cela, un agent qui ne
+ * remplit pas `responses` laisse ses défauts actifs pour toujours, et la correction rebondit entre
+ * le testeur et le développeur sans fin (revue de code du 03/10).
+ */
+export function endTurn(threads: DefectThread[], concerns: (t: DefectThread) => boolean): DefectThread[] {
+  return threads.map((t) => (isActive(t) && concerns(t) ? { ...t, status: "fixed" } : t));
+}
+
 /** Décision humaine sur un désaccord persistant : `accept:<id>` (raison à l'agent) ou `maintain:<id>` (à la lentille). */
 export function applyArbitration(threads: DefectThread[], decision: string): DefectThread[] {
   const i = decision.indexOf(":");

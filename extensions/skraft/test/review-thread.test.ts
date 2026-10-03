@@ -10,6 +10,7 @@ import {
   applyArbitration,
   applyResponses,
   effectiveTarget,
+  endTurn,
   lensHistory,
   lensesAfterThreads,
   numberDefects,
@@ -191,5 +192,18 @@ describe("applyResponses — hors de mon périmètre", () => {
 
   it("sans second agent (hors DELIVER), « hors périmètre » vaut contestation", () => {
     expect(applyResponses([t], [{ defect: "q#1.1", status: "outOfScope", reason: "r" }], () => true)[0]).toMatchObject({ status: "contested", contestation: "r" });
+  });
+});
+
+describe("endTurn", () => {
+  it("à la fin du tour d'un agent, ses défauts encore actifs sont tenus pour traités : la revue suivante les rejugera", () => {
+    // Sans cela, un agent qui ne remplit pas `responses` laisse ses défauts actifs pour toujours, et
+    // la correction rebondit entre le testeur et le développeur sans jamais finir.
+    const threads: DefectThread[] = [
+      { id: "a", lens: "c", severity: "major", description: "x", target: "test", status: "open", round: 1 },
+      { id: "b", lens: "c", severity: "major", description: "y", target: "code", status: "open", round: 1 },
+      { id: "c", lens: "c", severity: "major", description: "z", target: "test", status: "contested", contestation: "r", round: 1 },
+    ];
+    expect(endTurn(threads, (t) => t.target === "test").map((t) => [t.id, t.status])).toEqual([["a", "fixed"], ["b", "open"], ["c", "contested"]]);
   });
 });

@@ -23,8 +23,9 @@ juste) ou céder.
 
 ## Décision
 
-1. **Garde du contrat ratifié.** À la revue de DELIVER, le code relève les éléments du contrat
-   (`design/contracts.md`, identifiants capitalisés des blocs de code) présents dans les sources.
+1. **Garde du contrat ratifié.** À la revue de DELIVER, le code relève les noms que le contrat
+   **déclare** (`design/contracts.md`, blocs de code : types, méthodes `Type Nom(`, propriétés
+   `Nom { get` ou `Nom =>`) présents dans les sources.
    En correction, la porte GREEN refuse un tour qui en fait disparaître un, avec la marche à
    suivre : corriger sans retirer, ou contester, ou déclarer hors périmètre. La référence est
    relevée au moment de la revue faute de pouvoir relire le code d'un état passé : l'API de
@@ -44,7 +45,8 @@ juste) ou céder.
   `De`) passe ; la suppression est refusée (`Soustrait` disparu).
 - **Limite** : la garde voit les noms qui disparaissent, pas un comportement modifié à nom constant.
   Retirer la soustraction dans `ATPayer` en gardant `Soustrait` passerait ; la revue reste le filet.
-- La référence inclut aussi des noms du cadre cités dans le contrat (`IEnumerable`, `Aggregate`,
-  `ArgumentOutOfRangeException`) : retirer leur dernier usage en correction serait refusé. Accepté :
-  une correction de revue qui réécrit à ce point le code n'en est plus une.
+- ~~La référence inclut aussi des noms du cadre~~ — corrigé après la revue de code du 03/10 : seuls
+  les noms **déclarés** sont retenus (13 sur US-2, contre 27 en prenant tout mot capitalisé) ;
+  `IEnumerable`, `Aggregate`, `Montant` en type de paramètre ne le sont plus. Rejouée sur les commits
+  réels : la suppression de `Soustrait` reste refusée.
 - Un défaut mal routé coûte désormais un tour au lieu de trois.

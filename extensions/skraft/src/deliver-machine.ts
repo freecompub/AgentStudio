@@ -1,7 +1,7 @@
 import { levelEffects } from "./difficulty.js";
 import type { DeliverState, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
-import { agentFeedback, applyResponses, isActive, type DefectThread } from "./review-thread.js";
+import { agentFeedback, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
 
 type Out = { state: SkraftState; effects: SkraftEffect[] };
 type AgentStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix";
@@ -69,9 +69,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
 
     case "AGENT_REPORTED": {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
-      // Correction de revue : chaque agent répond aux défauts qui le concernent (ADR 0046).
-      if ((d.step === "fix-test" || d.step === "fix") && e.responses?.length && s.reviewThreads)
-        s = { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, d.step === "fix-test" ? forTests : forDev, otherAgent) };
+      // Correction de revue : les réponses de l'agent (ADR 0046) attendent que sa porte valide le pas.
+      if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...d, pendingResponses: e.responses ?? [] } };
       if (d.step === "fix-test")
         return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline }] };
       if (d.step === "test")
@@ -134,7 +133,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       // Correction côté tests validée (ADR 0046) : au développeur s'il a des défauts ou des tests
       // rouges à faire passer ; sinon, directement la porte de fin de scénario.
       if (d.step === "fix-test") {
-        const nd: DeliverState = { ...base, newTest: null, fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash };
+        s = closeTurn(s, d, forTests);
+        const nd: DeliverState = { ...base, newTest: null, pendingResponses: [], fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash };
         const devWork = (s.reviewThreads ?? []).some((t) => isActive(t) && forDev(t));
         // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
         if (devWork || nd.fixTargets!.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: d.reviewFeedback?.test ?? [], code: agentFeedback(s.reviewThreads ?? [], forDev) } }, []);
@@ -143,14 +143,16 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       // Correction de revue validée : la porte de fin de scénario revérifie le code corrigé, et la
       // séquence rouge puis vert des tests rouges ajoutés par la correction côté tests.
       if (d.step === "fix") {
+        s = closeTurn(s, d, forDev);
         // Un défaut renvoyé par le développeur au testeur (« hors de mon périmètre ») : au testeur
-        // maintenant, avec le retour recalculé, plutôt que de le laisser sans personne.
+        // maintenant, avec le retour recalculé, plutôt que de le laisser sans personne. Un défaut ne
+        // se renvoie qu'une fois et chaque tour clôt ceux de son agent : la correction se termine.
         const forTester = (s.reviewThreads ?? []).filter((t) => isActive(t) && forTests(t));
         if (forTester.length) {
           const test = agentFeedback(s.reviewThreads ?? [], forTests);
-          return agent(s, { ...base, newTest: null, step: "fix-test", reviewFeedback: { test, code: d.reviewFeedback?.code ?? [] }, reviewDefects: test }, []);
+          return agent(s, { ...base, newTest: null, pendingResponses: [], step: "fix-test", reviewFeedback: { test, code: d.reviewFeedback?.code ?? [] }, reviewDefects: test }, []);
         }
-        return scenarioGate(s, { ...base, newTest: null, unitTests: d.fixTargets ?? [] });
+        return scenarioGate(s, { ...base, newTest: null, pendingResponses: [], unitTests: d.fixTargets ?? [] });
       }
       return null;
     }
@@ -177,6 +179,12 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       return scenarioFailure(s, d, e.reasons);
   }
   return null;
+}
+
+/** Pas de correction validé : réponses de l'agent appliquées, puis ses défauts restés actifs clos (`endTurn`). */
+function closeTurn(s: SkraftState, d: DeliverState, concerns: (t: DefectThread) => boolean): SkraftState {
+  if (!s.reviewThreads) return s;
+  return { ...s, reviewThreads: endTurn(applyResponses(s.reviewThreads, d.pendingResponses ?? [], concerns, otherAgent), concerns) };
 }
 
 /** Tests d'acceptance encore autorisés à échouer : scénarios moteurs non terminés (dont le courant, ou non). */
@@ -281,8 +289,13 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
   const lastRejection = { gate: `scénario ${sc.id}`, reasons };
   // Correction de revue : relancée depuis son point de départ, dans la limite du budget.
   if (d.fixing && failures < s.budget.maxAttemptsPerPhase) {
-    const step = d.reviewFeedback?.test.length ? "fix-test" : "fix";
-    const r = agent({ ...s, lastRejection }, { ...restart, step, unitTests: [], fixTargets: [] }, reasons);
+    // Le rollback ramène le code à l'entrée en correction : les fils y reviennent aussi, et le
+    // premier pas dépend des défauts actifs — pas des lignes de rappel du retour.
+    const threads = d.threadsAtFixStart ?? s.reviewThreads ?? [];
+    const step = threads.some((t) => isActive(t) && forTests(t)) ? "fix-test" : "fix";
+    const reviewFeedback = { test: agentFeedback(threads, forTests), code: agentFeedback(threads, forDev) };
+    const nd: DeliverState = { ...restart, step, unitTests: [], fixTargets: [], pendingResponses: [], reviewFeedback, reviewDefects: step === "fix-test" ? reviewFeedback.test : reviewFeedback.code };
+    const r = agent({ ...s, reviewThreads: threads, lastRejection }, nd, reasons);
     return { state: r.state, effects: [...rollback, ...r.effects] };
   }
   if (d.granularity === "turn-per-scenario" && !d.fixing) {
@@ -336,6 +349,8 @@ export function startReviewFix(s0: SkraftState, threads: DefectThread[]): Out {
     ...d,
     step,
     fixing: true,
+    threadsAtFixStart: threads,
+    pendingResponses: [],
     reviewDefects: own,
     reviewFeedback: feedback,
     fixTargets: [],
