@@ -1,0 +1,290 @@
+{
+  "resume": {
+    "etapes": [
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-03T13:13:30.042Z",
+        "duréeMs": 20924,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 138030,
+        "sortie": 1368,
+        "nanoAiu": 7993050000
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-03T13:13:50.966Z",
+        "duréeMs": 14,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-03T13:13:50.980Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T13:13:50.987Z",
+        "duréeMs": 119731,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 15,
+        "entrée": 425256,
+        "sortie": 4758,
+        "nanoAiu": 28053840000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T13:15:50.718Z",
+        "duréeMs": 68275,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 31,
+        "entrée": 718438,
+        "sortie": 12047,
+        "nanoAiu": 51602490000
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T13:16:58.993Z",
+        "duréeMs": 38773,
+        "tours": 1,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[quality-gates#1.1, major, test] L'opérateur `+` (ligne 17) et `Soustrait` (ligne 25) ne sont exercés par aucun test — ils ne servent qu'à `Facture.ATPayer` (Tarification.Application/CalculDuPanier.cs), dont l'impl-plan DISTILL reconnaît explicitement qu'« aucun AC ne porte de valeur explicite sur ATPayer » et que la correction « n'est exercée par aucun test d'acceptance gelé ». Ce n'est pas un cas de l'ADR 0045 (pas de duplication d'un test d'acceptance existant) : c'est un comportement livré sans aucune preuve rouge→vert, ce qui explique une partie du déficit de couverture mesuré sur Montant.cs (70 %, 7/10 lignes). (src/Tarification.Domaine/Montant.cs:17)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 136807,
+        "sortie": 1590,
+        "nanoAiu": 17393190000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T13:17:37.766Z",
+        "duréeMs": 25155,
+        "tours": 4,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 328560,
+        "sortie": 4509,
+        "nanoAiu": 47416140000
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T13:18:02.921Z",
+        "duréeMs": 68,
+        "tours": 0,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-03T13:18:02.989Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-03T13:13:30.042Z",
+        "duréeMs": 20924,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 138030,
+        "sortie": 1368,
+        "nanoAiu": 7993050000
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-03T13:13:50.966Z",
+        "duréeMs": 14,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-03T13:13:50.980Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T13:13:50.987Z",
+        "duréeMs": 158572,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[quality-gates#1.1, major, test] L'opérateur `+` (ligne 17) et `Soustrait` (ligne 25) ne sont exercés par aucun test — ils ne servent qu'à `Facture.ATPayer` (Tarification.Application/CalculDuPanier.cs), dont l'impl-plan DISTILL reconnaît explicitement qu'« aucun AC ne porte de valeur explicite sur ATPayer » et que la correction « n'est exercée par aucun test d'acceptance gelé ». Ce n'est pas un cas de l'ADR 0045 (pas de duplication d'un test d'acceptance existant) : c'est un comportement livré sans aucune preuve rouge→vert, ce qui explique une partie du déficit de couverture mesuré sur Montant.cs (70 %, 7/10 lignes). (src/Tarification.Domaine/Montant.cs:17)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 19,
+        "entrée": 562063,
+        "sortie": 6348,
+        "nanoAiu": 45447030000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T13:15:50.718Z",
+        "duréeMs": 93430,
+        "tours": 8,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 44,
+        "entrée": 1046998,
+        "sortie": 16556,
+        "nanoAiu": 99018630000
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-03T13:18:02.989Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      }
+    ],
+    "total": {
+      "duréeMs": 272947,
+      "tours": 12,
+      "appels": 70,
+      "entrée": 1747091,
+      "sortie": 24272,
+      "nanoAiu": 152458710000,
+      "rejets": 1
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-03T13:13:29.948Z",
+      "etape": "départ",
+      "restantes": 320
+    },
+    {
+      "at": "2026-10-03T13:13:30.042Z",
+      "etape": "CLASSIFY",
+      "restantes": 320
+    },
+    {
+      "at": "2026-10-03T13:13:50.966Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 320
+    },
+    {
+      "at": "2026-10-03T13:13:50.980Z",
+      "etape": "ROUTE",
+      "restantes": 320
+    },
+    {
+      "at": "2026-10-03T13:13:50.987Z",
+      "etape": "DELIVER",
+      "restantes": 320
+    },
+    {
+      "at": "2026-10-03T13:15:50.718Z",
+      "etape": "REVIEW",
+      "restantes": 284
+    },
+    {
+      "at": "2026-10-03T13:16:58.993Z",
+      "etape": "DELIVER",
+      "restantes": 233
+    },
+    {
+      "at": "2026-10-03T13:17:37.766Z",
+      "etape": "REVIEW",
+      "restantes": 215
+    },
+    {
+      "at": "2026-10-03T13:18:02.921Z",
+      "etape": "DELIVER",
+      "restantes": 215
+    },
+    {
+      "at": "2026-10-03T13:18:02.989Z",
+      "etape": "DONE",
+      "restantes": 215
+    },
+    {
+      "at": "2026-10-03T13:18:06.229Z",
+      "etape": "fin",
+      "restantes": 215
+    }
+  ],
+  "brancheRun": "run/us-2-2026-10-03-9362",
+  "etatFinal": {
+    "stage": "DONE",
+    "phase": null
+  }
+}

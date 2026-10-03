@@ -3,8 +3,8 @@
  * dans les preuves, seuils de mutation par couche, règle de dépendance, Object Calisthenics
  * mesurables. Aucune I/O : les effets leur passent le contenu lu par le code.
  */
-import { z } from "zod";
-import type { ArchitectureReport, CoverageReport, DependencyRule, Evidence, LintReport, MutationReport } from "@agent-studio/extension-api";
+import { layerOf } from "@agent-studio/extension-api";
+import type { ArchitectureReport, CoverageReport, DependencyRule, Evidence, LintReport, MutationReport, QualityBar } from "@agent-studio/extension-api";
 import { acOf } from "./distill.js";
 
 export type Granularity = "turn-per-scenario" | "session-per-step";
@@ -50,8 +50,23 @@ export function planScenarios(input: { implPlan: string; acceptanceTestIds: stri
   });
 }
 
-/** Un résultat désigne-t-il ce test ? (un fichier qui ne compile plus apparaît sous son seul nom). */
-export const concerns = (resultId: string, testId: string) => resultId === testId || testId.startsWith(`${resultId} > `) || resultId.startsWith(`${testId} > `);
+/**
+ * Un résultat désigne-t-il ce test ? Un fichier qui ne compile plus apparaît sous son seul nom :
+ * - en `chemin > test` (Vitest, Swift), le chemin est un préfixe de l'identifiant ;
+ * - en JUnit, l'identifiant est une classe qualifiée (`Projet.Tests.QuantiteTests.Methode`) : le
+ *   fichier `…/QuantiteTests.cs` désigne alors les tests de la classe du même nom. Le 03/10, faute
+ *   de cette règle, la porte GREEN a déclaré introuvable un test rouge par compilation devenu vert.
+ */
+export const concerns = (resultId: string, testId: string) =>
+  resultId === testId || testId.startsWith(`${resultId} > `) || resultId.startsWith(`${testId} > `) || fileDesignatesClass(testId, resultId) || fileDesignatesClass(resultId, testId);
+
+/** `tests/X/QuantiteTests.cs` désigne `A.B.QuantiteTests.M` : le nom du fichier est un segment de classe de l'identifiant. */
+function fileDesignatesClass(path: string, id: string): boolean {
+  const m = /[/\\]([^/\\]+)\.[A-Za-z0-9]+$/.exec(path);
+  if (!m || /[/\\]/.test(id)) return false;
+  // Tous les segments sauf le dernier, qui est le nom de la méthode.
+  return id.split(".").slice(0, -1).includes(m[1]!);
+}
 
 /** Porte de fin de scénario : au moins un rouge (bonne raison) puis un vert par test unitaire ajouté. */
 export function checkRedGreenSequence(evidence: Evidence[], unitTests: string[]): string[] {
@@ -69,32 +84,8 @@ export function checkRedGreenSequence(evidence: Evidence[], unitTests: string[])
 }
 
 // ---------- barre de qualité (configurable par projet) ---------------------------------
-
-const qualitySchema = z.object({
-  mutation: z
-    .object({
-      /** Couches cœur (seuil strict) : un segment du chemin porte l'un de ces noms. */
-      coreLayers: z.array(z.string()).default(["Domain", "Application"]),
-      core: z.number().min(0).max(100).default(100),
-      edge: z.number().min(0).max(100).default(90),
-    })
-    .prefault({}),
-  // Aucune valeur par défaut ici : les noms d'infrastructure dépendent de l'écosystème, et une
-  // extension qui les connaîtrait deviendrait spécifique à un langage. Le projet les déclare,
-  // sinon ils viennent de la stack (voir `defaultDependencyRules`).
-  dependencyRules: z.array(z.object({ module: z.string(), forbidden: z.array(z.string()) })).default([]),
-  /**
-   * Couverture de lignes. **Aucun seuil par défaut** : sans déclaration du projet, la couverture
-   * est rapportée comme un fait, jamais exigée. Un seuil arbitraire imposé d'en haut ferait échouer
-   * des projets qui n'ont rien demandé, et pousserait à écrire des tests qui couvrent sans juger.
-   */
-  coverage: z
-    .object({
-      core: z.number().min(0).max(100).optional(),
-      edge: z.number().min(0).max(100).optional(),
-    })
-    .prefault({}),
-});
+// La barre vit dans `.agent-studio/quality.yaml`, commune aux extensions (ADR 0049) : lue par
+// `parseQualityBar` de `@agent-studio/extension-api`. L'ancien `.skraft/quality.json` est relu, converti.
 
 /**
  * Règles appliquées quand le projet n'en déclare aucune : le domaine n'importe pas ce que la
@@ -107,24 +98,7 @@ export function defaultDependencyRules(infrastructureModules: readonly string[])
 // Les seuils de forme ne figurent plus ici : ils appartiennent à la configuration du linter du
 // projet (`.eslintrc`, `.swiftlint.yml`…), seul endroit où ils ne peuvent pas se contredire.
 
-export type QualityBar = z.infer<typeof qualitySchema>;
-
-/** Barre de qualité : `.skraft/quality.json` du projet, sinon les valeurs par défaut (§7.4). */
-export function parseQualityBar(raw: string | null): { bar: QualityBar } | { error: string } {
-  let json: unknown = {};
-  if (raw !== null) {
-    try {
-      json = JSON.parse(raw);
-    } catch {
-      return { error: "`.skraft/quality.json` n'est pas du JSON valide." };
-    }
-  }
-  const r = qualitySchema.safeParse(json);
-  if (!r.success) return { error: `\`.skraft/quality.json\` invalide : ${r.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` };
-  return { bar: r.data };
-}
-
-const isCore = (path: string, bar: QualityBar) => path.split("/").some((seg) => bar.mutation.coreLayers.some((l) => l.toLowerCase() === seg.toLowerCase()));
+export { parseQualityBar, type QualityBar } from "@agent-studio/extension-api";
 
 /**
  * Seuils de couverture sur les fichiers de production du scénario. Plancher de la mutation : elle
@@ -137,7 +111,7 @@ const isCore = (path: string, bar: QualityBar) => path.split("/").some((seg) => 
 export function checkCoverage(report: CoverageReport, sources: string[], bar: QualityBar): string[] {
   const reasons: string[] = [];
   for (const path of sources) {
-    const seuil = isCore(path, bar) ? bar.coverage.core : bar.coverage.edge;
+    const seuil = bar.coverage[layerOf(path, bar)];
     if (seuil === undefined) continue; // le projet n'exige rien : le fait suffit
     const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
     if (!f) continue;
@@ -147,13 +121,13 @@ export function checkCoverage(report: CoverageReport, sources: string[], bar: Qu
   return reasons;
 }
 
-/** Seuils de mutation sur les fichiers de production du scénario : 100 % cœur, 90 % bords (par défaut). */
+/** Seuils de mutation sur les fichiers de production : par couche (domaine, application, reste), ADR 0049. */
 export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar): string[] {
   const reasons: string[] = [];
   for (const path of sources) {
     const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
     if (!f) continue; // aucun mutant applicable dans ce fichier
-    const threshold = isCore(path, bar) ? bar.mutation.core : bar.mutation.edge;
+    const threshold = bar.mutation[layerOf(path, bar)];
     if (f.score + 1e-9 < threshold) {
       const survivors = f.survived.map((s) => `ligne ${s.line} (${s.operator})`).join(", ");
       reasons.push(`Mutation : ${path} à ${round(f.score)} % (minimum ${threshold} %)${survivors ? ` ; mutants survivants : ${survivors}` : ""}.`);

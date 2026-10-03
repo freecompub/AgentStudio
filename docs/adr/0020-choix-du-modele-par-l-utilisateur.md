@@ -1,6 +1,7 @@
 # ADR 0020 — Choix du modèle par l'utilisateur
 
-- Statut : **décidé, sans effet à ce jour** — le Copilot CLI n'honore pas le choix (mesures ci-dessous)
+- Statut : **décidé** — sans effet du 24/09 au 03/10 ; **le Copilot CLI honore le choix depuis le
+  2026-10-03** (mesure en fin de document)
 - Date : 2026-09-24
 - Jalon : hors jalon (dette reprise après S6)
 
@@ -83,3 +84,21 @@ l'intégration CLI exposerait alors plus qu'`auto` — et à chaque montée de v
   son échec ne doit pas empêcher de converser — dans ce cas la liste est vide et le runtime décide.
 - Le choix étant par projet, deux projets ouverts successivement peuvent utiliser des modèles
   différents, ce qui est le but.
+
+## Mesuré le 2026-10-03 : le runtime honore désormais le choix
+
+Le compte a changé d'offre (1 500 requêtes premium par mois). Même voie qu'au 24/09 (port
+`AgentRuntime` → Copilot SDK → CLI) :
+
+| Voie | Résultat |
+| --- | --- |
+| `listModels()` | 15 modèles : Claude Sonnet 5 et 5.5, Claude Haiku 4.5, GPT-5.6 Luna et Terra, GPT-6 Luna, GPT-5.4 et mini, GPT-5.3-Codex, GPT-5 mini, MAI-Code-1.1-Flash, Grok 4.5 à 4.7, Kimi K3 |
+| `openSession({ model: "claude-haiku-4.5" })` | modèle utilisé (événement `usage`) : `claude-haiku-4.5`, 2,04 requêtes pour une réponse d'un mot |
+| `openSession({ model: "gpt-5-mini" })` | `gpt-5-mini`, 0,33 requête |
+
+Sans modèle demandé, tous les runs du 03/10 ont tourné sur `claude-sonnet-5`, de façon stable.
+
+Conséquence : le choix **par rôle** (D38), écarté faute d'effet, redevient possible. Il fera l'objet
+d'un ADR propre. Un seul échantillon par modèle : le coût relatif des modèles reste à mesurer sur un
+vrai tour, où le contexte domine (un appel de Sonnet 5 coûtait de 2,8 à 4 requêtes en DESIGN).
+

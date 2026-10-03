@@ -11,7 +11,7 @@ import {
   type Logger,
   type MainSession,
 } from "@agent-studio/core";
-import { ROLE_LABELS, type Profile } from "@agent-studio/core";
+import { resolveModel, ROLE_LABELS, type Profile } from "@agent-studio/core";
 import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
 import type { Workspace } from "@agent-studio/workspace";
@@ -127,7 +127,24 @@ export function createAppController(deps: AppControllerDeps): AppController {
    * Attache un projet. Il n'est exposé qu'une fois ses services prêts : sinon un appel concurrent
    * le croirait ouvert et ses requêtes (commandes, tâches, interactions) échoueraient.
    */
+  /**
+   * Modèles de l'abonnement, demandés une fois par ouverture de projet : une tâche skraft fait des
+   * dizaines de tours, quatre lentilles en parallèle à chaque revue, et chacun attendait sinon un
+   * appel réseau (revue de code du 03/10). Un échec n'est pas mémorisé : on redemandera.
+   */
+  let disponibles: Promise<string[] | undefined> | null = null;
+  function modelesDisponibles(): Promise<string[] | undefined> {
+    disponibles ??= ensureRuntime()
+      .then(async (rt) => (await rt.listModels?.())?.map((m) => m.id))
+      .catch(() => {
+        disponibles = null;
+        return undefined;
+      });
+    return disponibles;
+  }
+
   async function attach(ws: Workspace): Promise<void> {
+    disponibles = null;
     // Les services sont construits avant de toucher à l'existant : si la construction échoue
     // — adaptateur introuvable, extension illisible —, le projet en cours reste utilisable
     // plutôt que de laisser une conversation ouverte sur un contrôleur sans projet.
@@ -139,6 +156,13 @@ export function createAppController(deps: AppControllerDeps): AppController {
       // Même canal que l'arbitre de permissions : écrire un profil de stack élargit ce que
       // l'application a le droit de lancer, et se confirme donc dans la fenêtre (§8.5).
       confirmer,
+      // Modèle des agents de tâche (ADR 0048) : classe du rôle, puis modèle du projet (ADR 0020),
+      // relus à chaque appel pour qu'un changement de réglage vaille dès le tour suivant.
+      // Un modèle que l'abonnement ne propose pas (ou plus) est ignoré ; liste illisible = pas de filtre.
+      modelFor: async (cls) => {
+        const reglages = await deps.settings.load();
+        return resolveModel(cls, { classes: reglages.modelClasses?.[ws.root], fallback: reglages.models?.[ws.root], available: await modelesDisponibles() });
+      },
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
         if (session) void session.record("notice", markdown, extensionId);
@@ -287,6 +311,32 @@ export function createAppController(deps: AppControllerDeps): AppController {
         deps.logger?.info("modèles indisponibles", { error: String(err) });
         return { models: [], selected };
       }
+    },
+
+    "model-classes:list": async () => {
+      const ws = requireWorkspace();
+      const classes = (await deps.settings.load()).modelClasses?.[ws.root] ?? {};
+      try {
+        const rt = await ensureRuntime();
+        return { models: (await rt.listModels?.()) ?? [], classes };
+      } catch (err) {
+        deps.logger?.info("modèles indisponibles", { error: String(err) });
+        return { models: [], classes };
+      }
+    },
+
+    // Modèle d'une classe de rôle pour le projet courant (ADR 0048) ; `null` = retour au modèle du projet.
+    "model-class:set": async ({ modelClass, id }) => {
+      const ws = requireWorkspace();
+      const reglages = await deps.settings.load();
+      const projet = { ...(reglages.modelClasses?.[ws.root] ?? {}) };
+      if (id === null) delete projet[modelClass];
+      else projet[modelClass] = id;
+      const modelClasses = { ...(reglages.modelClasses ?? {}) };
+      if (Object.keys(projet).length) modelClasses[ws.root] = projet;
+      else delete modelClasses[ws.root];
+      await deps.settings.save({ ...reglages, modelClasses });
+      deps.logger?.info("modèle de classe choisi", { root: ws.root, modelClass, model: id });
     },
 
     "model:set": async ({ id }) => {

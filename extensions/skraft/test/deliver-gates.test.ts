@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
+/** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
-  const r = parseQualityBar(raw);
+  const r = parseQualityBar(raw === null ? {} : { legacyJson: raw });
   if ("error" in r) throw new Error(r.error);
   return r.bar;
 };
@@ -62,10 +63,10 @@ describe("checkRedGreenSequence", () => {
 });
 
 describe("barre de qualité", () => {
-  it("valeurs par défaut ; surcharge partielle ; JSON invalide signalé", () => {
-    expect(bar().mutation).toEqual({ coreLayers: ["Domain", "Application"], core: 100, edge: 90 });
-    expect(parseQualityBar("{")).toEqual({ error: "`.skraft/quality.json` n'est pas du JSON valide." });
-    expect(parseQualityBar('{"mutation":{"core":120}}')).toMatchObject({ error: expect.stringMatching(/mutation\.core/) });
+  it("valeurs par défaut ; ancien JSON invalide signalé", () => {
+    expect(bar().mutation).toEqual({ active: true, domain: 100, application: 100, rest: 90, moment: "phase-end" });
+    expect(parseQualityBar({ legacyJson: "{" })).toEqual({ error: "`.skraft/quality.json` n'est pas du JSON valide." });
+    expect(parseQualityBar({ legacyJson: '{"mutation":{"core":120}}' })).toMatchObject({ error: expect.stringMatching(/mutation\.core/) });
   });
 
   it("mutation : 100 % exigé dans le domaine, 90 % ailleurs ; survivants listés", () => {
@@ -142,7 +143,7 @@ describe("Qualité de forme : le linter du projet, pas un analyseur maison", () 
  */
 describe("Seuils de couverture", () => {
   const bar = (over: Record<string, unknown> = {}) => {
-    const r = parseQualityBar(JSON.stringify({ coverage: { core: 90, edge: 70 }, ...over }));
+    const r = parseQualityBar({ legacyJson: JSON.stringify({ coverage: { core: 90, edge: 70 }, ...over }) });
     if ("error" in r) throw new Error(r.error);
     return r.bar;
   };
@@ -171,7 +172,7 @@ describe("Seuils de couverture", () => {
   });
 
   it("par défaut, aucun seuil : la couverture est rapportée, pas exigée", () => {
-    const defaut = parseQualityBar(null);
+    const defaut = parseQualityBar({});
     if ("error" in defaut) throw new Error(defaut.error);
     expect(checkCoverage(rapport([{ file: "src/Domain/Panier.cs", score: 5 }]), ["src/Domain/Panier.cs"], defaut.bar)).toEqual([]);
   });
@@ -194,5 +195,309 @@ describe("Barre de qualité hors de portée des agents", () => {
     // Une constante que personne ne transmet ne protège rien.
     const src = await readFile(new URL("../src/effects.ts", import.meta.url), "utf8");
     expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS\]/);
+  });
+});
+
+/**
+ * Run réel US-2 du 03/10 : DESIGN et DISTILL validées, puis DELIVER refusée trois fois avant même
+ * le premier tour, « La suite est rouge avant DELIVER » — pour les deux tests d'acceptance que
+ * DISTILL venait de laisser rouges, exactement comme sa porte RED l'exige. C'est l'ADR 0041 une
+ * seconde fois : un rapport JUnit rend `file` comme un nom de classe, et les globs de
+ * `layout.acceptanceTests` sont des chemins. Le correctif d'alors n'avait touché que DISTILL.
+ */
+describe("planDeliver — tests d'acceptance d'un rapport JUnit (.NET)", async () => {
+  const { planDeliver } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const classe = "Tarification.Tests.RemiseParPalierAcceptanceTests";
+  const acceptance = (n: number, status: "passed" | "failed") => ({ id: `${classe}.Ac${n}_Scenario_${n}`, file: classe, name: `Ac${n}_Scenario_${n}`, status, ...(status === "failed" ? { failureKind: "assertion", message: "Assert.Equal() Failure" } : {}) });
+  const unitaire = (nom: string, status: "passed" | "failed" = "passed") => ({ id: `Tarification.Tests.CalculDuPanierTests.${nom}`, file: "Tarification.Tests.CalculDuPanierTests", name: nom, status, ...(status === "failed" ? { failureKind: "assertion", message: "x" } : {}) });
+
+  const ctx = (results: unknown[]) =>
+    ({
+      workspace: { fingerprint: async () => "h", readFile: async () => { throw new Error("absent"); } },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results }) },
+    }) as never;
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" };
+  const run = (results: unknown[]) => planDeliver({ ctx: ctx(results), state, taskId: "t", signal: new AbortController().signal });
+
+  it("les tests d'acceptance rouges laissés par DISTILL ne bloquent pas DELIVER, et deviennent ses scénarios", async () => {
+    const ev = await run([unitaire("Un_panier_vide_vaut_zero"), acceptance(1, "passed"), acceptance(2, "failed"), acceptance(3, "failed")]);
+    expect(ev.type).toBe("DELIVER_PLANNED");
+    if (ev.type !== "DELIVER_PLANNED") return;
+    expect(ev.scenarios.map((s) => s.id).sort()).toEqual(["ac-1", "ac-2", "ac-3"]);
+  });
+
+  it("un test unitaire rouge bloque toujours DELIVER", async () => {
+    await expect(run([unitaire("Un_panier_vide_vaut_zero", "failed"), acceptance(2, "failed")])).rejects.toThrow(/La suite est rouge avant DELIVER : Tarification\.Tests\.CalculDuPanierTests\.Un_panier_vide_vaut_zero\./);
+  });
+});
+
+/**
+ * Run réel US-2 du 03/10, deuxième pas de DELIVER : le test rouge appelait `AtteintLeSeuil`, qui
+ * n'existait pas — en C#, une erreur de COMPILATION. Le lecteur d'erreurs de compilation désigne
+ * alors le test par son fichier ; au vert, le rapport JUnit le nomme par sa classe qualifiée. La
+ * porte GREEN a conclu « test du pas introuvable » sur un test bel et bien vert.
+ */
+describe("concerns — un test désigné par son fichier (rouge de compilation)", async () => {
+  const { concerns, checkRedGreenSequence } = await import("../src/deliver.js");
+  const fichier = "tests/Tarification.Tests/QuantiteTests.cs";
+  const nom = "Tarification.Tests.QuantiteTests.AtteintLeSeuil_est_vrai_quand_la_quantite_est_egale_au_seuil";
+
+  it("le fichier désigne les tests de la classe du même nom, dans les deux sens", () => {
+    expect(concerns(nom, fichier)).toBe(true);
+    expect(concerns(fichier, nom)).toBe(true);
+  });
+
+  it("mais pas ceux d'une autre classe, ni d'une classe dont le nom ne fait que le contenir", () => {
+    expect(concerns("Tarification.Tests.MontantTests.Multiplie", fichier)).toBe(false);
+    expect(concerns("Tarification.Tests.QuantiteTestsBis.X", fichier)).toBe(false);
+  });
+
+  it("les identifiants `chemin > test` gardent leur sens", () => {
+    expect(concerns("Tests/A.swift", "Tests/A.swift > A.testX")).toBe(true);
+    expect(concerns("Tests/A.swift > A.testX", "Tests/A.swift > A.testY")).toBe(false);
+  });
+
+  it("la séquence rouge puis vert est reconnue quand le rouge vient du compilateur et le vert de JUnit", () => {
+    const preuve = (o: Partial<Evidence>): Evidence => ({ id: "e", taskId: "t", phase: "DELIVER_RED", source: "gate", at: "", exitCode: 1, timedOut: false, durationMs: 1, counts: { passed: 0, failed: 0, skipped: 0 }, testIds: [], failing: [], testsHash: "", head: "", ...o }) as Evidence;
+    const rouge = preuve({ testIds: [fichier], failing: [{ id: fichier, failureKind: "missing_symbol", message: "CS1061" }] });
+    const vert = preuve({ phase: "DELIVER_GREEN", exitCode: 0, testIds: [nom] });
+    expect(checkRedGreenSequence([rouge, vert], [fichier])).toEqual([]);
+  });
+});
+
+/**
+ * ADR 0045 — couvert par l'acceptance. Run réel US-2 du 03/10 : `skraft-test` refusait d'écrire un
+ * test unitaire pour `PalierApplicable`, dont les quatre branches sont vérifiées par ac-1/2/3/5
+ * (mandat 4 de `test-design-mandates`) ; la porte n'avait aucune sortie pour ce cas. Le testeur le
+ * déclare, et le CODE vérifie : rien d'écrit, le test désigné est celui du scénario, et il est
+ * rouge pour une bonne raison.
+ */
+describe("verifyUnitRed — couvert par l'acceptance", async () => {
+  const { verifyUnitRed } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const classe = "Tarification.Tests.RemiseParPalierAcceptanceTests";
+  const ac2 = `${classe}.Ac2_Palier_atteint`;
+  const res = (id: string, status: "passed" | "failed", failureKind?: string) => ({ id, file: classe, name: id, status, ...(failureKind ? { failureKind, message: "Assert.Equal() Failure" } : {}) });
+  const scenarios = [{ id: "ac-2", ac: 2, acceptanceTestId: ac2, role: "driver", status: "in_progress" }];
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", deliver: { scenarios, current: 0 } } as never;
+
+  function run(o: { changed?: string[]; results: unknown[]; coveredBy?: string }) {
+    const commits: string[] = [];
+    const ctx = {
+      workspace: {
+        changedFiles: async () => (o.changed ?? []).map((path) => ({ path, status: "added" })),
+        fingerprint: async () => "h",
+        checkpoint: async () => ({ id: "cp-acc" }),
+      },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: o.results }) },
+      git: { commit: async (m: string) => void commits.push(m) },
+    } as never;
+    const e = { kind: "verifyUnitRed", scenarioId: "ac-2", since: "cp", baseline: { all: [ac2, "U.old"], passed: ["U.old"] }, pending: [ac2], coveredBy: o.coveredBy ?? ac2 } as never;
+    return verifyUnitRed(e, { ctx, state, taskId: "t", signal: new AbortController().signal });
+  }
+
+  it("rien d'écrit, test d'acceptance du scénario rouge sur assertion : le pas est accepté et vise ce test", async () => {
+    const ev = await run({ results: [res("U.old", "passed"), res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_OK", newTest: ac2, viaAcceptance: true, checkpointId: "cp-acc" });
+  });
+
+  it("un test désigné qui n'est pas le test d'acceptance du scénario est refusé", async () => {
+    const ev = await run({ coveredBy: `${classe}.Ac3_Autre_critere`, results: [res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/n'est pas le test d'acceptance du scénario/) });
+  });
+
+  it("le test d'acceptance déjà vert : refusé, il n'y a plus rien à faire passer", async () => {
+    const ev = await run({ results: [res(ac2, "passed")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/déjà vert/) });
+  });
+
+  it("le test d'acceptance rouge pour une mauvaise raison : refusé", async () => {
+    const ev = await run({ results: [res(ac2, "failed", "other_error")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/mauvaise raison/) });
+  });
+
+  it("une déclaration « couvert » accompagnée de fichiers modifiés est contradictoire : refusée", async () => {
+    const ev = await run({ changed: ["tests/Tarification.Tests/GrilleTests.cs"], results: [res(ac2, "failed", "assertion")] });
+    expect(ev).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/couvert.*aucun fichier/i) });
+  });
+});
+
+/**
+ * ADR 0046 — porte de la correction côté tests. Un test réclamé par la revue sur du code existant
+ * passe souvent d'emblée : il est accepté ; un rouge doit l'être pour une bonne raison et devient
+ * une cible du développeur ; rien d'existant ne doit disparaître ni casser.
+ */
+describe("verifyFixTests — correction de revue côté tests", async () => {
+  const { verifyFixTests } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const res = (id: string, status: "passed" | "failed", failureKind?: string) => ({ id, file: "Tarification.Tests.GrilleTests", name: id, status, ...(failureKind ? { failureKind, message: "m" } : {}) });
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" } as never;
+  const baseline = { all: ["T.Grille.Existant", "T.Accept.Ac1_x"], passed: ["T.Grille.Existant", "T.Accept.Ac1_x"] };
+  function run(o: { changed?: string[]; results: unknown[] }) {
+    const commits: string[] = [];
+    const ctx = {
+      workspace: { changedFiles: async () => (o.changed ?? ["tests/T/GrilleTests.cs"]).map((path) => ({ path, status: "modified" })), fingerprint: async () => "h", checkpoint: async () => ({ id: "cp-ft" }) },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: o.results }) },
+      git: { commit: async (m: string) => void commits.push(m) },
+    } as never;
+    return verifyFixTests({ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp", baseline } as never, { ctx, state, taskId: "t", signal: new AbortController().signal });
+  }
+  const existing = [res("T.Grille.Existant", "passed"), res("T.Accept.Ac1_x", "passed")];
+
+  it("un test ajouté qui passe d'emblée (caractérisation) est accepté, sans cible pour le développeur", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.Grille_vide", "passed")] })).toMatchObject({ type: "STEP_OK", fixTargets: [] });
+  });
+
+  it("un test ajouté rouge sur assertion devient une cible du développeur", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.Taux_negatif", "failed", "assertion")] })).toMatchObject({ type: "STEP_OK", fixTargets: ["T.Grille.Taux_negatif"] });
+  });
+
+  it("un test ajouté rouge pour une mauvaise raison est refusé", async () => {
+    expect(await run({ results: [...existing, res("T.Grille.X", "failed", "other_error")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/mauvaise raison/) });
+  });
+
+  it("un test existant disparu ou cassé est refusé : ajouter, jamais retirer ni affaiblir", async () => {
+    expect(await run({ results: [res("T.Accept.Ac1_x", "passed")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/ont disparu.*T\.Grille\.Existant/) });
+    expect(await run({ results: [res("T.Grille.Existant", "failed", "assertion"), res("T.Accept.Ac1_x", "passed")] })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/ne passent plus/) });
+  });
+
+  it("un fichier hors tests unitaires est refusé ; ne rien écrire est permis (tout a pu être contesté)", async () => {
+    expect(await run({ changed: ["src/Grille.cs"], results: existing })).toMatchObject({ type: "STEP_FAIL", reason: expect.stringMatching(/hors tests unitaires/) });
+    expect(await run({ changed: [], results: existing })).toMatchObject({ type: "STEP_OK", fixTargets: [] });
+  });
+});
+
+/**
+ * ADR 0047 — garde du contrat ratifié. Run réel US-2 du 03/10 : pour faire taire un défaut de
+ * couverture, le développeur a supprimé `Montant.Soustrait` et la déduction de la remise, que le
+ * contrat de DESIGN exigeait. La revue l'a vu ; aucune porte ne l'interdisait.
+ */
+describe("verifyUnitGreen — un élément du contrat ratifié ne disparaît pas pendant une correction", async () => {
+  const { verifyUnitGreen } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" } as never;
+  function run(montant: string) {
+    const ctx = {
+      workspace: {
+        fingerprint: async () => "h",
+        changedFiles: async () => [{ path: "src/Tarification.Domaine/Montant.cs", status: "modified" }],
+        listFiles: async () => ["src/Tarification.Domaine/Montant.cs", "src/Tarification.Application/CalculDuPanier.cs"],
+        readFile: async (p: string) => (p.endsWith("Montant.cs") ? montant : "public Montant ATPayer => SommeDesArticles + FraisDePort;"),
+        checkpoint: async () => ({ id: "cp-fix" }),
+      },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: [{ id: "U.a", file: "U", name: "a", status: "passed" }] }) },
+      git: { commit: async () => "sha" },
+    } as never;
+    const e = { kind: "verifyUnitGreen", mode: "fix", scenarioId: "ac-2", since: "cp", newTest: null, unitTestsHash: "h", pending: [], contractSymbols: ["Soustrait", "Multiplie", "ATPayer"] } as never;
+    const s = { ...(state as object), deliver: { scenarios: [{ id: "ac-2", acceptanceTestId: "A.Ac2" }], baseline: { all: [], passed: [] } } } as never;
+    return verifyUnitGreen(e, { ctx, state: s, taskId: "t", signal: new AbortController().signal });
+  }
+
+  it("un élément du contrat supprimé pendant la correction : refusé, avec la marche à suivre", async () => {
+    expect(await run("public Montant Multiplie(Taux t) => De(Euros * t.Valeur);")).toMatchObject({
+      type: "STEP_FAIL",
+      reason: expect.stringMatching(/contrat ratifié.*Soustrait.*conteste.*hors de ton périmètre/s),
+    });
+  });
+
+  it("tous les éléments du contrat toujours présents : la correction passe", async () => {
+    expect(await run("public Montant Multiplie(Taux t) => De(Euros * t.Valeur);\npublic Montant Soustrait(Montant a) => De(Euros - a.Euros);")).toMatchObject({ type: "STEP_OK" });
+  });
+});
+
+
+/**
+ * ADR 0049 — barre de qualité du projet : seuils par couche, cœur défini par des chemins, mutation
+ * en fin de DELIVER par défaut. Le 03/10, `Montant.cs` (domaine) est passé au seuil du reste : la
+ * couche `Tarification.Domaine` n'était pas reconnue.
+ */
+describe("barre de qualité du projet (ADR 0049)", async () => {
+  const yaml = (y: string) => {
+    const r = parseQualityBar({ yaml: y });
+    if ("error" in r) throw new Error(r.error);
+    return r.bar;
+  };
+  const rapport = (files: { file: string; score: number }[]) => ({ files: files.map((f) => ({ ...f, covered: 7, total: 10 })) });
+
+  it("le cas réel : Montant.cs, dans Tarification.Domaine, est jugé au seuil du domaine", () => {
+    const b = yaml('coeur:\n  domaine: ["src/Tarification.Domaine/**"]\ncouverture:\n  domaine: 90\n  reste: 70\n');
+    expect(checkCoverage(rapport([{ file: "Tarification.Domaine/Montant.cs", score: 70 }]), ["src/Tarification.Domaine/Montant.cs"], b)).toEqual([
+      expect.stringMatching(/Montant\.cs à 70 % \(minimum 90 %\)/),
+    ]);
+    // Et même sans déclaration, les noms usuels reconnaissent la couche.
+    expect(checkCoverage(rapport([{ file: "Tarification.Domaine/Montant.cs", score: 70 }]), ["src/Tarification.Domaine/Montant.cs"], bar('{"coverage":{"core":90,"edge":70}}'))).toHaveLength(1);
+  });
+
+  it("domaine et application ont chacun leur seuil", () => {
+    const b = yaml("mutation:\n  domaine: 100\n  application: 80\n  reste: 50\n");
+    const report = { score: 85, files: [{ file: "Sources/Application/A.swift", score: 85, survived: [] }, { file: "Sources/Domain/D.swift", score: 85, survived: [] }] };
+    expect(checkMutation(report, ["Sources/Application/A.swift", "Sources/Domain/D.swift"], b)).toEqual([expect.stringMatching(/Domain\/D\.swift à 85 % \(minimum 100 %\)/)]);
+  });
+
+  const { scenarioGate, phaseEndMutation } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+
+  function ctxWith(files: Record<string, string>, mutation: unknown) {
+    let mutations = 0;
+    const ctx = {
+      workspace: {
+        readFile: async (p: string) => {
+          if (p in files) return files[p]!;
+          throw new Error("absent");
+        },
+        listFiles: async () => ["src/Tarification.Domaine/Montant.cs"],
+        changedFiles: async () => [{ path: "src/Tarification.Domaine/Montant.cs", status: "modified" }],
+        fingerprint: async () => "h",
+      },
+      stack: {
+        layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] },
+        isTestFile: () => false,
+        runTests: async () => ({ timedOut: false, results: [{ id: "A.Ac1_x", file: "A", name: "x", status: "passed" }] }),
+        mutation: async () => (mutations++, mutation),
+        lint: async () => null,
+        architecture: async () => null,
+        infrastructureModules: [],
+      },
+      evidence: { list: async () => [] },
+    } as never;
+    return { ctx, mutations: () => mutations };
+  }
+  const state = {
+    ...initialState({ storyPath: "stories/US-2.md" } as never),
+    slug: "us-2",
+    checkpoints: { DELIVER: "cp-d" },
+    deliver: { scenarios: [{ id: "ac-1", acceptanceTestId: "A.Ac1_x" }], baseline: { all: [], passed: [] } },
+  } as never;
+  const survivant = { score: 80, files: [{ file: "Tarification.Domaine/Montant.cs", score: 80, survived: [{ line: 25, operator: "ArithmeticOperatorReplacement" }] }] };
+
+  it("par défaut, la mutation ne tourne pas à chaque scénario", async () => {
+    const { ctx, mutations } = ctxWith({}, survivant);
+    await scenarioGate({ kind: "scenarioGate", scenarioId: "ac-1", since: "cp", unitTests: [], pending: [] } as never, { ctx, state, taskId: "t", signal: new AbortController().signal });
+    expect(mutations()).toBe(0);
+  });
+
+  it("en fin de DELIVER, elle tourne une fois sur les fichiers modifiés, et un mutant survivant est un motif", async () => {
+    const { ctx, mutations } = ctxWith({}, survivant);
+    const r = await phaseEndMutation(ctx, state);
+    expect(mutations()).toBe(1);
+    expect(r.reasons).toEqual([expect.stringMatching(/Montant\.cs à 80 % \(minimum 100 %\) ; mutants survivants : ligne 25/)]);
+  });
+
+  it("mutation par scénario si la barre le demande ; désactivée, elle ne tourne pas et c'est dit", async () => {
+    const parScenario = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  moment: scenario\n" }, survivant);
+    const r = await scenarioGate({ kind: "scenarioGate", scenarioId: "ac-1", since: "cp", unitTests: [], pending: [] } as never, { ctx: parScenario.ctx, state, taskId: "t", signal: new AbortController().signal });
+    expect(parScenario.mutations()).toBe(1);
+    expect(r).toMatchObject({ type: "SCENARIO_FAIL" });
+
+    const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
+    const fin = await phaseEndMutation(inactive.ctx, state);
+    expect(inactive.mutations()).toBe(0);
+    expect(fin).toEqual({ reasons: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+  });
+
+  it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {
+    const { ctx } = ctxWith({ ".agent-studio/quality.yaml": "couverture:\n  domaine: 150\n" }, null);
+    await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/couverture\.domaine/);
   });
 });

@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-09-29",
-  "branch": "feat/skraft-agents-skills-md",
+  "updated": "2026-10-03",
+  "branch": "feat/suivi-run",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -441,8 +441,8 @@
       "id": "retour-de-revue-cumulatif",
       "title": "Le retour donné à l'agent après un rejet de revue conserve les demandes des rejets précédents",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'rejet'",
-      "passes": false,
-      "notes": "Observé le 29/09, run 3 : essai 1 recalé par la lentille `architecture` (modélisation en commande/événement pour un calcul pur), essai 2 par `cold-reader` (la grille n'a ni source ni cycle de vie). L'agent corrige l'un et attire l'autre. `lastRejection` n'en garde qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois essais, une phase peut épuiser son budget en satisfaisant chaque critique à son tour sans jamais les satisfaire ensemble — le budget devient une loterie. C'est le plus sérieux des trois défauts du run."
+      "passes": true,
+      "notes": "Observé le 29/09, run 3 : essai 1 recalé par la lentille `architecture` (modélisation en commande/événement pour un calcul pur), essai 2 par `cold-reader` (la grille n'a ni source ni cycle de vie). L'agent corrige l'un et attire l'autre. `lastRejection` n'en garde qu'un, et `specialist(ns, reasons)` ne transmet que celui-là. Avec trois lentilles de fond et trois essais, une phase peut épuiser son budget en satisfaisant chaque critique à son tour sans jamais les satisfaire ensemble — le budget devient une loterie. C'est le plus sérieux des trois défauts du run. — RÉSOLU le 03/10 par les fils de défauts (ADR 0046) : les demandes déjà corrigées sont rappelées à chaque retour."
     },
     {
       "id": "skraft-agents-skills-md",
@@ -457,6 +457,104 @@
       "verify": "MANUEL : charger extensions/skraft comme plugin dans Claude Code (.claude-plugin/plugin.json) et dans Copilot CLI (plugin.json), vérifier que les agents skraft-* et les skills apparaissent",
       "passes": false,
       "notes": "Manifestes écrits d'après la structure de skraft-plugin, jamais éprouvés sur les versions installées (point À VÉRIFIER de l'ADR 0024). Sans agent-studio, aucune garantie : ni porte, ni preuve, ni test gelé."
+    },
+    {
+      "id": "trace-transitions-et-rejets",
+      "title": "La trace enregistre chaque transition et chaque rejet avec ses motifs entiers",
+      "verify": "pnpm vitest run --project task-engine -t \"trace\"",
+      "passes": true,
+      "notes": "Les entrées `transition` et `rejet` étaient déclarées depuis l’ADR 0032 mais rien ne les écrivait. Le moteur lit par convention `stage`, `attempts`, `rejections` (compteur croissant) et `lastRejection` ; skraft compte ses rejets dans `bumpRetries`."
+    },
+    {
+      "id": "bilan-de-run-par-etape",
+      "title": "Un run se résume par étape depuis sa trace : durée, tours, rejets et causes, requêtes premium",
+      "verify": "pnpm vitest run --project core test/run-summary.test.ts",
+      "passes": true,
+      "notes": "`resumerTrace`, pur. Le banc s’en sert en direct (lignes `§`) et pour `docs/runs/<date>-<story>/rapport.md`. Les requêtes premium viennent de `nanoAiu / 1e9`, vérifié contre l’écart de réserve (36 = 36)."
+    },
+    {
+      "id": "coherence-noms-definis-en-code",
+      "title": "La porte cohérence reconnaît un nom défini dans le code du modèle (bloc, signature, appel)",
+      "verify": "pnpm vitest run --project ext-skraft test/design-gate.test.ts",
+      "passes": true,
+      "notes": "Run réel du 03/10 : DESIGN rejetée deux fois à tort (`AppliqueA` défini en signature dans un bloc de code), environ 200 requêtes. Rejoué sur les trois instantanés : seul l’essai 1, où le nom manquait vraiment, est encore rejeté."
+    },
+    {
+      "id": "deliver-reconnait-ses-tests-a-leur-marque",
+      "title": "DELIVER reconnaît les tests d’acceptance d’un rapport JUnit à leur marque, pas à leur chemin",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"planDeliver\"",
+      "passes": true,
+      "notes": "Run réel US-2 du 03/10 : DISTILL validée, puis DELIVER refusée trois fois avant le premier tour (« suite rouge ») pour les tests d’acceptance que DISTILL venait de laisser rouges. Même cause que l’ADR 0041, qui n’avait corrigé que DISTILL : `file` est un nom de classe en JUnit."
+    },
+    {
+      "id": "rouge-de-compilation-suivi-jusqu-au-vert",
+      "title": "Un test unitaire rouge par compilation (désigné par son fichier) est reconnu au vert sous son nom JUnit",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"concerns\"",
+      "passes": true,
+      "notes": "Run réel US-2 du 03/10, deuxième pas de DELIVER : « test du pas introuvable » sur un test vert. `concerns` ne connaissait que les identifiants `chemin > test` ; un fichier `…/QuantiteTests.cs` désigne désormais les tests de la classe `….QuantiteTests`."
+    },
+    {
+      "id": "couvert-par-l-acceptance",
+      "title": "Un pas « test » peut déclarer le comportement couvert par l’acceptance ; le code le vérifie (ADR 0045)",
+      "verify": "pnpm vitest run --project ext-skraft -t \"couvert par l\"",
+      "passes": true,
+      "notes": "Option A choisie le 03/10. Champ `coveredBy` de report_phase ; retenu seulement si rien n’est écrit, si c’est le test d’acceptance du scénario et s’il est rouge pour une bonne raison. Éprouvé le 03/10 sur US-2 : accepté du premier coup, DELIVER sans rejet."
+    },
+    {
+      "id": "correction-de-revue-peut-ajouter-un-test",
+      "title": "Une correction de revue peut ajouter un test (rouge vérifié) au lieu de trouver les tests gelés",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"verifyFixTests\"",
+      "passes": true,
+      "notes": "ADR 0046 : correction en deux temps, côté tests (`fix-test`, tests ajoutés verts ou rouges pour une bonne raison) puis côté code.  Éprouvé le 03/10 : le testeur a ajouté FactureTests, vert d’emblée, accepté ; la revue suivante a approuvé et US-2 est allée jusqu’à DONE."
+    },
+    {
+      "id": "revue-dialogue-avec-l-agent",
+      "title": "La revue route chaque défaut vers l’agent concerné, qui peut le contester ; la lentille arbitre, l’humain en dernier recours (ADR 0046)",
+      "verify": "pnpm vitest run --project ext-skraft test/review-thread.test.ts test/reducer.test.ts -t \"fils de défauts|reviewRound|applyResponses|applyArbitration\"",
+      "passes": true,
+      "notes": "Éprouvé le 03/10 sur US-2 : contestation argumentée, arbitrages accepted/maintained, rappel des demandes corrigées. Routage amendé : le fichier cité ne fait basculer un défaut que vers le testeur. Reste ouvert : « corriger » un défaut de couverture en supprimant le code non couvert. Run DONE du 03/10 : défaut routé au testeur, corrigé, arbitrage accepted, quatre lentilles approuvent."
+    },
+    {
+      "id": "garde-du-contrat-ratifie",
+      "title": "Une correction de revue ne peut pas retirer du code un élément du contrat ratifié (ADR 0047)",
+      "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"contrat ratifié\"",
+      "passes": true,
+      "notes": "Rejouée sur les commits réels du run US-2 du 03/10 : la suppression de `Montant.Soustrait` est refusée, la correction légitime passe. Limite : un comportement modifié à nom constant n’est pas vu."
+    },
+    {
+      "id": "defaut-hors-perimetre-renvoye",
+      "title": "Un agent peut renvoyer un défaut « hors de mon périmètre » à l’autre agent, une fois (ADR 0047)",
+      "verify": "pnpm vitest run --project ext-skraft -t \"hors de mon périmètre\"",
+      "passes": true,
+      "notes": "Réponse `outOfScope` ; en DELIVER le défaut change de cible et part à l’autre agent ; renvoyé de nouveau, il devient une contestation.  Pas sollicité lors du run du 03/10 (routage déjà juste) : non éprouvé en réel."
+    },
+    {
+      "id": "us-2-livree-en-reel",
+      "title": "Une story réelle (US-2, .NET) va jusqu’à DONE avec le vrai Copilot",
+      "verify": "MANUEL : docs/runs/2026-10-03-us-2-836c8392/rapport.md (État final : DONE) et branche run/us-2-2026-10-03-9362 du projet d’essai, dotnet test vert",
+      "passes": true,
+      "notes": "03/10, repris à DELIVER depuis run/us-2-2026-10-03-2973 (RESEARCH, DESIGN, DISTILL validées par le run précédent). 152,5 requêtes pour la reprise. Un run complet sans reprise reste à faire."
+    },
+    {
+      "id": "modele-par-classe-de-role",
+      "title": "Chaque agent de tâche reçoit le modèle de sa classe de rôle, choisi par le projet parmi ceux de l’abonnement (ADR 0048)",
+      "verify": "pnpm vitest run --project core test/model-class.test.ts && pnpm vitest run --project ext-skraft test/manifest.test.ts -t \"classes de modèle\"",
+      "passes": true,
+      "notes": "Le CLI honore le modèle demandé depuis le 03/10 (ADR 0020). Classes strong/standard/light dans le manifeste, association par projet (`modelClasses`), modèle indisponible ignoré. Panneau « Modèles des agents » en mode avancé (testé par rendu, pas vu dans la vraie fenêtre). Non éprouvé sur un run réel."
+    },
+    {
+      "id": "barre-de-qualite-du-projet",
+      "title": "La barre de qualité est décidée par le projet dans .agent-studio/quality.yaml : seuils par couche, cœur par chemins, mutation activable (ADR 0049)",
+      "verify": "pnpm vitest run --project stack-adapters test/quality-bar.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"ADR 0049\"",
+      "passes": true,
+      "notes": "Corrige le seuil cœur non appliqué à Tarification.Domaine (03/10). Mutation en fin de DELIVER par défaut ; mutant survivant = défaut adressé au testeur. Reste : interface, migration du projet d’essai."
+    },
+    {
+      "id": "mutation-stryker",
+      "title": "La mutation se mesure avec Stryker (Stryker.NET, StrykerJS, Stryker4s) via le lecteur stryker-json",
+      "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts test/profile-adapter.test.ts -t \"Stryker\"",
+      "passes": true,
+      "notes": "Lecteur écrit sur un rapport réel de Stryker.NET 5.0.0 (03/10) ; éprouvé de bout en bout sur le code livré d’US-2 : 72 % en 32 s, comme Stryker. dotnet-stryker installé en outil global sur la machine de dev ; le projet d’essai n’a pas encore la commande dans son stack.yaml."
     }
   ]
 }

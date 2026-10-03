@@ -12,6 +12,8 @@ export const API_VERSION = "0.1.0";
 export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
+// Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
+export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
 export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
@@ -59,6 +61,12 @@ export interface ManifestAgent {
    * `shell:test`) ou outils de l'extension déclarés dans `contributes.tools`.
    */
   tools?: string[];
+  /**
+   * Classe de modèle du rôle (ADR 0048) : `strong` pour concevoir, `standard` pour produire,
+   * `light` pour classer ou confronter des faits. Jamais un identifiant de modèle : le projet
+   * associe chaque classe à un modèle réel. Absente : le modèle du projet, ou le runtime décide.
+   */
+  modelClass?: "strong" | "standard" | "light";
 }
 
 /** Skill : dossier contenant `SKILL.md` (ou fichier `.md`), relatif au dossier de l'extension. */

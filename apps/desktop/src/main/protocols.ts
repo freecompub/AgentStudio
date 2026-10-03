@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing, Role, ToolCallGuard, UserConfirmer } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, UserConfirmer } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -22,6 +22,8 @@ export interface AppSettings {
   uiMode?: "simple" | "advanced";
   /** Modèle retenu par projet (racine → identifiant), D38 / ADR 0020. */
   models?: Record<string, string>;
+  /** Modèle réel par classe de rôle, par projet (racine → classe → identifiant), ADR 0048. */
+  modelClasses?: Record<string, Partial<Record<ModelClass, string>>>;
   /** Hôte GitHub retenu : `github.com` ou une instance Enterprise (D4). */
   authHostname?: string;
 }
@@ -79,6 +81,11 @@ export interface WorkspaceServicesArgs {
    * commande qui écrirait sans demander.
    */
   confirmer?: UserConfirmer;
+  /**
+   * Modèle réel pour une classe de rôle d'un agent de tâche (ADR 0048), relu dans les réglages à
+   * chaque appel. Absent : les agents des tâches ne demandent aucun modèle.
+   */
+  modelFor?(cls: ModelClass | undefined): Promise<string | undefined>;
 }
 
 export type WorkspaceServicesFactory = (args: WorkspaceServicesArgs) => Promise<WorkspaceServices>;

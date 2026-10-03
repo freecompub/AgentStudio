@@ -277,6 +277,18 @@ label {
   max-width: 16rem;
 }
 
+/* Panneau « Modèles des agents » (ADR 0048) : une ligne par classe de rôle. */
+.model-class {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.9rem 0;
+  font-size: var(--step--1);
+}
+
+.model-class select {
+  width: 100%;
+}
+
 .spacer {
   flex: 1;
 }

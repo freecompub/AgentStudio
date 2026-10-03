@@ -1,0 +1,583 @@
+{
+  "resume": {
+    "etapes": [
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-03T10:07:55.346Z",
+        "duréeMs": 12710,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 73053,
+        "sortie": 697,
+        "nanoAiu": 6553650000
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-03T10:08:08.056Z",
+        "duréeMs": 18,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-03T10:08:08.074Z",
+        "duréeMs": 91517,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 172571,
+        "sortie": 8959,
+        "nanoAiu": 19905880000
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-03T10:09:39.591Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-03T10:09:39.601Z",
+        "duréeMs": 29161,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 5,
+        "entrée": 160923,
+        "sortie": 2601,
+        "nanoAiu": 14605190000
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-03T10:10:08.762Z",
+        "duréeMs": 12,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-03T10:10:08.774Z",
+        "duréeMs": 323827,
+        "tours": 4,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "cohérence",
+            "motifs": [
+              "`PalierApplicable` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 32,
+        "entrée": 1686747,
+        "sortie": 32277,
+        "nanoAiu": 130705440000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T10:15:32.601Z",
+        "duréeMs": 55584,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 14,
+        "entrée": 334058,
+        "sortie": 10606,
+        "nanoAiu": 38744070000
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-03T10:16:28.185Z",
+        "duréeMs": 74,
+        "tours": 0,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-03T10:16:28.259Z",
+        "duréeMs": 215087,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 15,
+        "entrée": 814353,
+        "sortie": 22126,
+        "nanoAiu": 53774410000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T10:20:03.346Z",
+        "duréeMs": 41084,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 20,
+        "entrée": 590375,
+        "sortie": 11326,
+        "nanoAiu": 64045740000
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-03T10:20:44.430Z",
+        "duréeMs": 34124,
+        "tours": 1,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader, major] `Facture.ATPayer` ne soustrait toujours pas `Remise` (`SommeDesArticles + FraisDePort`), alors que `Facture.Remise` peut désormais être non nulle via `CalculDuPanier.Chiffrer(Panier, GrilleDePaliers)`. Un lecteur qui découvre uniquement le code (sans le journal de phase) y verra un total facturé incohérent avec le champ `Remise` qu'il expose juste à côté — le commentaire XML de `Facture` (« les remises... restent à zéro tant que les stories correspondantes ne sont pas livrées ») est maintenant obsolète puisque cette story livre justement le calcul de `Remise`. (src/Tarification.Application/CalculDuPanier.cs:10)"
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 5,
+        "entrée": 289148,
+        "sortie": 1830,
+        "nanoAiu": 31756250000
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T10:21:18.554Z",
+        "duréeMs": 15511,
+        "tours": 4,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 377438,
+        "sortie": 3634,
+        "nanoAiu": 44148450000
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-03T10:21:34.065Z",
+        "duréeMs": 156,
+        "tours": 0,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T10:21:34.221Z",
+        "duréeMs": 7557,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-03T10:21:41.778Z",
+        "duréeMs": 77,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T10:21:41.855Z",
+        "duréeMs": 6781,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-03T10:21:48.636Z",
+        "duréeMs": 60,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T10:21:48.696Z",
+        "duréeMs": 6258,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-03T10:21:54.954Z",
+        "duréeMs": 84,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-03T10:21:55.038Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-03T10:07:55.346Z",
+        "duréeMs": 12710,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 73053,
+        "sortie": 697,
+        "nanoAiu": 6553650000
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-03T10:08:08.056Z",
+        "duréeMs": 18,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-03T10:08:08.074Z",
+        "duréeMs": 91517,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 172571,
+        "sortie": 8959,
+        "nanoAiu": 19905880000
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-03T10:09:39.591Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-03T10:09:39.601Z",
+        "duréeMs": 353062,
+        "tours": 5,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "cohérence",
+            "motifs": [
+              "`PalierApplicable` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 37,
+        "entrée": 1847670,
+        "sortie": 34878,
+        "nanoAiu": 145310630000
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-03T10:10:08.762Z",
+        "duréeMs": 12,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-03T10:15:32.601Z",
+        "duréeMs": 112179,
+        "tours": 11,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 43,
+        "entrée": 1301871,
+        "sortie": 25566,
+        "nanoAiu": 146938260000
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-03T10:16:28.259Z",
+        "duréeMs": 249367,
+        "tours": 2,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader, major] `Facture.ATPayer` ne soustrait toujours pas `Remise` (`SommeDesArticles + FraisDePort`), alors que `Facture.Remise` peut désormais être non nulle via `CalculDuPanier.Chiffrer(Panier, GrilleDePaliers)`. Un lecteur qui découvre uniquement le code (sans le journal de phase) y verra un total facturé incohérent avec le champ `Remise` qu'il expose juste à côté — le commentaire XML de `Facture` (« les remises... restent à zéro tant que les stories correspondantes ne sont pas livrées ») est maintenant obsolète puisque cette story livre justement le calcul de `Remise`. (src/Tarification.Application/CalculDuPanier.cs:10)"
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 20,
+        "entrée": 1103501,
+        "sortie": 23956,
+        "nanoAiu": 85530660000
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-03T10:21:34.221Z",
+        "duréeMs": 20596,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-03T10:21:41.778Z",
+        "duréeMs": 221,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-03T10:21:55.038Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0
+      }
+    ],
+    "total": {
+      "duréeMs": 839692,
+      "tours": 20,
+      "appels": 111,
+      "entrée": 4498666,
+      "sortie": 94056,
+      "nanoAiu": 404239080000,
+      "rejets": 2
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-03T10:07:55.269Z",
+      "etape": "départ",
+      "restantes": 1249
+    },
+    {
+      "at": "2026-10-03T10:07:55.346Z",
+      "etape": "CLASSIFY",
+      "restantes": 1249
+    },
+    {
+      "at": "2026-10-03T10:08:08.056Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 1249
+    },
+    {
+      "at": "2026-10-03T10:08:08.074Z",
+      "etape": "RESEARCH",
+      "restantes": 1249
+    },
+    {
+      "at": "2026-10-03T10:09:39.591Z",
+      "etape": "ROUTE",
+      "restantes": 1222
+    },
+    {
+      "at": "2026-10-03T10:09:39.601Z",
+      "etape": "DESIGN",
+      "restantes": 1222
+    },
+    {
+      "at": "2026-10-03T10:10:08.762Z",
+      "etape": "BLOCKED",
+      "restantes": 1222
+    },
+    {
+      "at": "2026-10-03T10:10:08.774Z",
+      "etape": "DESIGN",
+      "restantes": 1222
+    },
+    {
+      "at": "2026-10-03T10:15:32.601Z",
+      "etape": "REVIEW",
+      "restantes": 1077
+    },
+    {
+      "at": "2026-10-03T10:16:28.185Z",
+      "etape": "DESIGN",
+      "restantes": 1038
+    },
+    {
+      "at": "2026-10-03T10:16:28.259Z",
+      "etape": "DISTILL",
+      "restantes": 1038
+    },
+    {
+      "at": "2026-10-03T10:20:03.346Z",
+      "etape": "REVIEW",
+      "restantes": 984
+    },
+    {
+      "at": "2026-10-03T10:20:44.430Z",
+      "etape": "DISTILL",
+      "restantes": 920
+    },
+    {
+      "at": "2026-10-03T10:21:18.554Z",
+      "etape": "REVIEW",
+      "restantes": 888
+    },
+    {
+      "at": "2026-10-03T10:21:34.065Z",
+      "etape": "DISTILL",
+      "restantes": 888
+    },
+    {
+      "at": "2026-10-03T10:21:34.221Z",
+      "etape": "DELIVER",
+      "restantes": 888
+    },
+    {
+      "at": "2026-10-03T10:21:41.778Z",
+      "etape": "ESCALATED",
+      "restantes": 888
+    },
+    {
+      "at": "2026-10-03T10:21:41.855Z",
+      "etape": "DELIVER",
+      "restantes": 888
+    },
+    {
+      "at": "2026-10-03T10:21:48.636Z",
+      "etape": "ESCALATED",
+      "restantes": 844
+    },
+    {
+      "at": "2026-10-03T10:21:48.696Z",
+      "etape": "DELIVER",
+      "restantes": 844
+    },
+    {
+      "at": "2026-10-03T10:21:54.954Z",
+      "etape": "ESCALATED",
+      "restantes": 844
+    },
+    {
+      "at": "2026-10-03T10:21:55.038Z",
+      "etape": "ABORTED",
+      "restantes": 844
+    },
+    {
+      "at": "2026-10-03T10:21:56.385Z",
+      "etape": "fin",
+      "restantes": 844
+    }
+  ],
+  "brancheRun": "run/us-2-2026-10-03-2973",
+  "etatFinal": {
+    "stage": "ABORTED",
+    "phase": "DELIVER"
+  }
+}

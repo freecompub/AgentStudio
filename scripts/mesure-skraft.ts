@@ -4,7 +4,19 @@
  * Hors CI, consomme de vraies requêtes Copilot. Travaille sur une **copie** du projet d'essai :
  * le dépôt d'origine n'est jamais touché.
  *
- *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max]
+ *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--pousser]
+ *                                     [--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini]
+ *
+ * `--modeles` associe des classes de rôle à des modèles (ADR 0048) ; une classe absente laisse le
+ * runtime décider.
+ *
+ * `--pousser` : pousse le travail de la copie sur une branche `run/<story>-<date>-<id>` du dépôt
+ * GitHub du projet, après chaque phase commitée puis à la fin. C'est le banc qui pousse, jamais
+ * l'agent (le contrat lui interdit Git), et jamais sur `main`.
+ *
+ * Suivi : chaque changement d'étape, rejet et fin de tour anormale est annoncé en direct par une
+ * ligne commençant par `§`, lue dans la trace (ADR 0032) — la même source que le bilan final.
+ * La réserve Copilot est relevée à chaque étape : l'écart donne la consommation RÉELLE par étape.
  *
  * Ce que le script ajoute par rapport à l'application : il écoute les événements `usage` **pendant**
  * le tour, pas seulement à sa fin. C'est précisément l'angle mort constaté le 28/09 — la carte de
@@ -12,9 +24,9 @@
  * tour qui dérapait.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   createHookRegistry,
@@ -26,8 +38,15 @@ import {
   createUsageRecorder,
   createJsonlTraceStore,
   createJsonLogger,
+  resumerTrace,
+  resolveModel,
+  MODEL_CLASSES,
+  type ModelClass,
   type AgentEvent,
   type AgentRuntime,
+  type ResumeEtape,
+  type TraceEntry,
+  type TraceStore,
 } from "@agent-studio/core";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
@@ -37,7 +56,6 @@ import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/s
 import { openWorkspace } from "@agent-studio/workspace";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
-import { createGhAuth } from "../packages/github-auth/src/index.js";
 const execFileAsync = promisify(execFile);
 import { DEFAULT_ALLOWED_PROGRAMS } from "../apps/desktop/src/main/admin-config.js";
 import { manifest, skraftExtension, type SkraftState } from "../extensions/skraft/src/index.js";
@@ -49,6 +67,20 @@ const args = process.argv.slice(2);
 // `--depuis=DISTILL` : reprendre le pipeline à une phase donnée, les précédentes étant tenues pour
 // faites. Sert à réessayer une phase tardive sans repayer celles d'avant — le dépôt source doit
 // alors DÉJÀ contenir leurs livrables, le banc ne les fabrique pas.
+const pousser = args.includes("--pousser");
+// `--base=<branche>` : partir d'une branche du dépôt source plutôt que de `main` — typiquement la
+// branche `run/…` poussée par un run précédent, pour reprendre avec `--depuis` sans repayer les
+// phases déjà validées.
+const base = args.find((a) => a.startsWith("--base="))?.slice("--base=".length) ?? "main";
+// `--modeles=strong:x,light:y` : modèle réel par classe de rôle (ADR 0048).
+const classesModeles = Object.fromEntries(
+  (args.find((a) => a.startsWith("--modeles="))?.slice("--modeles=".length) ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map((p) => p.split(":") as [string, string]),
+) as Partial<Record<ModelClass, string>>;
+for (const k of Object.keys(classesModeles))
+  if (!(MODEL_CLASSES as readonly string[]).includes(k)) throw new Error(`--modeles : classe inconnue « ${k} » (attendu : ${MODEL_CLASSES.join(", ")})`);
 const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
 const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
 if (!source || !storyPath) throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE]");
@@ -65,8 +97,36 @@ const phaseOrder = depuis ? PHASE_ORDER.slice(iDepuis) : undefined;
 // refuser à l'agent la lecture de ses propres livrables. Le banc doit mesurer skraft, pas ça.
 const root = await realpath(await mkdtemp(join(tmpdir(), "mesure-skraft-")));
 execFileSync("git", ["clone", "-q", "--no-hardlinks", source, root]);
-execFileSync("git", ["checkout", "-q", "main"], { cwd: root });
+execFileSync("git", ["checkout", "-q", base], { cwd: root });
 console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}`);
+
+// ---------- Branche de run sur GitHub (--pousser) ---------------------------------------------
+// La copie est clonée depuis le dépôt local : son `origin` est un chemin. On pousse vers l'`origin`
+// du dépôt source, c'est-à-dire GitHub. Une branche par run, jamais `main` : chaque run reste
+// lisible et comparable aux autres.
+const jour = new Date().toISOString().slice(0, 10);
+const brancheRun = `run/${basename(storyPath, ".md").toLowerCase()}-${jour}-${randomUUID().slice(0, 4)}`;
+const distant = pousser ? execFileSync("git", ["remote", "get-url", "origin"], { cwd: source, encoding: "utf8" }).trim() : null;
+if (distant) {
+  execFileSync("git", ["remote", "add", "github", distant], { cwd: root });
+  console.log(`Poussée : ${distant} → ${brancheRun}`);
+}
+let derniereSha = "";
+/** Pousse HEAD de la copie. Jamais bloquant : un échec est dit, et le run continue. */
+async function pousserBranche(motif: string): Promise<void> {
+  if (!distant) return;
+  const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  if (sha === derniereSha) return;
+  try {
+    // `--force-with-lease` : la branche appartient à ce seul run, et un rollback peut légitimement
+    // réécrire ce qu'on y a poussé. Elle ne peut pas écraser le travail de quelqu'un d'autre.
+    await execFileAsync("git", ["push", "-q", "--force-with-lease", "github", `HEAD:refs/heads/${brancheRun}`], { cwd: root });
+    derniereSha = sha;
+    console.log(`§ ⇪ poussé sur ${brancheRun} (${sha.slice(0, 7)}, ${motif})`);
+  } catch (err) {
+    console.log(`§ ✖ poussée impossible (${motif}) : ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+  }
+}
 
 // ---------- Journal des tours ---------------------------------------------------------------
 interface Appel { at: number; inputTokens: number; outputTokens: number }
@@ -113,10 +173,75 @@ function instrumente(rt: AgentRuntime): AgentRuntime {
 // ---------- Câblage réel ---------------------------------------------------------------------
 const logger = createJsonLogger({ write: (l) => process.stderr.write(`${l}\n`), level: "info" });
 const auth = createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() });
+// Un jeton que Copilot refuse rend `400 Bad Request` à chaque tour : sans ce contrôle, le banc
+// relançait l'escalade en boucle (03/10, un PAT classique `ghp_` sur une machine Linux).
+const etatAuth = await auth.status();
+if (!etatAuth.loggedIn || !etatAuth.copilotCompatible) {
+  console.error(
+    `Jeton GitHub refusé par Copilot (${etatAuth.loggedIn ? `type ${etatAuth.tokenKind}` : "non connecté"}).\n` +
+      "Se connecter en OAuth : gh auth login --hostname github.com --git-protocol https --web",
+  );
+  process.exit(2);
+}
 const runtime = instrumente(createCopilotRuntime({ client: createCopilotClient({ gitHubToken: await auth.token() }), logger }));
 await runtime.start();
 
 const tasksDir = await mkdtemp(join(tmpdir(), "mesure-taches-"));
+
+// ---------- Suivi en direct, lu dans la trace -----------------------------------------------
+const ghRunner = { run: async (cmd: string, a: readonly string[]) => execFileAsync(cmd, [...a]).then((r) => ({ code: 0, ...r })).catch((e) => ({ code: e.code ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? String(e) })) };
+const lireReserve = () => createGhAuth({ runner: ghRunner, spawner: null as never }).copilotQuota().catch(() => null);
+/** Réserve relevée à chaque changement d'étape : l'écart entre deux relevés est la consommation réelle. */
+const releves: { at: string; etape: string; restantes: number | null }[] = [];
+const traceBrute = createJsonlTraceStore(join(tasksDir, "traces"));
+const vues: TraceEntry[] = [];
+// Arrondir les secondes AVANT de séparer les minutes : sinon 119,6 s s'affichait « 1m60 ».
+const hms = (ms: number) => {
+  const sec = Math.round(ms / 1000);
+  return `${Math.floor(sec / 60)}m${String(sec % 60).padStart(2, "0")}`;
+};
+/**
+ * Requêtes premium d'après le SDK : chaque appel au modèle porte son coût en `nanoAiu`, et 10⁹
+ * nanoAiu font une requête. Vérifié le 03/10 : 35,99 × 10⁹ sur CLASSIFY + RESEARCH, pour un écart
+ * de réserve de 36. C'est la mesure par étape ; la réserve, elle, se met à jour avec retard.
+ */
+const requetes = (nanoAiu: number) => Math.round((nanoAiu / 1e9) * 10) / 10;
+const horo = () => `[${hms(Date.now() - t0).padStart(6)}]`;
+const ligneEtape = (et: ResumeEtape) =>
+  `${et.phase} : ${hms(et.duréeMs)}, ${et.tours} tour(s), ${et.rejets.length} rejet(s)` +
+  (et.finsAnormales.length ? `, ${et.finsAnormales.length} fin(s) anormale(s)` : "") +
+  `, ${et.appels} appel(s), ${requetes(et.nanoAiu)} requête(s) premium`;
+let etapeCourante = "";
+let suivi = Promise.resolve();
+function suivre(e: TraceEntry): void {
+  vues.push(e);
+  // En série : deux changements d'étape rapprochés ne doivent pas croiser leurs relevés de réserve.
+  suivi = suivi.then(async () => {
+    if (e.kind === "transition" && e.phase && e.phase !== etapeCourante) {
+      const precedente = resumerTrace(vues).etapes.at(-2);
+      const reserve = await lireReserve();
+      const avant = releves.at(-1)?.restantes;
+      const conso = reserve && typeof avant === "number" ? ` (réserve : −${avant - reserve.restantes})` : "";
+      if (precedente) console.log(`§ ■ fin ${ligneEtape(precedente)}${conso}`);
+      releves.push({ at: e.at, etape: e.phase, restantes: reserve?.restantes ?? null });
+      etapeCourante = e.phase;
+      console.log(`§ ${horo()} ▶ étape ${e.phase}${e.essais ? ` (essai ${e.essais + 1})` : ""}${reserve ? ` — réserve ${reserve.restantes}/${reserve.total}` : ""}`);
+    }
+    if (e.kind === "rejet") console.log(`§ ${horo()} ✖ REJET ${etapeCourante} par « ${e.porte} » :\n${e.motifs.slice(0, 5).map((m) => `§      - ${m.slice(0, 220)}`).join("\n")}${e.motifs.length > 5 ? `\n§      (+${e.motifs.length - 5} autres)` : ""}`);
+    if (e.kind === "tour-fin" && e.fin !== "output" && e.fin !== "blocker") console.log(`§ ${horo()} ⚠ tour ${e.role?.replace("agent-studio.skraft/", "") ?? "?"} terminé : ${e.fin}${e.raison ? ` (${e.raison.slice(0, 200)})` : ""}`);
+    if (e.kind === "tour-fin" && e.fin === "blocker") console.log(`§ ${horo()} ❓ blocage déclaré par ${e.role?.replace("agent-studio.skraft/", "") ?? "?"}`);
+    if (e.kind === "transition" && e.événement === "COMMITTED") await pousserBranche("phase commitée");
+  });
+}
+/** Même trace pour le moteur et les agents : le suivi voit transitions, rejets et tours ensemble. */
+const trace: TraceStore = {
+  async append(e) {
+    await traceBrute.append(e);
+    suivre(e);
+  },
+  list: (id) => traceBrute.list(id),
+  archive: (id, label, files) => traceBrute.archive(id, label, files),
+};
 const workspace = await openWorkspace(root);
 const usage = createUsageRecorder(join(tasksDir, "usage"));
 const engine = createTaskEngine({
@@ -126,6 +251,7 @@ const engine = createTaskEngine({
   clock: { now: () => new Date() },
   ids: { next: () => randomUUID() },
   logger,
+  trace,
 });
 const interactions = createInteractionService({
   store: createJsonInteractionStore(join(tasksDir, "interactions")),
@@ -143,13 +269,29 @@ const REPONSES: [RegExp, string][] = [
   [/plafond|dépasse le sous-total/i, "Taux non négatifs sans plafond ; plafonner la remise au sous-total de ligne."],
 ];
 const repondues = new Set<string>();
+/**
+ * Escalades déjà relancées, par motif. Le banc répond « relancer » par défaut : face à une panne
+ * qui se reproduit à l'identique, il relancerait sans fin. Au troisième motif identique, il abandonne.
+ */
+const escalades = new Map<string, number>();
+const MAX_ESCALADES_IDENTIQUES = 3;
 const repondre = async () => {
   for (const q of await interactions.pending()) {
     if (repondues.has(q.id)) continue;
     repondues.add(q.id);
     const texte = `${q.title}\n${q.detail ?? ""}`;
     const voulue = REPONSES.find(([re]) => re.test(texte))?.[1];
-    const choix = q.options.find((o) => o.id === voulue || o.label === voulue) ?? q.options[0]!;
+    let choix = q.options.find((o) => o.id === voulue || o.label === voulue) ?? q.options[0]!;
+    const abandon = q.options.find((o) => o.id === "abort");
+    if (abandon && !voulue) {
+      const motif = (q.detail ?? q.title).replace(/Request ID: [^)]*/g, "");
+      const n = (escalades.get(motif) ?? 0) + 1;
+      escalades.set(motif, n);
+      if (n >= MAX_ESCALADES_IDENTIQUES) {
+        choix = abandon;
+        console.log(`§ ✖ même escalade ${n} fois de suite : abandon de la tâche.\n§      ${motif.split("\n")[0]?.slice(0, 200)}`);
+      }
+    }
     // Le profil doit être accepté par la demande : l'escalade n'admet ni le PO ni le testeur
     // (`requiredRoles`). Répondre « po » à tout laissait la demande sans réponse, donc la tâche en
     // attente définitive — deux runs gelés le 29/09 avant qu'on le voie.
@@ -172,7 +314,7 @@ const lu = parseStackProfile(await readFile(join(root, ".agent-studio/stack.yaml
 if ("error" in lu) throw new Error(`Profil refusé : ${lu.error}`);
 // L'application libère les sessions quand la tâche se termine (ADR 0039, workspace-services.ts) ;
 // le banc doit faire de même, sans quoi il laisse derrière lui un état que le produit supprime.
-const agents = createTaskAgentRunner({ runtime, root: workspace.root, logger, trace: createJsonlTraceStore(join(tasksDir, "traces")) });
+const agents = createTaskAgentRunner({ runtime, root: workspace.root, logger, trace });
 const hostDeps: HostDeps = {
   registry: createRegistry(),
   engine,
@@ -184,15 +326,18 @@ const hostDeps: HostDeps = {
   evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
   hooks: createHookRegistry(),
   usage,
+  modelFor: (cls) => resolveModel(cls, { classes: classesModeles }),
   clock: { now: () => new Date() },
   ids: { next: () => randomUUID() },
 };
+if (Object.keys(classesModeles).length) console.log(`Modèles par classe : ${Object.entries(classesModeles).map(([k, v]) => `${k} → ${v}`).join(", ")}`);
 await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
 
 // ---------- Lancement ------------------------------------------------------------------------
 // Réserve Copilot AVANT de lancer (ADR 0044) : une tâche skraft consomme des dizaines de requêtes
 // premium, et le 29/09 un run a été lancé avec 28 en réserve. Jamais bloquant — seulement dit.
-const quota = await createGhAuth({ runner: { run: async (cmd, args) => execFileAsync(cmd, [...args]).then((r) => ({ code: 0, ...r })).catch((e) => ({ code: e.code ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? String(e) })) }, spawner: null as never }).copilotQuota();
+const quota = await lireReserve();
+releves.push({ at: new Date().toISOString(), etape: "départ", restantes: quota?.restantes ?? null });
 if (!quota) console.log("Réserve Copilot : inconnue (gh absent, déconnecté, ou point d'accès changé).\n");
 else {
   const alerte = quota.restantes <= 100 && !quota.depassementAutorise ? "  ⚠ insuffisant pour une tâche complète" : "";
@@ -242,6 +387,51 @@ console.log(`\nTotal : ${s(Date.now() - t0)}, ${lignes.reduce((n, l) => n + l.en
 console.log(`État final : ${state?.stage} / ${state?.phase}, essais ${state?.attempts}`);
 console.log("Usage par phase :");
 console.table(await usage.report(taskId));
+await suivi;
+await pousserBranche("fin du run");
+const reserveFin = await lireReserve();
+releves.push({ at: new Date().toISOString(), etape: "fin", restantes: reserveFin?.restantes ?? null });
+const resume = resumerTrace(await traceBrute.list(taskId));
+const r0 = releves[0]?.restantes;
+const consoReelle = typeof r0 === "number" && reserveFin ? r0 - reserveFin.restantes : null;
+console.log("\n===== ÉTAPES (lues dans la trace) =====");
+console.table(resume.etapes.map((et) => ({ etape: et.phase, duree: hms(et.duréeMs), tours: et.tours, rejets: et.rejets.length, anormales: et.finsAnormales.length, appels: et.appels, requetes: requetes(et.nanoAiu), modeles: et.modèles.join(", "), entree: et.entrée })));
+console.log("Par phase :");
+console.table(resume.parPhase.map((et) => ({ phase: et.phase, duree: hms(et.duréeMs), tours: et.tours, rejets: et.rejets.length, requetes: requetes(et.nanoAiu), causes: [...new Set(et.rejets.map((r) => r.porte))].join(", ") })));
+console.log(
+  `Requêtes premium : ${requetes(resume.total.nanoAiu)} d'après le SDK (${resume.total.appels} appels), ` +
+    (consoReelle === null ? "réserve illisible." : `écart de réserve ${consoReelle} (${r0} → ${reserveFin!.restantes}, mis à jour avec retard).`),
+);
+
+// Rapport versé dans AgentStudio (docs/runs/) : le code produit est sur la branche du projet
+// d'essai, l'instrumentation reste ici.
+const rapportDir = join(process.cwd(), "docs/runs", `${jour}-${basename(storyPath, ".md").toLowerCase()}-${taskId.slice(0, 8)}`);
+await mkdir(rapportDir, { recursive: true });
+const md = [
+  `# Run skraft — ${basename(storyPath)} — ${jour}`,
+  "",
+  `- Projet : \`${source}\`${distant ? `, branche poussée \`${brancheRun}\`` : ""}`,
+  `- État final : ${state?.stage} / ${state?.phase ?? "—"}`,
+  `- Durée : ${hms(Date.now() - t0)}, ${resume.total.tours} tours, ${resume.total.rejets} rejets, ${resume.total.entrée} tokens d'entrée`,
+  `- Requêtes premium : ${requetes(resume.total.nanoAiu)} d'après le SDK (${resume.total.appels} appels), écart de réserve ${consoReelle ?? "illisible"}`,
+  "",
+  "## Étapes",
+  "",
+  "| Étape | Durée | Tours | Rejets | Fins anormales | Appels | Requêtes premium | Modèles | Tokens entrée |",
+  "|---|---|---|---|---|---|---|---|---|",
+  ...resume.etapes.map((et) => `| ${et.phase} | ${hms(et.duréeMs)} | ${et.tours} | ${et.rejets.length} | ${et.finsAnormales.map((f) => f.fin).join(", ")} | ${et.appels} | ${requetes(et.nanoAiu)} | ${et.modèles.join(", ")} | ${et.entrée} |`),
+  "",
+  "## Rejets et leurs motifs",
+  "",
+  ...resume.etapes.flatMap((et) => et.rejets.flatMap((r) => [`### ${et.phase} — porte « ${r.porte} »`, "", ...r.motifs.map((m) => `- ${m}`), ""])),
+  "## Relevés de réserve",
+  "",
+  ...releves.map((r) => `- ${r.at} — ${r.etape} : ${r.restantes ?? "inconnue"}`),
+  "",
+].join("\n");
+await writeFile(join(rapportDir, "rapport.md"), md);
+await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ resume, releves, brancheRun: distant ? brancheRun : null, etatFinal: { stage: state?.stage, phase: state?.phase } }, null, 2));
+console.log(`\nRapport : ${join(rapportDir, "rapport.md")}`);
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state }, null, 2));
 console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\nCopie du projet : ${root}`);
 await agents.releaseTask(taskId);

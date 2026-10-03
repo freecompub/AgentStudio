@@ -1,5 +1,5 @@
 import { adrId, parseAdr, parseSupersessions } from "./adr.js";
-import { extractPascalIdentifiers } from "./text-analysis.js";
+import { extractCodeIdentifiers, extractPascalIdentifiers } from "./text-analysis.js";
 
 /** Documents de conception attendus (§6.2) et sources des noms du modèle. */
 export const MODEL_DOCS = ["event-model.md", "domain-model.md"] as const;
@@ -23,7 +23,9 @@ export function checkDesign(i: DesignInput): string[] {
   const reasons: string[] = [];
 
   if (i.docs["event-model.md"] === undefined) reasons.push("Document de conception manquant : event-model.md.");
-  const known = new Set(MODEL_DOCS.flatMap((d) => extractPascalIdentifiers(i.docs[d] ?? "")));
+  // Asymétrie voulue : un document CITE un nom en l'écrivant seul entre backticks, mais le modèle
+  // le DÉFINIT n'importe où dans son code (signature dans un bloc, appel `Taux.AppliqueA(x)`).
+  const known = new Set(MODEL_DOCS.flatMap((d) => extractCodeIdentifiers(i.docs[d] ?? "")));
   for (const doc of CITING_DOCS) {
     for (const id of extractPascalIdentifiers(i.docs[doc] ?? ""))
       if (!known.has(id)) reasons.push(`\`${id}\` cité dans ${doc} n'existe pas dans ${MODEL_DOCS.join(" ni dans ")}.`);

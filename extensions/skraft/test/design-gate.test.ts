@@ -33,6 +33,33 @@ describe("Porte cohérence (SPEC-skraft §7.2, fixtures §13.2)", () => {
     expect(r).toEqual(["`BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."]);
   });
 
+  // Run réel du 03/10 sur US-2 : DESIGN rejetée trois fois, 200 requêtes premium, pour un nom
+  // pourtant défini. Le modèle le déclarait dans un bloc de code et sous forme d'appel ; la porte
+  // ne reconnaissait qu'un nom seul entre backticks.
+  it("un nom défini dans un bloc de code du modèle est connu", () => {
+    const docs = {
+      ...input().docs,
+      "domain-model.md": "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`.\n\n```\nTauxDeRemise { }\nMontant AppliqueA(Montant montant)\n```\n",
+      "contracts.md": "`CapBolus` produit `BolusCapped` ; `MaxBolus` est validé ; `AppliqueA` ne fait aucun arrondi.",
+    };
+    expect(checkDesign(input({ docs }))).toEqual([]);
+  });
+
+  it("un nom défini sous forme d'appel entre backticks dans le modèle est connu", () => {
+    const docs = {
+      ...input().docs,
+      "domain-model.md": "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`. Retourne `palier.Taux.AppliqueA(SousTotal)`.",
+      "contracts.md": "`CapBolus` produit `BolusCapped` ; `MaxBolus` ; `AppliqueA` ; `SousTotal`.",
+    };
+    expect(checkDesign(input({ docs }))).toEqual([]);
+  });
+
+  it("un nom écrit seulement en prose dans le modèle, hors code, reste inconnu", () => {
+    // La convention reste celle des documents de conception : un nom du modèle s'écrit en code.
+    const docs = { ...input().docs, "domain-model.md": "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`, et AppliqueA en prose.", "contracts.md": "`AppliqueA`." };
+    expect(checkDesign(input({ docs }))).toEqual(["`AppliqueA` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."]);
+  });
+
   it("identifiant cité dans diagrams.md absent : rejet", () => {
     expect(checkDesign(input({ docs: { ...input().docs, "diagrams.md": "`GhostAggregate` émet `BolusCapped`." } }))).toEqual([
       "`GhostAggregate` cité dans diagrams.md n'existe pas dans event-model.md ni dans domain-model.md.",

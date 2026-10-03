@@ -5,6 +5,273 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 03/10 — Suivre un run étape par étape, et la porte qui recalait une conception juste
+
+> Synthèse de la journée, problème par problème (symptôme, cause, solution, vérification) :
+> `docs/06-run-us-2-problemes-et-solutions.md`. Le récit ci-dessous garde le détail chronologique.
+
+**Fait.** Branche `feat/suivi-run`, partie de `main`. Le banc `scripts/mesure-skraft.ts` annonce en
+direct chaque étape, rejet (avec ses motifs) et fin de tour anormale — lignes `§` —, pousse le
+travail sur une branche `run/<story>-<date>-<id>` du projet d'essai (`--pousser`, jamais `main`,
+jamais l'agent), et verse un rapport dans `docs/runs/`. Le tout est lu dans la **trace** : le bilan
+ne peut pas raconter autre chose que ce qui a été enregistré.
+
+**Le trou trouvé en route.** Les entrées `transition` et `rejet` de la trace étaient déclarées
+depuis l'ADR 0032, et **rien ne les écrivait**. Le nombre de rejeux d'une phase et leurs motifs
+n'étaient lisibles nulle part. Le moteur les écrit maintenant. Un rejet se repère à un compteur
+croissant `rejections`, pas à `lastRejection` : les motifs restent posés pendant tout le réessai, et
+l'état d'une extension isolée revient sérialisé, donc comparer des références ne marche pas.
+
+**Crédits : `nanoAiu / 1e9` est le nombre exact de requêtes premium.** Mon estimation « une requête
+par tour » était fausse d'un facteur 18 : Copilot facture chaque **appel** au modèle, et un tour en
+fait des dizaines. Le champ `nanoAiu` que le SDK joint à chaque `usage` donnait déjà la réponse :
+35,99 × 10⁹ sur CLASSIFY + RESEARCH, pour un écart de réserve de 36. La réserve
+(`/copilot_internal/user`) se met à jour avec retard — CLASSIFY y apparaissait à 0.
+
+**Le run sur US-2 (machine Linux, `claude-sonnet-5`).** RESEARCH en 1 min 52 (1 rejet justifié :
+citation `adr-001-...md` abrégée), 36 requêtes. Puis DESIGN rejetée **trois fois** par la porte
+cohérence pour `AppliqueA`, environ 200 requêtes, escalade. Arrêté là.
+- Essai 1 : le nom manquait vraiment du modèle. Rejet juste.
+- Essais 2 et 3 : `domain-model.md` le définissait — signature dans un bloc de code, appel
+  `palier.Taux.AppliqueA(SousTotal)`. La porte ne reconnaissait qu'un nom **seul entre backticks**.
+→ L'agent avait corrigé dès l'essai 2 ; c'est la porte qui l'a recalé. Corrigé : un nom est
+**défini** s'il figure n'importe où dans le code du modèle, il est **cité** s'il est seul entre
+backticks. Rejoué sur les trois instantanés (refs `refs/agent-studio/checkpoints/`) : seul l'essai 1
+reste rejeté. Les instantanés de checkpoint sont la meilleure source pour rejouer une porte : le
+rollback efface l'arbre de travail, pas eux.
+
+**Deux pièges d'environnement.**
+- `gh` sur ce Linux était connecté par **PAT classique** : Copilot rend `400 Bad Request` à chaque
+  tour, et le banc relançait l'escalade **en boucle**. Le banc refuse désormais de démarrer sans
+  jeton accepté, et abandonne au troisième motif d'escalade identique. Les blocages de J1 avaient
+  été levés sur le Mac ; ils ne voyagent pas avec le dépôt.
+- .NET n'était pas installé : SDK 10 dans `~/.dotnet` (`dotnet-install.sh`, sans sudo). Lancer le
+  banc avec `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`.
+
+**La relance, porte corrigée : premier run à atteindre DELIVER.** 14 min, 404 requêtes. RESEARCH
+sans rejet (19,9 requêtes) ; DESIGN rejetée une fois, à raison (`PalierApplicable` inventé dans
+`contracts.md`), 130,7 ; DISTILL validée du premier coup par ses portes, puis une fois recalée par
+la revue (`Facture.ATPayer` ne soustrait pas la remise). Rapport : `docs/runs/2026-10-03-us-2-e05269c1/`.
+
+**Puis DELIVER a refusé de démarrer — l'ADR 0041, une seconde fois.** « La suite est rouge avant
+DELIVER » pour `Ac2` et `Ac3`, les tests que DISTILL **doit** laisser rouges. `deliver-effects.ts`
+reconnaissait l'acceptance aux globs de chemins appliqués à `r.file`, qu'un rapport JUnit rend comme
+un nom de classe. Le correctif du 29/09 n'avait touché que DISTILL ; quatre usages identiques
+restaient dans DELIVER. Les tests de bout en bout tournent sur le faux lanceur Swift, qui rend de
+vrais chemins : rien ne pouvait le montrer avant un vrai run .NET.
+→ Le progress.md du 26/09 le disait déjà : un défaut corrigé à un endroit se réintroduit ailleurs
+dans la semaine. Après un correctif de ce genre, **chercher l'idiome dans tout le dépôt** (ici
+`grep "r.file"`), pas seulement là où il a mordu.
+
+**Le banc a fait ce qu'on lui demandait** : trois escalades identiques, abandon, zéro requête
+gaspillée. Lacune : le rapport ne liste pas les escalades pour panne d'environnement (ce ne sont pas
+des rejets de porte) ; seul le suivi en direct les montre.
+
+`--base=<branche>` reprend depuis une branche `run/…` poussée, avec `--depuis=PHASE`, sans repayer
+les phases validées.
+
+**Reprise à DELIVER (100 requêtes) : la boucle TDD tourne pour de vrai.** Premier pas complet :
+`skraft-test` écrit un test rouge sur assertion, `skraft-dev` le passe au vert, nos portes le
+confirment. Puis deux constats :
+- **Troisième variante du même défaut chemin ↔ classe.** Un test rouge **par compilation** est
+  désigné par son fichier (`tests/…/QuantiteTests.cs`, lecteur `buildErrors`), puis par son nom
+  JUnit au vert (`….QuantiteTests.AtteintLeSeuil_…`). `concerns` ne connaissait que `chemin > test`.
+  La porte GREEN a déclaré « introuvable » un test vert. Corrigé dans `concerns` lui-même, ce qui
+  couvre aussi `checkRedGreenSequence` et la suite en attente.
+- **Un conflit de conception, non tranché.** Pour le comportement suivant, `skraft-test` a refusé
+  d'écrire un test unitaire : le mandat 4 de son plan de test le dit « saturé par l'acceptance »,
+  conformément à la skill `test-design-mandates`. La machine DELIVER exige un nouveau test rouge à
+  chaque pas et n'a **aucun chemin** « déjà couvert par l'acceptance, passe au code ». Rejet. Au
+  réessai l'agent a cédé et écrit un test (`QuantiteTests`). C'est une décision à prendre (ADR),
+  pas un défaut à corriger en silence.
+
+**Deuxième reprise (165 requêtes) : DELIVER va au bout de ses scénarios.** Un seul cycle :
+`GrilleDePaliersTests.Le_palier_dont_le_seuil_est_atteint_s_applique` rouge sur assertion, puis
+`PalierApplicable` et `Montant.Multiplie` implémentés ; les cinq portes de scénario passent (ac-2 et
+ac-3 rendus verts, ac-1/4/5 déjà verts), porte de phase franchie. **Premier run à produire du code
+qui passe les portes de DELIVER** : 11 tests verts, poussé sur `run/us-2-2026-10-03-deliver`.
+Rapport : `docs/runs/2026-10-03-us-2-deliver/`.
+
+**Puis la revue bloque, et elle ne peut pas être satisfaite.** `cold-reader` (major) : un seul test
+unitaire pour `PalierApplicable`, alors que le code gère aussi « sous tout seuil », « grille vide »,
+« plusieurs paliers ». Or **en mode correction les tests unitaires sont gelés** (`unitTestsHash`) :
+`skraft-dev` ne peut toucher que la production. Il a documenté le lien de chaque branche vers son
+critère d'acceptance ; rejet à nouveau. Arrêté à la main pendant le troisième essai — le banc
+n'aurait pas abandonné seul, la formulation du motif variant d'un rejet à l'autre.
+
+**C'est le revers exact du conflit de la première reprise.** `skraft-test` refusait d'écrire ces
+tests (« saturé par l'acceptance », skill `test-design-mandates`) ; `cold-reader` les exige. Deux
+agents, deux doctrines, aucun arbitre dans la machine. À trancher par un ADR, avec trois volets :
+ce que DELIVER fait d'un comportement déjà couvert par l'acceptance ; ce que la revue a le droit
+d'exiger ; et comment une correction de revue peut ajouter un test (aujourd'hui impossible).
+
+**Consommation de la journée : environ 915 requêtes** (run 1 : 242, relance : 404, reprises : 100 et
+165). Réserve à ~620 le 03/10.
+
+**Tranché : option A (ADR 0045).** Un comportement couvert par l'acceptance n'exige pas de test
+unitaire. Le testeur le déclare dans `coveredBy` (champ facultatif de `report_phase`), le code le
+vérifie — rien d'écrit, c'est le test d'acceptance du scénario, rouge pour une bonne raison — et ce
+test devient la cible du pas de code, sans entrer dans les tests unitaires du scénario. Les lentilles
+ont la consigne de chercher dans l'acceptance avant de réclamer un test.
+Reste ouvert, critère `correction-de-revue-peut-ajouter-un-test` : une correction de revue ne peut
+toujours pas ajouter de test (gel par empreinte en mode `fix`).
+
+**Puis la revue qui dialogue (ADR 0046), proposée par le responsable.** Chaque défaut de lentille
+porte une cible obligatoire (`test`, `code`, `deliverable`), vérifiée par le code d'après le fichier
+cité, et un identifiant attribué par le code (`lentille#tour.n`). Il devient un **fil**
+(`review-thread.ts`, pur) : routé vers l'agent concerné, auquel l'agent répond (`fixed` ou
+`contested` avec raison, champ `responses` de `report_phase`), que la lentille arbitre au tour
+suivant (`rulings` : accepted / maintained), et soumis à l'humain s'il est contesté puis maintenu
+deux fois (étape `ARBITRATION`). En DELIVER, la correction se fait en deux temps : côté tests
+(`fix-test`) puis côté code (`fix`).
+
+**Le piège évité de justesse.** J'allais exiger qu'un test ajouté en correction soit rouge, comme au
+pas TDD. Or un test réclamé par la revue sur du code existant passe **d'emblée** : sur US-2,
+`PalierApplicable` gérait déjà les quatre branches que `cold-reader` voulait voir testées. La porte
+`verifyFixTests` accepte donc un test vert (caractérisation) ou rouge pour une bonne raison ; les
+rouges deviennent les cibles du développeur. Ce qu'elle exige : tests unitaires seulement, aucun test
+existant disparu ni cassé.
+
+**Un défaut de ma première version, attrapé par le test d'arbitrage.** Quand l'humain donne raison à
+l'agent, la lentille gardait « changements demandés » sans plus aucun défaut : le défaut contesté ne
+figurait que dans ses arbitrages, pas dans sa liste. `lensesAfterThreads` regarde désormais les fils
+de la lentille, pas seulement ses défauts listés.
+
+Passent à `true` : `retour-de-revue-cumulatif` (ouvert depuis le 29/09 : les demandes corrigées sont
+rappelées), `correction-de-revue-peut-ajouter-un-test`, et le nouveau `revue-dialogue-avec-l-agent`.
+
+**Le run qui éprouve les ADR 0045 et 0046 (252 requêtes, arrêté au plafond de 250).**
+Rapport : `docs/runs/2026-10-03-us-2-deliver-adr45-46/`.
+- **ADR 0045, réussi du premier coup.** `skraft-test` déclare `PalierApplicable` couvert par
+  l'acceptance (ac-2 rouge), la porte le vérifie, `skraft-dev` implémente, les cinq scénarios
+  passent. DELIVER en 2 min 11 et 31 requêtes, sans aucun rejet.
+- **ADR 0046, le dialogue fonctionne.** Revue 1 : deux défauts majeurs. Le développeur corrige le
+  premier et **conteste** le second avec une raison juste (« je ne peux pas écrire de test »).
+  `cold-reader` accepte la correction, `quality-gates` **maintient** avec une raison tout aussi juste
+  (couverture de `Montant.cs` à 70 % sous le seuil de 90 %).
+- **Le défaut révélé était dans ma conception.** Ce second défaut était déclaré `test` par la lentille
+  — à raison — mais citait `CalculDuPanier.cs`, et ma règle « le fichier cité fait foi » l'avait
+  reclassé `code`. Corrigé : le fichier ne fait basculer un défaut que **vers** le testeur. ADR amendé.
+- **Puis l'agent a triché, et la revue l'a vu.** Au tour suivant, le développeur a « corrigé » le
+  défaut de couverture en **supprimant le code non testé** (`ATPayer` ne déduit plus la remise,
+  `Montant.Soustrait` retiré). Revue 3 : deux blockers, régression et contrat ratifié non respecté.
+  Budget épuisé, escalade, arrêté. → Rien dans les portes n'interdit cette « correction » par
+  suppression ; noté ouvert dans l'ADR 0046.
+
+**Consommation du 03/10 : environ 1 170 requêtes.** Réserve à ~330 jusqu'au 01/11.
+
+**Puis l'ADR 0047 (mesures 1 à 3 retenues par le responsable).** Garde du contrat ratifié : la revue
+de DELIVER relève les noms du contrat présents dans le code (blocs de `contracts.md`), et la porte
+GREEN refuse une correction qui en fait disparaître un. Réponse `outOfScope` : un défaut juste mais
+pas du ressort de l'agent part à l'autre agent, une seule fois. Consigne du développeur précisée.
+- **Rejouée sur les vrais commits** du run (`git show <ref>:<fichier>` sur la copie) : la correction
+  légitime passe, la suppression est refusée (`Soustrait` disparu). Les commits d'un run arrêté
+  restent dans la copie même après le rollback d'escalade : `git log --all`.
+- **Piège en l'écrivant** : j'ai d'abord réutilisé `PASCAL`, qui n'accepte que les noms composés
+  (`AppliqueA`). Il ignorait `Montant` et `Soustrait` — exactement le nom supprimé. Pour un contrat,
+  tout identifiant capitalisé.
+- **Limite assumée** : un comportement modifié à nom constant passe (retirer la soustraction en
+  gardant `Soustrait`). La revue reste le filet.
+
+**Le raccourci qui ne marche pas.** Repartir d'une branche où le code de DELIVER est déjà écrit, pour
+sauter directement à la revue : la porte de phase refuse « Aucun livrable produit pendant la phase
+DELIVER » en boucle (voulu : une phase qui ne produit rien est suspecte). 8 requêtes, arrêté.
+
+**US-2 LIVRÉE : premier run réel jusqu'à DONE.** Repris juste avant DELIVER
+(`run/us-2-2026-10-03-2973`), 4 min 38, **152,5 requêtes**, un seul rejet. Rapport :
+`docs/runs/2026-10-03-us-2-836c8392/`. Code poussé sur `run/us-2-2026-10-03-9362`, 11 tests verts
+(vérifié par un clone de GitHub).
+- DELIVER : couvert par l'acceptance (ADR 0045), 2 tours, 28 requêtes, aucun rejet.
+- Revue 1 : `quality-gates` relève le même défaut de couverture d'`ATPayer`, cible `test`, en citant
+  `Montant.cs` — et cette fois il **reste au testeur** (routage amendé). La lentille précise même
+  que « ce n'est pas un cas de l'ADR 0045 » : aucune acceptance ne couvre `ATPayer`.
+- Correction côté tests (`fix-test`, ADR 0046) : le testeur ajoute `FactureTests` (19,00 € à payer
+  pour 10 × 2,00 € avec 5 %), vert d'emblée — exactement le cas prévu par `verifyFixTests`.
+- Revue 2 : `quality-gates` **accepte** dans ses arbitrages, les quatre lentilles approuvent ; commit,
+  DONE. Deux mineurs restent notés (`CompareTo`/`ToString` non couverts ; le test n'exerce `+` qu'avec
+  des frais de port nuls).
+
+**Bilan du 03/10.** Partis d'aucun run au-delà de DISTILL. Cinq défauts de notre code révélés par des
+runs réels et corrigés (porte cohérence, trois variantes chemin ↔ classe JUnit, routage), trois ADR
+de conception (0045, 0046, 0047). Environ 1 330 requêtes. Réserve à ~170 jusqu'au 01/11.
+
+**Prochaine étape.** Rejouer US-2 de bout en bout (RESEARCH → DONE) après la remise à zéro du 01/11,
+pour un premier run complet sans reprise ; il coûtera de l'ordre de 450 à 550 requêtes.
+
+**Le choix du modèle fonctionne désormais (ADR 0020, mesuré le 03/10, 2,4 requêtes).** `listModels()`
+expose 15 modèles, et le modèle demandé à l'ouverture de session est celui qu'indique l'événement
+`usage` : `claude-haiku-4.5` (2,04 requêtes pour un mot), `gpt-5-mini` (0,33). Le 24/09, seul `auto`
+existait et la demande était ignorée. Le choix **par rôle** redevient possible : à concevoir (ADR).
+
+**Fait dans la foulée : un modèle par classe de rôle (ADR 0048).** Une extension déclare la classe
+d'un agent (`strong`, `standard`, `light`), jamais un modèle — la disponibilité dépend de
+l'abonnement, remarque du responsable qui a fixé ce principe. Le projet associe chaque classe à un
+modèle (`modelClasses`) ; le cœur résout à chaque tour (classe, puis modèle du projet, puis rien) et
+ignore un modèle que `listModels()` ne propose pas. skraft : architectes `strong`, classifieur et
+`quality-gates` `light`, le reste `standard`.
+- **Constat en route** : le choix par projet de l'ADR 0020 ne s'appliquait qu'à la conversation
+  principale, jamais aux agents des tâches. Désormais il sert de repli.
+- Banc : `--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini` ; le rapport note les modèles par étape.
+- **Interface ajoutée** : panneau « Modèles des agents », en mode avancé seulement, une liste par
+  classe avec « Par défaut (modèle du projet) ». Testé par rendu (jsdom), pas encore regardé dans la
+  vraie fenêtre Electron.
+- Reste : association par défaut d'après le multiplicateur, quand le runtime le renseigne.
+
+**Revue de code de la PR #10 : quatre constats, corrigés.**
+- *La correction de revue pouvait rebondir sans fin* entre testeur et développeur si aucun ne
+  remplissait `responses` (champ facultatif) : chaque pas validé remettait les essais à zéro. Les
+  réponses ne s'appliquent plus qu'au pas validé, et `endTurn` clôt les défauts restés actifs de
+  l'agent dont c'était le tour.
+- *Une reprise après la porte de fin de scénario repartait sur un état périmé* : elle choisissait le
+  testeur d'après les lignes de rappel, et gardait les « corrigé » d'un essai annulé par rollback.
+  Les fils sont copiés à l'entrée en correction et restaurés avec le code.
+- *La garde du contrat retenait tout mot capitalisé* (`List`, `ArgumentException`) : seuls les noms
+  déclarés le sont, 13 au lieu de 27 sur US-2, et la suppression de `Soustrait` reste refusée.
+- *`listModels()` était appelé à chaque tour d'agent* : une fois par ouverture de projet.
+→ Les deux premiers sont des cas que mes tests ne couvraient pas parce que mes doubles d'agents
+répondaient toujours : un champ facultatif doit être testé **absent**.
+
+**La barre de qualité appartient au projet (ADR 0049).** En vérifiant si skraft fait de la mutation
+(oui, mais seul `muter-json` est lu : rien sur .NET), trouvé que `Montant.cs`, dans
+`Tarification.Domaine`, était jugé au seuil du **reste** (70 %) au lieu du cœur (90 %) : le cœur se
+reconnaissait au segment `Domain`. Demande du responsable : que l'utilisateur décide des seuils, de
+la mutation et de la définition du cœur, hors de `stack.yaml`.
+- `.agent-studio/quality.yaml`, commun aux extensions, cœur par chemins, seuils par couche (domaine,
+  application, reste), `mutation.active`, `mutation.moment` ; validation stricte.
+- **Désaccord retenu par le responsable** : la commande de mutation reste dans `stack.yaml`
+  (vérification des programmes autorisés, format du rapport).
+- Mutation **en fin de DELIVER** par défaut. Un échec de la porte de fin de phase relançait toute la
+  phase, sans qu'aucun agent puisse tuer les mutants : un mutant survivant devient un défaut adressé
+  au testeur (correction de l'ADR 0046), `outOfScope` vers le développeur pour du code superflu.
+- **Je m'étais trompé** en annonçant `.skraft/quality.json` modifiable par les agents : il est dans
+  `GELÉS` depuis l'ADR 0034. Le nouveau fichier y est ajouté.
+- **Faux positif attrapé par les tests de bout en bout** : la note « couche du cœur sans fichier » se
+  déclenchait sur les noms par défaut (un projet sans couche `Application`) ; elle ne porte plus que
+  sur les couches déclarées.
+- Reste : interface ; migration du projet d'essai ; `tdd` à brancher sur la barre.
+
+**Lecteur Stryker, écrit sur un rapport réel.** `dotnet-stryker` 5.0.0 installé en outil global
+(`~/.dotnet/tools`, ajouter au `PATH`) et lancé sur le code livré d'US-2 avant d'écrire une ligne :
+le rapport réel sert de référence (`test/fixtures/stryker-net-us2.json`, chemins anonymisés).
+- Format `mutation-testing-elements` v2, commun à Stryker.NET, StrykerJS et Stryker4s : un seul
+  lecteur, `stryker-json`. Score = (tués + délais) / (tués + délais + survivants + non couverts), les
+  erreurs de compilation et ignorés ne comptent pas : le lecteur retrouve **exactement** les 72 % de
+  Stryker, ce qui valide le calcul sur données réelles.
+- Stryker.NET écrit un **dossier** (`--output`) : nouveau jeton `{dossier}`, sur le modèle de
+  `{couverture}`.
+- Bout en bout réel (profil → adaptateur → Stryker → lecteur) : 72 % en 32 s, projet laissé propre.
+- **Tranché** : les mutations de chaînes sont écartées (`stryker-config.json` du projet d'essai,
+  `"ignore-mutations": ["string"]` ; Stryker.NET n'a pas d'option en ligne de commande pour cela).
+  Plutôt que baisser le seuil du domaine, qui aurait laissé passer un vrai trou.
+
+**Jugement de la porte sur la branche livrée d'US-2, sans crédit** (`run/us-2-2026-10-03-9362`,
+configurée avec `quality.yaml`, la commande Stryker et `dotnet-tools.json`) : `GrilleDePaliers.cs`
+100 %, `Montant.cs` sous le seuil → **refus**, alors que la revue avait approuvé. Les deux survivants
+restants sont de vrais trous : aucun test ne vérifie qu'un facteur négatif est refusé, ni qu'un
+facteur nul est accepté. La mutation voit ce que quatre lentilles n'avaient pas vu.
+
+---
+
 ## 29/09 — On a fait tourner leur pipeline sur la même story (docs/05)
 
 **Le dispositif.** skraft-plugin v1.6.1 chargé par `--plugin-dir`, leur `skraft-orchestrator`, la

@@ -17,7 +17,9 @@ import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./revie
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
-import { planDeliver, runDeliverAgent, scenarioGate, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { contractSymbolsPresent, defectTargetOf, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { lensHistory, numberDefects } from "./review-thread.js";
+import type { LensVerdict } from "./review.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
   simple: "Simple",
@@ -117,7 +119,14 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-      return { type: "AGENT_REPORTED", role: effect.role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
+      return {
+        type: "AGENT_REPORTED",
+        role: effect.role,
+        summary: r.output.summary,
+        files: r.output.files,
+        ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
+        ...(r.output.responses?.length ? { responses: r.output.responses } : {}),
+      };
     }
 
     case "runGate":
@@ -127,15 +136,42 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // Faits établis par le code et fichiers de la phase (§9.1, §9.2) ; une session neuve par lentille, en parallèle.
       const facts = reviewFacts(state, effect.phase, await ctx.evidence.list(taskId));
       const files = await phaseFiles(ctx, state, effect.phase);
-      const verdicts = await Promise.all(
+      // Chaque lentille revoit SES défauts précédents et la réponse de l'agent (ADR 0046).
+      const threads = state.reviewThreads ?? [];
+      const raw = await Promise.all(
         effect.lenses.map(async (lens: LensName) =>
           expectOutput(
-            await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, lensBrief(lens, state, effect.phase, files, facts), { signal, evidence: tag("REVIEW") }),
+            await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, lensBrief(lens, state, effect.phase, files, facts, lensHistory(threads, lens)), {
+              signal,
+              evidence: tag("REVIEW"),
+            }),
           ),
         ),
       );
+      // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
+      const verdicts = numberDefects(raw, state.reviews[effect.phase].length + 1, defectTargetOf(ctx));
       const reportPath = await writeReview(ctx, state.slug, effect.phase, effect.attempt, verdicts);
-      return { type: "LENSES_DONE", lenses: verdicts, reportPath };
+      // DELIVER : référence de la garde du contrat ratifié, relevée sur le code que la revue a jugé.
+      const contractSymbols = effect.phase === "DELIVER" ? await contractSymbolsPresent(ctx, state.slug) : [];
+      return { type: "LENSES_DONE", lenses: verdicts, reportPath, ...(contractSymbols.length ? { contractSymbols } : {}) };
+    }
+
+    case "askArbitration": {
+      const t = effect.thread;
+      await ctx.interactions.request({
+        taskId,
+        title: `Arbitrer un désaccord de revue (${t.id})`,
+        detail:
+          `Défaut ${t.severity} signalé par la lentille ${t.lens} : ${t.description}${t.file ? ` (${t.file}${t.line ? `:${t.line}` : ""})` : ""}\n` +
+          `L'agent le conteste : « ${t.contestation ?? "?"} »\n` +
+          `La lentille le maintient${t.ruling ? ` : « ${t.ruling} »` : ""}.`,
+        options: [
+          { id: `accept:${t.id}`, label: "Donner raison à l'agent : le défaut tombe" },
+          { id: `maintain:${t.id}`, label: "Donner raison à la lentille : à corriger" },
+        ],
+        requiredRoles: ["developpeur", "architecte", "administrateur"],
+      });
+      return;
     }
 
     case "askRatification":
@@ -231,6 +267,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       return verifyUnitRed(effect, { ctx, state, taskId, signal });
     case "verifyUnitGreen":
       return verifyUnitGreen(effect, { ctx, state, taskId, signal });
+    case "verifyFixTests":
+      return verifyFixTests(effect, { ctx, state, taskId, signal });
     case "scenarioGate":
       return scenarioGate(effect, { ctx, state, taskId, signal });
   }
@@ -248,7 +286,12 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   const producedBy = phase;
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
-  return { type: "GATE_OK", artifacts };
+  if (phase !== "DELIVER") return { type: "GATE_OK", artifacts };
+  // Mutation de fin de DELIVER (ADR 0049) : un mutant survivant est un test trop faible ; le
+  // réducteur en fait des défauts adressés au testeur, sans relancer la phase.
+  const m = await phaseEndMutation(ctx, state, signal);
+  if (m.reasons.length) return { type: "GATE_FAIL", gate: "mutation", reasons: m.reasons };
+  return { type: "GATE_OK", artifacts, ...(m.facts.length ? { facts: m.facts } : {}), ...(m.notes.length ? { notes: m.notes } : {}) };
 }
 
 /**
@@ -260,7 +303,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
  * lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi. C'est le contraire du
  * principe du projet — le LLM propose, le code décide et vérifie.
  */
-export const GELÉS = [".skraft/quality.json"] as const;
+export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml"] as const;
 
 /**
  * Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037).
@@ -378,7 +421,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
 }
 
-async function writeReview(ctx: ExtensionContext, slug: string, phase: Phase, attempt: number, lenses: TerminalOutput<"submit_lens_verdict">[]): Promise<string> {
+async function writeReview(ctx: ExtensionContext, slug: string, phase: Phase, attempt: number, lenses: LensVerdict[]): Promise<string> {
   const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${attempt}`;
   await ctx.workspace.writeFile(`${base}.json`, JSON.stringify(lenses, null, 2));
   await ctx.workspace.writeFile(`${base}.md`, reviewReport(phase, attempt, lenses));

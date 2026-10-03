@@ -1,0 +1,211 @@
+{
+  "etapes": [
+    {
+      "phase": "CLASSIFY",
+      "début": "2026-10-03T10:33:30.168Z",
+      "duréeMs": 22307,
+      "tours": 1,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 7,
+      "entrée": 134199,
+      "sortie": 1500,
+      "nanoAiu": 9611970000
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "début": "2026-10-03T10:33:52.475Z",
+      "duréeMs": 17,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "ROUTE",
+      "début": "2026-10-03T10:33:52.492Z",
+      "duréeMs": 11,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T10:33:52.503Z",
+      "duréeMs": 135766,
+      "tours": 2,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 20,
+      "entrée": 555098,
+      "sortie": 6433,
+      "nanoAiu": 26919490000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T10:36:08.269Z",
+      "duréeMs": 62433,
+      "tours": 4,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 33,
+      "entrée": 794956,
+      "sortie": 11678,
+      "nanoAiu": 53198810000
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T10:37:10.702Z",
+      "duréeMs": 51939,
+      "tours": 1,
+      "essaisMax": 1,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader, major] Un seul scénario est testé (seuil exactement atteint, un seul palier). Le comportement implémenté dans GrilleDePaliers.PalierApplicable gère pourtant plusieurs cas non couverts ici : quantité en dessous de tout seuil (doit renvoyer null), grille vide, et plusieurs paliers applicables où celui au taux le plus élevé doit être retenu (MaxBy). Sans ces tests, un lecteur ne peut pas vérifier que la règle métier annoncée dans le commentaire de classe est réellement garantie au-delà du cas trivial. (tests/Tarification.Tests/GrilleDePaliersTests.cs:15)"
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 5,
+      "entrée": 155702,
+      "sortie": 3243,
+      "nanoAiu": 18049740000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T10:38:02.641Z",
+      "duréeMs": 11255,
+      "tours": 4,
+      "essaisMax": 1,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 8,
+      "entrée": 223499,
+      "sortie": 2473,
+      "nanoAiu": 48007990000
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T10:38:13.896Z",
+      "duréeMs": 24529,
+      "tours": 1,
+      "essaisMax": 2,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader, major] La suite de tests ne couvre qu'un seul scénario (seuil exactement atteint, un seul palier dans la grille). Le commentaire XML de PalierApplicable annonce pourtant explicitement trois autres comportements distincts : quantité sous tout seuil renvoyant null (@ac-1), grille vide renvoyant null (@ac-5), et choix du palier au taux le plus avantageux quand plusieurs seuils sont atteints (@ac-3). Aucun test ne verrouille ces trois comportements documentés ; un lecteur du dépôt ne peut donc pas vérifier que la règle métier annoncée est réellement garantie au-delà du cas trivial, et une régression sur MaxBy ou sur la grille vide passerait inaperçue. (tests/Tarification.Tests/GrilleDePaliersTests.cs:15)"
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 3,
+      "entrée": 110176,
+      "sortie": 2675,
+      "nanoAiu": 8803860000
+    }
+  ],
+  "parPhase": [
+    {
+      "phase": "CLASSIFY",
+      "début": "2026-10-03T10:33:30.168Z",
+      "duréeMs": 22307,
+      "tours": 1,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 7,
+      "entrée": 134199,
+      "sortie": 1500,
+      "nanoAiu": 9611970000
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "début": "2026-10-03T10:33:52.475Z",
+      "duréeMs": 17,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "ROUTE",
+      "début": "2026-10-03T10:33:52.492Z",
+      "duréeMs": 11,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T10:33:52.503Z",
+      "duréeMs": 212234,
+      "tours": 4,
+      "essaisMax": 2,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader, major] Un seul scénario est testé (seuil exactement atteint, un seul palier). Le comportement implémenté dans GrilleDePaliers.PalierApplicable gère pourtant plusieurs cas non couverts ici : quantité en dessous de tout seuil (doit renvoyer null), grille vide, et plusieurs paliers applicables où celui au taux le plus élevé doit être retenu (MaxBy). Sans ces tests, un lecteur ne peut pas vérifier que la règle métier annoncée dans le commentaire de classe est réellement garantie au-delà du cas trivial. (tests/Tarification.Tests/GrilleDePaliersTests.cs:15)"
+          ]
+        },
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader, major] La suite de tests ne couvre qu'un seul scénario (seuil exactement atteint, un seul palier dans la grille). Le commentaire XML de PalierApplicable annonce pourtant explicitement trois autres comportements distincts : quantité sous tout seuil renvoyant null (@ac-1), grille vide renvoyant null (@ac-5), et choix du palier au taux le plus avantageux quand plusieurs seuils sont atteints (@ac-3). Aucun test ne verrouille ces trois comportements documentés ; un lecteur du dépôt ne peut donc pas vérifier que la règle métier annoncée est réellement garantie au-delà du cas trivial, et une régression sur MaxBy ou sur la grille vide passerait inaperçue. (tests/Tarification.Tests/GrilleDePaliersTests.cs:15)"
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 28,
+      "entrée": 820976,
+      "sortie": 12351,
+      "nanoAiu": 53773090000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T10:36:08.269Z",
+      "duréeMs": 73688,
+      "tours": 8,
+      "essaisMax": 1,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 41,
+      "entrée": 1018455,
+      "sortie": 14151,
+      "nanoAiu": 101206800000
+    }
+  ],
+  "total": {
+    "duréeMs": 308257,
+    "tours": 13,
+    "appels": 76,
+    "entrée": 1973630,
+    "sortie": 28002,
+    "nanoAiu": 164591860000,
+    "rejets": 2
+  }
+}

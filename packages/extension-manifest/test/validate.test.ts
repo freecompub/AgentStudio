@@ -104,4 +104,15 @@ describe("Agents en fichiers Markdown et skills (D12, D26)", () => {
     expect(errorsOf(withAgent({ role: "r", skills: { onDemand: ["inconnue#A"] } }, []))).toEqual(["agents.dev : skill non déclarée dans contributes.skills : inconnue"]);
     expect(errorsOf(withAgent({ role: "r" }, [{ name: "s", path: "a" }, { name: "s", path: "b" }]))).toEqual(["skills : nom en double : s"]);
   });
+
+  it("classe de modèle d'un agent (ADR 0048) : fort, standard ou léger, jamais un identifiant de modèle", () => {
+    const avec = (modelClass: unknown) => {
+      const m = base();
+      m.contributes.agents = [{ name: "lecteur", title: "Lecteur", role: "Relis.", output: "report_phase", modelClass }];
+      return errorsOf(m);
+    };
+    expect(avec("light")).toEqual([]);
+    expect(avec("strong")).toEqual([]);
+    expect(avec("claude-opus-5")).toEqual([expect.stringMatching(/modelClass/)]);
+  });
 });

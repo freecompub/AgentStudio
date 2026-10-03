@@ -1,10 +1,13 @@
 import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
-import { featureScenarios } from "./distill.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "./deliver.js";
+import { coreFilesMissing } from "@agent-studio/extension-api";
+import { acOf, featureScenarios } from "./distill.js";
+import { declaredIdentifiers } from "./text-analysis.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
+import type { DefectTarget } from "./review.js";
 
 type Fx<K extends SkraftEffect["kind"]> = Extract<SkraftEffect, { kind: K }>;
 interface Run {
@@ -14,17 +17,44 @@ interface Run {
   signal: AbortSignal;
 }
 
-const QUALITY = ".skraft/quality.json";
+/** Barre de qualité du projet (ADR 0049), et son ancien emplacement relu le temps de la transition. */
+export const QUALITY = ".agent-studio/quality.yaml";
+export const QUALITY_LEGACY = ".skraft/quality.json";
 const fail = (reason: string): Ev => ({ type: "STEP_FAIL", reason });
 const firstLine = (msg?: string) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs: string[]) => [...new Set(xs)];
 
-/** Classement des fichiers selon la disposition de la stack : tests d'acceptance, tests unitaires, production. */
+/**
+ * Classement des fichiers selon la disposition de la stack : tests d'acceptance, tests unitaires,
+ * production. Les globs de `layout` sont des **chemins** : ils classent des fichiers, jamais des
+ * résultats de tests — voir `acceptanceResult`.
+ */
 function kinds(ctx: ExtensionContext) {
   const { acceptanceTests, unitTests } = ctx.stack.layout;
   const acceptance = (p: string) => matchesAny(acceptanceTests, p);
   const unit = (p: string) => !acceptance(p) && (matchesAny(unitTests, p) || ctx.stack.isTestFile(p));
-  return { acceptance, unit, production: (p: string) => !acceptance(p) && !unit(p) };
+  /**
+   * Un RÉSULTAT est d'acceptance s'il porte la marque `ac-<n>` que DISTILL impose dans le nom du
+   * test (ADR 0041). Un rapport JUnit rend `file` comme un nom de classe, que les globs de chemins
+   * ne reconnaissent jamais : le 03/10, DELIVER a pris les tests rouges de DISTILL pour une suite
+   * cassée et refusé de démarrer. Le chemin reste admis pour les lanceurs qui en rendent un.
+   */
+  const acceptanceResult = (r: TestResult) => acOf(r.id) !== null || acceptance(r.file);
+  return { acceptance, acceptanceResult, unit, production: (p: string) => !acceptance(p) && !unit(p) };
+}
+
+/**
+ * Nature d'un fichier cité par un défaut de revue (ADR 0046) : test, code de production, ou livrable
+ * de la tâche. `null` quand le chemin ne relève d'aucun : la cible déclarée par la lentille reste.
+ */
+export function defectTargetOf(ctx: ExtensionContext): (file: string) => DefectTarget | null {
+  const k = kinds(ctx);
+  return (file) => {
+    if (k.acceptance(file) || k.unit(file)) return "test";
+    if (matchesAny(ctx.stack.layout.sources, file)) return "code";
+    if (file.startsWith(".skraft/") || file.startsWith("docs/")) return "deliverable";
+    return null;
+  };
 }
 
 async function acceptanceFrozen(ctx: ExtensionContext, state: SkraftState): Promise<boolean> {
@@ -46,22 +76,29 @@ export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_BASELINE" } });
   if (run.timedOut) throw new EnvFailureError("Les tests ont dépassé le délai avant le début de DELIVER.");
   const k = kinds(ctx);
-  const broken = run.results.filter((r) => r.status === "failed" && !k.acceptance(r.file));
+  const broken = run.results.filter((r) => r.status === "failed" && !k.acceptanceResult(r));
   if (broken.length) throw new EnvFailureError(`La suite est rouge avant DELIVER : ${broken.map((r) => r.id).join(", ")}. Corrigez-la avant de relancer.`);
   const implPlan = (await readOr(ctx, `.skraft/${state.slug}/distill/impl-plan.md`)) ?? "";
-  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter((r) => k.acceptance(r.file)).map((r) => r.id), regressions: state.regressions });
+  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter(k.acceptanceResult).map((r) => r.id), regressions: state.regressions });
   return { type: "DELIVER_PLANNED", scenarios, all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) };
 }
 
 const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | null; unit: string; sources: string }) => string> = {
   test: ({ unit }) =>
-    `Pas en cours : écris UN nouveau test unitaire (dans ${unit}) pour le prochain petit comportement du scénario, vérifie avec run_tests qu'il échoue sur une assertion ou un symbole manquant, puis rends la main. N'écris aucun code de production.`,
+    `Pas en cours : écris UN nouveau test unitaire (dans ${unit}) pour le prochain petit comportement du scénario, vérifie avec run_tests qu'il échoue sur une assertion ou un symbole manquant, puis rends la main. N'écris aucun code de production.\n` +
+    "Si ce comportement est déjà vérifié par le test d'acceptance du scénario et qu'un test unitaire ne ferait que le dupliquer, n'écris rien : rends la main en désignant ce test d'acceptance dans le champ `coveredBy` de report_phase. Le code vérifiera qu'il échoue pour une bonne raison, et le pas suivant le fera passer.",
   dev: ({ newTest, sources }) =>
     `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifie avec run_tests, puis nettoie le code sans changer son comportement. Ne modifie aucun test.`,
   green: ({ newTest, sources }) => `Pas en cours : fais passer le test « ${newTest ?? "?"} » au vert avec le code minimal (dans ${sources}), vérifié avec run_tests. Ne modifie aucun test.`,
   refactor: () => "Pas en cours : nettoie le code de production sans changer son comportement ; la suite doit rester verte. Ne modifie aucun test.",
+  "fix-test": ({ unit }) =>
+    `Pas en cours : correction de revue, côté tests. Pour chaque défaut listé dans « Rejet précédent », ajoute le test demandé (dans ${unit}), ou conteste le défaut avec ta raison. ` +
+    "Un test ajouté peut passer d'emblée s'il décrit un comportement que le code a déjà, ou échouer sur une assertion s'il révèle un défaut du code : le développeur le fera passer ensuite. " +
+    "Ne modifie pas les tests existants, n'écris aucun code de production. Vérifie avec run_tests.",
   fix: ({ sources }) =>
-    `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test.`,
+    `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test. ` +
+    "Si un défaut ne doit pas être corrigé selon toi, conteste-le avec ta raison ; s'il est juste mais que sa correction n'est pas de ton ressort (un test à écrire, par exemple), déclare-le `outOfScope`. " +
+    "Ne supprime jamais un comportement exigé par le contrat de conception pour faire taire une revue : le code le vérifie, et refuse ce tour.",
 };
 
 /** Agent test ou dev d'un pas : dossier de passation construit par le code, tests gelés hors de son périmètre. */
@@ -81,11 +118,20 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
     ...(d.unitTests.length ? ["Tests unitaires déjà écrits pour ce scénario :", ...d.unitTests.map((t) => `  - ${t}`)] : []),
     STEP_TEXT[e.step]({ newTest: d.newTest, unit: unitTests.join(", "), sources: sources.join(", ") }),
   ];
-  const role = e.step === "test" ? "skraft-test" : "skraft-dev";
-  const readOnly = e.step === "test" ? ["@stack:acceptanceTests"] : ["@stack:acceptanceTests", "@stack:unitTests"];
+  const tester = e.step === "test" || e.step === "fix-test";
+  const role = tester ? "skraft-test" : "skraft-dev";
+  const readOnly = tester ? ["@stack:acceptanceTests"] : ["@stack:acceptanceTests", "@stack:unitTests"];
   const r = await ctx.agents.run<"report_phase">(role, lines.join("\n"), { signal, readOnly, evidence: { taskId, phase: "DELIVER", stepId: sc.id } });
   if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
-  return { type: "AGENT_REPORTED", role, summary: r.output.summary, files: r.output.files, ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}) };
+  return {
+    type: "AGENT_REPORTED",
+    role,
+    summary: r.output.summary,
+    files: r.output.files,
+    ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
+    ...(e.step === "test" && r.output.coveredBy ? { coveredBy: r.output.coveredBy } : {}),
+    ...(r.output.responses?.length ? { responses: r.output.responses } : {}),
+  };
 }
 
 /** Porte RED d'un pas (SPEC.md §8.3) : un seul nouveau test unitaire, rouge pour une bonne raison, aucun test gelé touché. */
@@ -93,14 +139,18 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
   const k = kinds(ctx);
   const changed = await ctx.workspace.changedFiles(e.since);
-  if (changed.length === 0) return fail("Aucun fichier modifié : écris un nouveau test unitaire.");
+  if (e.coveredBy) return coveredByAcceptance(e, changed.length, { ctx, state, taskId, signal });
+  if (changed.length === 0)
+    return fail(
+      "Aucun fichier modifié : écris un nouveau test unitaire, ou, si le test d'acceptance du scénario vérifie déjà le comportement, désigne-le dans `coveredBy`.",
+    );
   const outside = changed.filter((f) => !k.unit(f.path));
   if (outside.length) return fail(`Seuls des tests unitaires peuvent être modifiés à ce pas. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
 
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
   const known = new Set(e.baseline.all);
-  const fresh = run.results.filter((r) => !known.has(r.id) && !k.acceptance(r.file));
+  const fresh = run.results.filter((r) => !known.has(r.id) && !k.acceptanceResult(r));
   if (fresh.length === 0) return fail("Aucun nouveau test unitaire détecté.");
   if (fresh.length > 1) return fail(`Un seul nouveau test unitaire par pas ; trouvés : ${fresh.map((r) => r.id).join(", ")}.`);
   const t = fresh[0]!;
@@ -116,6 +166,94 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   return { type: "STEP_OK", checkpointId: cp.id, all: uniq([...e.baseline.all, t.id]), passed: e.baseline.passed, newTest: t.id, unitTestsHash };
 }
 
+/** Fichiers de production du projet, concaténés : de quoi chercher un nom du contrat. */
+async function sourcesText(ctx: ExtensionContext): Promise<string> {
+  const files = (await ctx.workspace.listFiles()).filter((f) => matchesAny(ctx.stack.layout.sources, f));
+  const parts: string[] = [];
+  for (const f of files) parts.push(await ctx.workspace.readFile(f));
+  return parts.join("\n");
+}
+
+const present = (text: string, id: string) => new RegExp(`\\b${id}\\b`).test(text);
+
+/**
+ * Noms déclarés par le contrat ratifié (`design/contracts.md`, blocs de code) présents dans le code à cet
+ * instant : la référence que la garde de correction compare ensuite (ADR 0047). Relevée au moment
+ * de la revue, faute de pouvoir relire le code d'un état passé.
+ */
+export async function contractSymbolsPresent(ctx: ExtensionContext, slug: string): Promise<string[]> {
+  let contract: string;
+  try {
+    contract = await ctx.workspace.readFile(`.skraft/${slug}/design/contracts.md`);
+  } catch {
+    return [];
+  }
+  const text = await sourcesText(ctx);
+  return declaredIdentifiers(contract).filter((id) => present(text, id));
+}
+
+/**
+ * Pas « test » sans test unitaire (ADR 0045) : le testeur déclare que le test d'acceptance du
+ * scénario vérifie déjà le comportement. Le LLM propose, le code décide : rien ne doit avoir été
+ * écrit, le test désigné doit être CELUI du scénario, et il doit échouer pour une bonne raison —
+ * c'est lui qui tient lieu de rouge, et le pas de code devra le faire passer.
+ */
+async function coveredByAcceptance(e: Fx<"verifyUnitRed">, changed: number, { ctx, state, taskId, signal }: Run): Promise<Ev> {
+  const sc = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!;
+  if (changed > 0) return fail("Tu as déclaré le comportement couvert par l'acceptance : aucun fichier ne doit alors être modifié. Écris un test unitaire, ou ne déclare rien.");
+  if (!concerns(sc.acceptanceTestId, e.coveredBy!))
+    return fail(`« ${e.coveredBy} » n'est pas le test d'acceptance du scénario : seul ${sc.acceptanceTestId} peut tenir lieu de test rouge à ce pas.`);
+  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
+  if (run.timedOut) return fail("Les tests ont dépassé le délai.");
+  const own = run.results.find((r) => concerns(r.id, sc.acceptanceTestId));
+  if (!own) return fail(`Le test d'acceptance ${sc.acceptanceTestId} est introuvable dans les résultats.`);
+  if (own.status === "passed") return fail(`Le test d'acceptance ${sc.acceptanceTestId} est déjà vert : il n'y a plus de comportement à faire passer.`);
+  if (own.status !== "failed" || own.failureKind === "other_error")
+    return fail(`Le test d'acceptance échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${firstLine(own.message)}`);
+  const regressions = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
+  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+  const unitTestsHash = await ctx.workspace.fingerprint(["@stack:unitTests"]);
+  const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : couvert par l'acceptance ${e.scenarioId}`);
+  return { type: "STEP_OK", checkpointId: cp.id, all: e.baseline.all, passed: e.baseline.passed, newTest: sc.acceptanceTestId, unitTestsHash, viaAcceptance: true };
+}
+
+/**
+ * Porte de la correction côté tests (ADR 0046). Un test réclamé par la revue sur du code existant
+ * passe souvent d'emblée — sur US-2, `PalierApplicable` gérait déjà les quatre branches — : exiger
+ * un rouge, comme au pas TDD, rendrait la correction impossible. Sont exigés : des tests unitaires
+ * seulement, aucun test existant disparu ni cassé, et un rouge éventuel pour une bonne raison. Les
+ * rouges deviennent les cibles du développeur. Ne rien écrire est permis : tout a pu être contesté.
+ */
+export async function verifyFixTests(e: Fx<"verifyFixTests">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
+  if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
+  const k = kinds(ctx);
+  const changed = await ctx.workspace.changedFiles(e.since);
+  const outside = changed.filter((f) => !k.unit(f.path));
+  if (outside.length) return fail(`À ce pas, seuls des tests unitaires peuvent être ajoutés. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
+  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_FIX_TEST", stepId: e.scenarioId } });
+  if (run.timedOut) return fail("Les tests ont dépassé le délai : un test ajouté boucle-t-il ?");
+  const ids = new Set(run.results.map((r) => r.id));
+  const gone = e.baseline.all.filter((id) => !ids.has(id) && !run.results.some((r) => concerns(r.id, id)));
+  if (gone.length) return fail(`Des tests existants ont disparu : ${gone.join(", ")}. Ajoute des tests, ne retire ni ne renomme les existants.`);
+  const broken = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
+  if (broken.length) return fail(`Des tests qui passaient ne passent plus : ${broken.map((r) => r.id).join(", ")}. Ne modifie pas les tests existants.`);
+  const fresh = run.results.filter((r) => !e.baseline.all.includes(r.id) && !k.acceptanceResult(r));
+  const skipped = fresh.filter((r) => r.status === "skipped");
+  if (skipped.length) return fail(`Tests ajoutés ignorés (interdit) : ${skipped.map((r) => r.id).join(", ")}.`);
+  const badRed = fresh.filter((r) => r.status === "failed" && r.failureKind === "other_error");
+  if (badRed.length) return fail(`Un test ajouté échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${badRed.map((r) => `${r.id} (${firstLine(r.message)})`).join("; ")}.`);
+  if (changed.length) await ctx.git.commit(`test(${state.slug}): correction de revue`);
+  const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : correction côté tests ${e.scenarioId}`);
+  return {
+    type: "STEP_OK",
+    checkpointId: cp.id,
+    all: uniq([...e.baseline.all, ...run.results.map((r) => r.id)]),
+    passed: run.results.filter((r) => r.status === "passed").map((r) => r.id),
+    unitTestsHash: await ctx.workspace.fingerprint(["@stack:unitTests"]),
+    fixTargets: fresh.filter((r) => r.status === "failed").map((r) => r.id),
+  };
+}
+
 /** Porte GREEN ou REFACTOR : tests gelés intacts (sinon tour annulé), code de production seul, suite verte hors acceptance en attente. */
 export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
@@ -124,16 +262,33 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   const k = kinds(ctx);
   const changed = await ctx.workspace.changedFiles(e.since);
   if (e.mode !== "refactor" && !changed.some((f) => k.production(f.path))) return fail("Aucun fichier de production modifié : écris le code qui fait passer le test.");
+  // Garde du contrat ratifié (ADR 0047) : le 03/10, une « correction » de revue a supprimé ce que
+  // le contrat de DESIGN exigeait, pour faire taire un défaut de couverture.
+  if (e.contractSymbols?.length) {
+    const text = await sourcesText(ctx);
+    const gone = e.contractSymbols.filter((id) => !present(text, id));
+    if (gone.length)
+      return fail(
+        `Cette correction retire du code des éléments du contrat ratifié (design/contracts.md) : ${gone.join(", ")}. ` +
+          "Corrige sans retirer ce que le contrat exige ; si le défaut ne peut pas être corrigé autrement, conteste-le ou déclare-le hors de ton périmètre (`outOfScope`).",
+      );
+  }
 
   const phase = e.mode === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN";
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase, stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le code boucle-t-il ?");
-  const suite = suiteProblems(run.results, e.pending, k.acceptance);
+  const suite = suiteProblems(run.results, e.pending, k.acceptanceResult);
   if (suite.length) return fail(suite.join(" "));
   if (e.newTest) {
     const own = run.results.filter((r) => concerns(r.id, e.newTest!) || r.file === e.newTest);
     if (own.length === 0) return fail(`Le test du pas est introuvable : ${e.newTest}.`);
     if (own.some((r) => r.status !== "passed")) return fail(`Le test du pas ne passe pas : ${e.newTest}.`);
+  }
+  // Correction : les tests rouges ajoutés côté tests doivent maintenant passer (ADR 0046).
+  for (const t of e.targets ?? []) {
+    const own = run.results.filter((r) => concerns(r.id, t));
+    if (own.length === 0) return fail(`Le test ajouté par la correction est introuvable : ${t}.`);
+    if (own.some((r) => r.status !== "passed")) return fail(`Le test ajouté par la correction ne passe pas : ${t}.`);
   }
 
   const kind = { dev: "feat", green: "feat", refactor: "refactor", fix: "fix" }[e.mode];
@@ -150,23 +305,68 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
 }
 
 /** Suite complète : verte, sauf les tests d'acceptance des scénarios pas encore livrés ; aucun test ignoré. */
-function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (p: string) => boolean): string[] {
+function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (r: TestResult) => boolean): string[] {
   const waiting = (r: TestResult) => pending.some((p) => concerns(r.id, p));
   const failing = results.filter((r) => r.status === "failed" && !waiting(r));
-  const skipped = results.filter((r) => r.status === "skipped" && !(isAcceptance(r.file) && waiting(r)));
+  const skipped = results.filter((r) => r.status === "skipped" && !(isAcceptance(r) && waiting(r)));
   const out: string[] = [];
   if (failing.length) out.push(`Tests en échec : ${failing.map((r) => `${r.id} (${firstLine(r.message)})`).join("; ")}.`);
   if (skipped.length) out.push(`Tests ignorés (interdit) : ${skipped.map((r) => r.id).join(", ")}.`);
   return out;
 }
 
+/**
+ * Barre de qualité du projet (ADR 0049), avec ce qu'il faut en dire : lue à l'ancien emplacement, ou
+ * un cœur déclaré qui ne correspond à aucun fichier — le seuil du reste s'appliquerait en silence.
+ * Une barre invalide est une panne d'environnement : la juger à moitié serait attester à tort.
+ */
+export async function loadQualityBar(ctx: ExtensionContext): Promise<{ bar: QualityBar; notes: string[] }> {
+  const q = parseQualityBar({ yaml: await readOr(ctx, QUALITY), legacyJson: await readOr(ctx, QUALITY_LEGACY) });
+  if ("error" in q) throw new EnvFailureError(q.error);
+  const sources = (await ctx.workspace.listFiles()).filter((f) => matchesAny(ctx.stack.layout.sources, f));
+  // Seules les couches déclarées : un projet sans couche « application », et qui n'a rien déclaré,
+  // n'a rien de suspect.
+  const vides = coreFilesMissing(q.bar, sources, q.declaredCore).map(
+    (c) => `Barre de qualité : la couche « ${c} » du cœur ne correspond à aucun fichier du projet ; ses seuils ne s'appliquent à rien (${q.source}).`,
+  );
+  return { bar: q.bar, notes: [...q.warnings, ...vides] };
+}
+
+/** Mutation des fichiers de production donnés, jugée contre la barre : motifs de rejet, faits, notes. */
+async function mutate(ctx: ExtensionContext, bar: QualityBar, sources: string[], label: string, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+  const mutation = await ctx.stack.mutation({ ...(signal ? { signal } : {}) });
+  if (!mutation) return { reasons: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  const facts = mutation.files
+    .filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`)))
+    .map((f) => `Mutation (${label}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
+  return { reasons: checkMutation(mutation, sources, bar), facts, notes: [] };
+}
+
+/**
+ * Mutation de fin de DELIVER (ADR 0049, moment par défaut) : une seule exécution sur tous les
+ * fichiers de production modifiés depuis le début de la phase. Un outil comme Stryker relance la
+ * suite pour chaque mutant : par scénario, ce serait une exécution complète à chaque fois.
+ */
+export async function phaseEndMutation(ctx: ExtensionContext, state: SkraftState, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+  const { bar, notes } = await loadQualityBar(ctx);
+  if (!bar.mutation.active) return { reasons: [], facts: [], notes: [...notes, "Mutation désactivée par la barre de qualité du projet."] };
+  if (bar.mutation.moment !== "phase-end") return { reasons: [], facts: [], notes };
+  const cp = state.checkpoints.DELIVER;
+  if (!cp) return { reasons: [], facts: [], notes };
+  const k = kinds(ctx);
+  const sources = (await ctx.workspace.changedFiles(cp))
+    .filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(ctx.stack.layout.sources, f.path))
+    .map((f) => f.path);
+  if (sources.length === 0) return { reasons: [], facts: [], notes };
+  const r = await mutate(ctx, bar, sources, "fin de DELIVER", signal);
+  return { reasons: r.reasons, facts: r.facts, notes: [...notes, ...r.notes] };
+}
+
 /** Porte de fin de scénario (§7.4) : acceptance verte, suite verte, séquence des preuves, mutation, dépendances, calisthenics. */
 export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
-  const quality = parseQualityBar(await readOr(ctx, QUALITY));
-  if ("error" in quality) throw new EnvFailureError(quality.error);
-  const bar = quality.bar;
+  const { bar, notes: barNotes } = await loadQualityBar(ctx);
   const reasons: string[] = [];
-  const notes: string[] = [];
+  const notes: string[] = [...barNotes];
   const facts: string[] = [];
   if (!(await acceptanceFrozen(ctx, state))) reasons.push("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL.");
 
@@ -176,7 +376,7 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   if (run.timedOut) return { type: "SCENARIO_FAIL", reasons: ["Les tests ont dépassé le délai à la fin du scénario."] };
   const own = run.results.find((r) => r.id === sc.acceptanceTestId);
   if (own?.status !== "passed") reasons.push(`Le test d'acceptance du scénario n'est pas vert : ${sc.acceptanceTestId}.`);
-  reasons.push(...suiteProblems(run.results, e.pending, k.acceptance));
+  reasons.push(...suiteProblems(run.results, e.pending, k.acceptanceResult));
 
   const evidence = (await ctx.evidence.list(taskId)).filter((x) => x.stepId === e.scenarioId);
   reasons.push(...checkRedGreenSequence(evidence, e.unitTests));
@@ -184,12 +384,15 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
   const changed = (await ctx.workspace.changedFiles(e.since)).filter((f) => f.status !== "deleted" && k.production(f.path));
   const sources = changed.map((f) => f.path).filter((p) => matchesAny(ctx.stack.layout.sources, p));
   if (sources.length) {
-    const mutation = await ctx.stack.mutation({ signal });
-    if (mutation) {
-      reasons.push(...checkMutation(mutation, sources, bar));
-      for (const f of mutation.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
-        facts.push(`Mutation (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-    } else notes.push("Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.");
+    // Mutation par scénario seulement si la barre le demande (ADR 0049) ; par défaut, une seule
+    // exécution en fin de DELIVER (`phaseEndMutation`). Désactivée : on le dit aux lentilles.
+    if (!bar.mutation.active) notes.push("Mutation désactivée par la barre de qualité du projet.");
+    else if (bar.mutation.moment === "scenario") {
+      const m = await mutate(ctx, bar, sources, e.scenarioId, signal);
+      reasons.push(...m.reasons);
+      facts.push(...m.facts);
+      notes.push(...m.notes);
+    }
 
     // Couverture : plancher de la mutation, produite par la même exécution de la suite. Sans
     // rapport, on le DIT — c'est ce que la lentille `quality-gates` croyait acquis alors qu'aucun

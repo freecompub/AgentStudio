@@ -55,7 +55,12 @@ Le test à faire passer est indiqué dans le dossier de passation. Tous les test
 même hors des outils d'écriture, est détectée par empreinte et annule le tour.`,
 
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
-Rends ton verdict avec l'outil submit_lens_verdict.`,
+Rends ton verdict avec l'outil submit_lens_verdict.
+Un comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test
+manquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).
+Donne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois
+un test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :
+accepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.`,
 };
 
 /**
@@ -71,6 +76,29 @@ export const LENS_FOCUS = {
   architecture: "Sens des dépendances entre couches, domaine sans doublure, fidélité aux ADR ratifiés et au modèle.",
   "quality-gates": "Cohérence des livrables avec les faits mesurés par le code, sans rien exécuter ni rejuger.",
 } as const;
+
+/**
+ * Classe de modèle par rôle (ADR 0048). Le projet associe chaque classe à un modèle réel ; skraft ne
+ * nomme jamais un modèle. Concevoir demande le plus de jugement ; produire, un bon modèle courant ;
+ * classer une story ou confronter des livrables à des faits déjà mesurés, un modèle léger.
+ */
+export const ROLE_MODEL_CLASS = {
+  classifier: "light",
+  researcher: "standard",
+  architectModel: "strong",
+  architectDecide: "strong",
+  acceptance: "standard",
+  test: "standard",
+  dev: "standard",
+} as const;
+
+/** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */
+export const LENS_MODEL_CLASS = {
+  "cold-reader": "standard",
+  "test-integrity": "standard",
+  architecture: "standard",
+  "quality-gates": "light",
+} as const satisfies Record<keyof typeof LENS_FOCUS, "strong" | "standard" | "light">;
 
 /**
  * Skills par rôle (SPEC-skraft §6.4) : injectées dans la session, ou chargées à la demande par

@@ -1,0 +1,970 @@
+{
+ "files": {
+  "/projet/src/Tarification.Domaine/GrilleDePaliers.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "1",
+     "mutatorName": "Linq method mutation (FirstOrDefault() to First())",
+     "replacement": "_paliers\n            .Where(palier => quantite.Valeur >= palier.Seuil.Valeur)\n            .OrderByDescending(palier => palier.Taux.Valeur)\n            .Select(palier => (Palier?)palier)\n            .First",
+     "location": {
+      "start": {
+       "line": 18,
+       "column": 9
+      },
+      "end": {
+       "line": 22,
+       "column": 28
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015"
+     ]
+    },
+    {
+     "id": "2",
+     "mutatorName": "Linq method mutation (OrderByDescending() to OrderBy())",
+     "replacement": "_paliers\n            .Where(palier => quantite.Valeur >= palier.Seuil.Valeur)\n            .OrderBy",
+     "location": {
+      "start": {
+       "line": 18,
+       "column": 9
+      },
+      "end": {
+       "line": 20,
+       "column": 31
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf"
+     ]
+    },
+    {
+     "id": "3",
+     "mutatorName": "Equality mutation",
+     "replacement": "quantite.Valeur < palier.Seuil.Valeur",
+     "location": {
+      "start": {
+       "line": 19,
+       "column": 30
+      },
+      "end": {
+       "line": 19,
+       "column": 68
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "4",
+     "mutatorName": "Equality mutation",
+     "replacement": "quantite.Valeur > palier.Seuil.Valeur",
+     "location": {
+      "start": {
+       "line": 19,
+       "column": 30
+      },
+      "end": {
+       "line": 19,
+       "column": 68
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    }
+   ]
+  },
+  "/projet/src/Tarification.Domaine/LigneDePanier.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "5",
+     "mutatorName": "Conditional (true) mutation",
+     "replacement": "(true?SousTotal.Multiplie(palier.Taux) :Montant.Zero)",
+     "location": {
+      "start": {
+       "line": 9,
+       "column": 9
+      },
+      "end": {
+       "line": 9,
+       "column": 106
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    },
+    {
+     "id": "6",
+     "mutatorName": "Conditional (false) mutation",
+     "replacement": "(false?SousTotal.Multiplie(palier.Taux) :Montant.Zero)",
+     "location": {
+      "start": {
+       "line": 9,
+       "column": 9
+      },
+      "end": {
+       "line": 9,
+       "column": 106
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    },
+    {
+     "id": "7",
+     "mutatorName": "Equality mutation",
+     "replacement": "grille.PalierApplicable(Quantite) is not { } palier",
+     "location": {
+      "start": {
+       "line": 9,
+       "column": 9
+      },
+      "end": {
+       "line": 9,
+       "column": 56
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    }
+   ]
+  },
+  "/projet/src/Tarification.Domaine/Montant.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "8",
+     "mutatorName": "Conditional (true) mutation",
+     "replacement": "(true?throw new ArgumentOutOfRangeException(nameof(euros), euros, \"Un montant ne peut pas être négatif.\") :new Montant(euros))",
+     "location": {
+      "start": {
+       "line": 14,
+       "column": 9
+      },
+      "end": {
+       "line": 14,
+       "column": 141
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "9",
+     "mutatorName": "Conditional (false) mutation",
+     "replacement": "(false?throw new ArgumentOutOfRangeException(nameof(euros), euros, \"Un montant ne peut pas être négatif.\") :new Montant(euros))",
+     "location": {
+      "start": {
+       "line": 14,
+       "column": 9
+      },
+      "end": {
+       "line": 14,
+       "column": 141
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f"
+     ]
+    },
+    {
+     "id": "10",
+     "mutatorName": "Equality mutation",
+     "replacement": "euros > 0",
+     "location": {
+      "start": {
+       "line": 14,
+       "column": 9
+      },
+      "end": {
+       "line": 14,
+       "column": 18
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "11",
+     "mutatorName": "Equality mutation",
+     "replacement": "euros <= 0",
+     "location": {
+      "start": {
+       "line": 14,
+       "column": 9
+      },
+      "end": {
+       "line": 14,
+       "column": 18
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf"
+     ]
+    },
+    {
+     "id": "12",
+     "mutatorName": "String mutation",
+     "replacement": "\"\"",
+     "location": {
+      "start": {
+       "line": 14,
+       "column": 81
+      },
+      "end": {
+       "line": 14,
+       "column": 119
+      }
+     },
+     "status": "Survived",
+     "static": false,
+     "coveredBy": [
+      "1ce3b408-9b2d-4e43-0b5c-73e23a2ed97f"
+     ],
+     "killedBy": []
+    },
+    {
+     "id": "13",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "a.Euros - b.Euros",
+     "location": {
+      "start": {
+       "line": 18,
+       "column": 67
+      },
+      "end": {
+       "line": 18,
+       "column": 84
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "14",
+     "mutatorName": "Conditional (true) mutation",
+     "replacement": "(true?throw new ArgumentOutOfRangeException(nameof(facteur), facteur, \"Un facteur négatif n'a pas de sens ici.\") :new Montant(Euros * facteur))",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 9
+      },
+      "end": {
+       "line": 21,
+       "column": 160
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "15",
+     "mutatorName": "Conditional (false) mutation",
+     "replacement": "(false?throw new ArgumentOutOfRangeException(nameof(facteur), facteur, \"Un facteur négatif n'a pas de sens ici.\") :new Montant(Euros * facteur))",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 9
+      },
+      "end": {
+       "line": 21,
+       "column": 160
+      }
+     },
+     "status": "Survived",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": []
+    },
+    {
+     "id": "16",
+     "mutatorName": "Equality mutation",
+     "replacement": "facteur > 0",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 9
+      },
+      "end": {
+       "line": 21,
+       "column": 20
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "17",
+     "mutatorName": "Equality mutation",
+     "replacement": "facteur <= 0",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 9
+      },
+      "end": {
+       "line": 21,
+       "column": 20
+      }
+     },
+     "status": "Survived",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": []
+    },
+    {
+     "id": "18",
+     "mutatorName": "String mutation",
+     "replacement": "\"\"",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 87
+      },
+      "end": {
+       "line": 21,
+       "column": 128
+      }
+     },
+     "status": "NoCoverage",
+     "statusReason": "Not covered by any test.",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    },
+    {
+     "id": "19",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "Euros / facteur",
+     "location": {
+      "start": {
+       "line": 21,
+       "column": 144
+      },
+      "end": {
+       "line": 21,
+       "column": 159
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "20",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "Euros / taux.Valeur",
+     "location": {
+      "start": {
+       "line": 23,
+       "column": 48
+      },
+      "end": {
+       "line": 23,
+       "column": 67
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "21",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "Euros + autre.Euros",
+     "location": {
+      "start": {
+       "line": 25,
+       "column": 51
+      },
+      "end": {
+       "line": 25,
+       "column": 70
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "22",
+     "mutatorName": "String mutation",
+     "replacement": "$\"\"",
+     "location": {
+      "start": {
+       "line": 29,
+       "column": 42
+      },
+      "end": {
+       "line": 29,
+       "column": 59
+      }
+     },
+     "status": "NoCoverage",
+     "statusReason": "Not covered by any test.",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    }
+   ]
+  },
+  "/projet/src/Tarification.Domaine/Palier.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": []
+  },
+  "/projet/src/Tarification.Domaine/Panier.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "23",
+     "mutatorName": "Block removal mutation",
+     "replacement": "{}",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 5
+      },
+      "end": {
+       "line": 14,
+       "column": 6
+      }
+     },
+     "status": "Ignored",
+     "statusReason": "Removed by block already covered filter",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": []
+    },
+    {
+     "id": "24",
+     "mutatorName": "Statement mutation",
+     "replacement": ";",
+     "location": {
+      "start": {
+       "line": 12,
+       "column": 9
+      },
+      "end": {
+       "line": 12,
+       "column": 28
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "25",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "total - l.SousTotal",
+     "location": {
+      "start": {
+       "line": 16,
+       "column": 86
+      },
+      "end": {
+       "line": 16,
+       "column": 105
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    },
+    {
+     "id": "26",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "total - l.Remise(grille)",
+     "location": {
+      "start": {
+       "line": 19,
+       "column": 55
+      },
+      "end": {
+       "line": 19,
+       "column": 79
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    }
+   ]
+  },
+  "/projet/src/Tarification.Domaine/Quantite.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "27",
+     "mutatorName": "Conditional (true) mutation",
+     "replacement": "(true?throw new ArgumentOutOfRangeException(nameof(valeur), valeur, \"Une quantité vaut au moins 1.\") :new Quantite(valeur))",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 9
+      },
+      "end": {
+       "line": 11,
+       "column": 139
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "28",
+     "mutatorName": "Conditional (false) mutation",
+     "replacement": "(false?throw new ArgumentOutOfRangeException(nameof(valeur), valeur, \"Une quantité vaut au moins 1.\") :new Quantite(valeur))",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 9
+      },
+      "end": {
+       "line": 11,
+       "column": 139
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f"
+     ]
+    },
+    {
+     "id": "29",
+     "mutatorName": "Equality mutation",
+     "replacement": "valeur > 1",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 9
+      },
+      "end": {
+       "line": 11,
+       "column": 19
+      }
+     },
+     "status": "Killed",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ]
+    },
+    {
+     "id": "30",
+     "mutatorName": "Equality mutation",
+     "replacement": "valeur <= 1",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 9
+      },
+      "end": {
+       "line": 11,
+       "column": 19
+      }
+     },
+     "status": "Survived",
+     "static": false,
+     "coveredBy": [
+      "9c0abe7f-887f-621b-6f3e-5047999da0d7",
+      "64105e03-08a0-c76e-d6c6-fdfadc297a7d",
+      "605af0a6-57bf-9b81-5075-002f32e55eaf",
+      "70f56d3b-bf39-b567-0501-196f6b787ebf",
+      "e2da3d44-92ef-1c2a-2ff9-e3dd73800876",
+      "b0627a73-f96b-05be-a7f9-664ded5ed2e8",
+      "dc289708-63e9-d3e0-fdf2-5f74d31e7015",
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f",
+      "ea7a112f-55c2-cbbf-a1b9-23b4b6c1ea00"
+     ],
+     "killedBy": []
+    },
+    {
+     "id": "31",
+     "mutatorName": "String mutation",
+     "replacement": "\"\"",
+     "location": {
+      "start": {
+       "line": 11,
+       "column": 84
+      },
+      "end": {
+       "line": 11,
+       "column": 115
+      }
+     },
+     "status": "Survived",
+     "static": false,
+     "coveredBy": [
+      "d08e6039-ee1a-16c8-156e-65bfc9944d7f"
+     ],
+     "killedBy": []
+    }
+   ]
+  },
+  "/projet/src/Tarification.Domaine/Taux.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": []
+  },
+  "/projet/src/Tarification.Application/CalculDuPanier.cs": {
+   "language": "cs",
+   "source": "",
+   "mutants": [
+    {
+     "id": "0",
+     "mutatorName": "Arithmetic mutation",
+     "replacement": "SommeDesArticles.Soustrait(Remise) - FraisDePort",
+     "location": {
+      "start": {
+       "line": 13,
+       "column": 31
+      },
+      "end": {
+       "line": 13,
+       "column": 79
+      }
+     },
+     "status": "CompileError",
+     "statusReason": "Mutant caused compile errors",
+     "static": false,
+     "coveredBy": [],
+     "killedBy": []
+    }
+   ]
+  }
+ },
+ "projectRoot": "/projet",
+ "schemaVersion": "2",
+ "thresholds": {
+  "high": 80,
+  "low": 60
+ }
+}

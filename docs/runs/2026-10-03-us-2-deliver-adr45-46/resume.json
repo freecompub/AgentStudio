@@ -1,0 +1,299 @@
+{
+  "etapes": [
+    {
+      "phase": "CLASSIFY",
+      "début": "2026-10-03T12:18:33.868Z",
+      "duréeMs": 5573,
+      "tours": 1,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 1,
+      "entrée": 17707,
+      "sortie": 254,
+      "nanoAiu": 4680650000
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "début": "2026-10-03T12:18:39.441Z",
+      "duréeMs": 16,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "ROUTE",
+      "début": "2026-10-03T12:18:39.457Z",
+      "duréeMs": 11,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T12:18:39.468Z",
+      "duréeMs": 131156,
+      "tours": 2,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 19,
+      "entrée": 542333,
+      "sortie": 4701,
+      "nanoAiu": 30734730000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T12:20:50.624Z",
+      "duréeMs": 194194,
+      "tours": 4,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 49,
+      "entrée": 1373230,
+      "sortie": 24149,
+      "nanoAiu": 80710830000
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T12:24:04.818Z",
+      "duréeMs": 42880,
+      "tours": 1,
+      "essaisMax": 1,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader#1.1, major, code] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne. (src/Tarification.Domaine/Montant.cs:23)",
+            "[quality-gates#1.1, major, code] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement. (src/Tarification.Domaine/Montant.cs)",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 6,
+      "entrée": 198917,
+      "sortie": 1849,
+      "nanoAiu": 18492610000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T12:24:47.698Z",
+      "duréeMs": 36161,
+      "tours": 4,
+      "essaisMax": 1,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 9,
+      "entrée": 275696,
+      "sortie": 3985,
+      "nanoAiu": 50950920000
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T12:25:23.859Z",
+      "duréeMs": 78473,
+      "tours": 1,
+      "essaisMax": 2,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[quality-gates#1.1, major, code] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement. (src/Tarification.Domaine/Montant.cs) — maintenu par la lentille après ta contestation (L'argument de l'agent porte sur qui a le droit d'écrire le test (périmètre DELIVER vs décision DISTILL) — pas sur le fait mesuré lui-même. Or le fait reste inchangé à l'essai 2 : Montant.cs est toujours à 70 % (7/10 lignes), sous le seuil 'core' de 90 % fixé par quality.json, et la nouvelle branche Soustrait n'a toujours aucune preuve rouge-puis-vert. Que la responsabilité d'ajouter ce test incombe à DISTILL plutôt qu'à DELIVER ne change rien à ce que je dois signaler : aucun livrable de cette phase (ni impl-plan.md, ni le code) ne reconnaît explicitement que ce seuil de couverture 'core' est franchi en dessous du plancher pour une règle métier visible du client. Le défaut est donc maintenu, mais je note que sa correction naturelle est une décision à documenter (en DISTILL ou dans le journal de phase) plutôt qu'un code à modifier ici.) : à corriger.",
+            "Rappel des demandes des revues précédentes, déclarées corrigées : ne les défais pas.",
+            "  - [cold-reader#1.1] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne.",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 7,
+      "entrée": 327891,
+      "sortie": 5054,
+      "nanoAiu": 20305350000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T12:26:42.332Z",
+      "duréeMs": 35690,
+      "tours": 4,
+      "essaisMax": 2,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 15,
+      "entrée": 501368,
+      "sortie": 5886,
+      "nanoAiu": 35854240000
+    },
+    {
+      "phase": "ESCALATED",
+      "début": "2026-10-03T12:27:18.022Z",
+      "duréeMs": 154,
+      "tours": 0,
+      "essaisMax": 3,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[test-integrity#3.1, blocker, code] Régression silencieuse : ATPayer calculait auparavant SommeDesArticles.Soustrait(Remise) + FraisDePort ; ici la remise n'est plus déduite (ATPayer == SommeDesArticles + FraisDePort). Le commentaire rationalise ce retrait en invoquant l'absence de critère d'acceptation sur ATPayer, mais aucun test ne couvre/empêche cette régression de comportement : la remise calculée par toute cette story devient inutilisée dans le total payé par le client, sans qu'aucun test rouge ne signale la perte. C'est un recul fonctionnel masqué par une justification plausible plutôt qu'une preuve de non-régression. (src/Tarification.Application/CalculDuPanier.cs:15)",
+            "[architecture#3.1, blocker, code] Facture.ATPayer est codé `SommeDesArticles + FraisDePort`, sans soustraire `Remise`. Le contrat ratifié (.skraft/us-2/design/contracts.md, section \"Facture.ATPayer — correction du calcul\") impose explicitement `SommeDesArticles.Soustrait(Remise) + FraisDePort` pour corriger ce bug connu avant que la remise ne devienne non nulle. Le plan d'implémentation (impl-plan.md) affirme à tort que cette correction a été appliquée (\"corrigé en SommeDesArticles.Soustrait(Remise) + FraisDePort\"), alors que le code livré ne le fait pas : la remise calculée par US-2 est désormais invisible dans le montant à payer, ce qui réintroduit le bug que la conception demandait explicitement de corriger dans cette story. (src/Tarification.Application/CalculDuPanier.cs:12)",
+            "[architecture#3.2, major, code] La méthode `Soustrait(Montant)` spécifiée dans le contrat ratifié (.skraft/us-2/design/contracts.md) a disparu de Montant.cs dans cette livraison (présente à l'essai 2, absente à l'essai 3), alors qu'elle est le moyen prévu pour que Facture.ATPayer applique la remise. Sa suppression est cohérente avec le défaut ci-dessus mais constitue en soi un retrait non justifié d'une opération actée par la conception. (src/Tarification.Domaine/Montant.cs:1)",
+            "Rappel des demandes des revues précédentes, déclarées corrigées : ne les défais pas.",
+            "  - [cold-reader#1.1] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne.",
+            "  - [quality-gates#1.1] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement.",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T12:27:18.176Z",
+      "duréeMs": 12493,
+      "tours": 1,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 1,
+      "entrée": 37322,
+      "sortie": 521,
+      "nanoAiu": 9851400000
+    }
+  ],
+  "parPhase": [
+    {
+      "phase": "CLASSIFY",
+      "début": "2026-10-03T12:18:33.868Z",
+      "duréeMs": 5573,
+      "tours": 1,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 1,
+      "entrée": 17707,
+      "sortie": 254,
+      "nanoAiu": 4680650000
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "début": "2026-10-03T12:18:39.441Z",
+      "duréeMs": 16,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "ROUTE",
+      "début": "2026-10-03T12:18:39.457Z",
+      "duréeMs": 11,
+      "tours": 0,
+      "essaisMax": 0,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    },
+    {
+      "phase": "DELIVER",
+      "début": "2026-10-03T12:18:39.468Z",
+      "duréeMs": 265002,
+      "tours": 5,
+      "essaisMax": 2,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[cold-reader#1.1, major, code] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne. (src/Tarification.Domaine/Montant.cs:23)",
+            "[quality-gates#1.1, major, code] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement. (src/Tarification.Domaine/Montant.cs)",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        },
+        {
+          "porte": "revue",
+          "motifs": [
+            "[quality-gates#1.1, major, code] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement. (src/Tarification.Domaine/Montant.cs) — maintenu par la lentille après ta contestation (L'argument de l'agent porte sur qui a le droit d'écrire le test (périmètre DELIVER vs décision DISTILL) — pas sur le fait mesuré lui-même. Or le fait reste inchangé à l'essai 2 : Montant.cs est toujours à 70 % (7/10 lignes), sous le seuil 'core' de 90 % fixé par quality.json, et la nouvelle branche Soustrait n'a toujours aucune preuve rouge-puis-vert. Que la responsabilité d'ajouter ce test incombe à DISTILL plutôt qu'à DELIVER ne change rien à ce que je dois signaler : aucun livrable de cette phase (ni impl-plan.md, ni le code) ne reconnaît explicitement que ce seuil de couverture 'core' est franchi en dessous du plancher pour une règle métier visible du client. Le défaut est donc maintenu, mais je note que sa correction naturelle est une décision à documenter (en DISTILL ou dans le journal de phase) plutôt qu'un code à modifier ici.) : à corriger.",
+            "Rappel des demandes des revues précédentes, déclarées corrigées : ne les défais pas.",
+            "  - [cold-reader#1.1] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne.",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 33,
+      "entrée": 1106463,
+      "sortie": 12125,
+      "nanoAiu": 79384090000
+    },
+    {
+      "phase": "REVIEW",
+      "début": "2026-10-03T12:20:50.624Z",
+      "duréeMs": 266045,
+      "tours": 12,
+      "essaisMax": 2,
+      "rejets": [],
+      "finsAnormales": [],
+      "appels": 73,
+      "entrée": 2150294,
+      "sortie": 34020,
+      "nanoAiu": 167515990000
+    },
+    {
+      "phase": "ESCALATED",
+      "début": "2026-10-03T12:27:18.022Z",
+      "duréeMs": 154,
+      "tours": 0,
+      "essaisMax": 3,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[test-integrity#3.1, blocker, code] Régression silencieuse : ATPayer calculait auparavant SommeDesArticles.Soustrait(Remise) + FraisDePort ; ici la remise n'est plus déduite (ATPayer == SommeDesArticles + FraisDePort). Le commentaire rationalise ce retrait en invoquant l'absence de critère d'acceptation sur ATPayer, mais aucun test ne couvre/empêche cette régression de comportement : la remise calculée par toute cette story devient inutilisée dans le total payé par le client, sans qu'aucun test rouge ne signale la perte. C'est un recul fonctionnel masqué par une justification plausible plutôt qu'une preuve de non-régression. (src/Tarification.Application/CalculDuPanier.cs:15)",
+            "[architecture#3.1, blocker, code] Facture.ATPayer est codé `SommeDesArticles + FraisDePort`, sans soustraire `Remise`. Le contrat ratifié (.skraft/us-2/design/contracts.md, section \"Facture.ATPayer — correction du calcul\") impose explicitement `SommeDesArticles.Soustrait(Remise) + FraisDePort` pour corriger ce bug connu avant que la remise ne devienne non nulle. Le plan d'implémentation (impl-plan.md) affirme à tort que cette correction a été appliquée (\"corrigé en SommeDesArticles.Soustrait(Remise) + FraisDePort\"), alors que le code livré ne le fait pas : la remise calculée par US-2 est désormais invisible dans le montant à payer, ce qui réintroduit le bug que la conception demandait explicitement de corriger dans cette story. (src/Tarification.Application/CalculDuPanier.cs:12)",
+            "[architecture#3.2, major, code] La méthode `Soustrait(Montant)` spécifiée dans le contrat ratifié (.skraft/us-2/design/contracts.md) a disparu de Montant.cs dans cette livraison (présente à l'essai 2, absente à l'essai 3), alors qu'elle est le moyen prévu pour que Facture.ATPayer applique la remise. Sa suppression est cohérente avec le défaut ci-dessus mais constitue en soi un retrait non justifié d'une opération actée par la conception. (src/Tarification.Domaine/Montant.cs:1)",
+            "Rappel des demandes des revues précédentes, déclarées corrigées : ne les défais pas.",
+            "  - [cold-reader#1.1] Montant.Multiplie(Taux taux) construit un Montant via le constructeur privé (`new(...)`) au lieu de passer par De(...). Le commentaire de type promet pourtant explicitement qu'« un montant négatif n'existe pas dans ce domaine ». Comme Taux.De(...) n'impose aucune borne (c'est assumé dans Taux.cs), un taux négatif ou hors intervalle produit silencieusement un Montant négatif qui viole l'invariant documenté de son propre type, sans qu'aucune exception ne soit levée. Un lecteur qui ne connaît que le contrat affiché par Montant ne peut pas deviner que cette méthode est la seule porte dérobée qui le contourne.",
+            "  - [quality-gates#1.1] Montant.Soustrait(Montant) n'est appelé que par Facture.ATPayer (src/Tarification.Application/CalculDuPanier.cs). Aucun test — ni acceptance, ni unitaire — n'accède jamais à ATPayer ni n'appelle Soustrait (confirmé par grep : zéro occurrence de 'ATPayer' ou 'Soustrait' sous tests/). impl-plan.md le reconnaît lui-même ('Aucun AC ne porte de valeur explicite sur ATPayer'), mais le mandat M4 (saturation par les AC, appliqué à GrilleDePaliers.PalierApplicable dans test-plan.md) n'a jamais été appliqué à cette règle pourtant tout aussi neuve et motivée par une correction de cohérence signalée en revue. Résultat : une règle métier visible du client (le total à payer) expédiée sans aucune preuve rouge-puis-vert, et c'est elle qui explique la couverture de Montant.cs (70 %) restant sous le seuil 'core' (90 %) de quality.json — sans qu'aucun document de la phase ne le dise explicitement.",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "finsAnormales": [],
+      "appels": 0,
+      "entrée": 0,
+      "sortie": 0,
+      "nanoAiu": 0
+    }
+  ],
+  "total": {
+    "duréeMs": 536801,
+    "tours": 18,
+    "appels": 107,
+    "entrée": 3274464,
+    "sortie": 46399,
+    "nanoAiu": 251580730000,
+    "rejets": 3
+  }
+}

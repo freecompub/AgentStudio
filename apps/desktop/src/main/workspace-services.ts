@@ -140,7 +140,7 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
 
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer }) => {
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor }) => {
     const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
     const manifests = sources.map((e) => e.manifest);
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
@@ -288,6 +288,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         hooks,
         trace: traceStore,
         usage,
+        ...(modelFor ? { modelFor } : {}),
         clock: cfg.clock,
         ids: cfg.ids,
         chat: { post: onPost },

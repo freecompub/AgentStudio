@@ -9,6 +9,28 @@ export const terminalSchemas = {
   report_phase: z.object({
     summary: z.string().min(1).max(2_000).describe("Ce que tu as fait, en une ou deux phrases"),
     files: z.array(z.string().max(1_000)).max(500).describe("Chemins relatifs des fichiers que tu as modifiés"),
+    // Facultatif, et seulement une PROPOSITION : le code vérifie que ce test existe, qu'il est le
+    // bon et qu'il échoue pour une bonne raison avant d'en tenir compte (ADR 0045).
+    coveredBy: z
+      .string()
+      .min(1)
+      .max(1_000)
+      .optional()
+      .describe("Si tu n'écris pas de nouveau test parce qu'un test existant vérifie déjà le comportement demandé : son identifiant exact"),
+    // Réponses aux défauts de revue qui te sont transmis (ADR 0046) : une par identifiant.
+    responses: z
+      .array(
+        z.object({
+          defect: z.string().min(1).max(100).describe("Identifiant du défaut, tel que donné (ex. cold-reader#2.1)"),
+          status: z
+            .enum(["fixed", "contested", "outOfScope"])
+            .describe("fixed : corrigé ; contested : tu estimes qu'il ne faut pas le corriger ; outOfScope : il est juste, mais sa correction n'est pas de ton ressort (ex. un test à écrire alors que tu ne peux écrire que du code)"),
+          reason: z.string().max(2_000).optional().describe("Obligatoire pour contested et outOfScope"),
+        }),
+      )
+      .max(100)
+      .optional()
+      .describe("Une réponse par défaut de revue qui t'a été transmis"),
   }),
   submit_plan: z.object({
     steps: z
@@ -32,12 +54,25 @@ export const terminalSchemas = {
       .array(
         z.object({
           severity: z.enum(["blocker", "major", "minor"]),
+          // Qui doit corriger (ADR 0046) : un seul sujet par défaut ; scinder un défaut qui touche les deux.
+          target: z.enum(["test", "code", "deliverable"]).describe("test : un test à écrire ou corriger ; code : le code de production ; deliverable : un document de la phase"),
           file: z.string().max(1_000).optional(),
           line: z.number().int().min(1).optional(),
           description: z.string().min(1).max(2_000),
         }),
       )
       .max(100),
+    // Arbitrage des défauts de tes revues précédentes que l'agent a contestés (ADR 0046).
+    rulings: z
+      .array(
+        z.object({
+          defect: z.string().min(1).max(100).describe("Identifiant du défaut contesté"),
+          decision: z.enum(["accepted", "maintained"]).describe("accepted : la contestation te convainc, le défaut tombe ; maintained : il doit être corrigé"),
+          reason: z.string().max(2_000).describe("Ta raison"),
+        }),
+      )
+      .max(100)
+      .optional(),
   }),
   report_blocker: z.object({
     question: z.string().min(1).max(2_000).describe("Question métier ou technique qui bloque"),

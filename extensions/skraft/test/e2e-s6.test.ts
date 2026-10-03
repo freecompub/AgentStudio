@@ -140,7 +140,7 @@ describe.skipIf(!toolchain)("skraft — bout en bout 13.3 (Swift)", () => {
           await t.callTool("submit_lens_verdict", {
             lens: "cold-reader",
             verdict: firstDeliver ? "CHANGES_REQUESTED" : "APPROVED",
-            defects: firstDeliver ? [{ severity: "major", description: "`MaxBolus` accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 3 }] : [],
+            defects: firstDeliver ? [{ severity: "major", target: "code", description: "`MaxBolus` accepte une valeur négative", file: "Sources/Domain/BolusCap.swift", line: 3 }] : [],
           });
         }),
         "skraft-lens-test-integrity": record("test-integrity", async (t) => void (await t.callTool("submit_lens_verdict", { lens: "test-integrity", verdict: "APPROVED", defects: [] }))),
@@ -181,7 +181,8 @@ describe.skipIf(!toolchain)("skraft — bout en bout 13.3 (Swift)", () => {
     expect(probes).toEqual([{ decision: "deny", reason: expect.any(String) }]);
     expect(calls.dev![1]).toContain("Les tests unitaires ont été modifiés pendant le pas de code");
     const fixPrompt = calls.dev!.find((p) => p.includes("corrige les défauts de revue"))!;
-    expect(fixPrompt).toContain("[cold-reader, major] `MaxBolus` accepte une valeur négative (Sources/Domain/BolusCap.swift:3)");
+    // Identifiant attribué par le code, cible vérifiée d'après le fichier cité (ADR 0046).
+    expect(fixPrompt).toContain("[cold-reader#1.1, major, code] `MaxBolus` accepte une valeur négative (Sources/Domain/BolusCap.swift:3)");
     expect(s.reviews.DELIVER.map((r) => r.verdict)).toEqual(["CHANGES_REQUESTED", "APPROVED"]);
     expect(await readFile(join(root, "Sources/Domain/BolusCap.swift"), "utf8")).toContain("Swift.max(0, units)");
     expect(mutation.runs).toBe(2);
@@ -204,6 +205,8 @@ describe.skipIf(!toolchain)("skraft — bout en bout 13.3 (Swift)", () => {
 
     // Bilan : réessais par phase ; usage par état (D37).
     expect(s.retries).toEqual({ RESEARCH: 1, DESIGN: 1, DISTILL: 1, DELIVER: 2 });
+    // Le compteur que le moteur lit pour tracer chaque rejet : la somme des réessais, toutes phases.
+    expect(s.rejections).toBe(5);
     expect(app.posted.at(-1)).toContain("Réessais par phase : RESEARCH 1, DESIGN 1, DISTILL 1, DELIVER 2.");
     const usage = await app.usage.report(id);
     for (const phase of ["CLASSIFY", "RESEARCH", "DESIGN", "DISTILL", "DELIVER", "REVIEW"]) expect(usage.find((r) => r.phase === phase)?.requests, phase).toBeGreaterThan(0);

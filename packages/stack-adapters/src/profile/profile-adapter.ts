@@ -9,6 +9,7 @@ import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
 import { substituer } from "./tokens.js";
+import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
 
@@ -16,9 +17,10 @@ import type { StackProfile } from "./stack-profile.js";
  * Adaptateur bâti sur un profil déclaratif (J5). Il ne connaît aucun langage : il exécute les
  * commandes que le projet déclare et confie leur sortie au lecteur nommé.
  *
- * Deux jetons sont substitués dans les arguments, et eux seuls : `{rapport}`, remplacé par un
- * fichier temporaire **hors du projet**, et `{fichiers}`, développé en autant d'arguments que de
- * fichiers. Le reste est passé tel quel, sans shell.
+ * Seuls quelques jetons sont substitués dans les arguments (voir `tokens.ts`) : `{rapport}`, un
+ * fichier temporaire **hors du projet** ; `{fichiers}`, développé en autant d'arguments que de
+ * fichiers ; `{couverture}` et `{dossier}`, des dossiers temporaires hors du projet. Le reste est
+ * passé tel quel, sans shell.
  */
 export interface ProfileAdapterDeps {
   runner?: ProcessRunner;
@@ -41,6 +43,17 @@ async function lireCouverture(profile: StackProfile, dossier: string, root: stri
     if (lu) return lu;
   }
   return undefined;
+}
+
+/**
+ * Rapport de mutation rangé par l'outil dans son dossier de sortie : `mutation-report.json` de
+ * préférence (Stryker), sinon le premier `.json` trouvé. `null` si rien n'a été écrit.
+ */
+async function rapportDansDossier(dossier: string): Promise<string | null> {
+  const entrees = await readdir(dossier, { withFileTypes: true, recursive: true }).catch(() => []);
+  const json = entrees.filter((e) => e.isFile() && e.name.endsWith(".json"));
+  const choisi = json.find((e) => e.name === "mutation-report.json") ?? json[0];
+  return choisi ? readFile(join(choisi.parentPath, choisi.name), "utf8") : null;
 }
 
 /** Fichiers `.xml` du dossier, récursivement. Vide si le dossier n'existe pas : rien n'a été écrit. */
@@ -155,17 +168,22 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
           async mutation(opts) {
             const c = profile.mutation!;
             const rapport = fichierTemporaire("json");
+            // Dossier de sortie (`{dossier}`) pour un outil qui range lui-même son rapport.
+            const dossier = fichierTemporaire("mutation");
+            await mkdir(dossier, { recursive: true });
             try {
-              const r = await runner.run(c.command[0]!, substituer(c.command.slice(1), rapport, []), {
+              const r = await runner.run(c.command[0]!, substituer(c.command.slice(1), rapport, [], "", dossier), {
                 cwd: opts.root,
                 timeoutMs: opts.timeoutMs ?? 60 * 60_000,
                 ...(opts.signal ? { signal: opts.signal } : {}),
               });
               if (r.timedOut) throw new Error("L'outil de mutation a dépassé le délai");
-              const brut = await readFile(rapport, "utf8").catch(() => r.stdout);
-              return parseMuterReport(JSON.parse(brut), opts.root);
+              const brut = (await readFile(rapport, "utf8").catch(() => null)) ?? (await rapportDansDossier(dossier)) ?? r.stdout;
+              const json = JSON.parse(brut);
+              return c.report === "stryker-json" ? parseStrykerReport(json, opts.root) : parseMuterReport(json, opts.root);
             } finally {
               await rm(rapport, { force: true });
+              await rm(dossier, { recursive: true, force: true });
             }
           },
         }
