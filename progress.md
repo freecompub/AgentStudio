@@ -82,7 +82,31 @@ confirment. Puis deux constats :
   réessai l'agent a cédé et écrit un test (`QuantiteTests`). C'est une décision à prendre (ADR),
   pas un défaut à corriger en silence.
 
-**Prochaine étape.** Reprendre DELIVER avec `concerns` corrigé ; trancher le conflit ci-dessus.
+**Deuxième reprise (165 requêtes) : DELIVER va au bout de ses scénarios.** Un seul cycle :
+`GrilleDePaliersTests.Le_palier_dont_le_seuil_est_atteint_s_applique` rouge sur assertion, puis
+`PalierApplicable` et `Montant.Multiplie` implémentés ; les cinq portes de scénario passent (ac-2 et
+ac-3 rendus verts, ac-1/4/5 déjà verts), porte de phase franchie. **Premier run à produire du code
+qui passe les portes de DELIVER** : 11 tests verts, poussé sur `run/us-2-2026-10-03-deliver`.
+Rapport : `docs/runs/2026-10-03-us-2-deliver/`.
+
+**Puis la revue bloque, et elle ne peut pas être satisfaite.** `cold-reader` (major) : un seul test
+unitaire pour `PalierApplicable`, alors que le code gère aussi « sous tout seuil », « grille vide »,
+« plusieurs paliers ». Or **en mode correction les tests unitaires sont gelés** (`unitTestsHash`) :
+`skraft-dev` ne peut toucher que la production. Il a documenté le lien de chaque branche vers son
+critère d'acceptance ; rejet à nouveau. Arrêté à la main pendant le troisième essai — le banc
+n'aurait pas abandonné seul, la formulation du motif variant d'un rejet à l'autre.
+
+**C'est le revers exact du conflit de la première reprise.** `skraft-test` refusait d'écrire ces
+tests (« saturé par l'acceptance », skill `test-design-mandates`) ; `cold-reader` les exige. Deux
+agents, deux doctrines, aucun arbitre dans la machine. À trancher par un ADR, avec trois volets :
+ce que DELIVER fait d'un comportement déjà couvert par l'acceptance ; ce que la revue a le droit
+d'exiger ; et comment une correction de revue peut ajouter un test (aujourd'hui impossible).
+
+**Consommation de la journée : environ 915 requêtes** (run 1 : 242, relance : 404, reprises : 100 et
+165). Réserve à ~620 le 03/10.
+
+**Prochaine étape.** Trancher le conflit (ADR), puis reprendre DELIVER depuis
+`run/us-2-2026-10-03-2973`.
 
 ---
 
