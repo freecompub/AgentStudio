@@ -172,6 +172,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const r = reviewRound(s.reviewThreads ?? [], e.lenses, round);
         const ns: SkraftState = {
           ...s,
+          ...(e.contractSymbols && s.deliver ? { deliver: { ...s.deliver, contractSymbols: e.contractSymbols } } : {}),
           reviewThreads: r.threads,
           reviews: { ...s.reviews, [p]: [...s.reviews[p], { attempt: s.attempts + 1, lenses: e.lenses, verdict: synthesize(r.lenses), reportPath: e.reportPath }] },
         };

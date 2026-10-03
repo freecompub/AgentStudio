@@ -366,3 +366,41 @@ describe("verifyFixTests — correction de revue côté tests", async () => {
     expect(await run({ changed: [], results: existing })).toMatchObject({ type: "STEP_OK", fixTargets: [] });
   });
 });
+
+/**
+ * ADR 0047 — garde du contrat ratifié. Run réel US-2 du 03/10 : pour faire taire un défaut de
+ * couverture, le développeur a supprimé `Montant.Soustrait` et la déduction de la remise, que le
+ * contrat de DESIGN exigeait. La revue l'a vu ; aucune porte ne l'interdisait.
+ */
+describe("verifyUnitGreen — un élément du contrat ratifié ne disparaît pas pendant une correction", async () => {
+  const { verifyUnitGreen } = await import("../src/deliver-effects.js");
+  const { initialState } = await import("../src/reducer.js");
+  const state = { ...initialState({ storyPath: "stories/US-2.md" } as never), slug: "us-2", acceptanceHash: "h" } as never;
+  function run(montant: string) {
+    const ctx = {
+      workspace: {
+        fingerprint: async () => "h",
+        changedFiles: async () => [{ path: "src/Tarification.Domaine/Montant.cs", status: "modified" }],
+        listFiles: async () => ["src/Tarification.Domaine/Montant.cs", "src/Tarification.Application/CalculDuPanier.cs"],
+        readFile: async (p: string) => (p.endsWith("Montant.cs") ? montant : "public Montant ATPayer => SommeDesArticles + FraisDePort;"),
+        checkpoint: async () => ({ id: "cp-fix" }),
+      },
+      stack: { layout: { acceptanceTests: ["tests/**/*AcceptanceTests.cs"], unitTests: ["tests/**/*.cs"], sources: ["src/**/*.cs"] }, isTestFile: () => false, runTests: async () => ({ timedOut: false, results: [{ id: "U.a", file: "U", name: "a", status: "passed" }] }) },
+      git: { commit: async () => "sha" },
+    } as never;
+    const e = { kind: "verifyUnitGreen", mode: "fix", scenarioId: "ac-2", since: "cp", newTest: null, unitTestsHash: "h", pending: [], contractSymbols: ["Soustrait", "Multiplie", "ATPayer"] } as never;
+    const s = { ...(state as object), deliver: { scenarios: [{ id: "ac-2", acceptanceTestId: "A.Ac2" }], baseline: { all: [], passed: [] } } } as never;
+    return verifyUnitGreen(e, { ctx, state: s, taskId: "t", signal: new AbortController().signal });
+  }
+
+  it("un élément du contrat supprimé pendant la correction : refusé, avec la marche à suivre", async () => {
+    expect(await run("public Montant Multiplie(Taux t) => De(Euros * t.Valeur);")).toMatchObject({
+      type: "STEP_FAIL",
+      reason: expect.stringMatching(/contrat ratifié.*Soustrait.*conteste.*hors de ton périmètre/s),
+    });
+  });
+
+  it("tous les éléments du contrat toujours présents : la correction passe", async () => {
+    expect(await run("public Montant Multiplie(Taux t) => De(Euros * t.Valeur);\npublic Montant Soustrait(Montant a) => De(Euros - a.Euros);")).toMatchObject({ type: "STEP_OK" });
+  });
+});

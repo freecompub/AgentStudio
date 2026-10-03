@@ -165,3 +165,31 @@ describe("lensesAfterThreads", () => {
     expect(t).toMatchObject({ verdict: "CHANGES_REQUESTED", defects: [expect.objectContaining({ id: "t#1.1" })] });
   });
 });
+
+/**
+ * ADR 0047 — « hors de mon périmètre ». Run réel US-2 du 03/10 : un défaut de couverture mal routé
+ * a été maintenu chez le développeur, qui ne pouvait pas écrire de test ; il a fini par supprimer
+ * le code. L'agent peut désormais renvoyer un défaut à l'autre agent, une fois.
+ */
+describe("applyResponses — hors de mon périmètre", () => {
+  const t: DefectThread = { id: "q#1.1", lens: "q", severity: "major", description: "aucun test ne couvre ATPayer", target: "code", status: "open", round: 1 };
+  const swap = (x: DefectThread) => (x.target === "test" ? "code" : "test") as "code" | "test";
+
+  it("le défaut est renvoyé à l'autre agent, toujours à traiter", () => {
+    const [r] = applyResponses([t], [{ defect: "q#1.1", status: "outOfScope", reason: "il faut un test" }], () => true, swap);
+    expect(r).toMatchObject({ target: "test", status: "open", rerouted: true });
+  });
+
+  it("un défaut maintenu peut aussi être renvoyé : c'est le routage qui était faux, pas le défaut", () => {
+    expect(applyResponses([{ ...t, status: "maintained" }], [{ defect: "q#1.1", status: "outOfScope", reason: "r" }], () => true, swap)[0]).toMatchObject({ target: "test", status: "open" });
+  });
+
+  it("renvoyé une seconde fois : il ne rebondit pas, il devient une contestation que la lentille arbitrera", () => {
+    const [r] = applyResponses([{ ...t, target: "test", rerouted: true }], [{ defect: "q#1.1", status: "outOfScope", reason: "pas pour moi non plus" }], () => true, swap);
+    expect(r).toMatchObject({ target: "test", status: "contested", contestation: "pas pour moi non plus" });
+  });
+
+  it("sans second agent (hors DELIVER), « hors périmètre » vaut contestation", () => {
+    expect(applyResponses([t], [{ defect: "q#1.1", status: "outOfScope", reason: "r" }], () => true)[0]).toMatchObject({ status: "contested", contestation: "r" });
+  });
+});

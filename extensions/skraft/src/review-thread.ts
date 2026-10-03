@@ -48,11 +48,13 @@ export interface DefectThread {
   ruling?: string;
   /** Tour de revue où le défaut a été signalé. */
   round: number;
+  /** Déjà renvoyé une fois à l'autre agent (« hors de mon périmètre », ADR 0047). */
+  rerouted?: boolean;
 }
 
 export interface DefectResponse {
   defect: string;
-  status: "fixed" | "contested";
+  status: "fixed" | "contested" | "outOfScope";
   reason?: string | undefined;
 }
 
@@ -142,14 +144,27 @@ export function reviewRound(prev: DefectThread[], lenses: LensVerdict[], round: 
   return { threads: [...carried, ...fresh], persistent, lenses: forSynthesis };
 }
 
-/** Réponses de l'agent aux fils qui le concernent. Contester sans raison ne vaut rien. */
-export function applyResponses(threads: DefectThread[], responses: readonly DefectResponse[], concerns: (t: DefectThread) => boolean): DefectThread[] {
+/**
+ * Réponses de l'agent aux fils qui le concernent. Contester sans raison ne vaut rien.
+ *
+ * « Hors de mon périmètre » (ADR 0047) : le défaut est juste mais revient à l'autre agent.
+ * `reroute` dit lequel ; sans second agent (hors DELIVER), c'est une contestation. Un défaut ne se
+ * renvoie qu'une fois : renvoyé de nouveau, il devient une contestation que la lentille arbitrera,
+ * au lieu de rebondir sans fin entre les deux agents.
+ */
+export function applyResponses(
+  threads: DefectThread[],
+  responses: readonly DefectResponse[],
+  concerns: (t: DefectThread) => boolean,
+  reroute?: (t: DefectThread) => DefectTarget,
+): DefectThread[] {
   return threads.map((t) => {
     const r = responses.find((x) => x.defect === t.id);
     if (!r || !concerns(t) || !isActive(t)) return t;
     if (r.status === "fixed") return { ...t, status: "fixed" };
     const reason = r.reason?.trim();
     if (!reason || t.status === "humanMaintained") return t;
+    if (r.status === "outOfScope" && reroute && !t.rerouted) return { ...t, target: reroute(t), status: "open", rerouted: true, contestation: reason };
     return { ...t, status: t.status === "maintained" ? "recontested" : "contested", contestation: reason };
   });
 }
@@ -165,7 +180,7 @@ export function applyArbitration(threads: DefectThread[], decision: string): Def
 
 /** Ce qu'on attend de l'agent face aux défauts qui lui sont transmis. */
 export const RESPONSE_INSTRUCTION =
-  "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain.";
+  "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain.";
 
 const where = (t: DefectThread) => (t.file ? ` (${t.file}${t.line ? `:${t.line}` : ""})` : "");
 

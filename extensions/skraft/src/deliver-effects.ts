@@ -3,6 +3,7 @@ import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios } from "./deliver.js";
 import { acOf, featureScenarios } from "./distill.js";
+import { fencedIdentifiers } from "./text-analysis.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 import type { DefectTarget } from "./review.js";
@@ -93,7 +94,8 @@ const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | n
     "Ne modifie pas les tests existants, n'écris aucun code de production. Vérifie avec run_tests.",
   fix: ({ sources }) =>
     `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test. ` +
-    "Si un défaut ne doit pas être corrigé selon toi, conteste-le avec ta raison plutôt que de le contourner.",
+    "Si un défaut ne doit pas être corrigé selon toi, conteste-le avec ta raison ; s'il est juste mais que sa correction n'est pas de ton ressort (un test à écrire, par exemple), déclare-le `outOfScope`. " +
+    "Ne supprime jamais un comportement exigé par le contrat de conception pour faire taire une revue : le code le vérifie, et refuse ce tour.",
 };
 
 /** Agent test ou dev d'un pas : dossier de passation construit par le code, tests gelés hors de son périmètre. */
@@ -159,6 +161,32 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   await ctx.git.commit(`test(${state.slug}): ${e.scenarioId}, ${t.id}`);
   const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : rouge ${e.scenarioId}`);
   return { type: "STEP_OK", checkpointId: cp.id, all: uniq([...e.baseline.all, t.id]), passed: e.baseline.passed, newTest: t.id, unitTestsHash };
+}
+
+/** Fichiers de production du projet, concaténés : de quoi chercher un nom du contrat. */
+async function sourcesText(ctx: ExtensionContext): Promise<string> {
+  const files = (await ctx.workspace.listFiles()).filter((f) => matchesAny(ctx.stack.layout.sources, f));
+  const parts: string[] = [];
+  for (const f of files) parts.push(await ctx.workspace.readFile(f));
+  return parts.join("\n");
+}
+
+const present = (text: string, id: string) => new RegExp(`\\b${id}\\b`).test(text);
+
+/**
+ * Éléments du contrat ratifié (`design/contracts.md`, blocs de code) présents dans le code à cet
+ * instant : la référence que la garde de correction compare ensuite (ADR 0047). Relevée au moment
+ * de la revue, faute de pouvoir relire le code d'un état passé.
+ */
+export async function contractSymbolsPresent(ctx: ExtensionContext, slug: string): Promise<string[]> {
+  let contract: string;
+  try {
+    contract = await ctx.workspace.readFile(`.skraft/${slug}/design/contracts.md`);
+  } catch {
+    return [];
+  }
+  const text = await sourcesText(ctx);
+  return fencedIdentifiers(contract).filter((id) => present(text, id));
 }
 
 /**
@@ -231,6 +259,17 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   const k = kinds(ctx);
   const changed = await ctx.workspace.changedFiles(e.since);
   if (e.mode !== "refactor" && !changed.some((f) => k.production(f.path))) return fail("Aucun fichier de production modifié : écris le code qui fait passer le test.");
+  // Garde du contrat ratifié (ADR 0047) : le 03/10, une « correction » de revue a supprimé ce que
+  // le contrat de DESIGN exigeait, pour faire taire un défaut de couverture.
+  if (e.contractSymbols?.length) {
+    const text = await sourcesText(ctx);
+    const gone = e.contractSymbols.filter((id) => !present(text, id));
+    if (gone.length)
+      return fail(
+        `Cette correction retire du code des éléments du contrat ratifié (design/contracts.md) : ${gone.join(", ")}. ` +
+          "Corrige sans retirer ce que le contrat exige ; si le défaut ne peut pas être corrigé autrement, conteste-le ou déclare-le hors de ton périmètre (`outOfScope`).",
+      );
+  }
 
   const phase = e.mode === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN";
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase, stepId: e.scenarioId } });

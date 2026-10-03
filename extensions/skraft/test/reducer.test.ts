@@ -864,6 +864,25 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(gate.effects).toEqual([expect.objectContaining({ kind: "scenarioGate", unitTests: ["U > t9"] })]);
     });
 
+    it("défaut renvoyé « hors de mon périmètre » par le développeur : il repart au testeur après la correction du code", () => {
+      const onlyCode = LENSES({ lens: "quality-gates", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "aucun test ne couvre ATPayer", target: "code" }] });
+      const fix = play([...delivered, onlyCode]);
+      expect((fix.effects.find((x) => x.kind === "runDeliverAgent") as { step: string }).step).toBe("fix");
+      const reported = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "outOfScope", reason: "il faut un test" }] } as Ev);
+      expect(reported.state.reviewThreads?.[0]).toMatchObject({ target: "test", status: "open", rerouted: true });
+      const next = transition(reported.state, { type: "STEP_OK", checkpointId: "cp-fix", all: [], passed: passedAll, acceptanceGreen: true });
+      const run = next.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(run.feedback.join("\n")).toMatch(/aucun test ne couvre ATPayer/);
+    });
+
+    it("la référence du contrat relevée à la revue accompagne la correction du développeur", () => {
+      const review = { ...(LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "taux négatif", target: "code" }] }) as object), contractSymbols: ["Soustrait", "ATPayer"] } as Ev;
+      const fix = play([...delivered, review]);
+      const green = transition(fix.state, REP_DEV);
+      expect(green.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "fix", contractSymbols: ["Soustrait", "ATPayer"] })]);
+    });
+
     it("tout contesté côté tests, rien côté code : directement la porte de fin de scénario, puis la revue", () => {
       const onlyTest = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "grille vide non testée", target: "test" }] });
       const r = play([...delivered, onlyTest, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "contested", reason: "couvert par ac-5" }] } as Ev,

@@ -22,8 +22,10 @@ export const terminalSchemas = {
       .array(
         z.object({
           defect: z.string().min(1).max(100).describe("Identifiant du défaut, tel que donné (ex. cold-reader#2.1)"),
-          status: z.enum(["fixed", "contested"]).describe("fixed : corrigé ; contested : tu estimes qu'il ne faut pas le corriger"),
-          reason: z.string().max(2_000).optional().describe("Obligatoire pour contested : pourquoi ce n'est pas un défaut"),
+          status: z
+            .enum(["fixed", "contested", "outOfScope"])
+            .describe("fixed : corrigé ; contested : tu estimes qu'il ne faut pas le corriger ; outOfScope : il est juste, mais sa correction n'est pas de ton ressort (ex. un test à écrire alors que tu ne peux écrire que du code)"),
+          reason: z.string().max(2_000).optional().describe("Obligatoire pour contested et outOfScope"),
         }),
       )
       .max(100)

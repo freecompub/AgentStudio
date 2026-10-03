@@ -103,6 +103,8 @@ export interface DeliverState {
   reviewFeedback?: { test: string[]; code: string[] };
   /** Tests ajoutés par la correction côté tests et encore rouges : le développeur doit les faire passer. */
   fixTargets?: string[];
+  /** Éléments du contrat ratifié présents dans le code à la revue : aucune correction ne doit les retirer. */
+  contractSymbols?: string[];
 }
 
 export interface SkraftInput {
@@ -189,7 +191,13 @@ export type SkraftEvent =
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   | { type: "GATE_OK"; artifacts: ArtifactRecord[]; adrs?: AdrRecord[]; openQuestions?: string[]; acceptanceHash?: string; regressions?: string[] }
   | { type: "GATE_FAIL"; gate: string; reasons: string[] }
-  | { type: "LENSES_DONE"; lenses: LensVerdict[]; reportPath: string }
+  | {
+      type: "LENSES_DONE";
+      lenses: LensVerdict[];
+      reportPath: string;
+      /** DELIVER : éléments du contrat ratifié présents dans le code au moment de la revue (ADR 0047). */
+      contractSymbols?: string[];
+    }
   | { type: "COMMITTED"; sha: string | null }
   | { type: "DELIVER_PLANNED"; scenarios: DeliverScenario[]; all: string[]; passed: string[] }
   | { type: "SCENARIO_STARTED"; checkpointId: string }
@@ -242,6 +250,8 @@ export type SkraftEffect =
       pending: string[];
       /** Correction : tests rouges ajoutés côté tests, qui doivent passer (ADR 0046). */
       targets?: string[];
+      /** Correction : éléments du contrat ratifié qui doivent rester dans le code (ADR 0047). */
+      contractSymbols?: string[];
     }
   | { kind: "scenarioGate"; scenarioId: string; since: string; unitTests: string[]; pending: string[] };
 

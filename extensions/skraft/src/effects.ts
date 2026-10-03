@@ -17,7 +17,7 @@ import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./revie
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
-import { defectTargetOf, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { contractSymbolsPresent, defectTargetOf, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
@@ -151,7 +151,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
       const verdicts = numberDefects(raw, state.reviews[effect.phase].length + 1, defectTargetOf(ctx));
       const reportPath = await writeReview(ctx, state.slug, effect.phase, effect.attempt, verdicts);
-      return { type: "LENSES_DONE", lenses: verdicts, reportPath };
+      // DELIVER : référence de la garde du contrat ratifié, relevée sur le code que la revue a jugé.
+      const contractSymbols = effect.phase === "DELIVER" ? await contractSymbolsPresent(ctx, state.slug) : [];
+      return { type: "LENSES_DONE", lenses: verdicts, reportPath, ...(contractSymbols.length ? { contractSymbols } : {}) };
     }
 
     case "askArbitration": {

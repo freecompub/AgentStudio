@@ -157,8 +157,22 @@ Rapport : `docs/runs/2026-10-03-us-2-deliver-adr45-46/`.
 
 **Consommation du 03/10 : environ 1 170 requêtes.** Réserve à ~330 jusqu'au 01/11.
 
-**Prochaine étape.** Une seule reprise de DELIVER, routage corrigé : le défaut de couverture ira au
-testeur. Puis envisager la garde « les symboles du contrat ratifié existent toujours ».
+**Puis l'ADR 0047 (mesures 1 à 3 retenues par le responsable).** Garde du contrat ratifié : la revue
+de DELIVER relève les noms du contrat présents dans le code (blocs de `contracts.md`), et la porte
+GREEN refuse une correction qui en fait disparaître un. Réponse `outOfScope` : un défaut juste mais
+pas du ressort de l'agent part à l'autre agent, une seule fois. Consigne du développeur précisée.
+- **Rejouée sur les vrais commits** du run (`git show <ref>:<fichier>` sur la copie) : la correction
+  légitime passe, la suppression est refusée (`Soustrait` disparu). Les commits d'un run arrêté
+  restent dans la copie même après le rollback d'escalade : `git log --all`.
+- **Piège en l'écrivant** : j'ai d'abord réutilisé `PASCAL`, qui n'accepte que les noms composés
+  (`AppliqueA`). Il ignorait `Montant` et `Soustrait` — exactement le nom supprimé. Pour un contrat,
+  tout identifiant capitalisé.
+- **Limite assumée** : un comportement modifié à nom constant passe (retirer la soustraction en
+  gardant `Soustrait`). La revue reste le filet.
+
+**Prochaine étape.** Une reprise à partir du code déjà écrit (commit `fd3d982` du run, poussé en
+branche) : DELIVER n'a rien à coder, la revue juge directement ; compter 140 à 170 requêtes. Réserve
+à 328 jusqu'au 01/11.
 
 ---
 

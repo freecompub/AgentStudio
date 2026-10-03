@@ -9,6 +9,8 @@ type AgentStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix";
 /** Un défaut de revue revient à l'agent des tests (`test`) ou au développeur (`code`, `deliverable`). */
 const forTests = (t: DefectThread) => t.target === "test";
 const forDev = (t: DefectThread) => t.target !== "test";
+/** « Hors de mon périmètre » : le défaut passe à l'autre agent (ADR 0047). */
+const otherAgent = (t: DefectThread) => (t.target === "test" ? "code" : "test");
 
 /**
  * Réessais par phase, pour les mesures d'usage (§12). Tout rejet passe par ici, ce qui en fait
@@ -69,7 +71,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
       // Correction de revue : chaque agent répond aux défauts qui le concernent (ADR 0046).
       if ((d.step === "fix-test" || d.step === "fix") && e.responses?.length && s.reviewThreads)
-        s = { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, d.step === "fix-test" ? forTests : forDev) };
+        s = { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, d.step === "fix-test" ? forTests : forDev, otherAgent) };
       if (d.step === "fix-test")
         return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline }] };
       if (d.step === "test")
@@ -99,6 +101,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
               unitTestsHash: d.unitTestsHash,
               pending: [],
               ...(d.fixTargets?.length ? { targets: d.fixTargets } : {}),
+              ...(d.contractSymbols?.length ? { contractSymbols: d.contractSymbols } : {}),
             },
           ],
         };
@@ -133,12 +136,22 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       if (d.step === "fix-test") {
         const nd: DeliverState = { ...base, newTest: null, fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash };
         const devWork = (s.reviewThreads ?? []).some((t) => isActive(t) && forDev(t));
-        if (devWork || nd.fixTargets!.length) return agent(s, { ...nd, step: "fix" }, []);
+        // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
+        if (devWork || nd.fixTargets!.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: d.reviewFeedback?.test ?? [], code: agentFeedback(s.reviewThreads ?? [], forDev) } }, []);
         return scenarioGate(s, { ...nd, unitTests: [] });
       }
       // Correction de revue validée : la porte de fin de scénario revérifie le code corrigé, et la
       // séquence rouge puis vert des tests rouges ajoutés par la correction côté tests.
-      if (d.step === "fix") return scenarioGate(s, { ...base, newTest: null, unitTests: d.fixTargets ?? [] });
+      if (d.step === "fix") {
+        // Un défaut renvoyé par le développeur au testeur (« hors de mon périmètre ») : au testeur
+        // maintenant, avec le retour recalculé, plutôt que de le laisser sans personne.
+        const forTester = (s.reviewThreads ?? []).filter((t) => isActive(t) && forTests(t));
+        if (forTester.length) {
+          const test = agentFeedback(s.reviewThreads ?? [], forTests);
+          return agent(s, { ...base, newTest: null, step: "fix-test", reviewFeedback: { test, code: d.reviewFeedback?.code ?? [] }, reviewDefects: test }, []);
+        }
+        return scenarioGate(s, { ...base, newTest: null, unitTests: d.fixTargets ?? [] });
+      }
       return null;
     }
 

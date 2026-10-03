@@ -47,6 +47,18 @@ export function extractCodeIdentifiers(md: string): string[] {
   return [...out];
 }
 
+/**
+ * Identifiants `PascalCase` des seuls blocs délimités par ``` : les signatures qu'un contrat
+ * déclare, sans les noms cités en passant dans le texte ou entre backticks (ADR 0047).
+ */
+export function fencedIdentifiers(md: string): string[] {
+  const out = new Set<string>();
+  // Tout identifiant capitalisé, d'un seul mot compris (`Montant`, `Soustrait`) : PASCAL, qui exige
+  // un mot composé, laisserait passer exactement les noms qu'une correction supprimerait.
+  for (const m of md.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) for (const id of m[1]!.match(/\b[A-Z][A-Za-z0-9_]*\b/g) ?? []) out.add(id);
+  return [...out];
+}
+
 /** Identifiants `PascalCase` entre backticks (convention imposée aux documents de conception). */
 export function extractPascalIdentifiers(md: string): string[] {
   const out: string[] = [];

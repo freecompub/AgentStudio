@@ -27,3 +27,11 @@ describe("Identifiants PascalCase entre backticks (porte cohérence, §7.2)", ()
     expect(extractPascalIdentifiers(md)).toEqual(["BolusCapped", "CapBolus"]);
   });
 });
+
+describe("Identifiants des blocs de code (garde du contrat ratifié, ADR 0047)", async () => {
+  const { fencedIdentifiers } = await import("../src/text-analysis.js");
+  it("ne retient que les noms des blocs délimités, pas ceux du texte ni des backticks en ligne", () => {
+    const md = "Le `Panier` et `Facture` en ligne.\n\n```\npublic Montant Soustrait(Montant autre);\npublic static Taux De(decimal valeur);\n```\n\nPuis du texte : PalierApplicable.";
+    expect(fencedIdentifiers(md).sort()).toEqual(["De", "Montant", "Soustrait", "Taux"]);
+  });
+});
