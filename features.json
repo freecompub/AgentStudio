@@ -505,14 +505,14 @@
       "title": "Une correction de revue peut ajouter un test (rouge vérifié) au lieu de trouver les tests gelés",
       "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"verifyFixTests\"",
       "passes": true,
-      "notes": "ADR 0046 : correction en deux temps, côté tests (`fix-test`, tests ajoutés verts ou rouges pour une bonne raison) puis côté code. Non encore éprouvé sur un run réel."
+      "notes": "ADR 0046 : correction en deux temps, côté tests (`fix-test`, tests ajoutés verts ou rouges pour une bonne raison) puis côté code.  Éprouvé le 03/10 : le testeur a ajouté FactureTests, vert d’emblée, accepté ; la revue suivante a approuvé et US-2 est allée jusqu’à DONE."
     },
     {
       "id": "revue-dialogue-avec-l-agent",
       "title": "La revue route chaque défaut vers l’agent concerné, qui peut le contester ; la lentille arbitre, l’humain en dernier recours (ADR 0046)",
       "verify": "pnpm vitest run --project ext-skraft test/review-thread.test.ts test/reducer.test.ts -t \"fils de défauts|reviewRound|applyResponses|applyArbitration\"",
       "passes": true,
-      "notes": "Éprouvé le 03/10 sur US-2 : contestation argumentée, arbitrages accepted/maintained, rappel des demandes corrigées. Routage amendé : le fichier cité ne fait basculer un défaut que vers le testeur. Reste ouvert : « corriger » un défaut de couverture en supprimant le code non couvert."
+      "notes": "Éprouvé le 03/10 sur US-2 : contestation argumentée, arbitrages accepted/maintained, rappel des demandes corrigées. Routage amendé : le fichier cité ne fait basculer un défaut que vers le testeur. Reste ouvert : « corriger » un défaut de couverture en supprimant le code non couvert. Run DONE du 03/10 : défaut routé au testeur, corrigé, arbitrage accepted, quatre lentilles approuvent."
     },
     {
       "id": "garde-du-contrat-ratifie",
@@ -526,7 +526,14 @@
       "title": "Un agent peut renvoyer un défaut « hors de mon périmètre » à l’autre agent, une fois (ADR 0047)",
       "verify": "pnpm vitest run --project ext-skraft -t \"hors de mon périmètre\"",
       "passes": true,
-      "notes": "Réponse `outOfScope` ; en DELIVER le défaut change de cible et part à l’autre agent ; renvoyé de nouveau, il devient une contestation. Non encore éprouvé sur un run réel."
+      "notes": "Réponse `outOfScope` ; en DELIVER le défaut change de cible et part à l’autre agent ; renvoyé de nouveau, il devient une contestation.  Pas sollicité lors du run du 03/10 (routage déjà juste) : non éprouvé en réel."
+    },
+    {
+      "id": "us-2-livree-en-reel",
+      "title": "Une story réelle (US-2, .NET) va jusqu’à DONE avec le vrai Copilot",
+      "verify": "MANUEL : docs/runs/2026-10-03-us-2-836c8392/rapport.md (État final : DONE) et branche run/us-2-2026-10-03-9362 du projet d’essai, dotnet test vert",
+      "passes": true,
+      "notes": "03/10, repris à DELIVER depuis run/us-2-2026-10-03-2973 (RESEARCH, DESIGN, DISTILL validées par le run précédent). 152,5 requêtes pour la reprise. Un run complet sans reprise reste à faire."
     }
   ]
 }

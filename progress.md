@@ -170,9 +170,30 @@ pas du ressort de l'agent part à l'autre agent, une seule fois. Consigne du dé
 - **Limite assumée** : un comportement modifié à nom constant passe (retirer la soustraction en
   gardant `Soustrait`). La revue reste le filet.
 
-**Prochaine étape.** Une reprise à partir du code déjà écrit (commit `fd3d982` du run, poussé en
-branche) : DELIVER n'a rien à coder, la revue juge directement ; compter 140 à 170 requêtes. Réserve
-à 328 jusqu'au 01/11.
+**Le raccourci qui ne marche pas.** Repartir d'une branche où le code de DELIVER est déjà écrit, pour
+sauter directement à la revue : la porte de phase refuse « Aucun livrable produit pendant la phase
+DELIVER » en boucle (voulu : une phase qui ne produit rien est suspecte). 8 requêtes, arrêté.
+
+**US-2 LIVRÉE : premier run réel jusqu'à DONE.** Repris juste avant DELIVER
+(`run/us-2-2026-10-03-2973`), 4 min 38, **152,5 requêtes**, un seul rejet. Rapport :
+`docs/runs/2026-10-03-us-2-836c8392/`. Code poussé sur `run/us-2-2026-10-03-9362`, 11 tests verts
+(vérifié par un clone de GitHub).
+- DELIVER : couvert par l'acceptance (ADR 0045), 2 tours, 28 requêtes, aucun rejet.
+- Revue 1 : `quality-gates` relève le même défaut de couverture d'`ATPayer`, cible `test`, en citant
+  `Montant.cs` — et cette fois il **reste au testeur** (routage amendé). La lentille précise même
+  que « ce n'est pas un cas de l'ADR 0045 » : aucune acceptance ne couvre `ATPayer`.
+- Correction côté tests (`fix-test`, ADR 0046) : le testeur ajoute `FactureTests` (19,00 € à payer
+  pour 10 × 2,00 € avec 5 %), vert d'emblée — exactement le cas prévu par `verifyFixTests`.
+- Revue 2 : `quality-gates` **accepte** dans ses arbitrages, les quatre lentilles approuvent ; commit,
+  DONE. Deux mineurs restent notés (`CompareTo`/`ToString` non couverts ; le test n'exerce `+` qu'avec
+  des frais de port nuls).
+
+**Bilan du 03/10.** Partis d'aucun run au-delà de DISTILL. Cinq défauts de notre code révélés par des
+runs réels et corrigés (porte cohérence, trois variantes chemin ↔ classe JUnit, routage), trois ADR
+de conception (0045, 0046, 0047). Environ 1 330 requêtes. Réserve à ~170 jusqu'au 01/11.
+
+**Prochaine étape.** Rejouer US-2 de bout en bout (RESEARCH → DONE) après la remise à zéro du 01/11,
+pour un premier run complet sans reprise ; il coûtera de l'ordre de 450 à 550 requêtes.
 
 ---
 
