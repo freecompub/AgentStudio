@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 03/10 (soir) — Trois correctifs du 29/09 restés hors de `main`, intégrés
+
+`fix/plafond-duree-tour` portait trois commits poussés **après** la fusion de la PR #9, donc jamais
+arrivés dans `main` : à l'escalade, le dépôt et la mémoire reviennent au même point ; un événement
+reçu pendant le chargement n'est plus perdu ; un checkpoint n'enregistre pas les fichiers que le
+système sème (et `--en-place` pour le banc). Rejoués sur `main`, conflits résolus :
+- **Numéros d'ADR en collision** : leurs 0045 et 0046 existaient déjà dans `main` (couvert par
+  l'acceptance ; la revue dialogue). Renumérotés **0050** et **0051**, renvois corrigés dans leurs
+  seules lignes, et noté dans les messages de commit.
+- **Interaction découverte en fusionnant** : `--en-place` + `--pousser` aurait ajouté un remote
+  `github` au vrai dépôt de l'utilisateur. En place, le banc pousse désormais par son `origin` ;
+  `--base` et `--en-place` sont incompatibles et refusés ensemble.
+- `scripts/` entre dans le typecheck (leur commit) : mon banc du 03/10 y passe sans erreur.
+- **Piège** : au premier rejeu, j'ai validé `progress.md` avec ses marqueurs de conflit — ma liste
+  des fichiers en conflit était tronquée par un `head`. Vu avant de pousser. Après une résolution,
+  `git grep "^<<<<<<< "` sur tout le dépôt, pas une liste partielle.
+
+---
+
 ## 03/10 — Suivre un run étape par étape, et la porte qui recalait une conception juste
 
 > Synthèse de la journée, problème par problème (symptôme, cause, solution, vérification) :
