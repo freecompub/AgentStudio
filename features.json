@@ -547,7 +547,14 @@
       "title": "La barre de qualité est décidée par le projet dans .agent-studio/quality.yaml : seuils par couche, cœur par chemins, mutation activable (ADR 0049)",
       "verify": "pnpm vitest run --project stack-adapters test/quality-bar.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts -t \"ADR 0049\"",
       "passes": true,
-      "notes": "Corrige le seuil cœur non appliqué à Tarification.Domaine (03/10). Mutation en fin de DELIVER par défaut ; mutant survivant = défaut adressé au testeur. Reste : lecteur Stryker, interface, migration du projet d’essai."
+      "notes": "Corrige le seuil cœur non appliqué à Tarification.Domaine (03/10). Mutation en fin de DELIVER par défaut ; mutant survivant = défaut adressé au testeur. Reste : interface, migration du projet d’essai."
+    },
+    {
+      "id": "mutation-stryker",
+      "title": "La mutation se mesure avec Stryker (Stryker.NET, StrykerJS, Stryker4s) via le lecteur stryker-json",
+      "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts test/profile-adapter.test.ts -t \"Stryker\"",
+      "passes": true,
+      "notes": "Lecteur écrit sur un rapport réel de Stryker.NET 5.0.0 (03/10) ; éprouvé de bout en bout sur le code livré d’US-2 : 72 % en 32 s, comme Stryker. dotnet-stryker installé en outil global sur la machine de dev ; le projet d’essai n’a pas encore la commande dans son stack.yaml."
     }
   ]
 }

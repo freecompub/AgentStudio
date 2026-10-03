@@ -72,8 +72,16 @@ Trois autres manques :
 
 ## Reste ouvert
 
-- **Aucun lecteur Stryker** : seul `muter-json` (Swift) est lu. Sur .NET, la mutation reste « non
-  mesurée » tant que ce lecteur n'existe pas.
+- ~~Aucun lecteur Stryker~~ — **fait le 03/10** : lecteur `stryker-json` (schéma
+  `mutation-testing-elements`, commun à Stryker.NET, StrykerJS et Stryker4s) et jeton `{dossier}`
+  pour un outil qui range lui-même son rapport. Écrit sur un rapport réel de Stryker.NET 5.0.0, et
+  éprouvé de bout en bout sur le code livré d'US-2 : 72 % en 32 s, le score affiché par Stryker.
+  Commande type dans `stack.yaml` :
+  `[dotnet, stryker, --solution, Tarification.sln, --reporter, json, --output, "{dossier}"]`.
+- **Mutations des messages d'erreur** : sur US-2, une part des survivants mute le texte d'une
+  exception, que les tests ne vérifient pas. Au seuil de 100 % pour le domaine, ils deviendraient des
+  défauts de faible valeur. À trancher par le projet : exclure ces mutations dans la commande, ou
+  fixer un seuil réaliste dans `quality.yaml`.
 - **Aucune interface** pour régler la barre : le fichier seulement. `/stack doctor` pourrait
   afficher la barre retenue et les fichiers reconnus comme cœur.
 - Le projet d'essai porte encore l'ancien `.skraft/quality.json`.

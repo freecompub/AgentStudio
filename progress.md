@@ -248,7 +248,20 @@ la mutation et de la définition du cœur, hors de `stack.yaml`.
 - **Faux positif attrapé par les tests de bout en bout** : la note « couche du cœur sans fichier » se
   déclenchait sur les noms par défaut (un projet sans couche `Application`) ; elle ne porte plus que
   sur les couches déclarées.
-- Reste : lecteur Stryker ; interface ; migration du projet d'essai ; `tdd` à brancher sur la barre.
+- Reste : interface ; migration du projet d'essai ; `tdd` à brancher sur la barre.
+
+**Lecteur Stryker, écrit sur un rapport réel.** `dotnet-stryker` 5.0.0 installé en outil global
+(`~/.dotnet/tools`, ajouter au `PATH`) et lancé sur le code livré d'US-2 avant d'écrire une ligne :
+le rapport réel sert de référence (`test/fixtures/stryker-net-us2.json`, chemins anonymisés).
+- Format `mutation-testing-elements` v2, commun à Stryker.NET, StrykerJS et Stryker4s : un seul
+  lecteur, `stryker-json`. Score = (tués + délais) / (tués + délais + survivants + non couverts), les
+  erreurs de compilation et ignorés ne comptent pas : le lecteur retrouve **exactement** les 72 % de
+  Stryker, ce qui valide le calcul sur données réelles.
+- Stryker.NET écrit un **dossier** (`--output`) : nouveau jeton `{dossier}`, sur le modèle de
+  `{couverture}`.
+- Bout en bout réel (profil → adaptateur → Stryker → lecteur) : 72 % en 32 s, projet laissé propre.
+- **À trancher par le responsable** : une part des survivants mute le texte des messages d'erreur ;
+  au seuil de 100 % du domaine, ils deviendraient des défauts sans valeur pour le testeur.
 
 ---
 

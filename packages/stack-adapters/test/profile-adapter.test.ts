@@ -154,3 +154,49 @@ describe("Adaptateur bâti sur un profil", () => {
     expect(a.isTestFile("src/bolus.py")).toBe(false);
   });
 });
+
+/**
+ * Mutation avec Stryker.NET : l'outil écrit dans un DOSSIER de sortie (`--output`), sous
+ * `reports/mutation-report.json`. Le jeton `{dossier}` lui en donne un, hors du projet.
+ */
+describe("Mutation par Stryker (rapport stryker-json, jeton {dossier})", () => {
+  const STRYKER = `
+id: dotnet
+detect: [Tarification.sln]
+tests:
+  command: [dotnet, test, "--logger", "junit;LogFilePath={rapport}"]
+  report: junit-xml
+mutation:
+  command: [dotnet, stryker, --solution, Tarification.sln, --reporter, json, --output, "{dossier}"]
+  report: stryker-json
+layout:
+  unitTests: ["tests/**/*.cs"]
+  sources: ["src/**/*.cs"]
+`;
+
+  it("le profil accepte stryker-json pour la mutation", () => {
+    const r = parseStackProfile(STRYKER, { allowedPrograms: ["dotnet"] });
+    expect("error" in r ? r.error : "ok").toBe("ok");
+  });
+
+  it("l'adaptateur donne un dossier hors du projet et lit le rapport que l'outil y range", async () => {
+    const r = parseStackProfile(STRYKER, { allowedPrograms: ["dotnet"] });
+    if ("error" in r) throw new Error(r.error);
+    const { mkdir } = await import("node:fs/promises");
+    const run = runner(async (_cmd, args) => {
+      const dossier = args[args.indexOf("--output") + 1]!;
+      await mkdir(join(dossier, "reports"), { recursive: true });
+      const rapport = { schemaVersion: "2", thresholds: { high: 80, low: 60 }, files: { [join(racine, "src/Montant.cs")]: { language: "cs", source: "", mutants: [
+        { id: "1", mutatorName: "Arithmetic mutation", location: { start: { line: 25, column: 1 }, end: { line: 25, column: 9 } }, status: "Survived" },
+        { id: "2", mutatorName: "Equality mutation", location: { start: { line: 14, column: 1 }, end: { line: 14, column: 9 } }, status: "Killed" },
+      ] } } };
+      await writeFile(join(dossier, "reports", "mutation-report.json"), JSON.stringify(rapport));
+      return sortie();
+    });
+    const m = await createProfileAdapter(r.profile, { runner: run }).mutation!({ root: racine });
+    const dossier = run.appels[0]!.args[run.appels[0]!.args.indexOf("--output") + 1]!;
+    expect(dossier.startsWith(racine)).toBe(false);
+    expect(m).toEqual({ score: 50, files: [{ file: "src/Montant.cs", score: 50, survived: [{ line: 25, operator: "Arithmetic mutation" }] }] });
+  });
+});
+
