@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 04/10 — skraft décrit en planification hiérarchique : la recette YAML et ses propriétaires
+
+**Fait.** Branche `docs/skraft-planification-hierarchique`, documentation seulement, aucun code.
+`docs/08-skraft-en-planification-hierarchique.md` refondu, et la recette complète écrite dans
+`docs/recettes/skraft.recette.yaml` (YAML valide, clés uniques ; **aucun code ne la charge**).
+Trois niveaux : actions atomiques, actions d'agent ou humaines, tâches et méthodes. Chaque
+élément a un propriétaire de sa définition, que le préfixe du nom désigne : plateforme (sans
+préfixe, catalogue), extension (`skraft.`), projet (`projet.`, scripts), recette (déclaré dans le
+fichier). Une action d'agent a quatre contributeurs : recette, extension (prompt), utilisateur
+(modèle), plateforme (outils terminaux, contrat, interdits). `$` est réservé aux entrées de
+l'utilisateur ; `initialiser-story` devient une tâche d'actions atomiques, `evaluer-difficulte`
+une tâche à part (mesure, grille, classifieur borné, confirmation).
+
+**Écarts trouvés, à trancher (docs/08 §8)** : le classifieur n'est pas borné à un cran en code
+(`isDifficulty` seul ; `shift` ne sert qu'aux options humaines, `--auto` applique le niveau tel
+quel) ; la grille `DEFAULT_THRESHOLDS` n'est pas réglable ; la story ne vient que d'un fichier.
+
+**Piège évité** : `mesurer-indicateurs` et `proposer-difficulte` ne sont pas des actions de la
+plateforme (je les y avais rangées à l'oral) : ce sont des calculs propres à skraft.
+
+**Suite** : faire valider le découpage et les propriétaires, puis ADR de l'orchestrateur générique.
+
+---
+
 ## 03/10 (soir) — Trois correctifs du 29/09 restés hors de `main`, intégrés
 
 `fix/plafond-duree-tour` portait trois commits poussés **après** la fusion de la PR #9, donc jamais
