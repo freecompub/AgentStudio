@@ -7,6 +7,111 @@ Chaque élément renvoie au code qui le réalise aujourd'hui (`extensions/skraft
 
 ---
 
+## 0. Les entrées de la recette
+
+Une recette déclare **ce qu'elle reçoit** : sans cela, « la story » n'est définie nulle part, et
+une action qui lit `story.criteres` ne peut pas être vérifiée avant le lancement. Aujourd'hui cette
+définition est cachée dans le code (`SkraftInput`, `parseStory`) ; elle devient la première section
+du fichier. Trois sortes d'entrées.
+
+### 0.1 Les entrées fournies au lancement
+
+```yaml
+entrees:
+  story:
+    type: fichier
+    format: story-markdown          # lecteur du catalogue (§0.3) : valide et découpe le fichier
+    obligatoire: true
+    aide: "Fichier de la story, relatif à la racine du dépôt"
+  confirmer-difficulte:
+    type: booleen
+    defaut: true                    # mode simple : l'humain confirme le niveau proposé
+  granularite:
+    type: choix
+    valeurs: [tour-par-scenario, sessions-par-pas]
+    obligatoire: false              # absente : déduite de la difficulté (D22)
+  phases:
+    type: liste
+    valeurs: [RESEARCH, DESIGN, DISTILL, DELIVER]
+    obligatoire: false              # surcharge de l'ordre, réservée aux essais
+```
+
+Elles arrivent par la commande (`/skraft stories/US-2.md --auto`) ou par un **formulaire que
+l'interface génère depuis cette déclaration** : type, valeurs, défaut et aide suffisent à le
+construire.
+
+### 0.2 Le contexte fourni par la plateforme
+
+Toujours présent, jamais saisi ; déclaré pour que la recette dise ce dont elle dépend :
+
+```yaml
+contexte:
+  depot: {}                          # arbre de travail, historique Git
+  stack: { fichier: ".agent-studio/stack.yaml" }     # comment lancer les outils
+  barre: { fichier: ".agent-studio/quality.yaml" }   # ce qui est exigé (ADR 0049)
+  modeles: {}                        # modèle par classe de rôle (ADR 0048)
+```
+
+### 0.3 Le format d'une entrée : un lecteur du catalogue
+
+Comme une vérification, un format **se nomme** dans le fichier et **s'écrit en code**. Le lecteur
+valide l'entrée et la découpe en champs typés, que les actions référencent ensuite.
+
+`story-markdown` (aujourd'hui `parseStory`, `story.ts`) :
+
+| Exigé dans le fichier | Champ produit | Type |
+|---|---|---|
+| titre `# <IDENTIFIANT> — <titre>` (ex. `# US-2 — Remise par palier`) | `story.id`, `story.titre`, `story.slug` | texte |
+| le paragraphe qui suit (« En tant que… je veux… afin de… ») | `story.enonce` | texte |
+| section `## Critères d'acceptation`, liste numérotée, au moins un | `story.criteres[]` : `n`, `texte`, `litteraux` | liste |
+| section `## Questions ouvertes`, facultative | `story.questions-ouvertes[]` | liste |
+
+Les `litteraux` (nombres avec unité, chaînes entre guillemets) sont extraits par le code : c'est
+sur eux que porte la vérification `valeurs-recopiees` de DISTILL.
+
+**Une entrée invalide arrête tout avant le premier agent**, donc sans coût : « Titre attendu
+« # <IDENTIFIANT> — <titre> » », « Aucun critère d'acceptation numéroté » → escalade (relancer,
+abandonner).
+
+### 0.4 Les actions référencent des champs, et le chargement le vérifie
+
+```yaml
+distiller:
+  entrees: [story.criteres, story.enonce, conception]
+```
+
+Au chargement de la recette, chaque référence est confrontée aux champs que produisent les
+lecteurs déclarés : `story.critere` (faute de frappe) ou une entrée jamais déclarée sont refusés
+**avant le lancement**, avec le nom fautif.
+
+### 0.5 Des entrées propres à une recette d'utilisateur
+
+Un utilisateur qui écrit sa recette déclare ses propres entrées, avec les **types de base**
+(`texte`, `booleen`, `nombre`, `choix`, `liste`, `fichier`, `fichiers` par motif) et, pour un
+fichier, un format :
+
+```yaml
+entrees:
+  ticket:
+    type: fichier
+    format: json
+    schema:                          # JSON Schema déclaré dans la recette, validé par le code
+      type: object
+      required: [titre, tables]
+      properties:
+        titre: { type: string }
+        tables: { type: array, items: { type: string } }
+  base-cible:
+    type: choix
+    valeurs: [postgres, sqlserver]
+```
+
+Pour un format qui ne s'exprime pas en schéma, les deux mêmes sorties que pour les vérifications :
+un **script du projet** (lancé par le code, programmes autorisés, qui rend du JSON confronté au
+schéma déclaré), ou un **lecteur fourni par une extension**.
+
+---
+
 ## 1. Vocabulaire et règles
 
 | Terme | Définition | Qui décide |
@@ -43,10 +148,10 @@ Calculés et enregistrés par le code ; seule matière autorisée dans une condi
 | Fait | Valeurs | Établi par |
 |---|---|---|
 | `difficulte` | `simple`, `medium`, `medium-hard`, `challenging` | classement confirmé (§3.2) |
-| `granularite` | `tour-par-scenario`, `sessions-par-pas` | déduite de la difficulté (`levelEffects`) |
+| `granularite` | `tour-par-scenario`, `sessions-par-pas` | l'entrée `granularite` si fournie, sinon déduite de la difficulté (`levelEffects`) |
 | `lentilles` | sous-ensemble des 4 lentilles | déduit de la difficulté |
 | `essais-max` | 2 ou 3 | déduit de la difficulté |
-| `questions-ouvertes` | liste, répondues ou non | recherche, story |
+| `questions-ouvertes` | liste, répondues ou non | `story.questions-ouvertes`, puis la recherche |
 | `adr-proposes` | liste | porte de DESIGN |
 | `scenario.deja-vert` | oui / non | exécution des tests par le code |
 | `scenario.echecs` | nombre | réducteur |
@@ -77,10 +182,10 @@ du catalogue ; un effet manqué est un **rejet avec motifs**.
 ```yaml
 initialiser-story:                     # effects.ts « init »
   executant: code
-  entrees: [chemin-story]
+  entrees: [entrees.story]             # fichier lu par le lecteur story-markdown (§0.3)
   effets:
-    - story-valide: {}                 # parseStory : en-tête, critères numérotés
-    - branche-creee: { nom: "skraft/{slug}" }
+    - story-valide: {}                 # §0.3 : titre, critères numérotés
+    - branche-creee: { nom: "skraft/{story.slug}" }
     - dossiers-crees: [research, design, distill/features, reviews]
   sorties-faits: [slug, story, indicateurs-difficulte, questions-ouvertes]
 
@@ -155,15 +260,15 @@ contrat d'exécution du cœur en dernier dans le prompt (ADR 0024).
 ```yaml
 classer:                               # rôle skraft-classifier, classe de modèle light
   executant: agent:skraft-classifier
-  entrees: [story, indicateurs-difficulte, difficulte-proposee]
+  entrees: [story.enonce, story.criteres, indicateurs-difficulte, difficulte-proposee]
   sortie: submit_difficulty
   effets:
     - niveau-connu: {}                 # sinon relance du classifieur, budget compté
 
 rechercher:                            # skraft-researcher, standard
   executant: agent:skraft-researcher
-  entrees: [story, reponses-humaines, motifs-precedents]
-  contraintes: { ecriture: [".skraft/{slug}/**"], outils: [list_files, report_blocker] }
+  entrees: [story.enonce, story.criteres, story.questions-ouvertes, reponses-humaines, motifs-precedents]
+  contraintes: { ecriture: [".skraft/{story.slug}/**"], outils: [list_files, report_blocker] }
   sortie: report_phase
   effets:                              # porte « citations », researchGate
     - document: { chemin: "research/research.md", sections: [
@@ -177,16 +282,16 @@ rechercher:                            # skraft-researcher, standard
 
 modeliser:                             # skraft-architect-model, strong
   executant: agent:skraft-architect-model
-  entrees: [story, research.md, reponses-humaines, motifs-precedents]
-  contraintes: { ecriture: [".skraft/{slug}/**"], outils: [list_files, report_blocker] }
+  entrees: [story.enonce, story.criteres, research.md, reponses-humaines, motifs-precedents]
+  contraintes: { ecriture: [".skraft/{story.slug}/**"], outils: [list_files, report_blocker] }
   sortie: report_phase
   effets: []                           # jugés avec la décision, à la porte de DESIGN
 
 decider:                               # skraft-architect-decide, strong
   executant: agent:skraft-architect-decide
-  entrees: [story, event-model.md, domain-model.md, motifs-precedents]
+  entrees: [story.enonce, story.criteres, event-model.md, domain-model.md, motifs-precedents]
   contraintes:
-    ecriture: [".skraft/{slug}/**"]    # docs/adr : SEULEMENT par l'outil render_adr
+    ecriture: [".skraft/{story.slug}/**"]    # docs/adr : SEULEMENT par l'outil render_adr
     outils: [list_files, render_adr, report_blocker]
   sortie: report_phase
   effets:                              # porte « cohérence », checkDesign
@@ -200,14 +305,14 @@ decider:                               # skraft-architect-decide, strong
 
 distiller:                             # skraft-acceptance, standard
   executant: agent:skraft-acceptance
-  entrees: [story, conception, emplacement-des-tests-acceptance, motifs-precedents]
+  entrees: [story.criteres, story.enonce, conception, emplacement-des-tests-acceptance, motifs-precedents]
   contraintes:
-    ecriture: [".skraft/{slug}/**", "@stack:acceptanceTests", "@stack:sources"]
+    ecriture: [".skraft/{story.slug}/**", "@stack:acceptanceTests", "@stack:sources"]
     outils: [list_files, run_tests, report_blocker]
   sortie: report_phase
   effets:
     - gherkin-valide: {}               # porte « gherkin »
-    - valeurs-recopiees: {}            # porte « valeurs » : valeurs des critères mot pour mot
+    - valeurs-recopiees: { depuis: story.criteres.litteraux }   # porte « valeurs » : mot pour mot
     - document: { chemin: "distill/test-plan.md" }
     - rouge-d-acceptance: {}           # chaque critère : un test marqué ac-<n>, rouge pour une bonne raison,
                                        # sauf non-régression justifiée dans le plan de test
@@ -215,7 +320,7 @@ distiller:                             # skraft-acceptance, standard
 
 ecrire-test-rouge:                     # skraft-test, pas « test »
   executant: agent:skraft-test
-  entrees: [scenario, gherkin, test-acceptance, tests-deja-ecrits, motifs-precedents]
+  entrees: [scenario, story.criteres, gherkin, test-acceptance, tests-deja-ecrits, motifs-precedents]
   contraintes: { ecriture: ["@stack:unitTests"], outils: [list_files, run_tests, run_lint, report_blocker] }
   sortie: report_phase
   effets:                              # verifyUnitRed
@@ -326,7 +431,7 @@ livrer-story:
 preparer:
   methodes:
     - nom: confirmee-par-l-humain
-      si: "confirmation-demandee"
+      si: "entrees.confirmer-difficulte"
       sous-taches: [initialiser-story, proposer-difficulte, classer, confirmer-difficulte]
     - nom: automatique
       sous-taches: [initialiser-story, proposer-difficulte, classer]
@@ -541,7 +646,9 @@ la correction routée, les étapes humaines. Les portes deviennent ce qu'elles s
    budget ; c'est un choix à expliciter.
 3. **`nettoyer` échoue sans escalade** : seule action dont l'échec ramène au vert et laisse
    continuer. C'est une règle de méthode, pas d'action ; elle doit s'écrire comme telle.
-4. **Les conditions lisent des faits que le code calcule à des moments différents** (difficulté
+4. ~~La story n'était définie nulle part~~ — **réglé par §0** : entrées déclarées, lues par un
+   lecteur du catalogue, références vérifiées au chargement.
+5. **Les conditions lisent des faits que le code calcule à des moments différents** (difficulté
    en début de tâche, `scenario.deja-vert` à l'ouverture du scénario). L'orchestrateur doit
    garantir qu'un fait existe quand une condition le lit : à vérifier au chargement de la recette.
 
