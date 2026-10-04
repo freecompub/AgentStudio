@@ -1,0 +1,792 @@
+# skraft décrit comme une fonctionnalité téléversable (docs/08), au format agent-studio/fonctionnalite@1.
+#
+# PROPOSITION du 2026-10-04 : aucun code de production ne charge ce fichier. Il décrit ce que fait
+# l'extension skraft (extensions/skraft/src/) avec, pour seul code propre, les scripts de scripts/,
+# portés depuis ses portes et vérifiés à parité par extensions/skraft/test/fonctionnalite-generique.test.ts.
+#
+# Références : $entree (fournie par l'utilisateur), faits.x, reglages.x, contexte.x, parametres.x,
+# courant.x (élément d'une boucle), sorties.<id>.x (sortie d'une étape), sortie.x (dans les
+# contrôles d'une action). « {…} » interpole une référence dans une chaîne.
+# Tout ce qui n'est pas déclaré ici vient du catalogue de la plateforme (../catalogue.yaml).
+
+format: agent-studio/fonctionnalite@1
+nom: skraft
+version: 0.1.0
+description: "Mène une story de la recherche à la livraison : conception, scénarios d'acceptance, code en TDD, revues."
+licence: GPL-3.0-or-later
+commande: /skraft
+tache-racine: livrer-story
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+entrees:
+  story:
+    type: texte
+    obligatoire: true
+    lecteur: lire-story                  # ses sorties deviennent $story.id, $story.slug, $story.criteres…
+    source: [chat, fichier]
+    aide: "La user story : « # US-2 — Titre », l'énoncé, puis « ## Critères d'acceptation » numérotés."
+  confirmer-difficulte:
+    type: booleen
+    defaut: true
+    aide: "Faux avec --auto : le niveau du classifieur est retenu sans confirmation."
+  granularite:
+    type: choix
+    valeurs: [tour-par-scenario, sessions-par-pas]
+    obligatoire: false
+    aide: "Absente : déduite de la difficulté (D22)."
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+reglages:
+  grille:                                # difficulty.ts, DEFAULT_THRESHOLDS
+    challenging-modules: 3
+    challenging-questions: 2
+    hard-criteres: 5
+    hard-modules: 3
+    medium-criteres: 3
+    medium-modules: 2
+  niveaux: [simple, medium, medium-hard, challenging]
+  effets-du-niveau:                      # difficulty.ts, levelEffects
+    simple:      { recherche: false, granularite: tour-par-scenario, lentilles: [cold-reader, test-integrity], essais-max: 2 }
+    medium:      { recherche: false, granularite: tour-par-scenario, lentilles: [cold-reader, test-integrity, architecture, quality-gates], essais-max: 3 }
+    medium-hard: { recherche: true,  granularite: tour-par-scenario, lentilles: [cold-reader, test-integrity, architecture, quality-gates], essais-max: 3 }
+    challenging: { recherche: true,  granularite: sessions-par-pas,  lentilles: [cold-reader, test-integrity, architecture, quality-gates], essais-max: 3 }
+  lentilles-de-conception: [cold-reader, test-integrity, architecture]   # quality-gates n'a rien à mesurer en DESIGN (ADR 0028)
+  cycles-par-scenario: 20                # D24
+  relecteurs:
+    cold-reader: relire-cold-reader
+    test-integrity: relire-test-integrity
+    architecture: relire-architecture
+    quality-gates: relire-quality-gates
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+faits:
+  base-sha:              { type: texte, description: "Commit de départ de la story." }
+  indicateurs:           { type: objet, description: "Critères, modules touchés, intégration externe, questions ouvertes." }
+  difficulte-proposee:   { type: objet, description: "Niveau proposé par la grille ({ niveau })." }
+  difficulte-classee:    { type: objet, description: "Sortie du classifieur ({ level, justification })." }
+  difficulte:            { type: texte, description: "Niveau retenu." }
+  niveau:                { type: objet, description: "Effets du niveau retenu : recherche, granularite, lentilles, essais-max." }
+  questions:             { type: liste, description: "Questions ouvertes de la story, puis de la recherche." }
+  reponses:              { type: liste, description: "Réponses de l'humain aux questions ouvertes." }
+  recherche:             { type: objet, description: "Sortie du chercheur, avec celle de sa porte (controles.verifier-recherche)." }
+  adr-avant-conception:  { type: objet, description: "ADR présents au début de DESIGN ({ fichiers })." }
+  conception:            { type: objet, description: "Sortie de l'architecte, avec celle de sa porte (controles.verifier-conception)." }
+  rouge-acceptance:      { type: objet, description: "Sortie de la porte RED d'acceptance ({ non-regressions })." }
+  empreinte-acceptance:  { type: objet, description: "Empreinte des tests d'acceptance, gelés à la sortie de DISTILL." }
+  plan:                  { type: objet, description: "Scénarios de DELIVER ({ scenarios })." }
+  depart-du-scenario:    { type: objet, description: "Tests à l'ouverture du scénario en cours ({ verts, rouges })." }
+  checkpoint-de-scenario: { type: objet, description: "Point de retour du scénario en cours." }
+  noms-du-contrat:       { type: objet, description: "Noms du contrat présents dans le code au moment de la revue (ADR 0047)." }
+  revue:                 { type: objet, description: "Dernière revue : verdict, défauts actifs par cible." }
+  mutation:              { type: objet, description: "Dernière mesure de mutation : score, survivants." }
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+interpreteurs:
+  python:
+    linux: [python3]
+    macos: [python3]
+    windows: [py, "-3"]
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+# Sessions : toutes détruites à la fin de l'orchestration ; rembobiner oublie celles qui ont
+# travaillé depuis le checkpoint. « conservee » reprend skraft : une session par rôle, gardée
+# d'un essai à l'autre (ADR 0039).
+sessions:
+  classifieur:
+    agent: agents/skraft-classifier.agent.md
+    modele: light
+    memoire: conservee
+  chercheur:
+    agent: agents/skraft-researcher.agent.md
+    modele: standard
+    outils: [list_files]
+    ecriture: [".skraft/**"]
+    memoire: conservee
+  architecte-modele:
+    agent: agents/skraft-architect-model.agent.md
+    modele: strong
+    skills-injectes: [architecture-patterns]
+    skills-a-la-demande: [architecture-decisions]
+    outils: [list_files]
+    ecriture: [".skraft/**"]
+    memoire: conservee
+  architecte-decision:
+    agent: agents/skraft-architect-decide.agent.md
+    modele: strong
+    skills-injectes: [architecture-decisions, adr-eligibility-gate]
+    skills-a-la-demande: [architecture-patterns]
+    outils: [list_files]
+    ecriture: [".skraft/**", "docs/adr/supersessions.md"]
+    creation-seule: ["docs/adr/**"]          # remplace l'outil render_adr : les ADR existants restent intouchables
+    memoire: conservee
+  acceptance:
+    agent: agents/skraft-acceptance.agent.md
+    modele: standard
+    skills-injectes: [bdd-methodology, test-design-mandates]
+    skills-a-la-demande: [outside-in-tdd, craft-discipline]
+    outils: [list_files, run_tests]
+    ecriture: [".skraft/**", "@stack:acceptanceTests", "@stack:sources"]
+    memoire: conservee
+  testeur:
+    agent: agents/skraft-test.agent.md
+    modele: standard
+    skills-injectes: [test-design-mandates, "outside-in-tdd#RED"]
+    skills-a-la-demande: [test-refactoring-catalog, clean-architecture-testing]
+    outils: [list_files, run_tests, run_lint]
+    ecriture: ["@stack:unitTests"]
+    memoire: conservee
+  developpeur:
+    agent: agents/skraft-dev.agent.md
+    modele: standard
+    skills-injectes: [craft-discipline, "outside-in-tdd#SYNTHESIZE-GREEN"]
+    skills-a-la-demande: [clean-architecture-testing, test-refactoring-catalog]
+    outils: [list_files, run_tests, run_lint]
+    ecriture: ["@stack:sources"]
+    lecture-seule: ["@stack:acceptanceTests", "@stack:unitTests"]
+    memoire: conservee
+  lentille-cold-reader:
+    agent: agents/skraft-lens-cold-reader.agent.md
+    modele: standard
+    skills-a-la-demande: [adversarial-review-lenses, acceptance-review-criteria, architecture-review-criteria]
+    memoire: conservee
+  lentille-test-integrity:
+    agent: agents/skraft-lens-test-integrity.agent.md
+    modele: standard
+    skills-a-la-demande: [adversarial-review-lenses, acceptance-review-criteria, architecture-review-criteria]
+    memoire: conservee
+  lentille-architecture:
+    agent: agents/skraft-lens-architecture.agent.md
+    modele: standard
+    skills-a-la-demande: [adversarial-review-lenses, acceptance-review-criteria, architecture-review-criteria]
+    memoire: conservee
+  lentille-quality-gates:
+    agent: agents/skraft-lens-quality-gates.agent.md
+    modele: light
+    skills-a-la-demande: [adversarial-review-lenses, acceptance-review-criteria, architecture-review-criteria]
+    memoire: conservee
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+actions:
+
+  # ── Scripts : le code propre à skraft, porté depuis ses portes ──
+  lire-story:
+    type: script
+    description: "Lecteur de la story (story.ts, parseStory)."
+    interpreteur: python
+    fichier: scripts/lire_story.py
+    parametres: { texte: { type: texte, obligatoire: true } }
+    sorties:
+      type: object
+      required: [id, titre, slug, enonce, criteres, questions-ouvertes, brut]
+    acces: lecture
+    reseau: false
+    delai: 10s
+  mesurer-indicateurs:
+    type: script
+    interpreteur: python
+    fichier: scripts/mesurer_indicateurs.py
+    parametres: { story: { type: objet, obligatoire: true }, fichiers: { type: liste, obligatoire: true } }
+    sorties: { type: object, required: [criteres, modules-touches, integration-externe, questions-ouvertes] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  proposer-difficulte:
+    type: script
+    interpreteur: python
+    fichier: scripts/proposer_difficulte.py
+    parametres: { indicateurs: { type: objet, obligatoire: true }, grille: { type: objet, obligatoire: true } }
+    sorties: { type: object, required: [niveau] }
+    acces: lecture
+    reseau: false
+    delai: 10s
+  verifier-recherche:
+    type: script
+    description: "Porte « citations » (research.ts, checkResearch)."
+    interpreteur: python
+    fichier: scripts/verifier_recherche.py
+    parametres: { document: { type: texte, obligatoire: true }, questions-connues: { type: liste } }
+    sorties: { type: object, required: [questions-ouvertes] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  verifier-conception:
+    type: script
+    description: "Porte « cohérence » (design.ts, checkDesign)."
+    interpreteur: python
+    fichier: scripts/verifier_conception.py
+    parametres: { dossier: { type: texte, obligatoire: true }, adr-existants: { type: liste, obligatoire: true }, adr-modifies: { type: liste } }
+    sorties: { type: object, required: [adr-nouveaux] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  verifier-gherkin:
+    type: script
+    description: "Porte « gherkin » (gherkin.ts, checkGherkin)."
+    interpreteur: python
+    fichier: scripts/verifier_gherkin.py
+    parametres: { features: { type: liste, obligatoire: true } }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  verifier-valeurs:
+    type: script
+    description: "Porte « valeurs » (distill.ts, checkValues)."
+    interpreteur: python
+    fichier: scripts/verifier_valeurs.py
+    parametres:
+      criteres: { type: liste, obligatoire: true }
+      features: { type: liste, obligatoire: true }
+      tests-acceptance: { type: liste, obligatoire: true }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  verifier-rouge-acceptance:
+    type: script
+    description: "Porte « RED d'acceptance » (distill.ts, checkAcceptanceRed)."
+    interpreteur: python
+    fichier: scripts/verifier_rouge_acceptance.py
+    parametres: { plan-de-test: { type: texte, obligatoire: true }, resultats: { type: liste, obligatoire: true } }
+    sorties: { type: object, required: [non-regressions] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  planifier-scenarios:
+    type: script
+    description: "Plan de DELIVER (deliver.ts, planScenarios)."
+    interpreteur: python
+    fichier: scripts/planifier_scenarios.py
+    parametres:
+      plan: { type: texte, obligatoire: true }
+      resultats: { type: liste, obligatoire: true }
+      non-regressions: { type: liste }
+      tests-acceptance: { type: liste }
+    sorties: { type: object, required: [scenarios] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  contrat:
+    type: script
+    description: "Noms du contrat présents dans le code ; sans disparition si une référence est donnée (ADR 0047)."
+    interpreteur: python
+    fichier: scripts/contrat.py
+    parametres: { contrat: { type: texte, obligatoire: true }, sources: { type: liste, obligatoire: true }, reference: { type: liste } }
+    sorties: { type: object, required: [noms] }
+    acces: lecture
+    reseau: false
+    delai: 30s
+  appliquer-statuts-adr:
+    type: script
+    description: "Ratification : statut écrit dans chaque ADR, ou ko si un amendement est demandé."
+    interpreteur: python
+    fichier: scripts/appliquer_statuts_adr.py
+    parametres: { ratifications: { type: liste, obligatoire: true } }
+    sorties: { type: object, required: [modifies] }
+    acces: { ecriture: ["docs/adr/**"] }
+    reseau: false
+    delai: 10s
+  rapport-final:
+    type: script
+    interpreteur: python
+    fichier: scripts/rapport_final.py
+    parametres:
+      story: { type: texte, obligatoire: true }
+      branche: { type: texte, obligatoire: true }
+      difficulte: { type: texte, obligatoire: true }
+      confirmee: { type: booleen, obligatoire: true }
+      phases: { type: liste }
+      sautees: { type: liste }
+      adr: { type: liste }
+      revues-rejetees: { type: nombre }
+      reessais: { type: objet }
+    sorties: { type: object, required: [texte] }
+    acces: lecture
+    reseau: false
+    delai: 10s
+
+  # ── Agents ──
+  classer:
+    type: agent
+    session: classifieur
+    consigne: "Évalue la difficulté de la story {$story.id}. La grille propose « {faits.difficulte-proposee.niveau} » ; ajuste d'un cran au plus, avec ta justification."
+    entrees: [$story.enonce, $story.criteres, faits.indicateurs, faits.difficulte-proposee]
+    sortie: { outil: submit_difficulty }
+    controles:
+      - verification: au-plus-un-cran-de      # ÉCART 6 de docs/08 : non borné dans le code actuel
+        avec: { valeur: sortie.level, reference: faits.difficulte-proposee.niveau, echelle: reglages.niveaux }
+    essais: 2
+
+  rechercher:
+    type: agent
+    session: chercheur
+    consigne: "Recherche pour {$story.id} : écris .skraft/{$story.slug}/research/research.md selon le gabarit, en citant les fichiers du dépôt."
+    entrees: [$story.enonce, $story.criteres, faits.questions, faits.reponses]
+    sortie: { outil: report_phase }
+    controles:
+      - verification: verifier-recherche
+        avec: { document: ".skraft/{$story.slug}/research/research.md", questions-connues: faits.questions }
+
+  modeliser:
+    type: agent
+    session: architecte-modele
+    consigne: "Modélise {$story.id} : event-model.md et domain-model.md dans .skraft/{$story.slug}/design/."
+    entrees: [$story.enonce, $story.criteres, ".skraft/{$story.slug}/research/research.md", faits.reponses]
+    sortie: { outil: report_phase }
+    controles:                                 # ÉCART 1 de docs/08 : aucun contrôle propre aujourd'hui
+      - verification: fichier-present
+        avec: { chemin: ".skraft/{$story.slug}/design/domain-model.md" }
+
+  decider:
+    type: agent
+    session: architecte-decision
+    consigne: "Décide pour {$story.id} : contracts.md, diagrams.md, consistency-matrix.md dans .skraft/{$story.slug}/design/, et un ADR au statut Proposed par décision qui le mérite, dans docs/adr/."
+    entrees: [$story.enonce, $story.criteres, ".skraft/{$story.slug}/design/event-model.md", ".skraft/{$story.slug}/design/domain-model.md"]
+    sortie: { outil: report_phase }
+    controles:
+      - verification: verifier-conception
+        avec: { dossier: ".skraft/{$story.slug}/design", adr-existants: faits.adr-avant-conception.fichiers }
+
+  distiller:
+    type: agent
+    session: acceptance
+    consigne: "Distille {$story.id} : un scénario Gherkin tagué @ac-<n> par critère dans .skraft/{$story.slug}/distill/features/, un test d'acceptance nommé ac-<n> par critère, rouge pour une bonne raison, et le plan de test."
+    entrees: [$story.criteres, $story.enonce, ".skraft/{$story.slug}/design/", contexte.stack.acceptanceTests]
+    sortie: { outil: report_phase }
+    controles:
+      - verification: verifier-gherkin
+        avec: { features: [".skraft/{$story.slug}/distill/features/**/*.feature"] }
+      - verification: verifier-valeurs
+        avec: { criteres: $story.criteres, features: [".skraft/{$story.slug}/distill/features/**/*.feature"], tests-acceptance: contexte.stack.acceptanceTests }
+      - verification: fichier-present
+        avec: { chemin: ".skraft/{$story.slug}/distill/test-plan.md" }
+
+  ecrire-test-rouge:
+    type: agent
+    session: testeur
+    parametres: { scenario: { type: objet, obligatoire: true } }
+    consigne: "Scénario {parametres.scenario.id} : écris UN test unitaire pour le prochain petit comportement, vérifie avec run_tests qu'il échoue sur une assertion ou un symbole manquant. Si le test d'acceptance {parametres.scenario.test-acceptance} vérifie déjà ce comportement, n'écris rien et désigne-le dans coveredBy."
+    entrees: [parametres.scenario, $story.criteres]
+    sortie: { outil: report_phase }
+    controles:
+      - { verification: perimetre-respecte, avec: { motifs: contexte.stack.unitTests }, si: "not sortie.coveredBy" }
+      - { verification: un-seul-nouveau-test, si: "not sortie.coveredBy" }
+      - { verification: rouge-pour-bonne-raison, si: "not sortie.coveredBy" }
+      - { verification: aucun-fichier-modifie, si: "sortie.coveredBy" }        # ADR 0045
+      - { verification: est-le-test, avec: { propose: sortie.coveredBy, attendu: parametres.scenario.test-acceptance }, si: "sortie.coveredBy" }
+      - { verification: rouge-pour-bonne-raison, avec: { test: sortie.coveredBy }, si: "sortie.coveredBy" }
+      - { verification: rien-ne-regresse }
+
+  coder:
+    type: agent
+    session: developpeur
+    parametres: { test: { type: texte, obligatoire: true } }
+    consigne: "Fais passer le test « {parametres.test} » au vert avec le code minimal, vérifie avec run_tests, puis nettoie sans changer le comportement. Ne modifie aucun test."
+    entrees: [parametres.test]
+    sortie: { outil: report_phase }
+    controles: &controles-du-vert
+      - { verification: gel-intact, avec: { motifs: [contexte.stack.unitTests, contexte.stack.acceptanceTests] } }
+      - { verification: production-modifiee }
+      - { verification: tests-passent, avec: { sauf-en-attente: true } }
+      - { verification: tests-passent, avec: { tests: [parametres.test] } }
+
+  faire-passer-au-vert:
+    type: agent
+    session: developpeur
+    parametres: { test: { type: texte, obligatoire: true } }
+    consigne: "Fais passer le test « {parametres.test} » au vert avec le code minimal, vérifié avec run_tests. Ne modifie aucun test."
+    entrees: [parametres.test]
+    sortie: { outil: report_phase }
+    controles: *controles-du-vert
+
+  nettoyer:
+    type: agent
+    session: developpeur
+    consigne: "Nettoie le code de production sans changer son comportement ; la suite doit rester verte. Ne modifie aucun test."
+    sortie: { outil: report_phase }
+    controles:
+      - { verification: gel-intact, avec: { motifs: [contexte.stack.unitTests, contexte.stack.acceptanceTests] } }
+      - { verification: tests-passent, avec: { sauf-en-attente: true } }
+
+  corriger-tests:
+    type: agent
+    session: testeur
+    parametres: { defauts: { type: liste, obligatoire: true } }
+    consigne: "Correction de revue, côté tests : pour chaque défaut, ajoute le test demandé, ou conteste-le avec ta raison (responses). Ne modifie pas les tests existants."
+    entrees: [parametres.defauts]
+    sortie: { outil: report_phase }
+    controles:
+      - { verification: perimetre-respecte, avec: { motifs: contexte.stack.unitTests } }
+      - { verification: rien-ne-regresse, avec: { tests-disparus: true } }
+      - { verification: nouveaux-tests-verts-ou-rouges-pour-bonne-raison }
+
+  corriger-code:
+    type: agent
+    session: developpeur
+    parametres: { defauts: { type: liste, obligatoire: true }, cibles: { type: liste, obligatoire: true } }
+    consigne: "Corrige les défauts de revue dans le code de production, et fais passer au vert les tests cibles. Conteste un défaut avec ta raison, ou déclare-le outOfScope s'il n'est pas de ton ressort."
+    entrees: [parametres.defauts, parametres.cibles]
+    sortie: { outil: report_phase }
+    controles:
+      - { verification: gel-intact, avec: { motifs: [contexte.stack.unitTests, contexte.stack.acceptanceTests] } }
+      - { verification: production-modifiee }
+      - { verification: tests-passent }
+      - { verification: tests-passent, avec: { tests: parametres.cibles } }
+      - verification: contrat                 # ADR 0047 : aucun nom du contrat retiré
+        avec: { contrat: ".skraft/{$story.slug}/design/contracts.md", sources: contexte.stack.sources, reference: faits.noms-du-contrat.noms }
+
+  relire-cold-reader:
+    type: agent
+    session: lentille-cold-reader
+    parametres: { phase: { type: texte, obligatoire: true } }
+    consigne: "Revue de la phase {parametres.phase} : rends ton verdict et tes défauts, chacun avec sa cible (test, code ou livrable)."
+    entrees: [parametres.phase]
+    sortie: { outil: submit_lens_verdict }
+  relire-test-integrity:
+    type: agent
+    session: lentille-test-integrity
+    parametres: { phase: { type: texte, obligatoire: true } }
+    consigne: "Revue de la phase {parametres.phase} : rends ton verdict et tes défauts, chacun avec sa cible (test, code ou livrable)."
+    entrees: [parametres.phase]
+    sortie: { outil: submit_lens_verdict }
+  relire-architecture:
+    type: agent
+    session: lentille-architecture
+    parametres: { phase: { type: texte, obligatoire: true } }
+    consigne: "Revue de la phase {parametres.phase} : rends ton verdict et tes défauts, chacun avec sa cible (test, code ou livrable)."
+    entrees: [parametres.phase]
+    sortie: { outil: submit_lens_verdict }
+  relire-quality-gates:
+    type: agent
+    session: lentille-quality-gates
+    parametres: { phase: { type: texte, obligatoire: true } }
+    consigne: "Revue de la phase {parametres.phase} : rends ton verdict et tes défauts, chacun avec sa cible (test, code ou livrable)."
+    entrees: [parametres.phase]
+    sortie: { outil: submit_lens_verdict }
+
+  # ── Humains ──
+  confirmer-difficulte:
+    type: humaine
+    question: "Difficulté de {$story.id} : {faits.difficulte-classee.level} ?"
+    detail: "{faits.difficulte-classee.justification}"
+    options: reglages.niveaux
+    profils: [po, developpeur, architecte]
+  repondre-question-ouverte:
+    type: humaine
+    parametres: { question: { type: texte, obligatoire: true } }
+    question: "{parametres.question}"
+    options: [repondre, reporter]
+    profils: [po]
+  ratifier-adr:
+    type: humaine
+    parametres: { adr: { type: objet, obligatoire: true } }
+    question: "Ratifier {parametres.adr.id} ?"
+    detail: "{parametres.adr.path}"
+    options: [accepter, rejeter, demander-un-amendement]
+    profils: [architecte]
+  arbitrer-desaccord:
+    type: humaine
+    question: "Un agent conteste un défaut que la lentille maintient : qui a raison ?"
+    options: [donner-raison-a-l-agent, donner-raison-a-la-lentille]
+    profils: [developpeur, architecte, administrateur]
+
+# ════════════════════════════════════════════════════════════════════════════════════════════
+taches:
+
+  livrer-story:
+    methodes:
+      - etapes:
+          - { faire: preparer }
+          - { faire: rechercher-phase, si: "faits.niveau.recherche" }
+          - { faire: questions-ouvertes }
+          - { faire: concevoir-phase }
+          - { faire: distiller-phase }
+          - { faire: livrer-phase }
+          - faire: rapport-final
+            id: rapport
+            avec:
+              story: $story.id
+              branche: "skraft/{$story.slug}"
+              difficulte: faits.difficulte
+              confirmee: $confirmer-difficulte
+          - { faire: informer, avec: { message: sorties.rapport.texte } }
+
+  preparer:
+    methodes:
+      - etapes:
+          - { faire: initialiser-story }
+          - { faire: evaluer-difficulte }
+          - { faire: retenir, avec: { valeur: "reglages.effets-du-niveau[faits.difficulte]" }, retenir: niveau }
+          - { faire: retenir, avec: { valeur: $granularite }, retenir: niveau.granularite, si: "$granularite != null" }
+          - { faire: retenir, avec: { valeur: $story.questions-ouvertes }, retenir: questions }
+
+  initialiser-story:
+    description: "Aujourd'hui l'effet « init » (effects.ts) ; la story a déjà été lue et validée par son lecteur."
+    methodes:
+      - tout-ou-rien: true
+        etapes:
+          - { faire: noter-depart, retenir: base-sha }
+          - { faire: creer-branche, avec: { nom: "skraft/{$story.slug}" } }
+          - { faire: creer-dossier, avec: { chemin: ".skraft/{$story.slug}/research" } }
+          - { faire: creer-dossier, avec: { chemin: ".skraft/{$story.slug}/design" } }
+          - { faire: creer-dossier, avec: { chemin: ".skraft/{$story.slug}/distill/features" } }
+          - { faire: creer-dossier, avec: { chemin: ".skraft/{$story.slug}/reviews" } }
+          - { faire: enregistrer, avec: { chemin: ".skraft/{$story.slug}/story.md", contenu: $story.brut } }
+    sur-echec: { puis: escalade, options-escalade: [relancer, abandonner] }
+
+  evaluer-difficulte:
+    description: "Le code mesure et propose, le classifieur ajuste d'un cran au plus, l'humain confirme si demandé."
+    methodes:
+      - nom: confirmee-par-l-humain
+        si: "$confirmer-difficulte"
+        etapes:
+          - { faire: lister-fichiers, avec: { motifs: ["**"] }, id: depot }
+          - { faire: mesurer-indicateurs, avec: { story: $story, fichiers: sorties.depot.fichiers }, retenir: indicateurs }
+          - { faire: proposer-difficulte, avec: { indicateurs: faits.indicateurs, grille: reglages.grille }, retenir: difficulte-proposee }
+          - { faire: classer, retenir: difficulte-classee }
+          - { faire: confirmer-difficulte, id: confirmation }
+          - { faire: retenir, avec: { valeur: sorties.confirmation.choix }, retenir: difficulte }
+      - nom: automatique
+        etapes:
+          - { faire: lister-fichiers, avec: { motifs: ["**"] }, id: depot }
+          - { faire: mesurer-indicateurs, avec: { story: $story, fichiers: sorties.depot.fichiers }, retenir: indicateurs }
+          - { faire: proposer-difficulte, avec: { indicateurs: faits.indicateurs, grille: reglages.grille }, retenir: difficulte-proposee }
+          - { faire: classer, retenir: difficulte-classee }
+          - { faire: retenir, avec: { valeur: faits.difficulte-classee.level }, retenir: difficulte }
+    sur-echec: { puis: escalade, options-escalade: [relancer, abandonner] }
+
+  # ── Les phases : checkpoint, travail, revue éventuelle, commit. Un rejet relance la phase avec
+  #    ses motifs (même session, fichiers laissés, ADR 0040) ; à l'escalade, retour au checkpoint.
+  rechercher-phase:
+    methodes:
+      - etapes:
+          - { faire: poser-checkpoint, avec: { nom: RESEARCH } }
+          - { faire: rechercher-travail }
+          - { faire: retenir, avec: { valeur: faits.recherche.controles.verifier-recherche.questions-ouvertes }, retenir: questions }
+          - { faire: commiter, avec: { message: "skraft({$story.slug}): RESEARCH" } }
+
+  rechercher-travail:
+    methodes:
+      - etapes:
+          - { faire: rechercher, retenir: recherche }
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-de-renoncer, puis: escalade, options-escalade: [relancer, sauter, abandonner] }
+
+  questions-ouvertes:
+    methodes:
+      - nom: rien-a-demander
+        si: "faits.questions == []"
+        etapes: []
+      - nom: demander
+        etapes:
+          - faire: pour-chaque
+            avec: { liste: faits.questions, comme: question }
+            retenir: reponses
+            etapes:
+              - { faire: repondre-question-ouverte, avec: { question: courant.question } }
+
+  concevoir-phase:
+    methodes:
+      - etapes:
+          - { faire: poser-checkpoint, avec: { nom: DESIGN } }
+          - { faire: lister-fichiers, avec: { motifs: ["docs/adr/adr-*.md"] }, retenir: adr-avant-conception }
+          - { faire: concevoir-travail }
+          - { faire: commiter, avec: { message: "skraft({$story.slug}): DESIGN" } }
+
+  concevoir-travail:
+    description: "Un réessai reprend les deux architectes (ADR 0040 : fichiers laissés, mêmes sessions)."
+    methodes:
+      - etapes:
+          - { faire: modeliser }
+          - { faire: decider, retenir: conception }
+          - faire: revue
+            retenir: revue
+            avec: { phase: DESIGN, lentilles: reglages.lentilles-de-conception, relecteurs: reglages.relecteurs, arbitre: arbitrer-desaccord }
+          - { faire: ratification }
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-de-renoncer, puis: escalade, options-escalade: [relancer, sauter, abandonner] }
+
+  ratification:
+    methodes:
+      - nom: rien-a-ratifier
+        si: "faits.conception.controles.verifier-conception.adr-nouveaux == []"
+        etapes: []
+      - nom: ratifier
+        etapes:
+          - faire: pour-chaque
+            id: decisions
+            avec: { liste: faits.conception.controles.verifier-conception.adr-nouveaux, comme: adr }
+            etapes:
+              - { faire: ratifier-adr, avec: { adr: courant.adr } }
+          - { faire: appliquer-statuts-adr, avec: { ratifications: sorties.decisions.resultats } }
+
+  distiller-phase:
+    methodes:
+      - etapes:
+          - { faire: poser-checkpoint, avec: { nom: DISTILL } }
+          - { faire: distiller-travail }
+          - { faire: geler, avec: { motifs: [contexte.stack.acceptanceTests] }, retenir: empreinte-acceptance }
+          - { faire: commiter, avec: { message: "skraft({$story.slug}): DISTILL" } }
+
+  distiller-travail:
+    methodes:
+      - etapes:
+          - { faire: distiller }
+          - { faire: lancer-tests, id: suite }
+          - faire: verifier-rouge-acceptance
+            retenir: rouge-acceptance
+            avec: { plan-de-test: ".skraft/{$story.slug}/distill/test-plan.md", resultats: sorties.suite.resultats }
+          - faire: revue
+            retenir: revue
+            avec: { phase: DISTILL, lentilles: faits.niveau.lentilles, relecteurs: reglages.relecteurs, arbitre: arbitrer-desaccord }
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-de-renoncer, puis: escalade, options-escalade: [relancer, sauter, abandonner] }
+
+  livrer-phase:
+    methodes:
+      - etapes:
+          - { faire: poser-checkpoint, avec: { nom: DELIVER } }
+          - { faire: verifier, avec: { verification: gel-intact, avec: { empreinte: faits.empreinte-acceptance.empreinte } } }
+          - { faire: lancer-tests, id: base }
+          - faire: planifier-scenarios
+            retenir: plan
+            avec:
+              plan: ".skraft/{$story.slug}/distill/impl-plan.md"
+              resultats: sorties.base.resultats
+              non-regressions: faits.rouge-acceptance.non-regressions
+              tests-acceptance: contexte.stack.acceptanceTests
+          - faire: pour-chaque
+            avec: { liste: faits.plan.scenarios, comme: scenario }
+            etapes:
+              - { faire: implementer-scenario, avec: { scenario: courant.scenario } }
+          - { faire: mutation-de-fin-de-phase, si: "contexte.barre.mutation.moment == fin-de-phase" }
+          - { faire: contrat, avec: { contrat: ".skraft/{$story.slug}/design/contracts.md", sources: contexte.stack.sources }, retenir: noms-du-contrat }
+          - { faire: revue-de-livraison }
+          - { faire: commiter, avec: { message: "skraft({$story.slug}): DELIVER" } }
+    sur-echec: { puis: escalade, options-escalade: [relancer, sauter, abandonner] }
+
+  # ── Un scénario ──
+  implementer-scenario:
+    parametres: { scenario: { type: objet, obligatoire: true } }
+    methodes:
+      - nom: deja-fait                          # non-régression requalifiée en DISTILL
+        si: "parametres.scenario.statut == done"
+        etapes: []
+      - nom: ouvrir-puis-realiser
+        etapes:
+          - { faire: poser-checkpoint, avec: { nom: "scenario-{parametres.scenario.id}" }, retenir: checkpoint-de-scenario }
+          - { faire: lancer-tests, retenir: depart-du-scenario }
+          - { faire: realiser-scenario, avec: { scenario: parametres.scenario } }
+
+  realiser-scenario:
+    parametres: { scenario: { type: objet, obligatoire: true } }
+    methodes:
+      - nom: deja-vert
+        si: "parametres.scenario.test-acceptance in faits.depart-du-scenario.verts"
+        etapes:
+          - { faire: fin-de-scenario }
+      - nom: un-tour
+        si: "faits.niveau.granularite == tour-par-scenario"
+        etapes:
+          - faire: boucle
+            avec: { jusqu-a: "parametres.scenario.test-acceptance in sorties.apres-le-cycle.verts", plafond: reglages.cycles-par-scenario }
+            etapes:
+              - { faire: cycle-un-tour, avec: { scenario: parametres.scenario } }
+              - { faire: lancer-tests, id: apres-le-cycle }
+          - { faire: fin-de-scenario }
+      - nom: sessions-separees                  # aussi le repli d'un échec de « un-tour » (D22)
+        etapes:
+          - faire: boucle
+            avec: { jusqu-a: "parametres.scenario.test-acceptance in sorties.apres-les-pas.verts", plafond: reglages.cycles-par-scenario }
+            etapes:
+              - { faire: cycle-en-sessions, avec: { scenario: parametres.scenario } }
+              - { faire: lancer-tests, id: apres-les-pas }
+          - { faire: fin-de-scenario }
+    sur-echec: { rembobiner: avant-de-renoncer, puis: methode-suivante, options-escalade: [relancer, sauter, abandonner] }
+
+  cycle-un-tour:
+    parametres: { scenario: { type: objet, obligatoire: true } }
+    methodes:
+      - etapes:
+          - { faire: ecrire-test-rouge, avec: { scenario: parametres.scenario }, id: test }
+          - { faire: coder, avec: { test: sorties.test.controles.rouge-pour-bonne-raison.test } }
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-chaque-reessai, puis: echouer }
+
+  cycle-en-sessions:
+    parametres: { scenario: { type: objet, obligatoire: true } }
+    methodes:
+      - etapes:
+          - { faire: ecrire-test-rouge, avec: { scenario: parametres.scenario }, id: test }
+          - { faire: faire-passer-au-vert, avec: { test: sorties.test.controles.rouge-pour-bonne-raison.test } }
+          - faire: nettoyer
+            sur-echec: { reessais: 0, rembobiner: avant-de-renoncer, puis: continuer }   # SPEC-skraft §8.3 : retour au vert, sans escalade
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-chaque-reessai, puis: echouer }
+
+  fin-de-scenario:
+    description: "Porte de fin de scénario (deliver-effects.ts, scenarioGate)."
+    methodes:
+      - etapes:
+          - { faire: verifier, avec: { verification: gel-intact, avec: { empreinte: faits.empreinte-acceptance.empreinte } } }
+          - { faire: verifier, avec: { verification: tests-passent, avec: { sauf-en-attente: true } } }
+          - { faire: verifier, avec: { verification: sequence-rouge-puis-vert, avec: { depuis: faits.checkpoint-de-scenario.checkpoint } } }
+          - { faire: verifier, avec: { verification: seuils-atteints, avec: { mesure: couverture } } }
+          - { faire: verifier, avec: { verification: lint } }
+          - { faire: verifier, avec: { verification: dependances-respectees } }
+          - { faire: verifier, avec: { verification: seuils-atteints, avec: { mesure: mutation } }, si: "contexte.barre.mutation.moment == scenario" }
+
+  # ── Fin de livraison : mutation, revue, corrections ──
+  mutation-de-fin-de-phase:
+    description: "Un mutant survivant est un défaut adressé au testeur (ADR 0049)."
+    methodes:
+      - nom: seuils-atteints
+        etapes:
+          - { faire: mesurer-mutation, retenir: mutation }
+          - { faire: verifier, avec: { verification: seuils-atteints, avec: { mesure: mutation } } }
+      - nom: corriger-les-mutants
+        etapes:
+          - { faire: corriger-tests, avec: { defauts: faits.mutation.survivants }, id: tests-ajoutes }
+          - faire: corriger-code
+            si: "sorties.tests-ajoutes.controles.nouveaux-tests-verts-ou-rouges-pour-bonne-raison.rouges != []"
+            avec: { defauts: [], cibles: sorties.tests-ajoutes.controles.nouveaux-tests-verts-ou-rouges-pour-bonne-raison.rouges }
+          - { faire: mesurer-mutation, retenir: mutation }
+          - { faire: verifier, avec: { verification: seuils-atteints, avec: { mesure: mutation } } }
+    sur-echec: { reessais: faits.niveau.essais-max, puis: methode-suivante, options-escalade: [relancer, sauter, abandonner] }
+
+  revue-de-livraison:
+    methodes:
+      - nom: approuvee
+        etapes:
+          - faire: revue
+            retenir: revue
+            avec: { phase: DELIVER, lentilles: faits.niveau.lentilles, relecteurs: reglages.relecteurs, arbitre: arbitrer-desaccord }
+      - nom: apres-correction
+        etapes:
+          - { faire: corriger-revue }
+    sur-echec: { puis: methode-suivante, options-escalade: [relancer, sauter, abandonner] }
+
+  corriger-revue:
+    description: "Correction routée par cible (ADR 0046) : tests d'abord s'il y a des défauts sur les tests."
+    methodes:
+      - nom: tests-puis-code
+        si: "faits.revue.defauts-actifs.test != []"
+        etapes:
+          - { faire: corriger-tests, avec: { defauts: faits.revue.defauts-actifs.test }, id: tests-ajoutes }
+          - faire: corriger-code
+            si: "faits.revue.defauts-actifs.code != [] or sorties.tests-ajoutes.controles.nouveaux-tests-verts-ou-rouges-pour-bonne-raison.rouges != []"
+            avec: { defauts: faits.revue.defauts-actifs.code, cibles: sorties.tests-ajoutes.controles.nouveaux-tests-verts-ou-rouges-pour-bonne-raison.rouges }
+          - { faire: controles-de-livraison }
+          - faire: revue
+            retenir: revue
+            avec: { phase: DELIVER, lentilles: faits.niveau.lentilles, relecteurs: reglages.relecteurs, arbitre: arbitrer-desaccord }
+      - nom: code-seul
+        etapes:
+          - { faire: corriger-code, avec: { defauts: faits.revue.defauts-actifs.code, cibles: [] } }
+          - { faire: controles-de-livraison }
+          - faire: revue
+            retenir: revue
+            avec: { phase: DELIVER, lentilles: faits.niveau.lentilles, relecteurs: reglages.relecteurs, arbitre: arbitrer-desaccord }
+    sur-echec: { reessais: faits.niveau.essais-max, rembobiner: avant-de-renoncer, puis: escalade, options-escalade: [relancer, sauter, abandonner] }
+
+  controles-de-livraison:
+    methodes:
+      - etapes:
+          - { faire: verifier, avec: { verification: gel-intact, avec: { empreinte: faits.empreinte-acceptance.empreinte } } }
+          - { faire: verifier, avec: { verification: tests-passent } }
+          - { faire: verifier, avec: { verification: seuils-atteints, avec: { mesure: couverture } } }
+          - { faire: verifier, avec: { verification: lint } }
+          - { faire: verifier, avec: { verification: dependances-respectees } }

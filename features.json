@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-03",
-  "branch": "feat/suivi-run",
+  "updated": "2026-10-04",
+  "branch": "docs/skraft-planification-hierarchique",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -590,6 +590,13 @@
       "verify": "npx tsx scripts/mesure-skraft.ts <dépôt> <story> 1 --en-place",
       "passes": true,
       "notes": "Le banc clonait toujours vers un dossier temporaire, ce qui protège le dépôt mais laisse les livrables hors de vue : après chaque run il fallait aller les chercher dans `/private/var/folders/...`. `--en-place` renverse le choix, avec deux garde-fous puisque le pipeline commite, crée une branche et peut rembobiner : un arbre de travail SALE fait échouer le lancement, en nommant les fichiers concernés ; et le banc annonce en clair que le dépôt SERA modifié. Le rapport final dit lequel des deux modes a servi. Les deux branches sont vérifiées à la main (refus sur arbre sale, acceptation et annonce sur arbre propre) ; pas de test automatisé — `scripts/` n'a pas de suite, il est seulement typechecké depuis aujourd'hui."
+    },
+    {
+      "id": "skraft-fonctionnalite-generique",
+      "title": "skraft est décrit comme une fonctionnalité téléversable : recette normalisée, cohérente, scripts à parité avec le code",
+      "verify": "pnpm vitest run --project ext-skraft test/fonctionnalite-generique.test.ts",
+      "passes": true,
+      "notes": "PROPOSITION (docs/08) : `fonctionnalites/skraft/` (skraft.yaml, scripts Python, prompts et skills copiés), `fonctionnalites/fonctionnalite.schema.json` (propriétés fermées) et `fonctionnalites/catalogue.yaml` (ce que la plateforme devra fournir). AUCUN CODE DE PRODUCTION NE CHARGE CE FORMAT : le test prouve seulement que la recette respecte le schéma, que tout nom et toute référence existent, qu'aucune tâche n'est morte, et que les 11 scripts qui remplacent les portes de skraft rendent la même chose que les fonctions TypeScript (parité sur jeux d'essai ; un script cassé exprès fait échouer le test). La suite de parité est SAUTÉE sans Python 3. Le rapport final n'a pas de parité (identifiant aléatoire côté TS). Le départage de planScenarios (localeCompare) n'est qu'approché en Python."
     }
   ]
 }

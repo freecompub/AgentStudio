@@ -5,27 +5,43 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
-## 04/10 — skraft décrit en planification hiérarchique : la recette YAML et ses propriétaires
+## 04/10 — skraft en fonctionnalité téléversable : recette normalisée, scripts à parité
 
-**Fait.** Branche `docs/skraft-planification-hierarchique`, documentation seulement, aucun code.
-`docs/08-skraft-en-planification-hierarchique.md` refondu, et la recette complète écrite dans
-`docs/recettes/skraft.recette.yaml` (YAML valide, clés uniques ; **aucun code ne la charge**).
-Trois niveaux : actions atomiques, actions d'agent ou humaines, tâches et méthodes. Chaque
-élément a un propriétaire de sa définition, que le préfixe du nom désigne : plateforme (sans
-préfixe, catalogue), extension (`skraft.`), projet (`projet.`, scripts), recette (déclaré dans le
-fichier). Une action d'agent a quatre contributeurs : recette, extension (prompt), utilisateur
-(modèle), plateforme (outils terminaux, contrat, interdits). `$` est réservé aux entrées de
-l'utilisateur ; `initialiser-story` devient une tâche d'actions atomiques, `evaluer-difficulte`
-une tâche à part (mesure, grille, classifieur borné, confirmation).
+**Le but, précisé par le responsable du projet en cours de journée** : un utilisateur crée une
+fonctionnalité en **téléversant un dossier** dont un YAML décrit tout (entrées, sessions, actions,
+contrôles, tâches et méthodes), sans TypeScript. J'avais d'abord compris « extensions importées par
+le YAML » : ce n'est pas ça. Branche `docs/skraft-planification-hierarchique`, aucun code de
+production.
 
-**Écarts trouvés, à trancher (docs/08 §8)** : le classifieur n'est pas borné à un cran en code
-(`isDifficulty` seul ; `shift` ne sert qu'aux options humaines, `--auto` applique le niveau tel
-quel) ; la grille `DEFAULT_THRESHOLDS` n'est pas réglable ; la story ne vient que d'un fichier.
+**Fait.** `fonctionnalites/` : `fonctionnalite.schema.json` (propriétés fermées partout, demandé
+explicitement), `catalogue.yaml` (opérations, primitives, vérifications, outils de la plateforme,
+avec leurs paramètres), `skraft/skraft.yaml` (skraft complet), `skraft/scripts/*.py` (douze
+scripts : le code propre à skraft porté depuis ses portes), prompts et skills copiés.
+`docs/08` réécrit. Test `extensions/skraft/test/fonctionnalite-generique.test.ts` : schéma,
+cohérence (tout nom et toute référence existent, rien d'inutilisé), **parité** de onze scripts avec
+les fonctions TypeScript, et copies identiques. Un script cassé exprès fait échouer la parité
+(vérifié). `ajv` et `yaml` ajoutés en dépendances de développement d'ext-skraft.
 
-**Piège évité** : `mesurer-indicateurs` et `proposer-difficulte` ne sont pas des actions de la
-plateforme (je les y avais rangées à l'oral) : ce sont des calculs propres à skraft.
+**Décisions du jour** (à inscrire en ADR) : les sessions sont déclarées dans la fonctionnalité,
+`memoire: neuve | conservee`, **toutes détruites à la fin de l'orchestration** (précise D17 après
+l'ADR 0039) ; sortie d'agent toujours normalisée ; `creation-seule` remplace `render_adr`.
 
-**Suite** : faire valider le découpage et les propriétaires, puis ADR de l'orchestrateur générique.
+**Pièges.**
+- Moteurs d'expressions régulières : `\w`, `\d`, `\b` sont ASCII en JS, Unicode en Python — tout
+  est réécrit en classes explicites. `split` JS ne coupe pas sur une correspondance vide en 0.
+  `localeCompare` n'est qu'approché (départage de `planScenarios`).
+- **Ma recette avait deux défauts de séquence**, vus en l'écrivant au propre : le diff de
+  conception relevé *avant* le tour de l'architecte, et un réessai de phase qui reposait le
+  checkpoint (les ADR du premier essai devenaient « existants »). Une phase ouvre donc une fois,
+  puis appelle une tâche « travail » seule réessayée. Le test de cohérence ne voit PAS ce genre de
+  faute : seule une exécution le prouvera.
+- J'ai utilisé une fusion YAML `<<` après l'avoir exclue du format ; retirée.
+
+**Écarts recette / code, à trancher** (docs/08 §7) : classifieur non borné, grille non réglable,
+story du chat, amendement qui relance aussi `modeliser`, budget partagé, `render_adr` retiré.
+
+**Suite** : ADR (format, sessions) ; puis un chargeur dans le cœur et l'exécution de
+`rechercher-phase` depuis `skraft.yaml`.
 
 ---
 

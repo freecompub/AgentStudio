@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-studio/fonctionnalite@1",
+  "title": "Fonctionnalité agent-studio, format 1",
+  "description": "Une fonctionnalité téléversée par l'utilisateur : entrées, sessions, actions, tâches. Chaque sorte d'élément a une liste fermée de propriétés (docs/08). PROPOSITION : aucun code de production ne charge encore ce format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "nom", "version", "description", "taches", "tache-racine"],
+  "properties": {
+    "format": { "const": "agent-studio/fonctionnalite@1" },
+    "nom": { "$ref": "#/$defs/nom" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "licence": { "type": "string" },
+    "commande": { "type": "string", "pattern": "^/[a-z][a-z0-9-]*$" },
+    "entrees": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom" }, "additionalProperties": { "$ref": "#/$defs/entree" } },
+    "reglages": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom" } },
+    "faits": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom-pointe" }, "additionalProperties": { "$ref": "#/$defs/fait" } },
+    "interpreteurs": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom" }, "additionalProperties": { "$ref": "#/$defs/interpreteur" } },
+    "sessions": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom" }, "additionalProperties": { "$ref": "#/$defs/session" } },
+    "actions": { "type": "object", "propertyNames": { "$ref": "#/$defs/nom" }, "additionalProperties": { "$ref": "#/$defs/action" } },
+    "taches": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/nom" }, "additionalProperties": { "$ref": "#/$defs/tache" } },
+    "tache-racine": { "$ref": "#/$defs/nom" }
+  },
+  "$defs": {
+    "nom": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "nom-pointe": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$" },
+    "motif-de-fichier": { "type": "string", "minLength": 1 },
+    "condition": {
+      "description": "Grammaire fermée : comparaisons (== != < > <= >=), in, and, or, not, parenthèses, littéraux et références ($entree, faits., reglages., sorties., sortie., contexte., courant., parametres.). « sortie. » désigne la sortie de l'action en cours (dans ses contrôles). Aucun appel de fonction.",
+      "type": "string",
+      "minLength": 1
+    },
+    "duree": { "type": "string", "pattern": "^[0-9]+(s|min)$" },
+
+    "entree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["texte", "booleen", "nombre", "choix", "liste", "fichier", "fichiers"] },
+        "obligatoire": { "type": "boolean" },
+        "defaut": {},
+        "valeurs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "lecteur": { "$ref": "#/$defs/nom", "description": "Action de type script qui valide l'entrée et la découpe en champs ; ses sorties deviennent les champs de l'entrée." },
+        "schema": { "type": "object" },
+        "source": { "type": "array", "items": { "enum": ["chat", "fichier", "formulaire"] }, "minItems": 1, "uniqueItems": true },
+        "aide": { "type": "string" }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "choix" } } }, "then": { "required": ["valeurs"] } },
+        { "not": { "required": ["lecteur", "schema"] } }
+      ]
+    },
+
+    "fait": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "description"],
+      "properties": {
+        "type": { "enum": ["texte", "booleen", "nombre", "liste", "objet"] },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "interpreteur": {
+      "description": "Programme qui lance un script, par système. Il doit figurer dans la liste des programmes autorisés de l'administrateur.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["linux", "macos", "windows"],
+      "properties": {
+        "linux": { "$ref": "#/$defs/commande" },
+        "macos": { "$ref": "#/$defs/commande" },
+        "windows": { "$ref": "#/$defs/commande" }
+      }
+    },
+    "commande": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "modele", "memoire"],
+      "properties": {
+        "agent": { "type": "string", "pattern": "\\.agent\\.md$", "description": "Fichier de l'agent, relatif au dossier de la fonctionnalité." },
+        "modele": { "enum": ["strong", "standard", "light"] },
+        "skills-injectes": { "type": "array", "items": { "$ref": "#/$defs/skill" }, "uniqueItems": true },
+        "skills-a-la-demande": { "type": "array", "items": { "$ref": "#/$defs/skill" }, "uniqueItems": true },
+        "outils": { "type": "array", "items": { "$ref": "#/$defs/nom-d-outil" }, "uniqueItems": true },
+        "ecriture": { "type": "array", "items": { "$ref": "#/$defs/motif-de-fichier" } },
+        "creation-seule": { "type": "array", "items": { "$ref": "#/$defs/motif-de-fichier" }, "description": "Créer un fichier, ou modifier un fichier créé par cette orchestration ; jamais modifier ni supprimer un fichier existant." },
+        "lecture-seule": { "type": "array", "items": { "$ref": "#/$defs/motif-de-fichier" } },
+        "memoire": { "enum": ["neuve", "conservee"], "description": "neuve : aucune mémoire d'un appel à l'autre. conservee : jusqu'à un « reinitialiser » ou la fin de l'orchestration. Toutes les sessions sont détruites à la fin de l'orchestration." }
+      }
+    },
+    "skill": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(#.+)?$" },
+    "nom-d-outil": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "enum": ["agent", "humaine", "script"] } },
+      "oneOf": [
+        { "$ref": "#/$defs/action-agent" },
+        { "$ref": "#/$defs/action-humaine" },
+        { "$ref": "#/$defs/action-script" }
+      ]
+    },
+    "action-agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "session", "consigne", "sortie"],
+      "properties": {
+        "type": { "const": "agent" },
+        "description": { "type": "string" },
+        "session": { "$ref": "#/$defs/nom" },
+        "parametres": { "$ref": "#/$defs/parametres" },
+        "consigne": { "type": "string", "minLength": 1 },
+        "entrees": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Ce que le code met dans le dossier de passation : références ou chemins. Jamais une transcription." },
+        "sortie": { "$ref": "#/$defs/sortie" },
+        "controles": { "type": "array", "items": { "$ref": "#/$defs/controle" } },
+        "essais": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "string" }] },
+        "delai": { "$ref": "#/$defs/duree" }
+      }
+    },
+    "action-humaine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "question", "options", "profils"],
+      "properties": {
+        "type": { "const": "humaine" },
+        "description": { "type": "string" },
+        "parametres": { "$ref": "#/$defs/parametres" },
+        "question": { "type": "string", "minLength": 1 },
+        "detail": { "type": "string" },
+        "options": { "oneOf": [{ "type": "array", "items": { "type": "string" }, "minItems": 1 }, { "type": "string" }] },
+        "profils": { "type": "array", "items": { "enum": ["po", "developpeur", "architecte", "administrateur"] }, "minItems": 1, "uniqueItems": true }
+      }
+    },
+    "action-script": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "interpreteur", "fichier", "acces"],
+      "description": "Paramètres en JSON sur l'entrée standard, résultat en JSON sur la sortie standard ({motifs, sorties}). Code de retour 0 = ok, 1 = ko, autre = erreur d'environnement. Aucun shell. Répertoire courant : la racine du dépôt.",
+      "properties": {
+        "type": { "const": "script" },
+        "description": { "type": "string" },
+        "interpreteur": { "$ref": "#/$defs/nom" },
+        "fichier": { "type": "string", "pattern": "^[^/\\\\][^\\\\]*$", "description": "Relatif au dossier de la fonctionnalité, sans « .. »." },
+        "parametres": { "$ref": "#/$defs/parametres" },
+        "sorties": { "type": "object", "description": "JSON Schema des sorties ; les références sorties.<id>.<champ> sont vérifiées contre lui." },
+        "acces": {
+          "oneOf": [
+            { "const": "lecture" },
+            { "type": "object", "additionalProperties": false, "required": ["ecriture"], "properties": { "ecriture": { "type": "array", "items": { "$ref": "#/$defs/motif-de-fichier" }, "minItems": 1 } } }
+          ]
+        },
+        "reseau": { "type": "boolean" },
+        "delai": { "$ref": "#/$defs/duree" }
+      }
+    },
+    "parametres": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nom" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["texte", "booleen", "nombre", "liste", "objet"] },
+          "obligatoire": { "type": "boolean" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "sortie": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["outil"] }, { "required": ["schema"] }],
+      "properties": {
+        "outil": { "enum": ["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"] },
+        "schema": { "type": "object" }
+      }
+    },
+    "controle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verification"],
+      "properties": {
+        "verification": { "$ref": "#/$defs/nom", "description": "Vérification du catalogue, ou action de type script de la fonctionnalité." },
+        "avec": { "type": "object" },
+        "si": { "$ref": "#/$defs/condition" }
+      }
+    },
+
+    "tache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["methodes"],
+      "properties": {
+        "description": { "type": "string" },
+        "parametres": { "$ref": "#/$defs/parametres" },
+        "methodes": { "type": "array", "items": { "$ref": "#/$defs/methode" }, "minItems": 1 },
+        "sur-echec": { "$ref": "#/$defs/politique-d-echec" }
+      }
+    },
+    "methode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["etapes"],
+      "properties": {
+        "nom": { "$ref": "#/$defs/nom" },
+        "si": { "$ref": "#/$defs/condition" },
+        "tout-ou-rien": { "type": "boolean" },
+        "etapes": { "type": "array", "items": { "$ref": "#/$defs/etape" } }
+      }
+    },
+    "etape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["faire"],
+      "properties": {
+        "faire": { "$ref": "#/$defs/nom", "description": "Action de la fonctionnalité, tâche, opération ou primitive du catalogue." },
+        "avec": { "type": "object" },
+        "si": { "$ref": "#/$defs/condition" },
+        "id": { "$ref": "#/$defs/nom" },
+        "retenir": { "$ref": "#/$defs/nom-pointe", "description": "Fait qui reçoit la sortie (ou, pour l'opération « retenir », la valeur)." },
+        "etapes": { "type": "array", "items": { "$ref": "#/$defs/etape" }, "description": "Seulement pour une primitive : boucle, pour-chaque, en-parallele." },
+        "sur-echec": { "$ref": "#/$defs/politique-d-echec" }
+      }
+    },
+    "politique-d-echec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["puis"],
+      "properties": {
+        "reessais": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "string" }] },
+        "rembobiner": { "enum": ["jamais", "avant-chaque-reessai", "avant-de-renoncer"], "description": "Retour au checkpoint posé avant l'étape ou la tâche, avec oubli des sessions qui y ont travaillé (ADR 0050). Défaut : jamais (un réessai repart des fichiers laissés, ADR 0040)." },
+        "puis": { "enum": ["methode-suivante", "escalade", "continuer", "echouer"], "description": "Une fois les réessais épuisés. methode-suivante : essayer la méthode suivante de la tâche, puis escalader s'il n'y en a plus. echouer : l'échec remonte à la tâche appelante." },
+        "options-escalade": { "type": "array", "items": { "enum": ["relancer", "sauter", "abandonner"] }, "minItems": 1, "uniqueItems": true }
+      }
+    }
+  }
+}
