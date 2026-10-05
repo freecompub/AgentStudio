@@ -24,6 +24,10 @@ S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`fea
 les blocages de J1 (jeton Copilot, Electron injouable) sont levés depuis le 2026-09-24
 (`docs/jalons/J1-blocages.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
+Orchestration : passage décidé à des **workflows rejouables** (script ordinaire, appels journalisés,
+reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`), **pas encore
+implémenté** — skraft et tdd tournent toujours sur leur réducteur. L'approche YAML de `docs/08` est
+abandonnée.
 
 ```bash
 pnpm install

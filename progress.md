@@ -5,7 +5,55 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/10 — YAML abandonné ; l'orchestration s'écrira comme un script rejouable (documentation seule)
+
+**Décision du responsable du projet**, après discussion : on arrête l'approche YAML de la veille et
+on documente l'approche « workflow rejouable », inspirée des workflows de Claude Code. **Aucun code
+de production** : on écrit d'abord toute la doc. Branche `docs/skraft-planification-hierarchique`
+(son nom date de l'approche abandonnée).
+
+**Fait.**
+- Retiré : `fonctionnalites/` (schéma, catalogue, recette, scripts Python, copies des agents et
+  skills), `extensions/skraft/test/fonctionnalite-generique.test.ts`, les dépendances `ajv` et
+  `yaml` d'ext-skraft, la ligne `__pycache__/` du `.gitignore`. `package.json`, `.gitignore` et
+  `pnpm-lock.yaml` sont revenus à l'identique de `main`. Tout reste lisible au commit `df4eed3`.
+- `docs/08` réduit à une note d'abandon : ce qui était proposé, les cinq raisons, ce qu'on garde.
+- `docs/09-workflows-rejouables.md` : le document de référence de la nouvelle approche.
+- ADR 0052 (orchestration par script rejouable, **lecture retenue de D16**) et ADR 0053 (mémoire
+  déclarée par agent ; crash, redémarrage ou fermeture = toutes les sessions supprimées ; précise
+  D17).
+- `features.json` : critère YAML retiré ; trois critères à `false` pour les étapes 2 à 4 du plan.
+
+**Pourquoi le YAML est abandonné** (détail dans `docs/08`) : langage déguisé sans outils, deux
+comportements de skraft inexprimables (ADR 0042, arbitrage hors budget), fautes de séquence
+invisibles au test, portes dupliquées en Python, et personne pour l'écrire. La vraie cause du coût
+de skraft est la **forme réducteur** (≈ 820 lignes de machine à états, une quarantaine de champs
+« où j'en suis »), pas le TypeScript.
+
+**Décisions prises en discutant, à ne pas rediscuter :**
+- le déclaratif (agents, skills, outils, mémoire, entrées, phases, questions et profils) reste
+  dans le **manifeste**, pas dans un `meta` en tête du script : un seul endroit vérifié et signé ;
+- le script ne choisit **jamais** les skills ni les outils d'un agent ; il peut seulement
+  restreindre un tour. Une autre combinaison = un agent de plus dans le manifeste ;
+- **pas de nouveau moteur** : `createWorkflowTask(script)` implémente le `TaskDefinition` actuel ;
+- la fermeture normale de l'application est traitée comme un crash pour les sessions.
+
+**Trouvé en lisant le cœur** (vrai défaut, indépendant des workflows) : après un crash, les sessions
+Copilot restent orphelines sur le disque, car le lien rôle → session ne vit que dans la `Map`
+`reprenables` de `task-agent-runner.ts`. Étape 2 du plan.
+
+**Piège.** Les écarts entre la recette YAML et le code (`docs/09` §13, quinze lignes) ne sont **pas**
+des décisions : tant qu'un écart n'est pas tranché, le workflow doit reproduire le code actuel.
+
+**Suite** (`docs/09` §14) : étape 2, sessions orphelines, sur une branche `fix/` ; puis étape 3,
+`packages/workflow` en TDD ; puis RESEARCH de skraft en workflow, avec `e2e-s2` et
+`research-gate` inchangés comme critère.
+
+---
+
 ## 04/10 — skraft en fonctionnalité téléversable : recette normalisée, scripts à parité
+
+> **Abandonné le 05/10** (voir ci-dessus et `docs/08`). `fonctionnalites/` n'existe plus.
 
 **Le but, précisé par le responsable du projet en cours de journée** : un utilisateur crée une
 fonctionnalité en **téléversant un dossier** dont un YAML décrit tout (entrées, sessions, actions,

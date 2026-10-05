@@ -1,6 +1,6 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-04",
+  "updated": "2026-10-05",
   "branch": "docs/skraft-planification-hierarchique",
   "items": [
     {
@@ -592,11 +592,25 @@
       "notes": "Le banc clonait toujours vers un dossier temporaire, ce qui protège le dépôt mais laisse les livrables hors de vue : après chaque run il fallait aller les chercher dans `/private/var/folders/...`. `--en-place` renverse le choix, avec deux garde-fous puisque le pipeline commite, crée une branche et peut rembobiner : un arbre de travail SALE fait échouer le lancement, en nommant les fichiers concernés ; et le banc annonce en clair que le dépôt SERA modifié. Le rapport final dit lequel des deux modes a servi. Les deux branches sont vérifiées à la main (refus sur arbre sale, acceptation et annonce sur arbre propre) ; pas de test automatisé — `scripts/` n'a pas de suite, il est seulement typechecké depuis aujourd'hui."
     },
     {
-      "id": "skraft-fonctionnalite-generique",
-      "title": "skraft est décrit comme une fonctionnalité téléversable : recette normalisée, cohérente, scripts à parité avec le code",
-      "verify": "pnpm vitest run --project ext-skraft test/fonctionnalite-generique.test.ts",
-      "passes": true,
-      "notes": "PROPOSITION (docs/08) : `fonctionnalites/skraft/` (skraft.yaml, scripts Python, prompts et skills copiés), `fonctionnalites/fonctionnalite.schema.json` (propriétés fermées) et `fonctionnalites/catalogue.yaml` (ce que la plateforme devra fournir). AUCUN CODE DE PRODUCTION NE CHARGE CE FORMAT : le test prouve seulement que la recette respecte le schéma, que tout nom et toute référence existent, qu'aucune tâche n'est morte, et que les 11 scripts qui remplacent les portes de skraft rendent la même chose que les fonctions TypeScript (parité sur jeux d'essai ; un script cassé exprès fait échouer le test). La suite de parité est SAUTÉE sans Python 3. Le rapport final n'a pas de parité (identifiant aléatoire côté TS). Le départage de planScenarios (localeCompare) n'est qu'approché en Python."
+      "id": "sessions-orphelines-au-redemarrage",
+      "title": "Après un crash, un redémarrage ou une fermeture, aucune session d’agent ne reste sur le disque (ADR 0053)",
+      "verify": "pnpm vitest run --project core -t \"sessions supprimées au redémarrage\"",
+      "passes": false,
+      "notes": "À FAIRE (docs/09 §14, étape 2), indépendant des workflows. Aujourd’hui le lien rôle → session ne vit que dans la Map `reprenables` de task-agent-runner.ts : après un crash, les sessions côté Copilot CLI restent orphelines. Il faut persister les identifiants avec la tâche et appeler deleteSession au redémarrage et à la fermeture."
+    },
+    {
+      "id": "workflow-rejouable",
+      "title": "Un workflow écrit comme un script est rejoué contre son journal : même effet suivant, reprise au bon endroit, non-déterminisme et script modifié refusés (ADR 0052)",
+      "verify": "pnpm vitest run --project workflow",
+      "passes": false,
+      "notes": "À FAIRE (docs/09 §14, étape 3). Paquet `packages/workflow` à créer : createWorkflowTask(script) sur le TaskDefinition existant, w de rejeu, magasin de contenus, w.phase, essayer, memoire déclarée par agent. Le projet Vitest `workflow` n’existe pas encore : ce verify échouera tant qu’il n’est pas créé."
+    },
+    {
+      "id": "skraft-research-en-workflow",
+      "title": "La phase RESEARCH de skraft tourne en workflow et ses tests de bout en bout passent sans modification",
+      "verify": "pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
+      "passes": false,
+      "notes": "À FAIRE (docs/09 §14, étape 4). Le verify passe AUJOURD’HUI avec le réducteur : ne passer ce critère à true que lorsque RESEARCH est exécutée par le workflow, sans toucher à ces tests. Critère d’arrêt : si le script n’est pas nettement plus simple que la partie de reducer.ts remplacée, on s’arrête."
     }
   ]
 }
