@@ -19,8 +19,6 @@
     "@agent-studio/extension-packaging": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
-    "ajv": "^8.20.0",
-    "esbuild": "^0.28.2",
-    "yaml": "^2.9.1"
+    "esbuild": "^0.28.2"
   }
 }
