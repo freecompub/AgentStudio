@@ -1,4 +1,5 @@
 import type { ExtensionModule } from "@agent-studio/extension-api";
+import { renderAdrTool } from "./render-adr-tool.js";
 import { skraftWorkflowTask } from "./workflow.js";
 
 const USAGE = "Utilisation : `/skraft-workflow <chemin de la story>`, par exemple `/skraft-workflow stories/us-12.md`. Ajoutez `--auto` pour confirmer la difficulté automatiquement.";
@@ -15,12 +16,13 @@ export function parseArgs(args: string): { storyPath: string; confirmDifficulty:
 
 export const skraftWorkflowExtension: ExtensionModule = {
   activate(ctx) {
+    ctx.tools.register(renderAdrTool(ctx));
     ctx.tasks.register(skraftWorkflowTask);
     ctx.chat.registerCommand("skraft-workflow", async (args) => {
       const input = parseArgs(args);
       if (!input) return ctx.chat.post(USAGE);
       await ctx.tasks.start("skraft-workflow", input);
-      ctx.chat.post(`Workflow skraft lancé pour **${input.storyPath}** (préparation, difficulté, RESEARCH).`);
+      ctx.chat.post(`Workflow skraft lancé pour **${input.storyPath}** (préparation, difficulté, RESEARCH, DESIGN).`);
     });
   },
 };

@@ -42,7 +42,13 @@ describe.each([
       );
       await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
     };
-    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-researcher": researcher });
+    let designBrief = "";
+    const model: ScriptedBehavior = async (t) => {
+      designBrief = t.prompt;
+      await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-researcher": researcher, "skraft-architect-model": model });
     const app = await assemble(root, runtime, tasksDir, { isolated });
     await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
     await until(async () => (await app.engine.list()).length > 0);
@@ -77,9 +83,12 @@ describe.each([
     await app.interactions.respond(questions[0]!.id, option(questions[0]!, "answer"), "par prise", { role: "po" });
     await app.interactions.respond(questions[1]!.id, option(questions[1]!, "defer"), undefined, { role: "po" });
 
-    // Fin : le dossier de passation de DESIGN contient les réponses.
-    await until(async () => (await app.engine.status(id))?.status === "finished");
-    const dossier = app.posted.find((m) => m.includes("prête pour DESIGN"))!;
+    // DESIGN reçoit les réponses dans son dossier de passation ; à la fin, le dossier de DISTILL aussi.
+    await until(async () => designBrief !== "");
+    expect(designBrief).toContain("Réponses de l'utilisateur :");
+    expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
+    await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+    const dossier = app.posted.find((m) => m.includes("prête pour DISTILL"))!;
     expect(dossier).toContain("Réponses de l'utilisateur :");
     expect(dossier).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(dossier).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");

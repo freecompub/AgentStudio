@@ -550,6 +550,11 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
 5. **DESIGN, puis DISTILL, puis DELIVER**, chacun avec ses tests de bout en bout inchangés et les
    écarts du §13 qui le concernent tranchés. `reducer.ts` et `deliver-machine.ts` ne sont supprimés
    qu'à la fin.
+   *DESIGN fait le 2026-10-08* dans `extensions/skraft-workflow` (`src/conception.ts`, 172 lignes
+   de code) : jumeau de `e2e-s3` et test du dialogue de revue jusqu'à l'arbitrage humain. Les
+   écarts 1, 2, 3, 8 et 9 ne sont **pas tranchés** : le comportement du réducteur est reproduit.
+   Le moteur a gagné trois appels pour cela : la phase reçoit son checkpoint, `essayer` accepte un
+   essai garanti demandé par le script, `w.disposition()` rend les emplacements de la stack.
 6. **`tdd`**, puis retrait de `contributes.tasks` si plus personne ne l'utilise.
 
 ## 15. Risques et questions ouvertes

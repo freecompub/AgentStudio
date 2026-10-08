@@ -5,6 +5,47 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — DESIGN en workflow dans skraft-workflow (étape 5 de `docs/09` §14, première phase)
+
+Branche `feat/workflow-rejouable`. Critère `skraft-design-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 564 tests.
+
+**Fait.**
+- `extensions/skraft-workflow/src/conception.ts` : modélisation et décisions avec les mêmes motifs,
+  porte cohérence, revue à lentilles (fils de défauts, réponses des architectes, historique par
+  lentille, arbitrage humain des désaccords persistants), ratification de tous les ADR à la fois,
+  amendement qui ne relance que les décisions sans consommer d'essai, statuts basculés dans les
+  fichiers, rapports de revue réécrits avant le commit.
+- Copies (avec provenance) : `design.ts`, `adr.ts`, `render-adr-tool.ts`, `review.ts`,
+  `review-thread.ts` et leurs tests ; agents des architectes et des lentilles ; six skills.
+  `review-brief.ts` réécrit sans l'état du réducteur, même texte pour les lentilles.
+- Moteur : la fonction de `w.phase` reçoit son checkpoint ; `essayer` accepte `garanti` (défaut
+  maintenu par l'humain) ; `w.disposition()`.
+- Tests : jumeau de `e2e-s3` (processus principal et isolé) ; `e2e-revue-workflow` (contesté,
+  maintenu, recontesté, arbitré par l'humain, essai accordé au-delà du budget), vérifié en
+  supprimant l'essai accordé : il échoue.
+
+**Taille.** `workflow.ts` 150 + `conception.ts` 172 = 322 lignes de code jusqu'à DESIGN. Le
+réducteur pour le même périmètre : de l'ordre de 650 lignes (estimation ; `reducer.ts`,
+`effects.ts`, `model.ts` mêlent les phases).
+
+**Différences assumées avec `/skraft`** : plusieurs amendements demandés ensemble sont traités
+ensemble (le réducteur ne traitait que le premier et perdait les réponses suivantes) ;
+`isTestFile` approché par les emplacements de la stack ; pas de preuve de tests dans les faits de
+revue (DESIGN n'en produit pas). Écarts du §13 (1, 2, 3, 8, 9) : non tranchés, réducteur reproduit.
+
+**Pièges.**
+- Les fils de défauts, les revues et les livrables doivent être déclarés **hors** de la fonction
+  de `w.phase` : le réducteur les garde quand l'humain relance la phase, et « une revue est la
+  première » se compte sur toute la phase.
+- Les questions humaines du workflow rendent l'option sans le préfixe `<n>:` ; les arbitrages se
+  recomposent donc en `accept:<id>` / `maintain:<id>` pour `applyArbitration`.
+
+**Suite** : DISTILL (porte gherkin, porte valeurs, RED d'acceptance, gel des tests d'acceptance),
+puis DELIVER.
+
+---
+
 ## 08/10 — skraft-workflow devient une extension indépendante de skraft
 
 **Demande du responsable** : « le skraft dans l'extension et le skraft workflow doivent être

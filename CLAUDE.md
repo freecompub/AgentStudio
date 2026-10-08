@@ -28,7 +28,7 @@ Orchestration : passage décidé à des **workflows rejouables** (script ordinai
 reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`). Le moteur existe
 (`packages/workflow` : `createWorkflowTask`, `essayer`, `agir`). skraft et tdd tournent toujours
 sur leur réducteur ; l'essai est `extensions/skraft-workflow` (`/skraft-workflow`, jusqu'à
-RESEARCH), extension **indépendante de skraft** : elle n'en importe rien, ses copies divergent. L'approche YAML de `docs/08` est
+DESIGN), extension **indépendante de skraft** : elle n'en importe rien, ses copies divergent. L'approche YAML de `docs/08` est
 abandonnée.
 
 ```bash

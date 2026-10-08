@@ -1,5 +1,10 @@
 import type { ExtensionManifest } from "@agent-studio/extension-api";
-import { ROLES } from "./roles.js";
+import { LENS_MODEL_CLASS, LENSES, ROLE_SKILLS, ROLES, SKILLS } from "./roles.js";
+
+const skillsOf = (s: { mandatory?: string[]; onDemand?: string[] }) => ({
+  ...(s.mandatory ? { mandatory: [...s.mandatory] } : {}),
+  ...(s.onDemand ? { onDemand: [...s.onDemand] } : {}),
+});
 
 const SKRAFT_DIR = ".skraft/**";
 
@@ -10,13 +15,13 @@ export const manifest: ExtensionManifest = {
   publisher: "agent-studio",
   engines: { appApi: "^0.1" },
   main: "dist/index.mjs",
-  permissions: ["fs:read", `fs:write:${SKRAFT_DIR}`, "git:commit", "git:branch", "git:revert", "copilot:sessions", "net:none"],
+  permissions: ["fs:read", `fs:write:${SKRAFT_DIR}`, "fs:write:docs/adr/**", "git:commit", "git:branch", "git:revert", "copilot:sessions", "net:none"],
   contributes: {
     commands: [
       {
         name: "skraft-workflow",
         title: "skraft en workflow (essai)",
-        description: "Pipeline skraft écrit en workflow rejouable ; pour l'instant préparation, difficulté, RESEARCH et questions ouvertes.",
+        description: "Pipeline skraft écrit en workflow rejouable ; pour l'instant préparation, difficulté, RESEARCH, questions ouvertes et DESIGN.",
       },
     ],
     agents: [
@@ -31,13 +36,47 @@ export const manifest: ExtensionManifest = {
         write: [SKRAFT_DIR],
         tools: ["list_files", "report_blocker"],
       },
+      {
+        name: "skraft-architect-model",
+        title: "Architecte (modélisation)",
+        prompt: "agents/skraft-architect-model.agent.md",
+        role: ROLES.architectModel,
+        output: "report_phase",
+        modelClass: "strong",
+        write: [SKRAFT_DIR],
+        tools: ["list_files", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.architectModel),
+      },
+      // Aucun droit d'écriture direct dans docs/adr : seul render_adr y écrit.
+      {
+        name: "skraft-architect-decide",
+        title: "Architecte (décisions)",
+        prompt: "agents/skraft-architect-decide.agent.md",
+        role: ROLES.architectDecide,
+        output: "report_phase",
+        modelClass: "strong",
+        write: [SKRAFT_DIR],
+        tools: ["list_files", "render_adr", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.architectDecide),
+      },
+      ...LENSES.map((name) => ({
+        name: `skraft-lens-${name}`,
+        title: `Lentille ${name}`,
+        prompt: `agents/skraft-lens-${name}.agent.md`,
+        role: ROLES.lens,
+        output: "submit_lens_verdict" as const,
+        modelClass: LENS_MODEL_CLASS[name],
+        skills: skillsOf(ROLE_SKILLS.lens),
+      })),
     ],
+    skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
+    tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],
     tasks: [
       {
         name: "skraft-workflow",
         title: "skraft en workflow (essai)",
-        states: { "DÉBUT": "Préparation et difficulté", RESEARCH: "Enquête sur le code existant" },
-        milestones: ["RESEARCH"],
+        states: { "DÉBUT": "Préparation et difficulté", RESEARCH: "Enquête sur le code existant", DESIGN: "Conception" },
+        milestones: ["RESEARCH", "DESIGN"],
       },
     ],
   },

@@ -2,8 +2,8 @@
  * skraft écrit en workflow rejouable (ADR 0052, `docs/09` §14 étape 4). Extension indépendante de
  * `extensions/skraft` : elle n'en importe rien, et `/skraft` reste intacte.
  *
- * Commande `/skraft-workflow` : pour l'instant la préparation, la difficulté, RESEARCH et les
- * questions ouvertes, puis arrêt avec le dossier de passation de DESIGN. Le comportement reproduit
+ * Commande `/skraft-workflow` : pour l'instant la préparation, la difficulté, RESEARCH, les
+ * questions ouvertes et DESIGN, puis arrêt avec le dossier de passation de DISTILL. Le comportement reproduit
  * celui du réducteur de skraft. Si le script n'est pas nettement plus simple que la partie du
  * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
  */
@@ -13,7 +13,8 @@ import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, l
 import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
 import { parseStory, slugOf, type Story } from "./story.js";
-import { commitMessage, dossiersDeLaStory, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.js";
+import { concevoir } from "./conception.js";
+import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.js";
 
 export interface EntreeWorkflow {
   storyPath: string;
@@ -26,6 +27,8 @@ const HUMAINS: Record<string, readonly Profil[]> = {
   "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
   blocage: ["po", "developpeur", "architecte", "administrateur"],
   escalade: ["developpeur", "architecte", "administrateur"],
+  arbitrer: ["developpeur", "architecte", "administrateur"],
+  "ratifier-adr": ["architecte"],
 };
 
 const RELANCER_OU_ABANDONNER = [
@@ -47,6 +50,7 @@ async function skraft(w: W, entree: EntreeWorkflow) {
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
     questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
     reponses: [],
+    adrs: [],
   };
 
   if (!effets.skipResearch) {
@@ -71,7 +75,10 @@ async function skraft(w: W, entree: EntreeWorkflow) {
     return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
   });
 
-  await w.informer(`**${story.id}** prête pour DESIGN. Dossier de passation :\n\n${buildBrief(vue, "DESIGN", [])}`);
+  if (await concevoir(w, vue, effets.lenses, effets.maxAttempts)) vue.phasesFaites = [...vue.phasesFaites, { phase: "DESIGN", fichiers: [] }];
+  else vue.phasesSautees = [...vue.phasesSautees, "DESIGN"];
+
+  await w.informer(`**${story.id}** prête pour DISTILL. Dossier de passation :\n\n${buildBrief(vue, "DISTILL", [])}`);
   return { slug, niveau };
 }
 
@@ -168,9 +175,6 @@ async function porteCitations(w: W, vue: Dossier): Promise<string[]> {
   return [];
 }
 
-async function creerDossiers(w: W, slug: string) {
-  for (const d of dossiersDeLaStory(slug)) await w.creerDossier(d);
-}
 
 async function relancerOuAbandonner(w: W, motif: string): Promise<void> {
   const d = await w.humain("escalade", "Pipeline skraft bloqué", RELANCER_OU_ABANDONNER, { detail: motif });

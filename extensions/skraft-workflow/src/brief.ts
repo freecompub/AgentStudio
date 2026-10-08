@@ -13,6 +13,8 @@ export interface Dossier {
   phasesSautees: Phase[];
   questions: { id: string; text: string; answer?: string }[];
   reponses: { question: string; answer: string }[];
+  /** ADR de la story, avec leur statut. */
+  adrs: { id: string; path: string; status: "Proposed" | "Accepted" | "Rejected" }[];
 }
 
 /**
@@ -27,6 +29,8 @@ export function buildBrief(d: Dossier, phase: Phase, rejet: readonly string[]): 
   lines.push(`Phase en cours : ${phase}`);
   if (d.phasesFaites.length) lines.push("Phases terminées :", ...d.phasesFaites.map((p) => `  - ${p.phase}${p.fichiers.length ? ` : ${p.fichiers.join(", ")}` : ""}`));
   if (d.phasesSautees.length) lines.push(`Phases sautées : ${d.phasesSautees.join(", ")}`);
+  const decides = d.adrs.filter((a) => a.status !== "Proposed");
+  if (decides.length) lines.push("ADR décidés :", ...decides.map((a) => `  - ${a.id} (${a.status}) : ${a.path}`));
   const repondues = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer! })), ...d.reponses];
   if (repondues.length) lines.push("Réponses de l'utilisateur :", ...repondues.map((a) => `  - ${a.question} → ${a.answer}`));
   if (rejet.length) lines.push("Rejet précédent :", ...rejet.map((f) => `  - ${f}`));

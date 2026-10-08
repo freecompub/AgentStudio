@@ -1,6 +1,16 @@
 // Repris de extensions/skraft/src/effects.ts et config.ts (2026-10-08) : skraft-workflow est
 // indépendante de skraft et n'en importe rien.
+import { createHash } from "node:crypto";
+import type { W } from "@agent-studio/workflow";
 import type { Difficulty, RepositoryShape } from "./difficulty.js";
+
+/** Empreinte d'un contenu : déterministe, donc permise dans le script. */
+export const sha256 = (texte: string): string => createHash("sha256").update(texte).digest("hex");
+
+/** Recrée l'arborescence de la story (ADR 0037) : Git ne suit pas les dossiers vides. */
+export async function creerDossiers(w: W, slug: string): Promise<void> {
+  for (const d of dossiersDeLaStory(slug)) await w.creerDossier(d);
+}
 
 export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
 

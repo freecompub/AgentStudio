@@ -606,6 +606,13 @@
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
     },
     {
+      "id": "skraft-design-en-workflow",
+      "title": "skraft-workflow mène DESIGN : porte cohérence, revue à lentilles avec dialogue et arbitrage humain, ratification et amendement (jumeau de e2e-s3, en processus isolé aussi)",
+      "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s3-workflow.test.ts test/e2e-revue-workflow.test.ts test/design-gate.test.ts test/review-thread.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), docs/09 §14 étape 5 pour DESIGN. src/conception.ts : 172 lignes de code. Écarts du §13 non tranchés : comportement du réducteur reproduit (budget partagé, amendement sans budget ni modélisation, lentilles sans quality-gates, défaut maintenu par l’humain corrigé malgré le budget). Différences assumées : plusieurs amendements traités ensemble ; isTestFile approché par les emplacements de la stack (w.disposition) ; aucune preuve de tests dans les faits de revue (DESIGN n’en produit pas)."
+    },
+    {
       "id": "skraft-research-en-workflow",
       "title": "L'extension indépendante skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
       "verify": "pnpm vitest run --project ext-skraft-workflow && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",

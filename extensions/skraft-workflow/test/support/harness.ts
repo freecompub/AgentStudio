@@ -76,6 +76,21 @@ export function researchDoc(over: Partial<Record<string, string>> = {}): string 
   return ["# Recherche", ...Object.entries(body).map(([h, t]) => `## ${h}\n\n${t}`)].join("\n\n");
 }
 
+/** Répond automatiquement aux questions ouvertes (profil PO), avec la réponse donnée. */
+export function answerQuestions(app: { interactions: import("@agent-studio/core").InteractionService }, answer = "par prise"): () => void {
+  const answered = new Set<string>();
+  const tick = async () => {
+    for (const q of await app.interactions.pending()) {
+      if (!q.title.startsWith("Question ouverte") || answered.has(q.id)) continue;
+      answered.add(q.id);
+      await app.interactions.respond(q.id, q.options[0]!.id, answer, { role: "po" }).catch(() => answered.delete(q.id));
+    }
+  };
+  const off = app.interactions.onChange(() => void tick());
+  void tick();
+  return off;
+}
+
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
 export function simulatedAgents(
   runtime: ScriptedRuntime,
@@ -96,6 +111,20 @@ export function simulatedAgents(
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
       await writer(`.skraft/${slug}/research/research.md`, researchDoc())(t);
     },
+    "skraft-architect-model": async (t) => {
+      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+      await writer(`.skraft/${slug}/design/event-model.md`, "`BolusCapped`\n")(t);
+    },
+    "skraft-architect-decide": async (t) => {
+      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+      await writer(`.skraft/${slug}/design/contracts.md`, "`BolusCapped`\n")(t);
+    },
+    ...Object.fromEntries(
+      ["cold-reader", "test-integrity", "architecture", "quality-gates"].map((l) => [
+        `skraft-lens-${l}`,
+        (async (t) => void (await t.callTool("submit_lens_verdict", { lens: l, verdict: "APPROVED", defects: [] }))) as ScriptedBehavior,
+      ]),
+    ),
   };
   for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) {
     if (!behavior) continue;
