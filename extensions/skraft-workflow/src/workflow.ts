@@ -1,20 +1,19 @@
 /**
- * skraft en workflow rejouable (ADR 0052, `docs/09` §14 étape 4), à côté du réducteur.
+ * skraft écrit en workflow rejouable (ADR 0052, `docs/09` §14 étape 4). Extension indépendante de
+ * `extensions/skraft` : elle n'en importe rien, et `/skraft` reste intacte.
  *
  * Commande `/skraft-workflow` : pour l'instant la préparation, la difficulté, RESEARCH et les
  * questions ouvertes, puis arrêt avec le dossier de passation de DESIGN. Le comportement reproduit
- * celui du réducteur (`reducer.ts`, `effects.ts`) ; les portes et la story sont les mêmes fonctions.
- * Si le script n'est pas nettement plus simple que la partie du réducteur qu'il remplace, on
- * s'arrête là (ADR 0052, conséquences).
+ * celui du réducteur de skraft. Si le script n'est pas nettement plus simple que la partie du
+ * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
  */
 import { createWorkflowTask, essayer, PanneEnvironnement, Escalade, TourInterrompu, type Profil, type W } from "@agent-studio/workflow";
-import { buildBrief, type BriefSource } from "./brief.js";
-import { commitMessage } from "./config.js";
+import { buildBrief, type Dossier } from "./brief.js";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
-import { dossiersDeLaStory, GELÉS, LEVEL_LABELS, repositoryShape } from "./effects.js";
 import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
 import { parseStory, slugOf, type Story } from "./story.js";
+import { commitMessage, dossiersDeLaStory, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.js";
 
 export interface EntreeWorkflow {
   storyPath: string;
@@ -40,19 +39,14 @@ async function skraft(w: W, entree: EntreeWorkflow) {
   const effets = levelEffects(niveau);
 
   // Ce que le dossier de passation raconte, tenu à jour au fil du script.
-  const vue: BriefSource = {
+  const vue: Dossier = {
     story,
     slug,
-    difficulty: { level: niveau, indicators: indicateurs, confirmedBy: entree.confirmDifficulty ? "user" : "auto" },
-    phasesCompleted: [],
-    artifacts: { RESEARCH: [], DESIGN: [], DISTILL: [], DELIVER: [] },
-    skipPhases: effets.skipResearch ? ["RESEARCH"] : [],
-    adrs: [],
-    openQuestions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
-    answers: [],
-    regressions: [],
-    acceptanceHash: null,
-    deliver: null,
+    niveau,
+    phasesFaites: [],
+    phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
+    questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+    reponses: [],
   };
 
   if (!effets.skipResearch) {
@@ -62,17 +56,17 @@ async function skraft(w: W, entree: EntreeWorkflow) {
       // Git ne suit pas les dossiers vides : le rembobinage les emporte (ADR 0037).
       apresRembobinage: () => creerDossiers(w, slug),
     });
-    if (faite === undefined) vue.skipPhases = [...vue.skipPhases, "RESEARCH"];
-    else vue.phasesCompleted = ["RESEARCH"];
+    if (faite === undefined) vue.phasesSautees = [...vue.phasesSautees, "RESEARCH"];
+    else vue.phasesFaites = [{ phase: "RESEARCH", fichiers: [`.skraft/${slug}/research/research.md`] }];
   }
 
   // Les questions ouvertes (story, recherche) sont tranchées avant DESIGN, toutes à la fois.
   const reponses = await Promise.all(
-    vue.openQuestions.map((q) =>
+    vue.questions.map((q) =>
       w.humain("question-ouverte", `Question ouverte (${story.id})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true }),
     ),
   );
-  vue.openQuestions = vue.openQuestions.map((q, i) => {
+  vue.questions = vue.questions.map((q, i) => {
     const d = reponses[i]!;
     return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
   });
@@ -134,26 +128,26 @@ async function evaluerDifficulte(w: W, story: Story, indicateurs: ReturnType<typ
 }
 
 /** Un essai de RESEARCH : le chercheur, ses questions bloquantes, puis la porte citations (§7.1). */
-function rechercher(w: W, vue: BriefSource, max: number) {
-  return essayer(w, { max }, async (motifs, essai) => {
+function rechercher(w: W, vue: Dossier, max: number) {
+  return essayer(w, { max }, async (motifs) => {
     let retour = motifs;
     for (;;) {
       const fichiers = await w.listerFichiers();
-      const utiles = preselectFiles(vue.story!, fichiers);
+      const utiles = preselectFiles(vue.story, fichiers);
       const consigne = buildBrief(vue, "RESEARCH", retour) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
       const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
       if (r.sortie) break;
       // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier.
       const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
       const d = await w.humain("blocage", "Question de l'agent (RESEARCH)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
-      vue.answers = [...vue.answers, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
+      vue.reponses = [...vue.reponses, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
       retour = [];
     }
-    return porteCitations(w, vue, essai);
+    return porteCitations(w, vue);
   });
 }
 
-async function porteCitations(w: W, vue: BriefSource, essai: number): Promise<string[]> {
+async function porteCitations(w: W, vue: Dossier): Promise<string[]> {
   const chemin = `.skraft/${vue.slug}/research/research.md`;
   let md: string;
   try {
@@ -168,10 +162,9 @@ async function porteCitations(w: W, vue: BriefSource, essai: number): Promise<st
     if (existants.has(cite)) lignes.set(cite, (await w.lireFichier(cite)).replace(/\n$/, "").split("\n").length);
   const { reasons, openQuestions } = checkResearch(md, { lineCount: (p) => lignes.get(p) ?? null });
   if (reasons.length) return reasons;
-  const connues = new Set(vue.openQuestions.map((q) => q.text));
+  const connues = new Set(vue.questions.map((q) => q.text));
   const nouvelles = openQuestions.filter((q) => !connues.has(q));
-  vue.openQuestions = [...vue.openQuestions, ...nouvelles.map((text, i) => ({ id: `q${vue.openQuestions.length + i + 1}`, text }))];
-  vue.artifacts = { ...vue.artifacts, RESEARCH: [{ path: chemin, sha256: "", producedBy: "skraft-researcher", attempt: essai }] };
+  vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.length + i + 1}`, text }))];
   return [];
 }
 

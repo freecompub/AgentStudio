@@ -1,7 +1,6 @@
 import type { ExtensionContext, ExtensionModule, TaskDefinition } from "@agent-studio/extension-api";
 import { runSkraftEffect } from "./effects.js";
 import { renderAdrTool } from "./render-adr-tool.js";
-import { skraftWorkflowTask } from "./workflow.js";
 import type { SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { initialEffects, initialState, isTerminal, phaseOf, transition } from "./reducer.js";
 
@@ -39,14 +38,6 @@ export const skraftExtension: ExtensionModule = {
       if (!input) return ctx.chat.post(USAGE);
       await ctx.tasks.start("skraft-pipeline", input);
       ctx.chat.post(`Pipeline skraft lancé pour **${input.storyPath}** : lecture de la story et évaluation de la difficulté.`);
-    });
-    // Même pipeline écrit en workflow rejouable (ADR 0052) ; pour l'instant jusqu'à RESEARCH.
-    ctx.tasks.register(skraftWorkflowTask);
-    ctx.chat.registerCommand("skraft-workflow", async (args) => {
-      const input = parseSkraftArgs(args);
-      if (!input) return ctx.chat.post(USAGE.replaceAll("/skraft ", "/skraft-workflow "));
-      await ctx.tasks.start("skraft-workflow", { storyPath: input.storyPath, confirmDifficulty: input.confirmDifficulty ?? true });
-      ctx.chat.post(`Workflow skraft lancé pour **${input.storyPath}** (préparation, difficulté, RESEARCH).`);
     });
     ctx.chat.registerCommand("skraft-status", async () => {
       ctx.chat.post("Les pipelines skraft en cours sont affichés dans le panneau des tâches, avec leur phase et les décisions qui vous attendent.");

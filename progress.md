@@ -5,7 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
-## 08/10 — skraft en workflow jusqu'à RESEARCH (`/skraft-workflow`, étape 4 de `docs/09` §14)
+## 08/10 — skraft-workflow devient une extension indépendante de skraft
+
+**Demande du responsable** : « le skraft dans l'extension et le skraft workflow doivent être
+totalement indépendants ». Fait :
+- `extensions/skraft` est revenue **à l'identique** de son état d'avant le workflow (commit
+  `b3e3ce0`) : plus de commande, de tâche, de dépendance ni de remaniement liés au workflow.
+- Nouvelle extension `extensions/skraft-workflow` (`agent-studio.skraft-workflow`, GPL comme
+  skraft) : son manifeste, ses deux agents (classifieur, chercheur), son script, et des **copies**
+  des fonctions pures (story, difficulté, porte citations, analyse de texte, présélection) avec
+  leurs tests, plus un `brief.ts` réduit à ce que le workflow produit. Chaque copie porte sa
+  provenance en tête ; `README.md` les liste.
+- `test/independance.test.ts` refuse tout import de skraft (paquet ou chemin) ; vérifié en
+  ajoutant un import exprès.
+
+**Le prix, à connaître** : environ 450 lignes de fonctions pures existent maintenant en deux
+exemplaires. Une correction dans une porte de skraft ne se reporte pas seule dans skraft-workflow.
+Les tests copiés protègent chaque copie, pas leur accord.
+
+---
+
+## 08/10 — skraft en workflow jusqu'à RESEARCH (`/skraft-workflow`, d'abord dans skraft, étape 4 de `docs/09` §14)
 
 Branche `feat/workflow-rejouable`. Option B retenue par le responsable du projet : une **deuxième
 commande** à côté de `/skraft`, qui reste intacte. Critère `skraft-research-en-workflow` passé à

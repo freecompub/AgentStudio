@@ -607,10 +607,10 @@
     },
     {
       "id": "skraft-research-en-workflow",
-      "title": "/skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
-      "verify": "pnpm vitest run --project ext-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts test/e2e-s2.test.ts",
+      "title": "L'extension indépendante skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
+      "verify": "pnpm vitest run --project ext-skraft-workflow && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
       "passes": true,
-      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte. Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte ; puis, à sa demande, dans une extension totalement indépendante (extensions/skraft-workflow, aucune importation de skraft, vérifiée par test/independance.test.ts ; code pur, agents et tests copiés avec leur provenance). Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
     }
   ]
 }

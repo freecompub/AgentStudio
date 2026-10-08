@@ -10,7 +10,6 @@
   "dependencies": {
     "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
-    "@agent-studio/workflow": "workspace:*",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -537,7 +537,9 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
    remplacée. Si ce n'est pas nettement plus simple, on s'arrête.
    *Fait le 2026-10-08, critère amendé.* Une seule phase ne peut pas passer en workflow pendant que
    les autres restent dans le réducteur sans code de liaison jetable : on a ajouté une deuxième
-   commande, `/skraft-workflow` (`extensions/skraft/src/workflow.ts`), qui mène préparation,
+   commande, `/skraft-workflow`, dans une **extension indépendante** (`extensions/skraft-workflow`,
+   demande du responsable : elle n'importe rien de skraft, ses fonctions pures et ses agents sont
+   copiés avec leur provenance), qui mène préparation,
    difficulté, RESEARCH et questions ouvertes puis publie le dossier de passation de DESIGN.
    `/skraft` et `e2e-s2` restent intacts (ce test lit les champs internes du réducteur, il ne
    pouvait pas tester un workflow) ; `e2e-s2-workflow` rejoue le même scénario sur la nouvelle

@@ -1,5 +1,6 @@
 /**
- * Jumeau de `e2e-s2.test.ts` pour `/skraft-workflow` (ADR 0052, `docs/09` §14 étape 4) : même
+ * Jumeau de `extensions/skraft/test/e2e-s2.test.ts` pour `/skraft-workflow` (ADR 0052, `docs/09`
+ * §14 étape 4), dans une extension indépendante de skraft : même
  * scénario US-12, mêmes vérifications sur ce que voient les agents et les humains. Seuls changent
  * la commande, les identifiants d'options et ce qui suit RESEARCH (le workflow s'arrête avant
  * DESIGN et publie le dossier de passation que DESIGN recevrait).

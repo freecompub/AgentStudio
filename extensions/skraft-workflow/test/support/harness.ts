@@ -1,0 +1,239 @@
+/**
+ * Banc d'essai de skraft-workflow, repris de `extensions/skraft/test/support/harness.ts`
+ * (2026-10-08) et réduit : vrai dépôt Git, vraie pile (moteur, hôte, exécuteur d'agents, preuves,
+ * interactions persistées), agents simulés par un runtime scripté. Aucun LLM.
+ */
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import {
+  createHookRegistry,
+  createInteractionService,
+  createJsonEvidenceStore,
+  createJsonInteractionStore,
+  createRegistry,
+  createTaskAgentRunner,
+  createUsageRecorder,
+} from "@agent-studio/core";
+import { sequentialIds, type ScriptedBehavior, type ScriptedRuntime } from "@agent-studio/core/testing";
+import { activateInProcess, activateIsolated, bundle, copyDeclaredFiles, createNodeLauncher, type ExtensionHandle, type HostDeps } from "@agent-studio/extension-host";
+import type { StackAdapter } from "@agent-studio/stack-adapters";
+import { createJsonTaskStore, createTaskEngine } from "@agent-studio/task-engine";
+import { openWorkspace, type Workspace } from "@agent-studio/workspace";
+import { manifest, skraftWorkflowExtension } from "../../src/index.js";
+
+export const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@localhost", ...args], { cwd, encoding: "utf8" }).trim();
+
+export async function put(root: string, rel: string, content: string) {
+  await mkdir(dirname(join(root, rel)), { recursive: true });
+  await writeFile(join(root, rel), content);
+}
+
+export const US12 = `# US-12 — Plafonner le bolus proposé
+
+En tant que patient, quand le calcul propose une dose de bolus supérieure au plafond défini par mon médecin,
+je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'explique pourquoi.
+
+## Critères d'acceptation
+1. Plafond de 10 U, calcul à 6 U : dose proposée 6 U, pas d'alerte.
+2. Plafond de 10 U, calcul à 12,5 U : dose proposée 10 U, alerte « Dose plafonnée à 10 U ».
+3. Aucun plafond configuré : dose proposée égale au calcul, pas d'alerte.
+
+## Questions ouvertes
+- Le plafond s'applique-t-il par prise ou par jour ?
+`;
+
+/** Projet Swift de démonstration (code seulement : S1 ne lance aucun test). */
+export async function createProject(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "agent-studio-skraft-"));
+  await put(root, "Package.swift", "// swift-tools-version:5.9\n");
+  await put(root, "Sources/Domain/BolusCalculator.swift", "public struct BolusCalculator {}\n");
+  await put(root, "Sources/Settings/MaxBolusSetting.swift", "public struct MaxBolusSetting {}\n");
+  await put(root, "stories/us-12.md", US12);
+  git(root, "init", "-q", "-b", "main");
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "init");
+  return root;
+}
+
+export const ROLE = (name: string) => `agent-studio.skraft-workflow/${name}`;
+
+/** Document de recherche conforme au gabarit (§7.1), citations valides sur le projet de démonstration. */
+export function researchDoc(over: Partial<Record<string, string>> = {}): string {
+  const body: Record<string, string> = {
+    "Périmètre et critères de succès": "Plafonner la dose proposée au maximum défini par le médecin.",
+    "Fichiers analysés": "- `Sources/Domain/BolusCalculator.swift:1-1`\n- `Sources/Settings/MaxBolusSetting.swift`",
+    "Recherches effectuées": "XCTest : https://developer.apple.com/documentation/xctest",
+    "Conventions du projet": "Objets-valeurs immuables dans le domaine.",
+    Découvertes: "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:1-1`.",
+    "Approches évaluées": "1. Plafond dans le domaine.\n2. Plafond dans l'interface.",
+    Recommandation: "Appliquer le plafond dans le domaine.",
+    "Passage de relais": "Décision à valider : emplacement du plafond.\n\n### Questions ouvertes\n- Le plafond est-il rappelé au patient ?",
+    ...over,
+  };
+  return ["# Recherche", ...Object.entries(body).map(([h, t]) => `## ${h}\n\n${t}`)].join("\n\n");
+}
+
+/** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
+export function simulatedAgents(
+  runtime: ScriptedRuntime,
+  root: string,
+  over: Partial<Record<string, ScriptedBehavior>> = {},
+  opts: { usage?: boolean } = {},
+): ScriptedRuntime {
+  const writer = (rel: string, content: string): ScriptedBehavior => async (t) => {
+    await put(root, rel, content);
+    await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
+  };
+  const behaviors: Record<string, ScriptedBehavior> = {
+    "skraft-classifier": async (t) => {
+      const proposed = /Niveau proposé par la grille : (\S+)/.exec(t.prompt)?.[1] ?? "medium";
+      await t.callTool("submit_difficulty", { level: proposed, justification: "conforme à la grille" });
+    },
+    "skraft-researcher": async (t) => {
+      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+      await writer(`.skraft/${slug}/research/research.md`, researchDoc())(t);
+    },
+  };
+  for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) {
+    if (!behavior) continue;
+    // Usage simulé (D37) : une requête par tour, tokens proportionnels au dossier de passation.
+    const measured: ScriptedBehavior = opts.usage
+      ? async (t) => {
+          t.session.emit({ type: "usage", model: "gpt-5", inputTokens: t.prompt.length, outputTokens: 100, multiplier: 1 });
+          await behavior(t);
+        }
+      : behavior;
+    runtime.behave(ROLE(name), measured);
+  }
+  return runtime;
+}
+
+/** Panne simulée : l'opération désignée ne rend jamais la main (plantage du processus). */
+export type HangPoint = "readStory" | "changedFiles" | "commit";
+
+function withHang(ws: Workspace, hang: HangPoint | undefined): Workspace {
+  if (!hang) return ws;
+  const never = () => new Promise<never>(() => {});
+  return {
+    ...ws,
+    files: { ...ws.files, read: (p) => (hang === "readStory" && p.startsWith("stories/") ? never() : ws.files.read(p)) },
+    checkpoints: { ...ws.checkpoints, diff: (id) => (hang === "changedFiles" ? never() : ws.checkpoints.diff(id)) },
+    repo: { ...ws.repo, commit: (m, o) => (hang === "commit" ? never() : ws.repo.commit(m, o)) },
+  };
+}
+
+/** Dossier source de l'extension : ses fichiers de rôle (`agents/`) et ses skills (`skills/`). */
+export const EXTENSION_DIR = resolve(import.meta.dirname, "../..");
+
+let artifacts: Promise<{ runtimeEntry: string; extDir: string }> | undefined;
+function isolatedArtifacts() {
+  artifacts ??= (async () => {
+    const dir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-workflow-bundles-"));
+    const runtimeEntry = join(dir, "runtime", "extension-child.mjs");
+    const extDir = join(dir, "skraft-workflow");
+    await bundle(resolve(import.meta.dirname, "../../../../packages/extension-host/src/child/entry.ts"), runtimeEntry);
+    await bundle(resolve(import.meta.dirname, "../../src/entry.ts"), join(extDir, "dist/index.mjs"));
+    // Fichiers de rôle et skills livrés avec l'extension, comme dans le paquet .asx (ADR 0024).
+    await copyDeclaredFiles(manifest, EXTENSION_DIR, extDir);
+    return { runtimeEntry, extDir };
+  })();
+  return artifacts;
+}
+
+const handles: ExtensionHandle[] = [];
+export async function shutdownHosts(): Promise<void> {
+  for (const h of handles.splice(0)) await h.deactivate().catch(() => undefined);
+}
+
+/**
+ * Fausse exécution Swift : chaque test d'acceptance marqué `ac-<n>` est rouge sur assertion tant que le
+ * fichier de production `Sources/Domain/BolusCap.swift` n'existe pas, vert ensuite ; chaque test
+ * unitaire de `Tests/UnitTests` est rouge sur symbole manquant tant que ce fichier n'existe pas.
+ */
+async function fakeSwiftRun(opts: { root: string }) {
+  const { readdir, readFile: read, access } = await import("node:fs/promises");
+  const results: { id: string; file: string; status: "passed" | "failed"; failureKind?: "assertion" | "missing_symbol"; message?: string }[] = [];
+  const dir = join(opts.root, "Tests/AcceptanceTests");
+  const delivered = await access(join(opts.root, "Sources/Domain/BolusCap.swift")).then(() => true, () => false);
+  for (const f of await readdir(dir).catch(() => [] as string[])) {
+    const content = await read(join(dir, f), "utf8");
+    for (const m of content.matchAll(/func (testAc\d+)/g))
+      results.push(delivered
+        ? { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "passed" }
+        : { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "failed", failureKind: "assertion", message: "XCTFail" });
+  }
+  const unitDir = join(opts.root, "Tests/UnitTests");
+  for (const f of await readdir(unitDir).catch(() => [] as string[])) {
+    const content = await read(join(unitDir, f), "utf8");
+    for (const m of content.matchAll(/func (test\w+)/g)) {
+      const id = `UnitTests.${f.replace(".swift", "")}/${m[1]}`;
+      const file = `Tests/UnitTests/${f}`;
+      results.push(delivered ? { id, file, status: "passed" } : { id, file, status: "failed", failureKind: "missing_symbol", message: "cannot find 'BolusCap' in scope" });
+    }
+  }
+  return { results, exitCode: results.some((r) => r.status === "failed") ? 1 : 0, timedOut: false, output: "", durationMs: 1 };
+}
+
+/** Pile Swift simulée (aucune chaîne réelle) : tests d'acceptance et unitaires lus sur le disque. */
+export function fakeSwiftStack(): StackAdapter {
+  return {
+    id: "swift",
+    layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
+    infrastructureModules: ["Infrastructure"],
+    detect: async () => true,
+    isTestFile: (p) => /(^|\/)Tests\//.test(p),
+    testFilePattern: "(^|\\/)Tests\\/",
+    runTests: fakeSwiftRun,
+  };
+}
+
+export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; isolated?: boolean; stack?: StackAdapter } = {}) {
+  const workspace = withHang(await openWorkspace(root), opts.hang);
+  const usage = createUsageRecorder(join(tasksDir, "usage"));
+  const engine = createTaskEngine({
+    usage,
+    store: createJsonTaskStore(tasksDir),
+    checkpoints: workspace.checkpoints,
+    clock: { now: () => new Date() },
+    ids: sequentialIds(`t${Math.random().toString(36).slice(2, 6)}-`),
+  });
+  const interactions = createInteractionService({
+    store: createJsonInteractionStore(join(tasksDir, "interactions")),
+    clock: { now: () => new Date() },
+    ids: sequentialIds(`int${Math.random().toString(36).slice(2, 6)}-`),
+    deliver: (taskId, option, comment) => engine.dispatch(taskId, { type: "HUMAN_DECISION", decision: option, ...(comment ? { comment } : {}) }),
+  });
+  const registry = createRegistry();
+  const posted: string[] = [];
+  const hostDeps: HostDeps = {
+    registry,
+    engine,
+    agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
+    workspace,
+    stack: opts.stack ?? fakeSwiftStack(),
+    interactions,
+    chat: { post: (_e, md) => void posted.push(md) },
+    evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),
+    hooks: createHookRegistry(),
+    usage,
+    clock: { now: () => new Date() },
+    ids: sequentialIds(`e${Math.random().toString(36).slice(2, 6)}-`),
+  };
+  if (opts.isolated) {
+    const { runtimeEntry, extDir } = await isolatedArtifacts();
+    handles.push(await activateIsolated({ manifest, directory: extDir, entry: join(extDir, "dist/index.mjs") }, hostDeps, { launcher: createNodeLauncher(), runtimeEntry }));
+  } else handles.push(await activateInProcess({ manifest, module: skraftWorkflowExtension, directory: EXTENSION_DIR }, hostDeps));
+  return { engine, interactions, registry, posted, workspace, usage };
+}
+
+export async function until(check: () => Promise<boolean>, timeoutMs = 30_000): Promise<void> {
+  const start = Date.now();
+  while (!(await check())) {
+    if (Date.now() - start > timeoutMs) throw new Error("Condition non atteinte à temps");
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+

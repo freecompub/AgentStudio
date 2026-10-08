@@ -1,16 +1,10 @@
 import type { Phase, SkraftState } from "./model.js";
 
-/** Ce que le dossier de passation lit de l'état : le réducteur et le workflow le fournissent tous deux. */
-export type BriefSource = Pick<
-  SkraftState,
-  "story" | "difficulty" | "slug" | "phasesCompleted" | "artifacts" | "skipPhases" | "adrs" | "openQuestions" | "answers" | "regressions" | "acceptanceHash" | "deliver"
->;
-
 /**
  * Dossier de passation (SPEC.md §6.6, SPEC-skraft E4) : construit par le code à partir des phases
  * réellement exécutées ; jamais de transcription. Pur.
  */
-export function buildBrief(s: BriefSource, phase: Phase, feedback: readonly string[]): string {
+export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): string {
   const story = s.story;
   const lines: string[] = [];
   if (story) {
