@@ -185,6 +185,12 @@ importers:
       '@agent-studio/extension-host':
         specifier: workspace:*
         version: link:../../packages/extension-host
+      '@agent-studio/extension-installer':
+        specifier: workspace:*
+        version: link:../../packages/extension-installer
+      '@agent-studio/extension-packaging':
+        specifier: workspace:*
+        version: link:../../packages/extension-packaging
       '@agent-studio/stack-adapters':
         specifier: workspace:*
         version: link:../../packages/stack-adapters

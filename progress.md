@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Décision : skraft et skraft-workflow coexistent (ADR 0054)
+
+Le responsable choisit de **garder les deux** et de les comparer sur de vraies stories avec Copilot
+avant de retirer quoi que ce soit. ADR 0054 : indépendance maintenue, aucun écart du §13 tranché
+d'ici là, toute correction d'une copie à reporter à la main (ou à noter).
+
+**Fait.** `extensions/skraft-workflow` s'empaquette et s'installe comme skraft : `pnpm ext:build
+extensions/skraft-workflow <sortie>`, puis `pnpm ext:pack <sortie> <fichier.asx>` (paquet non
+signé, 56 fichiers) ; `test/install.test.ts` (copié de skraft) passe avec l'installateur réel,
+mode développeur exigé.
+
+**Suite** : run réel des deux sur une même story (US-2 ou US-12), avec Copilot ; relever par
+phase requêtes, tokens, rejets, interventions humaines ; puis décider (ADR qui remplacera 0054).
+
+---
+
 ## 08/10 — DELIVER en workflow : skraft-workflow mène tout le pipeline
 
 Branche `feat/workflow-rejouable`. Critère `skraft-deliver-en-workflow` ajouté et passé à `true`

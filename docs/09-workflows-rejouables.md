@@ -567,6 +567,8 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
    `model.ts`), soit environ 40 % de moins. Le gain vient surtout de la disparition des types
    d'état, d'événements et d'effets et des aiguillages du réducteur ; sur DELIVER seul, le script
    (portes comprises) est à peine plus court que la sous-machine et ses effets (595 contre 639).
+   *Décision du 2026-10-08 (ADR 0054)* : skraft et skraft-workflow **coexistent**, indépendants,
+   le temps de les comparer sur de vraies stories avec Copilot. Aucune n'est retirée avant.
 6. **`tdd`**, puis retrait de `contributes.tasks` si plus personne ne l'utilise.
 
 ## 15. Risques et questions ouvertes
