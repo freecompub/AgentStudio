@@ -1,0 +1,187 @@
+/**
+ * skraft en workflow rejouable (ADR 0052, `docs/09` §14 étape 4), à côté du réducteur.
+ *
+ * Commande `/skraft-workflow` : pour l'instant la préparation, la difficulté, RESEARCH et les
+ * questions ouvertes, puis arrêt avec le dossier de passation de DESIGN. Le comportement reproduit
+ * celui du réducteur (`reducer.ts`, `effects.ts`) ; les portes et la story sont les mêmes fonctions.
+ * Si le script n'est pas nettement plus simple que la partie du réducteur qu'il remplace, on
+ * s'arrête là (ADR 0052, conséquences).
+ */
+import { createWorkflowTask, essayer, PanneEnvironnement, Escalade, TourInterrompu, type Profil, type W } from "@agent-studio/workflow";
+import { buildBrief, type BriefSource } from "./brief.js";
+import { commitMessage } from "./config.js";
+import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift, type Difficulty } from "./difficulty.js";
+import { dossiersDeLaStory, GELÉS, LEVEL_LABELS, repositoryShape } from "./effects.js";
+import { preselectFiles } from "./preselect.js";
+import { checkResearch } from "./research.js";
+import { parseStory, slugOf, type Story } from "./story.js";
+
+export interface EntreeWorkflow {
+  storyPath: string;
+  confirmDifficulty: boolean;
+}
+
+/** Qui répond à quoi (§11). Vide : tout profil. */
+const HUMAINS: Record<string, readonly Profil[]> = {
+  "confirmer-difficulte": [],
+  "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
+  blocage: ["po", "developpeur", "architecte", "administrateur"],
+  escalade: ["developpeur", "architecte", "administrateur"],
+};
+
+const RELANCER_OU_ABANDONNER = [
+  { id: "relancer", label: "Relancer" },
+  { id: "abandonner", label: "Abandonner" },
+];
+
+async function skraft(w: W, entree: EntreeWorkflow) {
+  const { story, slug, indicateurs } = await preparer(w, entree.storyPath);
+  const niveau = await evaluerDifficulte(w, story, indicateurs, entree.confirmDifficulty);
+  const effets = levelEffects(niveau);
+
+  // Ce que le dossier de passation raconte, tenu à jour au fil du script.
+  const vue: BriefSource = {
+    story,
+    slug,
+    difficulty: { level: niveau, indicators: indicateurs, confirmedBy: entree.confirmDifficulty ? "user" : "auto" },
+    phasesCompleted: [],
+    artifacts: { RESEARCH: [], DESIGN: [], DISTILL: [], DELIVER: [] },
+    skipPhases: effets.skipResearch ? ["RESEARCH"] : [],
+    adrs: [],
+    openQuestions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+    answers: [],
+    regressions: [],
+    acceptanceHash: null,
+    deliver: null,
+  };
+
+  if (!effets.skipResearch) {
+    // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
+    const faite = await w.phase("RESEARCH", async () => (await rechercher(w, vue, effets.maxAttempts), true), {
+      commit: commitMessage("RESEARCH", slug),
+      // Git ne suit pas les dossiers vides : le rembobinage les emporte (ADR 0037).
+      apresRembobinage: () => creerDossiers(w, slug),
+    });
+    if (faite === undefined) vue.skipPhases = [...vue.skipPhases, "RESEARCH"];
+    else vue.phasesCompleted = ["RESEARCH"];
+  }
+
+  // Les questions ouvertes (story, recherche) sont tranchées avant DESIGN, toutes à la fois.
+  const reponses = await Promise.all(
+    vue.openQuestions.map((q) =>
+      w.humain("question-ouverte", `Question ouverte (${story.id})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true }),
+    ),
+  );
+  vue.openQuestions = vue.openQuestions.map((q, i) => {
+    const d = reponses[i]!;
+    return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
+  });
+
+  await w.informer(`**${story.id}** prête pour DESIGN. Dossier de passation :\n\n${buildBrief(vue, "DESIGN", [])}`);
+  return { slug, niveau };
+}
+
+/** Lecture de la story, branche et arborescence (effet `init` du réducteur). */
+async function preparer(w: W, chemin: string) {
+  for (;;) {
+    let motifs: string[];
+    try {
+      const lue = parseStory(await w.lireFichier(chemin));
+      if (lue.ok) {
+        const slug = slugOf(lue.story.id);
+        await w.brancher(`skraft/${slug}`);
+        await creerDossiers(w, slug);
+        const indicateurs = computeIndicators(lue.story, repositoryShape(await w.listerFichiers()));
+        return { story: lue.story, slug, indicateurs };
+      }
+      motifs = lue.errors;
+    } catch (e) {
+      motifs = [e instanceof PanneEnvironnement ? `Panne d'environnement : ${e.message}` : `Story introuvable : ${chemin}`];
+    }
+    await relancerOuAbandonner(w, `Story invalide : ${motifs.join(" ; ")}`);
+  }
+}
+
+/** Classifieur, budget compté par le code (D24), puis confirmation humaine si demandée. */
+async function evaluerDifficulte(w: W, story: Story, indicateurs: ReturnType<typeof computeIndicators>, confirmer: boolean): Promise<Difficulty> {
+  const grille = gradeDifficulty(indicateurs, DEFAULT_THRESHOLDS);
+  const consigne = [`Story : ${story.id} — ${story.title}`, `Indicateurs : ${JSON.stringify(indicateurs)}`, `Niveau proposé par la grille : ${grille}`].join("\n");
+  let propose: { level: Difficulty; justification: string } | undefined;
+  for (;;) {
+    try {
+      await essayer(w, { max: 3 }, async () => {
+        const r = await w.agent<{ level: string; justification: string }>("skraft-classifier", consigne);
+        if (!r.sortie) return [`Blocage inattendu : ${r.blocage.question}`];
+        if (!isDifficulty(r.sortie.level)) return [`Niveau de difficulté inconnu : ${r.sortie.level}`];
+        propose = { level: r.sortie.level, justification: r.sortie.justification };
+        return [];
+      });
+      break;
+    } catch (e) {
+      if (!(e instanceof Escalade || e instanceof PanneEnvironnement)) throw e;
+      await relancerOuAbandonner(w, e.message);
+    }
+  }
+  if (!confirmer) return propose!.level;
+  const niveaux = [...new Set([propose!.level, shift(propose!.level, 1), shift(propose!.level, -1)])];
+  const d = await w.humain(
+    "confirmer-difficulte",
+    `Difficulté de ${story.id} : ${LEVEL_LABELS[propose!.level]} ?`,
+    niveaux.map((l) => ({ id: l, label: l === propose!.level ? `Confirmer : ${LEVEL_LABELS[l]}` : LEVEL_LABELS[l] })),
+    { detail: propose!.justification },
+  );
+  return isDifficulty(d.decision) ? d.decision : propose!.level;
+}
+
+/** Un essai de RESEARCH : le chercheur, ses questions bloquantes, puis la porte citations (§7.1). */
+function rechercher(w: W, vue: BriefSource, max: number) {
+  return essayer(w, { max }, async (motifs, essai) => {
+    let retour = motifs;
+    for (;;) {
+      const fichiers = await w.listerFichiers();
+      const utiles = preselectFiles(vue.story!, fichiers);
+      const consigne = buildBrief(vue, "RESEARCH", retour) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
+      const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
+      if (r.sortie) break;
+      // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier.
+      const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
+      const d = await w.humain("blocage", "Question de l'agent (RESEARCH)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
+      vue.answers = [...vue.answers, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
+      retour = [];
+    }
+    return porteCitations(w, vue, essai);
+  });
+}
+
+async function porteCitations(w: W, vue: BriefSource, essai: number): Promise<string[]> {
+  const chemin = `.skraft/${vue.slug}/research/research.md`;
+  let md: string;
+  try {
+    md = await w.lireFichier(chemin);
+  } catch (e) {
+    if (e instanceof PanneEnvironnement || e instanceof TourInterrompu) throw e;
+    return [`Document de recherche absent : ${chemin}`];
+  }
+  const existants = new Set(await w.listerFichiers());
+  const lignes = new Map<string, number>();
+  for (const cite of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0])))
+    if (existants.has(cite)) lignes.set(cite, (await w.lireFichier(cite)).replace(/\n$/, "").split("\n").length);
+  const { reasons, openQuestions } = checkResearch(md, { lineCount: (p) => lignes.get(p) ?? null });
+  if (reasons.length) return reasons;
+  const connues = new Set(vue.openQuestions.map((q) => q.text));
+  const nouvelles = openQuestions.filter((q) => !connues.has(q));
+  vue.openQuestions = [...vue.openQuestions, ...nouvelles.map((text, i) => ({ id: `q${vue.openQuestions.length + i + 1}`, text }))];
+  vue.artifacts = { ...vue.artifacts, RESEARCH: [{ path: chemin, sha256: "", producedBy: "skraft-researcher", attempt: essai }] };
+  return [];
+}
+
+async function creerDossiers(w: W, slug: string) {
+  for (const d of dossiersDeLaStory(slug)) await w.creerDossier(d);
+}
+
+async function relancerOuAbandonner(w: W, motif: string): Promise<void> {
+  const d = await w.humain("escalade", "Pipeline skraft bloqué", RELANCER_OU_ABANDONNER, { detail: motif });
+  if (d.decision !== "relancer") w.echec(`Abandon : ${motif}`);
+}
+
+export const skraftWorkflowTask = createWorkflowTask<EntreeWorkflow>({ nom: "skraft-workflow", script: skraft, humains: HUMAINS });

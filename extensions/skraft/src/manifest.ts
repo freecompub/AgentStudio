@@ -39,6 +39,11 @@ export const manifest: ExtensionManifest = {
   contributes: {
     commands: [
       { name: "skraft", title: "Livrer une story avec skraft", description: "Mène une story de la recherche à la livraison : conception, scénarios d'acceptance, code en TDD, revues." },
+      {
+        name: "skraft-workflow",
+        title: "skraft en workflow (essai)",
+        description: "Même pipeline écrit en workflow rejouable ; pour l'instant préparation, difficulté, RESEARCH et questions ouvertes.",
+      },
       { name: "skraft-status", title: "État du pipeline skraft", description: "Affiche la phase, la difficulté et les décisions en attente des pipelines skraft." },
     ],
     // Contenu des rôles dans agents/*.agent.md (partagé avec Copilot CLI et Claude Code) ; ici,
@@ -130,6 +135,12 @@ export const manifest: ExtensionManifest = {
         states: STAGE_LABELS,
         milestones: ["RESEARCH", "DESIGN", "DISTILL", "DELIVER", "RATIFICATION", "DONE"],
         alerts: ["BLOCKED", "ESCALATED", "ABORTED"],
+      },
+      {
+        name: "skraft-workflow",
+        title: "skraft en workflow (essai)",
+        states: { "DÉBUT": "Préparation et difficulté", RESEARCH: "Enquête sur le code existant" },
+        milestones: ["RESEARCH"],
       },
     ],
   },

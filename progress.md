@@ -5,6 +5,52 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — skraft en workflow jusqu'à RESEARCH (`/skraft-workflow`, étape 4 de `docs/09` §14)
+
+Branche `feat/workflow-rejouable`. Option B retenue par le responsable du projet : une **deuxième
+commande** à côté de `/skraft`, qui reste intacte. Critère `skraft-research-en-workflow` passé à
+`true` après son `verify` ; suite complète : 1 415 tests.
+
+**Fait.**
+- `extensions/skraft/src/workflow.ts` : préparation (story, branche, dossiers, indicateurs),
+  classifieur avec budget, confirmation de la difficulté, RESEARCH (`w.phase` + `essayer`,
+  présélection, question bloquante, porte citations), questions ouvertes posées toutes à la fois,
+  puis publication du dossier de passation de DESIGN. Mêmes fonctions pures que le réducteur
+  (`parseStory`, `computeIndicators`, `checkResearch`, `preselectFiles`, `buildBrief`).
+- `buildBrief` accepte une vue réduite (`BriefSource`) : même consigne au mot près.
+- Moteur : `w.rembobiner` archive les livrables effacés dans la trace (ADR 0038), et `w.phase`
+  prend `apresRembobinage` (skraft y recrée ses dossiers, que Git ne suit pas).
+- Test jumeau `e2e-s2-workflow.test.ts`, joué dans le processus principal **et en processus
+  isolé** (le script tourne alors dans l'utilityProcess, transitions par RPC).
+
+**Mesure pour le critère d'arrêt.** `workflow.ts` : 154 lignes de code. Le même comportement dans
+le réducteur : ≈ 430 lignes estimées (cas INIT, CLASSIFY, CONFIRM_DIFFICULTY, BLOCKED, ROUTE,
+COMMIT, ESCALATED et leurs aides dans `reducer.ts` ; effets correspondants dans `effects.ts` ;
+types d'état, d'événements et d'effets dans `model.ts`). Une partie de ce code sert aussi aux
+phases suivantes : le rapport réel ne se saura qu'après DESIGN. Le jugement « nettement plus
+simple » revient au responsable.
+
+**Écarts avec `/skraft`** (assumés, pas des décisions sur le comportement) : identifiants
+d'options préfixés `<n>:` ; libellé de l'escalade (« Phase RESEARCH : <motif> ») ; le workflow
+s'arrête avant DESIGN.
+
+**Pièges.**
+- `w.phase` rend `undefined` quand l'humain saute la phase **et** quand `fn` ne rend rien
+  (`essayer` rend `void`) : le script croyait RESEARCH sautée. La fonction de phase doit rendre
+  une valeur ; documenté dans `protocols.ts`.
+- Le critère d'origine (« `e2e-s2` sans modification ») ne pouvait pas tenir : ce test lit
+  `stage`, `lastRejection`, `artifacts` du réducteur. Amendé dans `docs/09` §14 et `features.json`.
+
+**Reste.** `contributes.workflows` et le chargement du fichier par l'hôte (le workflow passe pour
+l'instant par `ctx.tasks.register` et `contributes.tasks`) ; retrait des globaux non
+déterministes ; l'empreinte par défaut ne couvre que la fonction principale du script (une aide
+modifiée n'est pas détectée).
+
+**Suite** : décision du responsable sur le critère d'arrêt ; si on continue, DESIGN (revue,
+ratification, écarts 1, 2, 3, 7, 8 du §13).
+
+---
+
 ## 08/10 — Moteur de workflows rejouables (`packages/workflow`, étape 3 de `docs/09` §14)
 
 Branche `feat/workflow-rejouable`, partie de `fix/sessions-orphelines`. Critère `workflow-rejouable`

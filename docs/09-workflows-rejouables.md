@@ -535,6 +535,16 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
 4. **Preuve sur skraft : RESEARCH en workflow**. *Sortie* : `e2e-s2` et `research-gate` passent
    **sans modification** ; comparaison de taille et de lisibilité avec la partie de `reducer.ts`
    remplacée. Si ce n'est pas nettement plus simple, on s'arrête.
+   *Fait le 2026-10-08, critère amendé.* Une seule phase ne peut pas passer en workflow pendant que
+   les autres restent dans le réducteur sans code de liaison jetable : on a ajouté une deuxième
+   commande, `/skraft-workflow` (`extensions/skraft/src/workflow.ts`), qui mène préparation,
+   difficulté, RESEARCH et questions ouvertes puis publie le dossier de passation de DESIGN.
+   `/skraft` et `e2e-s2` restent intacts (ce test lit les champs internes du réducteur, il ne
+   pouvait pas tester un workflow) ; `e2e-s2-workflow` rejoue le même scénario sur la nouvelle
+   commande, dans le processus principal et en processus isolé. Taille : 154 lignes de code contre
+   ≈ 430 estimées pour le même comportement dans le réducteur (une partie de ce code sert aussi aux
+   phases suivantes). Le workflow est enregistré par `ctx.tasks.register` et déclaré dans
+   `contributes.tasks` : `contributes.workflows` (§3) reste à faire.
 5. **DESIGN, puis DISTILL, puis DELIVER**, chacun avec ses tests de bout en bout inchangés et les
    écarts du §13 qui le concernent tranchés. `reducer.ts` et `deliver-machine.ts` ne sont supprimés
    qu'à la fin.

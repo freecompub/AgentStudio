@@ -21,7 +21,7 @@ import { contractSymbolsPresent, defectTargetOf, phaseEndMutation, planDeliver, 
 import { lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
-const LEVEL_LABELS: Record<Difficulty, string> = {
+export const LEVEL_LABELS: Record<Difficulty, string> = {
   simple: "Simple",
   medium: "Moyenne",
   "medium-hard": "Assez difficile",

@@ -607,10 +607,10 @@
     },
     {
       "id": "skraft-research-en-workflow",
-      "title": "La phase RESEARCH de skraft tourne en workflow et ses tests de bout en bout passent sans modification",
-      "verify": "pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
-      "passes": false,
-      "notes": "À FAIRE (docs/09 §14, étape 4). Le verify passe AUJOURD’HUI avec le réducteur : ne passer ce critère à true que lorsque RESEARCH est exécutée par le workflow, sans toucher à ces tests. Critère d’arrêt : si le script n’est pas nettement plus simple que la partie de reducer.ts remplacée, on s’arrête."
+      "title": "/skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
+      "verify": "pnpm vitest run --project ext-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts test/e2e-s2.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte. Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
     }
   ]
 }
