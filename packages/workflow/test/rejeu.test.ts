@@ -214,6 +214,12 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: ["interrompu", "panne"] } });
   });
 
+  it("w.disposition rend les emplacements de la stack du projet", async () => {
+    const f = fauxContexte();
+    const t = await lancer(decl(async (w) => w.disposition()), f.ctx);
+    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: { acceptanceTests: [], sources: [], unitTests: [] } } });
+  });
+
   it("w.echec termine la tâche en échec avec son motif", async () => {
     const f = fauxContexte();
     const t = await lancer(decl(async (w) => w.echec("Story invalide : critère 2 vide")), f.ctx);

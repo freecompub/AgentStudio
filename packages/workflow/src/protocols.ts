@@ -42,6 +42,7 @@ export type NomAppel =
   | "lint"
   | "mutation"
   | "empreinte"
+  | "disposition"
   | "brancher"
   | "checkpoint"
   | "rembobiner"
@@ -112,6 +113,8 @@ export interface W {
   lancerTests(): Promise<TestRun>;
   lint(fichiers?: readonly string[]): Promise<LintReport | null>;
   mutation(): Promise<MutationReport | null>;
+  /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources), en motifs. */
+  disposition(): Promise<{ acceptanceTests: string[]; unitTests: string[]; sources: string[] }>;
   /** Empreinte des fichiers correspondant aux motifs : geler des tests, puis vérifier le gel (D21). */
   empreinte(motifs: readonly string[]): Promise<string>;
   brancher(nom: string): Promise<void>;
@@ -127,7 +130,7 @@ export interface W {
    * `fn` doit rendre une valeur.
    * `apresRembobinage` reprépare ce que le rembobinage efface (dossiers vides que Git ne suit pas).
    */
-  phase<T>(nom: string, fn: () => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
+  phase<T>(nom: string, fn: (checkpoint: string) => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
   /** Termine la tâche en échec, avec ce motif. */
   echec(motif: string): never;
 }

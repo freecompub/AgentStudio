@@ -5,8 +5,12 @@
 import { Escalade, TourInterrompu } from "./erreurs.js";
 import type { OptionsAgent, W } from "./protocols.js";
 
-/** Rejet d'un essai : des motifs de porte, ou les défauts d'une revue (ADR 0042, 0046). */
-export type Rejet = readonly string[] | { motifs: readonly string[]; revue: true };
+/**
+ * Rejet d'un essai : des motifs de porte, ou les défauts d'une revue (ADR 0042, 0046). `garanti`
+ * donne un essai de plus malgré un budget épuisé : un arbitrage humain a maintenu un défaut, il a
+ * droit à sa correction (`docs/09` §13, écart 9).
+ */
+export type Rejet = readonly string[] | { motifs: readonly string[]; revue: true; garanti?: boolean };
 
 /**
  * Motifs rendus après un tour interrompu (ADR 0029, 0040). La seconde phrase compte autant que la
@@ -41,7 +45,8 @@ export async function essayer(_w: W, opts: { max: number; premiereRevueGarantie?
     const m = Array.isArray(rejet) ? (rejet as readonly string[]) : (rejet as { motifs: readonly string[] }).motifs;
     if (!m.length) return;
     if (revue) revues++;
-    const garanti = opts.premiereRevueGarantie === true && revue && revues === 1;
+    const demande = Array.isArray(rejet) ? undefined : (rejet as { garanti?: boolean }).garanti;
+    const garanti = demande ?? (opts.premiereRevueGarantie === true && revue && revues === 1);
     if (essai >= opts.max && !garanti) throw new Escalade(m);
     motifs = m;
   }

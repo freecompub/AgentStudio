@@ -69,6 +69,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     lint: (fichiers) => appeler("lint", fichiers ? { fichiers: [...fichiers] } : {}),
     mutation: () => appeler("mutation", {}),
     empreinte: (motifs) => appeler("empreinte", { motifs: [...motifs] }),
+    disposition: () => appeler("disposition", {}),
     brancher: (nom) => appeler("brancher", { nom }),
     checkpoint: (nom) => appeler("checkpoint", { nom }),
     rembobiner: (checkpoint) => appeler("rembobiner", { checkpoint }),
@@ -85,7 +86,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
       for (;;) {
         let motif: string;
         try {
-          const v = await fn();
+          const v = await fn(cp);
           if (opts.commit) await w.commiter(opts.commit);
           return v;
         } catch (e) {

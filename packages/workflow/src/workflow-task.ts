@@ -206,6 +206,10 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return ctx.stack.mutation({ signal });
     case "empreinte":
       return ctx.workspace.fingerprint(a.motifs);
+    case "disposition": {
+      const { acceptanceTests, unitTests, sources } = ctx.stack.layout;
+      return { acceptanceTests, unitTests, sources };
+    }
     case "brancher":
       return ctx.git.branch(a.nom);
     case "checkpoint":

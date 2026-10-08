@@ -37,6 +37,16 @@ describe("essayer : budget d'essais appliqué par le code (D24)", () => {
     expect((r as Escalade).motifs).toEqual(["défaut D-2"]);
   });
 
+  it("essai garanti demandé par le script (arbitrage humain, ADR 0046) : un essai de plus, chaque fois qu'il le demande", async () => {
+    let essais = 0;
+    const r = await essayer(w, { max: 1 }, async () => {
+      essais++;
+      return { motifs: [`défaut ${essais}`], revue: true, garanti: essais < 3 };
+    }).catch((e: unknown) => e);
+    expect(essais).toBe(3);
+    expect((r as Escalade).motifs).toEqual(["défaut 3"]);
+  });
+
   it("sans l'option, la revue n'a pas d'essai garanti", async () => {
     let essais = 0;
     await essayer(w, { max: 2 }, async () => (essais++ === 0 ? ["porte"] : { motifs: ["défaut"], revue: true })).catch(() => undefined);
@@ -78,6 +88,12 @@ describe("w.phase : checkpoint, commit, escalade (docs/09 §5.2)", () => {
         }),
       { commit: "docs: DESIGN" },
     );
+
+  it("la fonction de phase reçoit le checkpoint de la phase", async () => {
+    const f = fauxContexte();
+    const t = await lancer(decl((w) => w.phase("DESIGN", async (cp) => cp)), f.ctx);
+    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: "cp-1" } });
+  });
 
   it("réussite : checkpoint à l'ouverture, commit à la fin, la phase est celle de la tâche", async () => {
     const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
