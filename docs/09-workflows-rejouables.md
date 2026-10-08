@@ -155,7 +155,7 @@ le script ne peut lui donner un outil, une skill ou un droit d'écriture (§8).
   escalade : rembobine au checkpoint, fait oublier les agents qui ont travaillé depuis (ADR 0050,
   désormais automatique, §9), puis pose la question `escalade` (relancer, sauter, abandonner).
   Une phase s'ouvre **une seule fois** : un réessai ne repose pas son checkpoint.
-- **`essayer(w, { max, premiereRevueGarantie }, fn)`** : `fn` rend une liste de motifs (vide = ok).
+- **`essayer(w, { max, premiereRevueGarantie }, fn)`** : `fn` rend ses motifs de rejet (vide = ok) : des textes pour une porte, des fils de défauts pour la revue (§5.4).
   Tant que le budget le permet, relance `fn` avec les motifs, **sans rembobiner** (ADR 0040) ; à
   épuisement, escalade. Le budget est partagé entre portes et revue (ADR 0042), avec l'essai
   garanti de la première revue.
@@ -173,6 +173,37 @@ une bibliothèque partagée si une deuxième extension en a besoin (D14).
 | Panne d'environnement (D25) | `w.*` lève `PanneEnvironnement` ; `essayer` ne la compte pas et la laisse remonter ; `w.phase` escalade aussitôt |
 | Annulation par l'utilisateur | le script s'arrête au prochain appel ; sessions supprimées |
 | Script qui lève une autre erreur | tâche en échec, avec l'erreur ; sessions supprimées |
+
+### 5.4 Le retour des échecs à l'agent
+
+Le workflow ne change **rien** à ce que l'agent reçoit après un échec. Les règles restent celles
+d'aujourd'hui : dossier de passation construit par le code, jamais de transcription (SPEC §6.6,
+D17) ; un réessai ne rembobine pas (ADR 0040) ; la première revue a droit à un essai (ADR 0042) ;
+la revue dialogue avec l'agent qui corrige (ADR 0046) ; un défaut mal routé se renvoie (ADR 0047).
+Le texte exact vit aujourd'hui dans `brief.ts` et `review-thread.ts` (`agentFeedback`,
+`RESPONSE_INSTRUCTION`) ; ces fonctions pures restent et sont appelées par le script.
+
+| Origine de l'échec | Ce qui passe à l'essai suivant | Ce que l'agent reçoit |
+|---|---|---|
+| **Porte** (`checkResearch`, `checkDesign`…) | une liste de motifs (textes) | « Rejet précédent : » suivi des motifs, à la fin de sa consigne |
+| **Revue** | les **fils de défauts** (`DefectThread` : identifiant, lentille, gravité, fichier, destinataire, statut, contestation, arbitrage) | ses défauts actifs, le rappel de ceux déclarés corrigés, et la consigne de réponse (`fixed`, `contested`, `outOfScope`) |
+| **Tour interrompu** | le motif « interrompu, pas refusé ; relis, ne recommence pas » | ce motif, comme un rejet (§5.3) |
+
+Conséquences pour l'API :
+
+- **`essayer` ne transmet pas qu'un `string[]`.** Une porte rend des textes ; la revue a besoin de
+  ses fils d'un essai à l'autre, pour savoir quels défauts sont contestés, maintenus, tranchés par
+  l'humain ou corrigés. `revue()` tient ses fils dans une **variable du script** : ils se
+  recalculent au rejeu à partir des sorties journalisées des lentilles (`submit_lens_verdict`) et
+  des réponses des agents (`report_phase.responses`). Aucun champ d'état ne les porte.
+- **Le destinataire ne change pas.** En DESIGN, les deux architectes reçoivent **tous** les défauts
+  (`agentFeedback(threads, () => true)`, `reducer.ts`). En DELIVER, chaque défaut va au testeur ou
+  au développeur selon sa cible (ADR 0046), avec un renvoi possible (ADR 0047). Changer cela
+  demande d'abord une ligne au §13.
+- **La consigne envoyée est journalisée** (`consigneRef`, §10) : on relit exactement ce que l'agent
+  a reçu, motifs compris.
+- La mémoire de session n'est qu'un confort (§9.2) : un agent qui repart de zéro doit pouvoir
+  corriger avec sa seule consigne.
 
 ## 6. Le rejeu
 

@@ -5,12 +5,34 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Retour des échecs à l'agent dans un workflow (documentation seule)
+
+Branche `docs/workflows-rejouables`. Ajout de `docs/09` §5.4 : le workflow ne change rien à ce que
+l'agent reçoit après un échec (SPEC §6.6, ADR 0040, 0042, 0046, 0047). Une porte rend des textes ;
+la revue rend des **fils de défauts**, que `revue()` garde dans une variable du script, recalculée
+au rejeu. `essayer` ne transmet donc pas qu'un `string[]`.
+
+**Piège.** En DESIGN, les deux architectes reçoivent **tous** les défauts de la revue
+(`agentFeedback(threads, () => true)`, `reducer.ts`) ; le routage par cible (`target`) n'existe
+qu'en DELIVER, entre testeur et développeur. Je l'avais affirmé à tort pour DESIGN avant de relire.
+
+**Aussi discuté, sans rien écrire dans le dépôt** : faire tourner skraft dans Claude Code. Un
+workflow Claude Code ne peut ni définir d'outil, ni en attribuer par agent, ni lire un fichier ou
+lancer des tests sans passer par un agent ; la reprise ne vaut que dans la même session. Les
+outils viendraient d'un serveur MCP livré avec le plugin, mais les preuves resteraient rapportées
+par un agent (contraire à D20). Conclusion : on ne vise **pas** la compatibilité du script avec
+Claude Code ; le plugin (agents et skills) reste à éprouver (critère `skraft-plugin-autonome`).
+
+**Suite** : inchangée (`docs/09` §14, étape 2 : sessions orphelines sur une branche `fix/`).
+
+---
+
 ## 05/10 — YAML abandonné ; l'orchestration s'écrira comme un script rejouable (documentation seule)
 
 **Décision du responsable du projet**, après discussion : on arrête l'approche YAML de la veille et
 on documente l'approche « workflow rejouable », inspirée des workflows de Claude Code. **Aucun code
 de production** : on écrit d'abord toute la doc. Branche `docs/skraft-planification-hierarchique`
-(son nom date de l'approche abandonnée).
+(son nom datait de l'approche abandonnée), renommée `docs/workflows-rejouables`.
 
 **Fait.**
 - Retiré : `fonctionnalites/` (schéma, catalogue, recette, scripts Python, copies des agents et
