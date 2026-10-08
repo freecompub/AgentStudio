@@ -141,6 +141,7 @@ interface Args {
   chemins?: string[];
   agents: string[];
   texte: string;
+  etiquette?: string;
 }
 
 interface Execution {
@@ -199,7 +200,7 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
     case "creerDossier":
       return ctx.workspace.ensureDir(a.chemin);
     case "lancerTests":
-      return ctx.stack.runTests({ signal, evidence });
+      return ctx.stack.runTests({ signal, evidence: a.etiquette ? { taskId, phase: a.etiquette } : evidence });
     case "lint":
       return ctx.stack.lint({ signal, ...(a.fichiers ? { files: a.fichiers } : {}) });
     case "mutation":

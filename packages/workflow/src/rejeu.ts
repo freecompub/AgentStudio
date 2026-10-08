@@ -65,7 +65,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     fichiersModifies: (depuis) => appeler("fichiersModifies", { depuis }),
     ecrireFichier: (chemin, contenu) => appeler("ecrireFichier", { chemin, contenu }),
     creerDossier: (chemin) => appeler("creerDossier", { chemin }),
-    lancerTests: () => appeler("lancerTests", {}),
+    lancerTests: (opts = {}) => appeler("lancerTests", opts.etiquette ? { etiquette: opts.etiquette } : {}),
     lint: (fichiers) => appeler("lint", fichiers ? { fichiers: [...fichiers] } : {}),
     mutation: () => appeler("mutation", {}),
     empreinte: (motifs) => appeler("empreinte", { motifs: [...motifs] }),

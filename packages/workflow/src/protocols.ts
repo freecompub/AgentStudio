@@ -110,7 +110,8 @@ export interface W {
   fichiersModifies(depuis: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
   ecrireFichier(chemin: string, contenu: string): Promise<void>;
   creerDossier(chemin: string): Promise<void>;
-  lancerTests(): Promise<TestRun>;
+  /** Tests du projet par le cœur : la preuve est enregistrée sous `etiquette`, sinon sous la phase en cours (D20). */
+  lancerTests(opts?: { etiquette?: string }): Promise<TestRun>;
   lint(fichiers?: readonly string[]): Promise<LintReport | null>;
   mutation(): Promise<MutationReport | null>;
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources), en motifs. */

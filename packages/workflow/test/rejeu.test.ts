@@ -214,6 +214,23 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: ["interrompu", "panne"] } });
   });
 
+  it("w.lancerTests : preuve rattachée à la tâche, sous l'étiquette demandée ou la phase en cours", async () => {
+    const f = fauxContexte();
+    const vus: unknown[] = [];
+    (f.ctx.stack as { runTests: (o: unknown) => Promise<unknown> }).runTests = async (o: unknown) => (vus.push(o), { results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 });
+    await lancer(
+      decl((w) =>
+        w.phase("DISTILL", async () => {
+          await w.lancerTests();
+          await w.lancerTests({ etiquette: "DISTILL_RED" });
+          return true;
+        }),
+      ),
+      f.ctx,
+    );
+    expect(vus).toMatchObject([{ evidence: { taskId: "t1", phase: "DISTILL" } }, { evidence: { taskId: "t1", phase: "DISTILL_RED" } }]);
+  });
+
   it("w.disposition rend les emplacements de la stack du projet", async () => {
     const f = fauxContexte();
     const t = await lancer(decl(async (w) => w.disposition()), f.ctx);
