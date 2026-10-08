@@ -1,7 +1,8 @@
 # ADR 0053 — La mémoire d'un agent se déclare, et un redémarrage l'efface toujours
 
-- Statut : **décidé**, 2026-10-05 — points 4 et 5 implémentés le 2026-10-08 (branche
-  `fix/sessions-orphelines`) ; points 1 à 3 avec les workflows (`docs/09-workflows-rejouables.md` §14)
+- Statut : **décidé**, 2026-10-05 — implémenté le 2026-10-08 : points 4 et 5 sur
+  `fix/sessions-orphelines`, points 1 à 3 sur `feat/workflow-rejouable` (`memoire` dans le
+  manifeste, `w.oublier`, oubli automatique par `w.rembobiner`)
 - Précise : **D17** (une session neuve par phase ou par rôle)
 - Complète : ADR 0030 (reprise après interruption), ADR 0039 (une session par phase et par rôle,
   pas par essai), ADR 0050 (le dépôt et la mémoire reviennent au même point)
@@ -68,8 +69,8 @@ projet**, à côté des tâches (`<tasksDir>/<projet>/sessions/sessions.json`,
 `createJsonTaskSessionStore`). Raison : l'exécuteur d'agents ne connaît pas le magasin des tâches,
 et une session doit être inscrite **dès son ouverture**, avant toute transition, pour qu'un crash
 au milieu d'un tour ne la perde pas. La clé de continuité (`<taskId>/<extension>/<rôle>`) garde le
-lien avec la tâche. Avec les workflows, le journal portera aussi ses sessions (`docs/09` §10) ; le
-registre restera la source de la suppression.
+lien avec la tâche. Le journal d'un workflow ne porte pas les sessions : le registre est la seule
+source de la suppression (`docs/09` §10).
 
 - `TaskAgentRunner.releaseAll()` supprime toutes les sessions connues (Map en mémoire et registre).
 - Au démarrage d'un projet, elle est lancée sans attendre, avant la reprise des tâches : le

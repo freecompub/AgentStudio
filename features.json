@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
   "updated": "2026-10-08",
-  "branch": "fix/sessions-orphelines",
+  "branch": "feat/workflow-rejouable",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -602,8 +602,8 @@
       "id": "workflow-rejouable",
       "title": "Un workflow écrit comme un script est rejoué contre son journal : même effet suivant, reprise au bon endroit, non-déterminisme et script modifié refusés (ADR 0052)",
       "verify": "pnpm vitest run --project workflow",
-      "passes": false,
-      "notes": "À FAIRE (docs/09 §14, étape 3). Paquet `packages/workflow` à créer : createWorkflowTask(script) sur le TaskDefinition existant, w de rejeu, magasin de contenus, w.phase, essayer, memoire déclarée par agent. Le projet Vitest `workflow` n’existe pas encore : ce verify échouera tant qu’il n’est pas créé."
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
     },
     {
       "id": "skraft-research-en-workflow",

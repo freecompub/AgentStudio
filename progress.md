@@ -5,6 +5,54 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Moteur de workflows rejouables (`packages/workflow`, étape 3 de `docs/09` §14)
+
+Branche `feat/workflow-rejouable`, partie de `fix/sessions-orphelines`. Critère `workflow-rejouable`
+passé à `true` après son `verify` (29 tests). Suite complète : 1 410 tests.
+
+**Fait.**
+- `createWorkflowTask(declaration)` implémente le `TaskDefinition` existant : aucun nouveau moteur.
+  L'état est `{ script, entree, journal, contenus, fin? }`. Un effet ne porte que `{ kind, n }` :
+  `runEffect` relit ses arguments dans le journal (`EffectContext.state`), donc `pending` reste petit.
+- `rejeu.ts` : relance le script contre le journal. Appel journalisé = résultat rendu ; autres
+  arguments = **non-déterminisme**, la tâche s'arrête ; appel absent = inscrit, ne se résout pas.
+  Le script est considéré bloqué quand plus aucun appel n'arrive d'un `setImmediate` à l'autre.
+- Erreurs journalisées par nature (`tour-interrompu`, `panne`, `erreur`) et relevées sous la même
+  classe au rejeu (`TourInterrompu`, `PanneEnvironnement`, `Error`). `runEffect` attrape tout
+  lui-même : le moteur ne voit jamais d'exception d'effet, donc l'erreur garde son numéro d'appel.
+- Questions humaines : options préfixées `<n>:` pour retrouver l'appel quand plusieurs questions
+  attendent ; profils pris dans `declaration.humains`, jamais dans le script ; question non
+  déclarée = échec.
+- Magasin de contenus dans l'état : au-delà de 512 caractères, valeur rangée sous son empreinte
+  sha256 ; un fichier lu deux fois n'est stocké qu'une fois.
+- Script modifié (empreinte différente) : la tâche s'arrête en échec avec le motif.
+- `w.phase` (checkpoint unique, commit, escalade → rembobine + question relancer/sauter/abandonner),
+  `essayer` (budget, motifs transmis, première revue garantie ADR 0042, tour interrompu compté,
+  panne remontée sans consommer), `agir` (question bloquante → humain → même agent relancé).
+- `w.rembobiner` fait oublier les agents lancés depuis le checkpoint, **déduits du journal**.
+- `memoire: "tache" | "tour"` par agent dans le manifeste ; l'hôte ne donne pas de clé de
+  continuité à un agent `tour`.
+
+**Vérifié contre de faux positifs** : en cassant la comparaison des arguments, puis l'oubli au
+rembobinage, les tests correspondants échouent.
+
+**Pas encore fait (étape 4)** : `contributes.workflows` dans le manifeste, chargement du fichier de
+workflow par l'hôte, et le retrait des globaux non déterministes (`Date`, `Math.random`…) prévu
+par `docs/09` §6.4. Aujourd'hui, un script qui lit l'heure n'est **détecté** qu'au rejeu suivant.
+
+**Pièges.**
+- Un marqueur (`phase`) est journalisé avec un résultat nul dès son premier passage : il doit
+  compter dans la numérotation, sinon tous les appels suivants changent de numéro au rejeu.
+- `HUMAN_DECISION` ne dit pas à quelle demande il répond ; sans le préfixe `<n>:`, deux
+  ratifications simultanées seraient indiscernables.
+- `noUncheckedIndexedAccess` : les arguments relus du journal sont typés par une interface `Args`
+  plutôt que par `Record<string, …>`.
+
+**Suite** : étape 4, RESEARCH de skraft en workflow ; critère : `e2e-s2` et `research-gate`
+inchangés, et un script nettement plus simple que la partie de `reducer.ts` remplacée.
+
+---
+
 ## 08/10 — Sessions orphelines corrigées (ADR 0053, étape 2 de `docs/09` §14)
 
 Branche `fix/sessions-orphelines`, partie de `docs/workflows-rejouables`. Critère

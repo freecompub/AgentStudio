@@ -1,6 +1,7 @@
 # ADR 0052 — L'orchestration s'écrit comme un script rejouable
 
-- Statut : **décidé**, 2026-10-05 — non implémenté (plan : `docs/09-workflows-rejouables.md` §14)
+- Statut : **décidé**, 2026-10-05 — moteur implémenté le 2026-10-08 (`packages/workflow`), encore
+  utilisé par aucune extension (plan : `docs/09-workflows-rejouables.md` §14)
 - Précise : **D16** (orchestrateur déterministe : réducteur pur + runner d'effets)
 - S'appuie sur : D9, D10, D11, D13, D23, D24, D25, D29
 - Remplace : la proposition YAML de `docs/08` (abandonnée)

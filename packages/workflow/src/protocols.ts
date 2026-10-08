@@ -1,0 +1,143 @@
+/**
+ * Workflows rejouables (ADR 0052, `docs/09-workflows-rejouables.md`).
+ *
+ * Une orchestration est un script ordinaire. Chaque appel vers l'extérieur passe par `w` et est
+ * journalisé ; à chaque événement, le script est relancé depuis le début contre son journal :
+ * un appel journalisé rend son résultat enregistré, le premier appel absent devient l'effet suivant.
+ */
+import type { LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
+
+/** Profils qui peuvent répondre à une question humaine (D6). */
+export type Profil = "testeur" | "po" | "developpeur" | "architecte" | "administrateur";
+
+/** Valeur JSON : seul ce qui se sérialise entre dans le journal. */
+export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+
+/** Valeur rangée dans le journal : en clair, ou renvoi vers le magasin de contenus. */
+export type Range = { clair: Json } | { ref: string };
+
+/** Nature d'une erreur journalisée : elle se relève au rejeu sous la même classe. */
+export type NatureErreur = "tour-interrompu" | "panne" | "erreur";
+
+/** Un appel `w.*`, dans l'ordre où le script l'a fait. */
+export interface EntreeJournal {
+  n: number;
+  appel: NomAppel;
+  args: Range;
+  /** Absent : l'appel est demandé et attend son résultat. */
+  resultat?: Range;
+  erreur?: { nature: NatureErreur; message: string };
+}
+
+/** Appels qui produisent un effet, puis les marqueurs, résolus sans effet. */
+export type NomAppel =
+  | "agent"
+  | "humain"
+  | "lireFichier"
+  | "listerFichiers"
+  | "fichiersModifies"
+  | "ecrireFichier"
+  | "creerDossier"
+  | "lancerTests"
+  | "lint"
+  | "mutation"
+  | "empreinte"
+  | "brancher"
+  | "checkpoint"
+  | "rembobiner"
+  | "commiter"
+  | "oublier"
+  | "informer"
+  | "phase";
+
+export type Fin =
+  | { statut: "fini"; valeur: Range }
+  | { statut: "echec"; motif: string }
+  | { statut: "annule" };
+
+/** L'état persisté d'une tâche de workflow (`docs/09` §10). */
+export interface EtatWorkflow {
+  script: { nom: string; empreinte: string };
+  entree: Json;
+  journal: EntreeJournal[];
+  /** Magasin de contenus, indexé par empreinte : un même contenu n'est stocké qu'une fois. */
+  contenus: Record<string, string>;
+  fin?: Fin;
+}
+
+/** Effet émis vers le moteur : seulement le numéro d'appel, les arguments sont dans le journal. */
+export interface EffetWorkflow {
+  kind: Exclude<NomAppel, "phase">;
+  n: number;
+}
+
+export type EvenementWorkflow =
+  | { type: "RESULTAT"; n: number; resultat: Json }
+  | { type: "ERREUR"; n: number; nature: NatureErreur; message: string };
+
+/** Sortie d'un tour d'agent : la sortie validée de son outil terminal, ou sa question bloquante. */
+export type ResultatAgent<S = Record<string, unknown>> =
+  | { sortie: S; blocage?: undefined }
+  | { sortie?: undefined; blocage: { question: string; choix: string[] } };
+
+export interface OptionsAgent {
+  /** Motifs du rejet précédent, ajoutés à la consigne sous « Rejet précédent : » (SPEC §6.6). */
+  motifs?: readonly string[];
+  /** Motifs interdits en écriture pendant ce tour, en plus du périmètre du rôle (tests gelés). */
+  lectureSeule?: readonly string[];
+  /** Plus aucune écriture de test après une exécution rouge (D22). */
+  gelApresRouge?: boolean;
+}
+
+export interface OptionHumaine {
+  id: string;
+  label: string;
+}
+
+export interface Decision {
+  decision: string;
+  commentaire?: string;
+}
+
+/** L'API du script. Rien d'autre ne sort du script : pas de disque, pas d'heure, pas de hasard. */
+export interface W {
+  agent<S = Record<string, unknown>>(nom: string, consigne: string, opts?: OptionsAgent): Promise<ResultatAgent<S>>;
+  /** `id` désigne la question ; ses profils viennent de la déclaration du workflow, jamais du script. */
+  humain(id: string, question: string, options: readonly OptionHumaine[], opts?: { detail?: string; texteLibre?: boolean }): Promise<Decision>;
+  lireFichier(chemin: string): Promise<string>;
+  listerFichiers(): Promise<string[]>;
+  fichiersModifies(depuis: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
+  ecrireFichier(chemin: string, contenu: string): Promise<void>;
+  creerDossier(chemin: string): Promise<void>;
+  lancerTests(): Promise<TestRun>;
+  lint(fichiers?: readonly string[]): Promise<LintReport | null>;
+  mutation(): Promise<MutationReport | null>;
+  /** Empreinte des fichiers correspondant aux motifs : geler des tests, puis vérifier le gel (D21). */
+  empreinte(motifs: readonly string[]): Promise<string>;
+  brancher(nom: string): Promise<void>;
+  checkpoint(nom: string): Promise<string>;
+  /** Revient au checkpoint et fait oublier les agents qui ont travaillé depuis (ADR 0053). */
+  rembobiner(checkpoint: string): Promise<void>;
+  commiter(message: string, chemins?: readonly string[]): Promise<string | null>;
+  oublier(agents: readonly string[]): Promise<void>;
+  informer(texte: string): Promise<void>;
+  /** Ouvre une phase (checkpoint), exécute `fn`, commite ; à l'escalade, rembobine et demande. */
+  phase<T>(nom: string, fn: () => Promise<T>, opts?: { commit?: string }): Promise<T | undefined>;
+  /** Termine la tâche en échec, avec ce motif. */
+  echec(motif: string): never;
+}
+
+export type ScriptWorkflow<E = Json, R = unknown> = (w: W, entree: E) => Promise<R>;
+
+export interface DeclarationWorkflow<E = Json> {
+  /** Nom de la tâche dans le moteur. */
+  nom: string;
+  script: ScriptWorkflow<E>;
+  /**
+   * Empreinte du fichier de workflow (ADR 0052) : une tâche commencée refuse de reprendre avec un
+   * autre script. Absente : empreinte du texte de la fonction `script`.
+   */
+  empreinte?: string;
+  /** Qui peut répondre à quelle question (D6). Une question non déclarée est refusée. */
+  humains?: Record<string, readonly Profil[]>;
+}

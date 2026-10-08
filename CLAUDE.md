@@ -25,14 +25,15 @@ les blocages de J1 (jeton Copilot, Electron injouable) sont levés depuis le 202
 (`docs/jalons/J1-blocages.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
 Orchestration : passage décidé à des **workflows rejouables** (script ordinaire, appels journalisés,
-reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`), **pas encore
-implémenté** — skraft et tdd tournent toujours sur leur réducteur. L'approche YAML de `docs/08` est
+reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`). Le moteur existe
+(`packages/workflow` : `createWorkflowTask`, `essayer`, `agir`) mais **aucune extension ne s'en
+sert encore** — skraft et tdd tournent toujours sur leur réducteur. L'approche YAML de `docs/08` est
 abandonnée.
 
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # projets : core, task-engine, workspace, stack-adapters, runtime-copilot, github-auth,
+pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
                                 #            extension-packaging, ext-tdd, ext-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test

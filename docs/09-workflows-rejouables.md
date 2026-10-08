@@ -1,7 +1,8 @@
 # Workflows rejouables : l'orchestration écrite comme un script
 
-- Statut : **direction retenue le 2026-10-05**, rien d'implémenté. Décisions : ADR 0052
-  (orchestration par script rejouable) et ADR 0053 (cycle de vie des sessions).
+- Statut : **direction retenue le 2026-10-05**. Décisions : ADR 0052 (orchestration par script
+  rejouable) et ADR 0053 (cycle de vie des sessions). Étapes 2 et 3 du §14 faites le 2026-10-08
+  (sessions orphelines ; moteur `packages/workflow`) ; aucune extension ne s'en sert encore.
 - Remplace : l'approche YAML de `docs/08` (abandonnée, raisons dans ce document).
 - Inspiration : les workflows de Claude Code (un en-tête déclaratif, un script qui orchestre des
   agents, une reprise par rejeu d'un journal).
@@ -437,6 +438,18 @@ dates). C'est `state` qui devient un journal :
 | `checkpoints` | rembobiner et faire oublier exactement les bons agents |
 | `inflight` (enveloppe) | crash pendant un appel : retour à son checkpoint, et l'appel est refait |
 | `phase`, `status` (enveloppe) | la carte de tâche, sans rien exécuter |
+
+**Écart de l'implémentation (2026-10-08, `packages/workflow`).** `sessions` et `checkpoints` ne
+sont pas des champs de l'état :
+
+- les sessions sont inscrites dans le registre du projet dès leur ouverture (ADR 0053, mise en
+  œuvre du point 4) : l'exécuteur d'agents ne voit pas l'état de la tâche, et une session doit être
+  connue avant toute transition ;
+- les agents à oublier au rembobinage se **déduisent du journal** (`agentsDepuis` : les appels
+  `agent` qui suivent l'appel `checkpoint` visé). Une seule source, rien à tenir à jour.
+
+L'état réel est donc `{ script, entree, journal, contenus, fin? }` ; les arguments et résultats
+sont rangés en clair sous 512 caractères, sinon par renvoi `{ ref }` au magasin `contenus`.
 
 **Ce qui n'y est pas :**
 

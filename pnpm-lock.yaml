@@ -301,6 +301,19 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/workflow:
+    dependencies:
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../task-engine
+    devDependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/workspace: {}
 
 packages:
