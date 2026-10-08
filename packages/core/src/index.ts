@@ -41,6 +41,8 @@ export { createLazyRuntime } from "./agents/lazy-runtime.js";
 export { MODEL_CLASSES, resolveModel, type ModelClass, type ModelPreferences } from "./agents/model-class.js";
 export { MemoryInteractionStore } from "./testing/memory-doubles.js";
 export { createJsonInteractionStore } from "./interactions/json-interaction-store.js";
+export { createJsonTaskSessionStore } from "./agents/json-task-session-store.js";
+export type { TaskSessionEntry, TaskSessionStore } from "./protocols/task-sessions.js";
 export type * from "./protocols/evidence.js";
 export { createJsonEvidenceStore } from "./evidence/json-evidence-store.js";
 export { composeGuards } from "./guards/compose-guards.js";

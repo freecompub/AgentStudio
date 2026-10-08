@@ -1,5 +1,6 @@
 import type { Evidence, EvidenceStore } from "../protocols/evidence.js";
 import type { InteractionRequest, InteractionStore } from "../protocols/interactions.js";
+import type { TaskSessionEntry, TaskSessionStore } from "../protocols/task-sessions.js";
 import type {
   Clock,
   ConversationRecord,
@@ -67,5 +68,25 @@ export class MemoryEvidenceStore implements EvidenceStore {
 
   async list(taskId: string): Promise<Evidence[]> {
     return this.items.filter((e) => e.taskId === taskId).map((e) => structuredClone(e));
+  }
+}
+
+export class MemoryTaskSessionStore implements TaskSessionStore {
+  entries: TaskSessionEntry[] = [];
+
+  constructor(initial: TaskSessionEntry[] = []) {
+    this.entries = [...initial];
+  }
+
+  async add(entry: TaskSessionEntry): Promise<void> {
+    if (!this.entries.some((e) => e.sessionId === entry.sessionId)) this.entries.push({ ...entry });
+  }
+
+  async remove(sessionId: string): Promise<void> {
+    this.entries = this.entries.filter((e) => e.sessionId !== sessionId);
+  }
+
+  async list(): Promise<TaskSessionEntry[]> {
+    return this.entries.map((e) => ({ ...e }));
   }
 }

@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
   "updated": "2026-10-08",
-  "branch": "docs/workflows-rejouables",
+  "branch": "fix/sessions-orphelines",
   "items": [
     {
       "id": "j5-profil-schema",
@@ -595,8 +595,8 @@
       "id": "sessions-orphelines-au-redemarrage",
       "title": "Après un crash, un redémarrage ou une fermeture, aucune session d’agent ne reste sur le disque (ADR 0053)",
       "verify": "pnpm vitest run --project core -t \"sessions supprimées au redémarrage\"",
-      "passes": false,
-      "notes": "À FAIRE (docs/09 §14, étape 2), indépendant des workflows. Aujourd’hui le lien rôle → session ne vit que dans la Map `reprenables` de task-agent-runner.ts : après un crash, les sessions côté Copilot CLI restent orphelines. Il faut persister les identifiants avec la tâche et appeler deleteSession au redémarrage et à la fermeture."
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche fix/sessions-orphelines). Chaque session est inscrite dès son ouverture dans un registre par projet (createJsonTaskSessionStore, <tasksDir>/<projet>/sessions/) ; TaskAgentRunner.releaseAll() supprime tout, lancée à l’ouverture du projet et attendue à la fermeture (workspace-services). Test côté application : apps/desktop/test/workspace-services.test.ts « ADR 0053 »."
     },
     {
       "id": "workflow-rejouable",

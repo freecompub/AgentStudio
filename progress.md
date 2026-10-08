@@ -5,6 +5,46 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Sessions orphelines corrigées (ADR 0053, étape 2 de `docs/09` §14)
+
+Branche `fix/sessions-orphelines`, partie de `docs/workflows-rejouables`. Critère
+`sessions-orphelines-au-redemarrage` passé à `true` après son `verify`.
+
+**Fait.**
+- Port `TaskSessionStore` (`packages/core/src/protocols/task-sessions.ts`) et registre JSON
+  `createJsonTaskSessionStore` : un fichier `sessions.json` par projet, écriture atomique.
+- `task-agent-runner.ts` : chaque session est **inscrite dès son ouverture** (avant le tour : un
+  crash au milieu du tour ne la perd pas) et retirée quand le runtime l'a supprimée. Nouvelle
+  méthode `releaseAll()` : Map en mémoire + registre. Commentaire d'en-tête périmé (d'avant
+  l'ADR 0039) corrigé.
+- `workspace-services.ts` : `releaseAll()` lancée **sans attendre** à l'ouverture du projet, avant
+  `engine.resumeAll()`, et **attendue** dans `dispose()` (fermeture normale = crash).
+- Double `MemoryTaskSessionStore` dans `@agent-studio/core/testing`.
+- Tests : `packages/core/test/sessions-orphelines.test.ts` (crash après un tour gardé, crash au
+  milieu d'un tour, toutes tâches, fermeture, suppression refusée, écritures simultanées, fichier
+  illisible) et un test de branchement dans `apps/desktop/test/workspace-services.test.ts`,
+  vérifié en échec quand on retire l'appel de `dispose()`.
+
+**Décisions et raisons.**
+- **Registre par projet plutôt que dans le fichier de la tâche** (l'ADR 0053 disait « avec la
+  tâche ») : l'exécuteur ne connaît pas le magasin des tâches, et l'inscription doit précéder toute
+  transition. La clé `<taskId>/<extension>/<rôle>` garde le lien. Noté dans l'ADR 0053.
+- **Purge au démarrage sans attendre** : s'il reste des sessions, elle démarre le runtime Copilot,
+  ce qui ne doit pas bloquer l'ouverture du projet. Pas de course : `releaseAll` met la lecture du
+  registre en file avant toute inscription des tâches reprises.
+- **Suppression refusée = identifiant gardé** : le démarrage suivant réessaie.
+
+**Pièges.**
+- Les lentilles ouvrent leurs sessions en parallèle : sans file d'attente sur le registre, deux
+  lectures-écritures entrelacées perdaient une inscription (test « inscriptions simultanées »).
+- Les tests de `workspace-services` utilisent `tasksDir: "/inutile"` : sans registre injecté, le
+  registre par défaut aurait tenté d'écrire là (échec seulement journalisé). Ils injectent désormais
+  `MemoryTaskSessionStore`.
+
+**Suite** : étape 3 de `docs/09` §14, `packages/workflow` en TDD.
+
+---
+
 ## 08/10 — Retour des échecs à l'agent dans un workflow (documentation seule)
 
 Branche `docs/workflows-rejouables`. Ajout de `docs/09` §5.4 : le workflow ne change rien à ce que

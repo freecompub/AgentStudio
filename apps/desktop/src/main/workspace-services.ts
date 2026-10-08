@@ -7,6 +7,7 @@ import {
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
+  createJsonTaskSessionStore,
   createProgressReporter,
   createJsonlTraceStore,
   createUsageRecorder,
@@ -21,6 +22,7 @@ import {
   type Clock,
   type EvidenceStore,
   type InteractionStore,
+  type TaskSessionStore,
   type IdGenerator,
   type Logger,
 } from "@agent-studio/core";
@@ -73,6 +75,8 @@ export interface WorkspaceServicesConfig {
   taskStore?: TaskStore;
   evidenceStore?: EvidenceStore;
   interactionStore?: InteractionStore;
+  /** Registre des sessions d'agent ouvertes (ADR 0053). */
+  taskSessionStore?: TaskSessionStore;
   usageRecorder?: UsageRecorder;
   /** Unité d'usage du runtime (`RuntimeCapabilities.usageUnit`). */
   usageUnit?: "requests" | "tokens";
@@ -272,8 +276,16 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
       // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
       trace: traceStore,
+      // Chaque session ouverte est inscrite ici : un crash ne la rend plus orpheline (ADR 0053).
+      sessions: cfg.taskSessionStore ?? createJsonTaskSessionStore(join(cfg.tasksDir, projectKey, "sessions")),
       ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
     });
+    // Au démarrage, les sessions encore inscrites sont celles d'un crash ou d'une fermeture
+    // interrompue : on les supprime, et chaque agent repartira neuf (ADR 0053). Sans attendre :
+    // si des sessions restent, cela démarre le runtime, ce qui ne doit pas bloquer l'ouverture du
+    // projet. Le registre est lu avant toute nouvelle inscription, donc les sessions des tâches
+    // reprises ci-dessous ne sont pas visées.
+    void agents.releaseAll().catch((err: unknown) => cfg.logger?.warn("purge des sessions impossible", { error: String(err) }));
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
     for (const ext of sources) {
@@ -330,6 +342,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         reporter.dispose();
         offInteractions();
         for (const h of handles) await h.deactivate();
+        // Fermeture normale traitée comme un crash (ADR 0053) : aucune session ne survit au
+        // processus, pas même celles d'une tâche en attente d'une réponse humaine.
+        await agents.releaseAll().catch((err: unknown) => cfg.logger?.warn("libération des sessions impossible", { error: String(err) }));
       },
     };
   };

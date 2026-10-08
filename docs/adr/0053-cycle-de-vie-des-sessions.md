@@ -1,6 +1,7 @@
 # ADR 0053 — La mémoire d'un agent se déclare, et un redémarrage l'efface toujours
 
-- Statut : **décidé**, 2026-10-05 — non implémenté (plan : `docs/09-workflows-rejouables.md` §14)
+- Statut : **décidé**, 2026-10-05 — points 4 et 5 implémentés le 2026-10-08 (branche
+  `fix/sessions-orphelines`) ; points 1 à 3 avec les workflows (`docs/09-workflows-rejouables.md` §14)
 - Précise : **D17** (une session neuve par phase ou par rôle)
 - Complète : ADR 0030 (reprise après interruption), ADR 0039 (une session par phase et par rôle,
   pas par essai), ADR 0050 (le dépôt et la mémoire reviennent au même point)
@@ -59,3 +60,20 @@ la pause.
   simule le crash).
 - La question des « sessions conservées » au-delà de l'orchestration ne se pose plus : une session
   vit au plus le temps de sa tâche, et au plus le temps du processus qui l'a ouverte.
+
+## Mise en œuvre du point 4 (2026-10-08)
+
+Les identifiants ne sont pas écrits dans le fichier de chaque tâche mais dans un **registre par
+projet**, à côté des tâches (`<tasksDir>/<projet>/sessions/sessions.json`,
+`createJsonTaskSessionStore`). Raison : l'exécuteur d'agents ne connaît pas le magasin des tâches,
+et une session doit être inscrite **dès son ouverture**, avant toute transition, pour qu'un crash
+au milieu d'un tour ne la perde pas. La clé de continuité (`<taskId>/<extension>/<rôle>`) garde le
+lien avec la tâche. Avec les workflows, le journal portera aussi ses sessions (`docs/09` §10) ; le
+registre restera la source de la suppression.
+
+- `TaskAgentRunner.releaseAll()` supprime toutes les sessions connues (Map en mémoire et registre).
+- Au démarrage d'un projet, elle est lancée sans attendre, avant la reprise des tâches : le
+  registre est lu avant toute nouvelle inscription.
+- À la fermeture normale (`dispose`), elle est attendue.
+- Une suppression refusée par le runtime laisse l'identifiant inscrit : le démarrage suivant
+  réessaie.
