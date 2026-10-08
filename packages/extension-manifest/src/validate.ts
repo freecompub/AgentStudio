@@ -41,6 +41,8 @@ const schema = z.object({
           tools: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)).optional(),
           // Classe de modèle (ADR 0048) : jamais un identifiant — le projet choisit le modèle réel.
           modelClass: z.enum(["strong", "standard", "light"]).optional(),
+          // Mémoire de l'agent (ADR 0053) : gardée d'un tour à l'autre dans la tâche, ou neuve à chaque appel.
+          memoire: z.enum(["tache", "tour"]).optional(),
         }),
       )
       .optional(),

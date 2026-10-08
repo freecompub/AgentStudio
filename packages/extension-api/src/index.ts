@@ -67,6 +67,12 @@ export interface ManifestAgent {
    * associe chaque classe à un modèle réel. Absente : le modèle du projet, ou le runtime décide.
    */
   modelClass?: "strong" | "standard" | "light";
+  /**
+   * Mémoire de l'agent (ADR 0053) : `tache` (défaut) garde sa session d'un tour à l'autre dans la
+   * même tâche (ADR 0039) ; `tour` repart d'une session neuve à chaque appel — une lentille de
+   * revue qui doit juger sans se souvenir de son verdict précédent. Le script ne peut pas la changer.
+   */
+  memoire?: "tache" | "tour";
 }
 
 /** Skill : dossier contenant `SKILL.md` (ou fichier `.md`), relatif au dossier de l'extension. */

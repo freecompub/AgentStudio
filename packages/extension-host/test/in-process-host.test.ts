@@ -179,6 +179,30 @@ describe("Hôte d'extension en processus", () => {
     }
   });
 
+  it("mémoire déclarée par agent (ADR 0053) : « tour » repart toujours neuf, « tache » (défaut) garde sa session", async () => {
+    const manifest: ExtensionManifest = {
+      ...MANIFEST,
+      contributes: {
+        ...MANIFEST.contributes,
+        agents: [
+          { name: "writer", title: "Rédacteur", role: "r", output: "report_phase", write: ["tests/**"] },
+          { name: "lens", title: "Lentille", role: "r", output: "report_phase", memoire: "tour" },
+        ],
+      },
+    };
+    const env = setup(manifest);
+    const cles: (string | undefined)[] = [];
+    env.deps.agents = {
+      run: async (_s, _p, opts) => (cles.push(opts?.resumeKey), { output: { summary: "", files: [] } as never }),
+      releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {},
+    };
+    let ctx!: ExtensionContext;
+    await activateInProcess({ manifest, module: { activate: (c) => void (ctx = c) } }, env.deps);
+    await ctx.agents.run("writer", "x", { evidence: { taskId: "t1" } });
+    await ctx.agents.run("lens", "x", { evidence: { taskId: "t1" } });
+    expect(cles).toEqual(["t1/diabeo.demo/writer", undefined]);
+  });
+
   it("une capacité non déclarée est refusée (D11)", async () => {
     const manifest: ExtensionManifest = { ...MANIFEST, permissions: ["fs:read"] , contributes: { ...MANIFEST.contributes, agents: [] } };
     const { ctx } = await activateWith(() => {}, manifest);
