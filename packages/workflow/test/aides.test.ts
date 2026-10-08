@@ -1,7 +1,7 @@
 import { EnvFailureError } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
 import { agir, essayer } from "../src/aides.js";
-import { Escalade, PanneEnvironnement, TourInterrompu } from "../src/erreurs.js";
+import { Escalade, PanneEnvironnement, SauterPhase, TourInterrompu } from "../src/erreurs.js";
 import type { DeclarationWorkflow, W } from "../src/protocols.js";
 import { fauxContexte, lancer, sortie } from "./faux-contexte.js";
 
@@ -155,6 +155,22 @@ describe("w.phase : checkpoint, commit, escalade (docs/09 §5.2)", () => {
     await t.engine.idle(t.id);
     expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: "après" } });
     expect(f.appels).not.toContain("commit:docs: DESIGN");
+  });
+
+  it("SauterPhase levée par le script : la phase est rembobinée et sautée, sans nouvelle question", async () => {
+    const f = fauxContexte();
+    const t = await lancer(
+      decl(async (w) => {
+        const r = await w.phase("DELIVER", async () => {
+          throw new SauterPhase();
+        });
+        return r === undefined ? "sautée" : "faite";
+      }),
+      f.ctx,
+    );
+    expect(f.rembobinages).toEqual(["cp-1"]);
+    expect(f.demandes).toEqual([]);
+    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: "sautée" } });
   });
 
   it("abandonner : la tâche se termine en échec avec le motif de l'escalade", async () => {

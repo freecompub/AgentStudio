@@ -5,7 +5,7 @@
  * journalisé ; à chaque événement, le script est relancé depuis le début contre son journal :
  * un appel journalisé rend son résultat enregistré, le premier appel absent devient l'effet suivant.
  */
-import type { LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
+import type { ArchitectureReport, DependencyRule, Evidence, LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
 
 /** Profils qui peuvent répondre à une question humaine (D6). */
 export type Profil = "testeur" | "po" | "developpeur" | "architecte" | "administrateur";
@@ -43,6 +43,8 @@ export type NomAppel =
   | "mutation"
   | "empreinte"
   | "disposition"
+  | "preuves"
+  | "architecture"
   | "brancher"
   | "checkpoint"
   | "rembobiner"
@@ -88,6 +90,8 @@ export interface OptionsAgent {
   lectureSeule?: readonly string[];
   /** Plus aucune écriture de test après une exécution rouge (D22). */
   gelApresRouge?: boolean;
+  /** Rattachement des preuves de l'agent (`run_tests`) : étape (scénario), phase si elle diffère. */
+  preuve?: { phase?: string; etape?: string };
 }
 
 export interface OptionHumaine {
@@ -111,11 +115,15 @@ export interface W {
   ecrireFichier(chemin: string, contenu: string): Promise<void>;
   creerDossier(chemin: string): Promise<void>;
   /** Tests du projet par le cœur : la preuve est enregistrée sous `etiquette`, sinon sous la phase en cours (D20). */
-  lancerTests(opts?: { etiquette?: string }): Promise<TestRun>;
+  lancerTests(opts?: { etiquette?: string; etape?: string }): Promise<TestRun>;
+  /** Preuves de la tâche, dans l'ordre : produites par le cœur, en lecture seule (D20). */
+  preuves(): Promise<Evidence[]>;
+  /** Contrôle des règles de dépendance entre modules ; `null` si la stack ne sait pas l'analyser. */
+  architecture(regles: readonly DependencyRule[]): Promise<ArchitectureReport | null>;
   lint(fichiers?: readonly string[]): Promise<LintReport | null>;
   mutation(): Promise<MutationReport | null>;
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources), en motifs. */
-  disposition(): Promise<{ acceptanceTests: string[]; unitTests: string[]; sources: string[] }>;
+  disposition(): Promise<{ acceptanceTests: string[]; unitTests: string[]; sources: string[]; infrastructureModules: string[] }>;
   /** Empreinte des fichiers correspondant aux motifs : geler des tests, puis vérifier le gel (D21). */
   empreinte(motifs: readonly string[]): Promise<string>;
   brancher(nom: string): Promise<void>;

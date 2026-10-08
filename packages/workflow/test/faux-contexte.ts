@@ -82,14 +82,14 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
     },
     stack: {
       layout: { acceptanceTests: [], unitTests: [], sources: [] },
-      infrastructureModules: [],
+      infrastructureModules: ["Infrastructure"],
       async runTests(): Promise<TestRun> {
         appels.push("tests");
         return { results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 } as unknown as TestRun;
       },
       isTestFile: () => false,
       mutation: async () => null,
-      architecture: async () => null,
+      architecture: async (regles: unknown) => ({ modules: [], violations: [], regles }),
       lint: async () => null,
     },
     interactions: {
@@ -104,6 +104,11 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
       post: (m: string) => void messages.push(m),
     },
     log: { info() {}, warn() {} },
+    evidence: {
+      async list(taskId: string) {
+        return [{ taskId, phase: "DELIVER_RED", counts: { passed: 0, failed: 1, skipped: 0 } }];
+      },
+    },
     trace: {
       async rejected(_taskId: string, label: string, files: { path: string; content: string }[]) {
         archives.push({ label, files: [...files] });

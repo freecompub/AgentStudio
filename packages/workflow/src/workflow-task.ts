@@ -142,6 +142,9 @@ interface Args {
   agents: string[];
   texte: string;
   etiquette?: string;
+  etape?: string;
+  preuve?: { phase?: string; etape?: string };
+  regles: { module: string; forbidden: string[] }[];
 }
 
 interface Execution {
@@ -171,7 +174,7 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
     case "agent": {
       const r = await ctx.agents.run(a.nom, a.consigne, {
         signal,
-        evidence,
+        evidence: { ...evidence, ...(a.preuve?.phase ? { phase: a.preuve.phase } : {}), ...(a.preuve?.etape ? { stepId: a.preuve.etape } : {}) },
         ...(a.lectureSeule ? { readOnly: a.lectureSeule } : {}),
         ...(a.gelApresRouge ? { freezeTestsAfterRed: true } : {}),
       });
@@ -200,7 +203,11 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
     case "creerDossier":
       return ctx.workspace.ensureDir(a.chemin);
     case "lancerTests":
-      return ctx.stack.runTests({ signal, evidence: a.etiquette ? { taskId, phase: a.etiquette } : evidence });
+      return ctx.stack.runTests({ signal, evidence: { ...evidence, ...(a.etiquette ? { phase: a.etiquette } : {}), ...(a.etape ? { stepId: a.etape } : {}) } });
+    case "preuves":
+      return ctx.evidence.list(taskId);
+    case "architecture":
+      return ctx.stack.architecture(a.regles);
     case "lint":
       return ctx.stack.lint({ signal, ...(a.fichiers ? { files: a.fichiers } : {}) });
     case "mutation":
@@ -209,7 +216,7 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return ctx.workspace.fingerprint(a.motifs);
     case "disposition": {
       const { acceptanceTests, unitTests, sources } = ctx.stack.layout;
-      return { acceptanceTests, unitTests, sources };
+      return { acceptanceTests, unitTests, sources, infrastructureModules: [...ctx.stack.infrastructureModules] };
     }
     case "brancher":
       return ctx.git.branch(a.nom);

@@ -231,10 +231,39 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect(vus).toMatchObject([{ evidence: { taskId: "t1", phase: "DISTILL" } }, { evidence: { taskId: "t1", phase: "DISTILL_RED" } }]);
   });
 
-  it("w.disposition rend les emplacements de la stack du projet", async () => {
+  it("w.disposition rend les emplacements de la stack du projet et ses modules d'infrastructure", async () => {
     const f = fauxContexte();
     const t = await lancer(decl(async (w) => w.disposition()), f.ctx);
-    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: { acceptanceTests: [], sources: [], unitTests: [] } } });
+    expect((await t.record()).state.fin).toEqual({
+      statut: "fini",
+      valeur: { clair: { acceptanceTests: [], infrastructureModules: ["Infrastructure"], sources: [], unitTests: [] } },
+    });
+  });
+
+  it("w.preuves rend les preuves de la tâche ; w.architecture contrôle les règles de dépendance", async () => {
+    const f = fauxContexte();
+    const t = await lancer(
+      decl(async (w) => ({ preuves: await w.preuves(), architecture: await w.architecture([{ module: "Domain", forbidden: ["Infrastructure"] }]) })),
+      f.ctx,
+    );
+    expect((await t.record()).state.fin).toMatchObject({
+      valeur: { clair: { preuves: [{ taskId: "t1", phase: "DELIVER_RED" }], architecture: { regles: [{ module: "Domain", forbidden: ["Infrastructure"] }] } } },
+    });
+  });
+
+  it("preuves rattachées à une étape : w.lancerTests et w.agent passent l'étape (scénario) au cœur", async () => {
+    const f = fauxContexte({ dev: () => sortie({ summary: "" }) });
+    const vus: unknown[] = [];
+    (f.ctx.stack as { runTests: (o: unknown) => Promise<unknown> }).runTests = async (o: unknown) => (vus.push(o), { results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 });
+    await lancer(
+      decl(async (w) => {
+        await w.lancerTests({ etiquette: "DELIVER_RED", etape: "ac-1" });
+        await w.agent("dev", "", { preuve: { etape: "ac-1" } });
+      }),
+      f.ctx,
+    );
+    expect(vus).toMatchObject([{ evidence: { taskId: "t1", phase: "DELIVER_RED", stepId: "ac-1" } }]);
+    expect(f.consignes[0]!.opts).toMatchObject({ evidence: { taskId: "t1", stepId: "ac-1" } });
   });
 
   it("w.echec termine la tâche en échec avec son motif", async () => {

@@ -27,6 +27,18 @@ export class EchecWorkflow extends Error {
   }
 }
 
+/**
+ * Levée par le script quand l'humain a décidé de sauter la phase en cours lors d'une escalade que
+ * le script a posée lui-même (un scénario de DELIVER, par exemple) : `w.phase` rembobine au
+ * checkpoint de la phase et rend `undefined`, sans poser d'autre question.
+ */
+export class SauterPhase extends Error {
+  constructor() {
+    super("phase sautée par l'humain");
+    this.name = "SauterPhase";
+  }
+}
+
 /** Levée par `essayer` quand le budget est épuisé ; `w.phase` la transforme en question à l'humain. */
 export class Escalade extends Error {
   constructor(readonly motifs: readonly string[]) {

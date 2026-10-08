@@ -1,5 +1,5 @@
 import { canon, ranger, relire } from "./contenus.js";
-import { EchecWorkflow, Escalade, PanneEnvironnement, TourInterrompu } from "./erreurs.js";
+import { EchecWorkflow, Escalade, PanneEnvironnement, SauterPhase, TourInterrompu } from "./erreurs.js";
 import type { DeclarationWorkflow, EntreeJournal, EtatWorkflow, Fin, NatureErreur, NomAppel, OptionHumaine, W } from "./protocols.js";
 
 /** Promesse qui ne se résout jamais : l'appel attend son résultat, le script s'arrête là. */
@@ -55,6 +55,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
         consigne: opts.motifs?.length ? `${consigne}\n\nRejet précédent :\n${opts.motifs.map((m) => `  - ${m}`).join("\n")}` : consigne,
         ...(opts.lectureSeule?.length ? { lectureSeule: [...opts.lectureSeule] } : {}),
         ...(opts.gelApresRouge ? { gelApresRouge: true } : {}),
+        ...(opts.preuve ? { preuve: { ...opts.preuve } } : {}),
       }),
     humain: async (id, question, options, opts = {}) => {
       if (decl.humains && !(id in decl.humains)) throw new Error(`Question humaine « ${id} » non déclarée dans le workflow ${decl.nom}`);
@@ -65,7 +66,9 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     fichiersModifies: (depuis) => appeler("fichiersModifies", { depuis }),
     ecrireFichier: (chemin, contenu) => appeler("ecrireFichier", { chemin, contenu }),
     creerDossier: (chemin) => appeler("creerDossier", { chemin }),
-    lancerTests: (opts = {}) => appeler("lancerTests", opts.etiquette ? { etiquette: opts.etiquette } : {}),
+    lancerTests: (opts = {}) => appeler("lancerTests", { ...(opts.etiquette ? { etiquette: opts.etiquette } : {}), ...(opts.etape ? { etape: opts.etape } : {}) }),
+    preuves: () => appeler("preuves", {}),
+    architecture: (regles) => appeler("architecture", { regles: regles.map((r) => ({ ...r })) }),
     lint: (fichiers) => appeler("lint", fichiers ? { fichiers: [...fichiers] } : {}),
     mutation: () => appeler("mutation", {}),
     empreinte: (motifs) => appeler("empreinte", { motifs: [...motifs] }),
@@ -90,6 +93,11 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
           if (opts.commit) await w.commiter(opts.commit);
           return v;
         } catch (e) {
+          if (e instanceof SauterPhase) {
+            await w.rembobiner(cp);
+            await opts.apresRembobinage?.();
+            return undefined;
+          }
           if (e instanceof Escalade) motif = e.message;
           else if (e instanceof PanneEnvironnement) motif = `panne d'environnement : ${e.message}`;
           else throw e;
