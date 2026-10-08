@@ -30,7 +30,10 @@ reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`). Le mot
 sur leur réducteur ; l'essai est `extensions/skraft-workflow` (`/skraft-workflow`, pipeline
 complet), extension **indépendante de skraft** : elle n'en importe rien, ses copies divergent.
 Les deux coexistent le temps de les comparer avec Copilot (ADR 0054) : une correction dans l'une
-ne se reporte pas seule dans l'autre. L'approche YAML de `docs/08` est
+ne se reporte pas seule dans l'autre.
+**Décidé le 08/10 (ADR 0055, `docs/11`)** : un workflow n'est plus une extension mais un **dossier**
+(`workflow.mjs` en JavaScript, `meta` littéral en tête, agents, skills, contrôles), sur la machine
+(`~/.agent-studio/workflows/`) ou dans le projet (`.agent-studio/workflows/`) ; pas encore implémenté. L'approche YAML de `docs/08` est
 abandonnée.
 
 ```bash

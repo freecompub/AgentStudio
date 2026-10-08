@@ -2,6 +2,8 @@
 
 - Statut : **plan**, 2026-10-08. Rien n'est lancé ; les prérequis (§5) sont à développer d'abord.
 - Contexte : ADR 0054 (les deux extensions coexistent le temps de les comparer), `docs/09`.
+- **Depuis l'ADR 0055**, l'objet comparé au réducteur est le **workflow `skraft`** au nouveau format
+  (dossier, `docs/11`), une fois converti ; le banc (P3) lance une commande, extension ou workflow.
 - Projet d'essai : `/home/diabeo/Projets/exemple-dotnet-tdd` (.NET 10, xUnit, rapport JUnit,
   `.agent-studio/stack.yaml`), story `stories/US-2.md` (remise par palier de quantité, cinq
   critères, une question ouverte). Historique : `docs/06-run-us-2-problemes-et-solutions.md`,

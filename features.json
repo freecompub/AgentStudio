@@ -606,6 +606,41 @@
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
     },
     {
+      "id": "workflow-dossier-chargeur",
+      "title": "Les workflows sont trouvés sur la machine et dans le projet (copie à la main comprise), le projet l'emporte, et un meta non littéral ou trop permissif est refusé avec son motif (docs/11 §11, étape 2)",
+      "verify": "À DÉFINIR à l’implémentation (docs/11)",
+      "passes": false,
+      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+    },
+    {
+      "id": "workflow-dossier-isole",
+      "title": "Le script d'un workflow tourne dans un processus isolé dédié, sans heure, hasard, minuteries, réseau ni modules Node, ses appels w.* bornés par le meta (docs/11 §11, étape 3)",
+      "verify": "À DÉFINIR à l’implémentation (docs/11)",
+      "passes": false,
+      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+    },
+    {
+      "id": "workflow-dossier-accord",
+      "title": "Accord de l'utilisateur par empreinte du dossier à la première exécution et à chaque modification ; dossier gelé pendant une tâche (docs/11 §11, étape 4)",
+      "verify": "À DÉFINIR à l’implémentation (docs/11)",
+      "passes": false,
+      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+    },
+    {
+      "id": "workflow-dossier-lancement",
+      "title": "Un workflow se lance par sa commande, ou sur proposition de l'agent principal confirmée par l'utilisateur (docs/11 §11, étape 5)",
+      "verify": "À DÉFINIR à l’implémentation (docs/11)",
+      "passes": false,
+      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+    },
+    {
+      "id": "workflow-skraft-javascript",
+      "title": "Le workflow skraft en JavaScript, chargé depuis un dossier de projet, passe les jumeaux e2e-s2 à e2e-s6 et le test de reprise ; ADR rattachés à leur US par le slug (docs/11 §11, étape 6)",
+      "verify": "À DÉFINIR à l’implémentation (docs/11)",
+      "passes": false,
+      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+    },
+    {
       "id": "mesure-workflow-rejets-traces",
       "title": "Chaque rejeu du workflow est tracé avec son étape, sa porte et ses motifs exacts (prérequis P1 de docs/10)",
       "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",

@@ -5,6 +5,35 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Un workflow est un dossier, pas une extension (ADR 0055, `docs/11`)
+
+Décidé **point par point** avec le responsable, après comparaison avec les workflows dynamiques de
+Claude Code et de Copilot (vérifiée sur leur documentation). Rien d'implémenté.
+
+**Les décisions, en bref** : écrits par nous, utilisés par l'agent principal ; lancés par commande
+ou proposés par l'agent puis confirmés ; un dossier (`workflow.mjs` en JavaScript, `meta` littéral
+en tête, agents, skills, contrôles, revue) ; sur la machine ou dans le projet, copie à la main
+comprise, le projet l'emporte ; accord par empreinte et gel pendant la tâche ; agents et leurs
+droits dans le `meta`, fichiers d'agents réduits au contenu ; plus de `render_adr` : ADR rattaché
+à l'US par une ligne `Story : <slug>` écrite par le code, modifiable tant qu'il est « Proposé » ;
+skraft-workflow converti, l'extension skraft reste pour la comparaison.
+
+**Ce que la discussion a corrigé en route** (à ne pas refaire) :
+- les droits des agents étaient d'abord dans l'en-tête des fichiers d'agents ; le responsable les
+  a voulus dans le `meta` — un seul endroit pour la sécurité, et des fichiers d'agents partageables ;
+- l'appartenance d'un ADR à son US passait d'abord par la branche ; le responsable a rappelé que
+  le slug existe dès la première étape : c'est lui qui fait foi, et c'est le code qui l'écrit ;
+- la règle de modification d'un ADR doit tenir après un arrêt et une reprise : elle se lit donc
+  dans le fichier, pas dans l'état d'une tâche.
+
+**Remplacé** : ADR 0052 points 4 et 5, `docs/09` §3 et §8, `contributes.workflows`. Le moteur
+rejouable reste.
+
+**Suite** (`docs/11` §11) : chargeur et `meta`, exécution isolée, accord et gel, lancement, puis
+skraft converti en JavaScript ; la comparaison `docs/10` portera sur ce workflow.
+
+---
+
 ## 08/10 — Plan de comparaison skraft / skraft-workflow sur US-2 (`docs/10`)
 
 Demande du responsable : un plan de test complet qui compare les deux approches sur US-2, avec la

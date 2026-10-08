@@ -4,6 +4,9 @@
   rejouable) et ADR 0053 (cycle de vie des sessions). Étapes 2 et 3 du §14 faites le 2026-10-08
   (sessions orphelines ; moteur `packages/workflow`) ; aucune extension ne s'en sert encore.
 - Remplace : l'approche YAML de `docs/08` (abandonnée, raisons dans ce document).
+- **Remplacé en partie le 2026-10-08** par `docs/11-workflows-dynamiques.md` (ADR 0055) : un
+  workflow est un **dossier** (`meta` littéral + script JavaScript), pas une extension. Les §3 et §8
+  (manifeste, `contributes.workflows`) ne s'appliquent plus ; le moteur (§5 à §7, §9, §10) reste.
 - Inspiration : les workflows de Claude Code (un en-tête déclaratif, un script qui orchestre des
   agents, une reprise par rejeu d'un journal).
 
