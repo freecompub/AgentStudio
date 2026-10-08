@@ -14,6 +14,9 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
   const rembobinages: string[] = [];
   const demandes: { title: string; options: { id: string; label: string }[]; requiredRoles?: string[]; detail?: string }[] = [];
   const messages: string[] = [];
+  const archives: { label: string; files: { path: string; content: string }[] }[] = [];
+  /** Fichiers « modifiés depuis le checkpoint », pour l'archivage avant rembobinage. */
+  const modifies: Record<string, string> = {};
   let cp = 0;
   const ctx = {
     extensionId: "test.ext",
@@ -32,7 +35,7 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
     workspace: {
       async readFile(p: string) {
         appels.push(`lire:${p}`);
-        const c = fichiers[p];
+        const c = fichiers[p] ?? modifies[p];
         if (c === undefined) throw new Error(`Fichier absent : ${p}`);
         return c;
       },
@@ -56,7 +59,7 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
         rembobinages.push(id);
       },
       async changedFiles() {
-        return [];
+        return Object.keys(modifies).map((path) => ({ path, status: "added" as const }));
       },
       async fingerprintTests() {
         return "empreinte-tests";
@@ -101,8 +104,13 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
       post: (m: string) => void messages.push(m),
     },
     log: { info() {}, warn() {} },
+    trace: {
+      async rejected(_taskId: string, label: string, files: { path: string; content: string }[]) {
+        archives.push({ label, files: [...files] });
+      },
+    },
   } as unknown as ExtensionContext;
-  return { ctx, appels, consignes, oublis, rembobinages, demandes, messages, fichiers };
+  return { ctx, appels, consignes, oublis, rembobinages, demandes, messages, fichiers, archives, modifies };
 }
 
 /** Moteur réel, magasin en mémoire partageable entre deux « démarrages ». */

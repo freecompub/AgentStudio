@@ -184,7 +184,7 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
         options: a.options.map((o) => ({ id: `${x.n}:${o.id}`, label: o.label })),
         ...(a.detail ? { detail: a.detail } : {}),
         ...(a.texteLibre ? { freeText: true } : {}),
-        ...(roles ? { requiredRoles: [...roles] } : {}),
+        ...(roles?.length ? { requiredRoles: [...roles] } : {}),
       });
       return ATTENTE;
     }
@@ -211,6 +211,13 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
     case "checkpoint":
       return (await ctx.workspace.checkpoint(a.nom)).id;
     case "rembobiner": {
+      // Archiver AVANT (ADR 0038) : le rembobinage efface le livrable avec le verdict qui le
+      // condamne. La trace raconte ; elle n'atteste rien, et son échec n'arrête rien.
+      const effaces = await ctx.workspace.changedFiles(a.checkpoint).catch(() => []);
+      const livrables = await Promise.all(
+        effaces.filter((f) => f.status !== "deleted").map(async (f) => ({ path: f.path, content: await ctx.workspace.readFile(f.path).catch(() => "") })),
+      );
+      if (livrables.length) await ctx.trace.rejected(taskId, `${phaseDe(x.state)} rembobinage`, livrables).catch(() => undefined);
       await ctx.workspace.rollback(a.checkpoint);
       const agents = agentsDepuis(x.state, a.checkpoint);
       if (agents.length) await ctx.agents.forget(taskId, agents);

@@ -121,8 +121,13 @@ export interface W {
   commiter(message: string, chemins?: readonly string[]): Promise<string | null>;
   oublier(agents: readonly string[]): Promise<void>;
   informer(texte: string): Promise<void>;
-  /** Ouvre une phase (checkpoint), exécute `fn`, commite ; à l'escalade, rembobine et demande. */
-  phase<T>(nom: string, fn: () => Promise<T>, opts?: { commit?: string }): Promise<T | undefined>;
+  /**
+   * Ouvre une phase (checkpoint), exécute `fn`, commite ; à l'escalade, rembobine et demande.
+   * Rend la valeur de `fn`, ou `undefined` si l'humain saute la phase : pour distinguer les deux,
+   * `fn` doit rendre une valeur.
+   * `apresRembobinage` reprépare ce que le rembobinage efface (dossiers vides que Git ne suit pas).
+   */
+  phase<T>(nom: string, fn: () => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
   /** Termine la tâche en échec, avec ce motif. */
   echec(motif: string): never;
 }

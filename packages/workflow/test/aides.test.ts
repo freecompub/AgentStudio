@@ -99,6 +99,28 @@ describe("w.phase : checkpoint, commit, escalade (docs/09 §5.2)", () => {
     expect((await t.record()).status).toBe("waiting");
   });
 
+  it("rembobinage : les livrables effacés sont archivés d'abord (ADR 0038), puis la phase reprépare ce qu'il faut", async () => {
+    const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
+    f.modifies["docs/conception.md"] = "brouillon";
+    await lancer(
+      decl((w) =>
+        w.phase(
+          "DESIGN",
+          () =>
+            essayer(w, { max: 1 }, async () => {
+              await w.agent("archi", "");
+              return ["porte"];
+            }),
+          { apresRembobinage: () => w.creerDossier(".skraft/design") },
+        ),
+      ),
+      f.ctx,
+    );
+    expect(f.archives).toEqual([{ label: "DESIGN rembobinage", files: [{ path: "docs/conception.md", content: "brouillon" }] }]);
+    const i = f.appels.indexOf("rollback:cp-1");
+    expect(f.appels.slice(i, i + 2)).toEqual(["rollback:cp-1", "dossier:.skraft/design"]);
+  });
+
   it("relancer : la phase repart, sans nouveau checkpoint ; sauter : la tâche continue sans elle", async () => {
     const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
     const t = await lancer(
