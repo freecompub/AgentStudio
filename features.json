@@ -606,6 +606,41 @@
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
     },
     {
+      "id": "mesure-workflow-rejets-traces",
+      "title": "Chaque rejeu du workflow est tracé avec son étape, sa porte et ses motifs exacts (prérequis P1 de docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "notes": "À FAIRE. Planifié le 2026-10-08."
+    },
+    {
+      "id": "mesure-durees-effets",
+      "title": "La trace donne la durée de chaque effet et de chaque transition, pour skraft et skraft-workflow (prérequis P2 de docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "notes": "À FAIRE. Planifié le 2026-10-08."
+    },
+    {
+      "id": "mesure-banc-commun",
+      "title": "Le banc de mesure lance skraft ou skraft-workflow et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "notes": "À FAIRE. Planifié le 2026-10-08."
+    },
+    {
+      "id": "mesure-repondeur-commun",
+      "title": "Un répondeur scripté par fichier donne les mêmes réponses humaines aux deux extensions, reconnues par libellé (prérequis P4 de docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "notes": "À FAIRE. Planifié le 2026-10-08."
+    },
+    {
+      "id": "comparaison-us-2",
+      "title": "Campagne de quatre runs réels sur US-2 en alternance, rapport de comparaison avec la raison de chaque rejeu, durée et coût par étape (docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "notes": "À FAIRE. Planifié le 2026-10-08."
+    },
+    {
       "id": "skraft-deliver-en-workflow",
       "title": "skraft-workflow mène DELIVER et tout le pipeline : jumeaux de e2e-s5 et e2e-s6 (vraie chaîne Swift, correction de revue, usage sur trois stories) et reprise après un crash au milieu de DELIVER",
       "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s5-workflow.test.ts test/e2e-s6-workflow.test.ts test/e2e-reprise-workflow.test.ts test/deliver-gates.test.ts",

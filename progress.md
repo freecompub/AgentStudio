@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — Plan de comparaison skraft / skraft-workflow sur US-2 (`docs/10`)
+
+Demande du responsable : un plan de test complet qui compare les deux approches sur US-2, avec la
+**raison de chaque rejeu**, le **temps** et le **coût** de chaque étape. Écrit dans
+`docs/10-plan-comparaison-skraft-workflow.md` ; rien n'est lancé.
+
+**Trouvé en préparant le plan** (ce sont les prérequis P1 à P6) :
+- le workflow ne trace **aucun** rejet : le moteur lit `rejections` et `lastRejection` dans l'état
+  (`TracedState`), que l'état du workflow n'a pas ;
+- `scripts/mesure-skraft.ts` ne sait lancer que skraft (il importe l'extension et lit
+  `SkraftState`) ;
+- son répondeur reconnaît les options par identifiant (`abort`) : ceux du workflow diffèrent
+  (`<n>:abandonner`), et les questions ouvertes y reçoivent une réponse vide ;
+- la trace ne donne pas la durée des effets de code (tests, mutation) ni des transitions ;
+- la barre de qualité du projet d'essai est à l'ancien emplacement (`.skraft/quality.json`).
+
+**Budget** : 150 à 400 requêtes premium par run complet d'après le 03/10 ; quatre runs en
+alternance, plafonnés à 250 chacun. Prix unitaire et réserve à valider par le responsable.
+
+**Suite** : P1 et P2 sur une branche `feat/mesure-comparee` (TDD), puis P3 à P6, run à blanc sur
+agents simulés, puis la campagne.
+
+---
+
 ## 08/10 — Décision : skraft et skraft-workflow coexistent (ADR 0054)
 
 Le responsable choisit de **garder les deux** et de les comparer sur de vraies stories avec Copilot
