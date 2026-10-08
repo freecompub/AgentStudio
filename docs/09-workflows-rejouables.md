@@ -557,7 +557,16 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
    essai garanti demandé par le script, `w.disposition()` rend les emplacements de la stack.
    *DISTILL fait le 2026-10-08* (`src/distillation.ts`, 64 lignes ; revue commune `src/revue.ts`,
    98 lignes) : jumeau de `e2e-s4`, avec un vrai Vitest. `w.lancerTests` accepte une étiquette de
-   preuve (`DISTILL_RED`). Reste DELIVER.
+   preuve (`DISTILL_RED`).
+   *DELIVER fait le 2026-10-08* (`src/livraison.ts`, 595 lignes portes comprises) : jumeaux de
+   `e2e-s5` et `e2e-s6` en vraie chaîne Swift (correction de revue comprise), mesures d'usage sur
+   trois stories, et reprise après un crash au milieu de DELIVER. Le moteur a gagné `w.preuves()`,
+   `w.architecture()`, l'étape des preuves et `SauterPhase`.
+   **Bilan de taille, sans arrondi** : 1 015 lignes de code pour tout le pipeline, contre 1 624
+   dans skraft (`reducer.ts`, `deliver-machine.ts`, `effects.ts`, `deliver-effects.ts`,
+   `model.ts`), soit environ 40 % de moins. Le gain vient surtout de la disparition des types
+   d'état, d'événements et d'effets et des aiguillages du réducteur ; sur DELIVER seul, le script
+   (portes comprises) est à peine plus court que la sous-machine et ses effets (595 contre 639).
 6. **`tdd`**, puis retrait de `contributes.tasks` si plus personne ne l'utilise.
 
 ## 15. Risques et questions ouvertes

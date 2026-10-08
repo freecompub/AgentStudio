@@ -83,16 +83,14 @@ describe.each([
     await app.interactions.respond(questions[0]!.id, option(questions[0]!, "answer"), "par prise", { role: "po" });
     await app.interactions.respond(questions[1]!.id, option(questions[1]!, "defer"), undefined, { role: "po" });
 
-    // DESIGN reçoit les réponses dans son dossier de passation ; à la fin, le dossier de DISTILL aussi.
+    // DESIGN reçoit les réponses et la phase RESEARCH dans son dossier de passation.
     await until(async () => designBrief !== "");
     expect(designBrief).toContain("Réponses de l'utilisateur :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
+    expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
+    expect(designBrief).toContain("RESEARCH : .skraft/us-12/research/research.md");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
-    const dossier = app.posted.find((m) => m.includes("prête pour DELIVER"))!;
-    expect(dossier).toContain("Réponses de l'utilisateur :");
-    expect(dossier).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
-    expect(dossier).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
-    expect(dossier).toContain("RESEARCH : .skraft/us-12/research/research.md");
+    expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");
   }, 120_000);
 
   it("recherche sans document : rejet explicite, escalade après le budget", async () => {

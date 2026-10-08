@@ -45,6 +45,28 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 - Le plafond s'applique-t-il par prise ou par jour ?
 `;
 
+/** Story difficile : deux questions métier ouvertes (§8.2). */
+export const US15 = `# US-15 — Alerter sur un bolus rapproché
+
+En tant que patient, je veux être alerté si je demande un bolus peu après le précédent.
+
+## Critères d'acceptation
+1. Bolus demandé 30 min après le précédent : alerte « Bolus rapproché ».
+2. Bolus demandé 3 h après le précédent : aucune alerte.
+
+## Questions ouvertes
+- Le délai minimal dépend-il de l'insuline utilisée ?
+- L'alerte bloque-t-elle la validation ?
+`;
+
+export const SIMPLE = `# US-7 — Afficher l'unité
+
+En tant que patient, je veux voir l'unité de la dose.
+
+## Critères d'acceptation
+1. La dose est affichée avec « U ».
+`;
+
 /** Projet Swift de démonstration (code seulement : S1 ne lance aucun test). */
 export async function createProject(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "agent-studio-skraft-"));
@@ -52,6 +74,8 @@ export async function createProject(): Promise<string> {
   await put(root, "Sources/Domain/BolusCalculator.swift", "public struct BolusCalculator {}\n");
   await put(root, "Sources/Settings/MaxBolusSetting.swift", "public struct MaxBolusSetting {}\n");
   await put(root, "stories/us-12.md", US12);
+  await put(root, "stories/us-7.md", SIMPLE);
+  await put(root, "stories/us-15.md", US15);
   git(root, "init", "-q", "-b", "main");
   git(root, "add", "-A");
   git(root, "commit", "-qm", "init");
@@ -89,6 +113,20 @@ export function answerQuestions(app: { interactions: import("@agent-studio/core"
   const off = app.interactions.onChange(() => void tick());
   void tick();
   return off;
+}
+
+/** Agent test simulé : un test unitaire de plus par tour, rouge (symbole manquant) tant que le code n'existe pas. */
+export function unitTestWriter(root: string): ScriptedBehavior {
+  return async (t) => {
+    const { readFile: read } = await import("node:fs/promises");
+    const rel = "Tests/UnitTests/BolusCapTests.swift";
+    const existing = await read(join(root, rel), "utf8").catch(() => "");
+    const n = [...existing.matchAll(/func test/g)].length + 1;
+    const tests = [...existing.matchAll(/^  func .*$/gm)].map((m) => m[0]);
+    tests.push(`  func testCap${n}() { XCTAssertEqual(BolusCap().max, 10) }`);
+    await put(root, rel, `import XCTest\n@testable import Domain\nfinal class BolusCapTests: XCTestCase {\n${tests.join("\n")}\n}\n`);
+    await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
+  };
 }
 
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
@@ -129,6 +167,8 @@ export function simulatedAgents(
       await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
       await writer("Tests/AcceptanceTests/StoryAcceptanceTests.swift", `import XCTest\nfinal class StoryAcceptanceTests: XCTestCase {\n${tests}\n}\n`)(t);
     },
+    "skraft-test": unitTestWriter(root),
+    "skraft-dev": writer("Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n"),
     ...Object.fromEntries(
       ["cold-reader", "test-integrity", "architecture", "quality-gates"].map((l) => [
         `skraft-lens-${l}`,

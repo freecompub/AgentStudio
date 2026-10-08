@@ -21,6 +21,11 @@ export interface Dossier {
   acceptanceHash: string | null;
   /** Dernière exécution des tests par le code, pour les faits de revue. */
   derniereExecution?: string;
+  /** DELIVER : scénarios livrés et constats des portes, pour l'agent du pas suivant. */
+  livres?: string[];
+  constats?: string[];
+  /** Bilan de DELIVER, rendu par le workflow : granularité, scénarios, constats. */
+  livraison?: { granularity: string; scenarios: [string, string, string][]; notes: string[] };
 }
 
 /**
@@ -41,6 +46,8 @@ export function buildBrief(d: Dossier, phase: Phase, rejet: readonly string[]): 
   if (repondues.length) lines.push("Réponses de l'utilisateur :", ...repondues.map((a) => `  - ${a.question} → ${a.answer}`));
   if (d.regressions.length) lines.push("Tests d'acceptance requalifiés en non-régression :", ...d.regressions.map((r) => `  - ${r}`));
   if (d.acceptanceHash) lines.push("Les tests d'acceptance sont gelés : ne les modifie jamais.");
+  if (d.livres?.length) lines.push(`Scénarios livrés : ${d.livres.join(", ")}`);
+  if (d.constats?.length) lines.push("Constats de DELIVER :", ...d.constats.map((n) => `  - ${n}`));
   if (rejet.length) lines.push("Rejet précédent :", ...rejet.map((f) => `  - ${f}`));
   return lines.join("\n");
 }

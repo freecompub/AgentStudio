@@ -5,6 +5,48 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — DELIVER en workflow : skraft-workflow mène tout le pipeline
+
+Branche `feat/workflow-rejouable`. Critère `skraft-deliver-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 646 tests (dont les tests Swift réels, chaîne présente).
+
+**Fait.**
+- `src/livraison.ts` : plan (suite de référence, scénarios), par scénario les pas test → code ou
+  vert → nettoyage avec leurs portes (RED, GREEN, REFACTOR, couvert par l'acceptance), porte de fin
+  de scénario (acceptance, suite, séquence rouge puis vert, mutation par scénario, couverture,
+  lint, dépendances), reprise du scénario en sessions séparées puis escalade au niveau du
+  scénario ; fin de phase (livrables, mutation de fin), revue, correction ciblée côté tests puis
+  côté code avec renvoi d'un défaut à l'autre agent et garde du contrat ratifié (ADR 0046, 0047).
+- Moteur : `w.preuves()`, `w.architecture()`, étape des preuves (`lancerTests({ etape })`,
+  `agent(..., { preuve })`), modules d'infrastructure dans `w.disposition()`, `SauterPhase`.
+- Tests : jumeaux de `e2e-s5` (pile simulée et vraie chaîne Swift) et de `e2e-s6` (bout en bout
+  Swift avec correction de revue, usage sur trois stories) ; `e2e-reprise-workflow` : crash pendant
+  le tour du développeur, redémarrage de toute la pile, seul ce tour est rejoué.
+
+**Bilan de taille, sans arrondi.** Pipeline complet : 1 015 lignes de code (`workflow.ts` 175,
+`conception.ts` 83, `distillation.ts` 64, `revue.ts` 98, `livraison.ts` 595), contre 1 624 dans
+skraft (`reducer.ts` 346, `deliver-machine.ts` 299, `effects.ts` 370, `deliver-effects.ts` 340,
+`model.ts` 269). Environ 40 % de moins, surtout grâce à la disparition des types d'état,
+d'événements et d'effets et des aiguillages. **Sur DELIVER seul, le gain est faible** : 595 lignes
+portes comprises contre 639 — les portes sont recopiées presque telles quelles, et la logique
+d'échecs (pas, scénario, correction) reste dense, exprimée par exceptions et boucles imbriquées.
+
+**Divergences assumées avec `/skraft`** : rembobiner fait oublier les agents (ADR 0053, décidé) ;
+usage par phase (pas d'états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non
+comptés ; « relancer » après une escalade pendant une correction de revue reprend la correction.
+
+**Pièges.**
+- La valeur de fin dépasse 512 caractères : elle est dans le magasin de contenus, pas en clair
+  (`test/support/fin.ts` la relit).
+- Les tests copiés de `deliver-gates.test.ts` qui pilotaient `deliver-effects.ts` et le réducteur
+  ne sont pas repris : la couverture de ces portes passe par les jumeaux de bout en bout.
+
+**Suite** : décision du responsable sur la suite de la migration (remplacer `/skraft`, ou garder
+les deux) ; `contributes.workflows` et le chargement du script par l'hôte ; retrait des globaux non
+déterministes.
+
+---
+
 ## 08/10 — DISTILL en workflow dans skraft-workflow
 
 Branche `feat/workflow-rejouable`. Critère `skraft-distill-en-workflow` ajouté et passé à `true`

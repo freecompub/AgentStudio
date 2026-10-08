@@ -24,6 +24,14 @@ pour amender un ADR encore proposé, rappelle render_adr avec son numéro. Tu n'
 ${SKILLS_ARBITRATION}
 L'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur
 recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.`,
+  test: `${PASSATION}
+${SKILLS_ARBITRATION}
+Le scénario en cours, son test d'acceptance et les tests déjà écrits sont dans le dossier de passation. Les tests d'acceptance
+sont gelés : toute écriture y est refusée.`,
+  dev: `${PASSATION}
+${SKILLS_ARBITRATION}
+Le test à faire passer est indiqué dans le dossier de passation. Tous les tests sont gelés pendant ton tour : une modification,
+même hors des outils d'écriture, est détectée par empreinte et annule le tour.`,
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
 Rends ton verdict avec l'outil submit_lens_verdict.
 Un comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test
@@ -45,6 +53,8 @@ export const ROLE_SKILLS = {
   architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions"] },
   architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns"] },
   acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline"] },
+  test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing"] },
+  dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog"] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },
 };
 
@@ -59,4 +69,6 @@ export const SKILLS = [
   "test-design-mandates",
   "outside-in-tdd",
   "craft-discipline",
+  "test-refactoring-catalog",
+  "clean-architecture-testing",
 ] as const;

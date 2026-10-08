@@ -15,6 +15,7 @@ import { checkResearch } from "./research.js";
 import { parseStory, slugOf, type Story } from "./story.js";
 import { concevoir } from "./conception.js";
 import { distiller } from "./distillation.js";
+import { livrer } from "./livraison.js";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.js";
 
 export interface EntreeWorkflow {
@@ -84,8 +85,29 @@ async function skraft(w: W, entree: EntreeWorkflow) {
   if (await distiller(w, vue, effets.lenses, effets.maxAttempts)) vue.phasesFaites = [...vue.phasesFaites, { phase: "DISTILL", fichiers: [] }];
   else vue.phasesSautees = [...vue.phasesSautees, "DISTILL"];
 
-  await w.informer(`**${story.id}** prête pour DELIVER. Dossier de passation :\n\n${buildBrief(vue, "DELIVER", [])}`);
-  return { slug, niveau, acceptanceHash: vue.acceptanceHash, regressions: vue.regressions };
+  if (await livrer(w, vue, effets.lenses, effets.maxAttempts)) vue.phasesFaites = [...vue.phasesFaites, { phase: "DELIVER", fichiers: [] }];
+  else vue.phasesSautees = [...vue.phasesSautees, "DELIVER"];
+
+  await w.informer(bilan(vue, entree.confirmDifficulty));
+  return {
+    slug,
+    niveau,
+    acceptanceHash: vue.acceptanceHash,
+    regressions: vue.regressions,
+    phases: vue.phasesFaites.map((p) => p.phase),
+    adrs: vue.adrs,
+    livraison: vue.livraison ?? null,
+  };
+}
+
+function bilan(d: Dossier, confirmee: boolean): string {
+  const adrs = d.adrs.map((a) => `${a.id} (${a.status})`).join(", ") || "aucun";
+  return [
+    `Pipeline skraft terminé pour **${d.story.id}** (branche skraft/${d.slug}).`,
+    `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
+    `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
+    `ADR : ${adrs}.`,
+  ].join("\n");
 }
 
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */

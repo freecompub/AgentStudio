@@ -5,8 +5,9 @@ Extension **totalement indépendante** de `extensions/skraft` : elle n'en import
 vérifie, `test/independance.test.ts`), et `/skraft` n'est pas modifiée.
 
 Commande : `/skraft-workflow [--auto] <story>`. Pour l'instant : préparation, difficulté, RESEARCH,
-questions ouvertes, DESIGN (revue et ratification comprises) et DISTILL (portes, RED d'acceptance,
-gel des tests), puis publication du dossier de passation de DELIVER.
+questions ouvertes, DESIGN (revue et ratification comprises), DISTILL (portes, RED d'acceptance,
+gel des tests) et DELIVER (TDD par scénario, porte de fin de scénario, mutation, revue et correction
+ciblée), puis bilan.
 
 ## Provenance et licence
 
@@ -15,13 +16,13 @@ provenance en tête de chaque fichier :
 
 - `src/story.ts`, `difficulty.ts`, `research.ts`, `text-analysis.ts`, `preselect.ts` et leurs tests ;
 - `src/design.ts`, `adr.ts`, `render-adr-tool.ts`, `review.ts`, `review-thread.ts`, `distill.ts`,
-  `gherkin.ts` et leurs tests ;
+  `gherkin.ts`, `deliver.ts` et leurs tests (seuls les tests des fonctions pures de `deliver.ts`) ;
   `src/review-brief.ts` (sans l'état du réducteur) ;
 - `src/support.ts` (extraits de `effects.ts` et `config.ts`), `src/brief.ts` (réduit), `src/roles.ts` ;
 - `agents/` : classifieur, chercheur, les deux architectes, l'agent d'acceptance et les quatre
   lentilles ;
 - `skills/` : les dix skills de ces rôles (reprises de skraft-plugin v1.6.1,
   voir `docs/licences/autorisation-skraft.md`) ;
-- `test/support/harness.ts` (réduit).
+- `test/support/harness.ts` (réduit), `test/support/swift-demo.ts`.
 
 Les copies divergent librement : une correction faite dans skraft ne se reporte pas seule ici.

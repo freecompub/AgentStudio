@@ -11,7 +11,6 @@ import { join, resolve } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { EtatWorkflow } from "@agent-studio/workflow";
 import { answerQuestions, assemble, put, shutdownHosts, simulatedAgents, until, US12 } from "./support/harness.js";
 
 const NODE_MODULES = resolve(import.meta.dirname, "../../../node_modules");
@@ -68,6 +67,7 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
 
   it("valeur arrondie rejetée, test déjà vert rejeté puis requalifié avec justification, tests d'acceptance gelés", async () => {
     const prompts: string[] = [];
+    let deliverPrompt = "";
     const acceptance: ScriptedBehavior = async (t) => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
@@ -87,6 +87,11 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
         await t.callTool("report_phase", { summary: "m", files: [] });
       },
       "skraft-acceptance": acceptance,
+      // Arrêt au premier pas de DELIVER : le test d'origine s'arrête à la fin de DISTILL.
+      "skraft-test": async (t) => {
+        deliverPrompt = t.prompt;
+        t.hang();
+      },
     });
     const app = await assemble(root, runtime, tasksDir, { stack: createTypeScriptAdapter() });
     answerQuestions(app);
@@ -96,7 +101,8 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     const id = (await app.engine.list())[0]!.id;
 
-    await until(async () => (await app.engine.status(id))?.status === "finished", 120_000);
+    // DELIVER commence : son premier agent reçoit le gel et la non-régression dans son dossier.
+    await until(async () => deliverPrompt !== "", 120_000);
     expect(prompts).toHaveLength(3);
     // 1. porte valeurs : « 12 U » au lieu de « 12,5 U »
     expect(prompts[1]).toContain("La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us-12/distill/features/plafond.feature).");
@@ -104,9 +110,8 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
     expect(prompts[2]).toContain("« tests/acceptance/plafond.test.ts > ac-3 aucun plafond » (critère 3) passe déjà");
     expect(prompts[0]).toContain("Tests d'acceptance à écrire dans : tests/acceptance/**");
 
-    const fin = ((await app.engine.status(id))!.state as EtatWorkflow).fin;
-    expect(fin).toMatchObject({ statut: "fini", valeur: { clair: { regressions: ["tests/acceptance/plafond.test.ts > ac-3 aucun plafond"] } } });
-    expect((fin as unknown as { valeur: { clair: { acceptanceHash: string } } }).valeur.clair.acceptanceHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(deliverPrompt).toContain("Tests d'acceptance requalifiés en non-régression :\n  - tests/acceptance/plafond.test.ts > ac-3 aucun plafond");
+    expect(deliverPrompt).toContain("Les tests d'acceptance sont gelés : ne les modifie jamais.");
     expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): distill de us-12");
     const evidence = await import("@agent-studio/core").then(({ createJsonEvidenceStore }) => createJsonEvidenceStore(join(tasksDir, "evidence")).list(id));
     const redRuns = evidence.filter((e) => e.phase === "DISTILL_RED");
