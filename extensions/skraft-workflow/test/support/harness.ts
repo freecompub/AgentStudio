@@ -119,6 +119,16 @@ export function simulatedAgents(
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
       await writer(`.skraft/${slug}/design/contracts.md`, "`BolusCapped`\n")(t);
     },
+    "skraft-acceptance": async (t) => {
+      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+      const criteria = [...t.prompt.matchAll(/^\s+(\d+)\. (.+)$/gm)].map((m) => ({ n: m[1]!, text: m[2]! }));
+      const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
+      const tests = criteria.map((c) => `  func testAc${c.n}() { XCTFail(${JSON.stringify(c.text)}) } // ac-${c.n}`).join("\n");
+      await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
+      await put(root, `.skraft/${slug}/distill/test-plan.md`, "# Plan de test\n");
+      await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
+      await writer("Tests/AcceptanceTests/StoryAcceptanceTests.swift", `import XCTest\nfinal class StoryAcceptanceTests: XCTestCase {\n${tests}\n}\n`)(t);
+    },
     ...Object.fromEntries(
       ["cold-reader", "test-integrity", "architecture", "quality-gates"].map((l) => [
         `skraft-lens-${l}`,

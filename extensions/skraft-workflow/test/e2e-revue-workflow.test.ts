@@ -84,6 +84,6 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
     await until(async () => decidePrompts.length >= 4);
     expect(decidePrompts[3]).toContain("tranché par l'humain en faveur de la lentille : à corriger, sans recours.");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
-    expect(app.posted.some((m) => m.includes("prête pour DISTILL"))).toBe(true);
+    expect(app.posted.some((m) => m.includes("prête pour DELIVER"))).toBe(true);
   }, 120_000);
 });

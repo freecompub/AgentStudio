@@ -15,6 +15,12 @@ export interface Dossier {
   reponses: { question: string; answer: string }[];
   /** ADR de la story, avec leur statut. */
   adrs: { id: string; path: string; status: "Proposed" | "Accepted" | "Rejected" }[];
+  /** Tests d'acceptance requalifiés en non-régression à la sortie de DISTILL. */
+  regressions: string[];
+  /** Empreinte des tests d'acceptance gelés à la sortie de DISTILL. */
+  acceptanceHash: string | null;
+  /** Dernière exécution des tests par le code, pour les faits de revue. */
+  derniereExecution?: string;
 }
 
 /**
@@ -33,6 +39,8 @@ export function buildBrief(d: Dossier, phase: Phase, rejet: readonly string[]): 
   if (decides.length) lines.push("ADR décidés :", ...decides.map((a) => `  - ${a.id} (${a.status}) : ${a.path}`));
   const repondues = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer! })), ...d.reponses];
   if (repondues.length) lines.push("Réponses de l'utilisateur :", ...repondues.map((a) => `  - ${a.question} → ${a.answer}`));
+  if (d.regressions.length) lines.push("Tests d'acceptance requalifiés en non-régression :", ...d.regressions.map((r) => `  - ${r}`));
+  if (d.acceptanceHash) lines.push("Les tests d'acceptance sont gelés : ne les modifie jamais.");
   if (rejet.length) lines.push("Rejet précédent :", ...rejet.map((f) => `  - ${f}`));
   return lines.join("\n");
 }

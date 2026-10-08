@@ -5,6 +5,13 @@
  */
 const PASSATION = "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.";
 
+/**
+ * Les skills sont reprises telles quelles ; là où elles contredisent une décision du projet, la
+ * consigne d'orchestration tranche (linter du projet, ADR 0022 ; commits et portes par le code).
+ */
+const SKILLS_ARBITRATION = `Les skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.
+Pour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.`;
+
 export const ROLES = {
   classifier: `${PASSATION}
 Rends le niveau et sa justification avec l'outil submit_difficulty.`,
@@ -13,6 +20,10 @@ Rends le niveau et sa justification avec l'outil submit_difficulty.`,
   architectDecide: `${PASSATION}
 Rédige chaque ADR uniquement avec l'outil render_adr, qui applique le gabarit du projet et refuse un champ manquant ;
 pour amender un ADR encore proposé, rappelle render_adr avec son numéro. Tu n'as aucun accès direct en écriture à docs/adr.`,
+  acceptance: `${PASSATION}
+${SKILLS_ARBITRATION}
+L'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur
+recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.`,
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
 Rends ton verdict avec l'outil submit_lens_verdict.
 Un comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test
@@ -33,6 +44,7 @@ export const LENS_MODEL_CLASS = { "cold-reader": "standard", "test-integrity": "
 export const ROLE_SKILLS = {
   architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions"] },
   architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns"] },
+  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline"] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },
 };
 
@@ -43,4 +55,8 @@ export const SKILLS = [
   "adversarial-review-lenses",
   "acceptance-review-criteria",
   "architecture-review-criteria",
+  "bdd-methodology",
+  "test-design-mandates",
+  "outside-in-tdd",
+  "craft-discipline",
 ] as const;

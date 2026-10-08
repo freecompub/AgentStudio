@@ -88,7 +88,7 @@ describe.each([
     expect(designBrief).toContain("Réponses de l'utilisateur :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
-    const dossier = app.posted.find((m) => m.includes("prête pour DISTILL"))!;
+    const dossier = app.posted.find((m) => m.includes("prête pour DELIVER"))!;
     expect(dossier).toContain("Réponses de l'utilisateur :");
     expect(dossier).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(dossier).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");

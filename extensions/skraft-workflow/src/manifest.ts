@@ -15,7 +15,19 @@ export const manifest: ExtensionManifest = {
   publisher: "agent-studio",
   engines: { appApi: "^0.1" },
   main: "dist/index.mjs",
-  permissions: ["fs:read", `fs:write:${SKRAFT_DIR}`, "fs:write:docs/adr/**", "git:commit", "git:branch", "git:revert", "copilot:sessions", "net:none"],
+  permissions: [
+    "fs:read",
+    `fs:write:${SKRAFT_DIR}`,
+    "fs:write:docs/adr/**",
+    "fs:write:@stack:acceptanceTests",
+    "fs:write:@stack:sources",
+    "shell:test",
+    "git:commit",
+    "git:branch",
+    "git:revert",
+    "copilot:sessions",
+    "net:none",
+  ],
   contributes: {
     commands: [
       {
@@ -59,6 +71,17 @@ export const manifest: ExtensionManifest = {
         tools: ["list_files", "render_adr", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.architectDecide),
       },
+      {
+        name: "skraft-acceptance",
+        title: "Scénarios d'acceptance",
+        prompt: "agents/skraft-acceptance.agent.md",
+        role: ROLES.acceptance,
+        output: "report_phase",
+        modelClass: "standard",
+        write: [SKRAFT_DIR, "@stack:acceptanceTests", "@stack:sources"],
+        tools: ["list_files", "run_tests", "report_blocker"],
+        skills: skillsOf(ROLE_SKILLS.acceptance),
+      },
       ...LENSES.map((name) => ({
         name: `skraft-lens-${name}`,
         title: `Lentille ${name}`,
@@ -75,8 +98,8 @@ export const manifest: ExtensionManifest = {
       {
         name: "skraft-workflow",
         title: "skraft en workflow (essai)",
-        states: { "DÉBUT": "Préparation et difficulté", RESEARCH: "Enquête sur le code existant", DESIGN: "Conception" },
-        milestones: ["RESEARCH", "DESIGN"],
+        states: { "DÉBUT": "Préparation et difficulté", RESEARCH: "Enquête sur le code existant", DESIGN: "Conception", DISTILL: "Scénarios d'acceptance" },
+        milestones: ["RESEARCH", "DESIGN", "DISTILL"],
       },
     ],
   },

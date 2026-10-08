@@ -555,6 +555,9 @@ Chaque étape a son critère de sortie ; on ne passe pas à la suivante sans lui
    écarts 1, 2, 3, 8 et 9 ne sont **pas tranchés** : le comportement du réducteur est reproduit.
    Le moteur a gagné trois appels pour cela : la phase reçoit son checkpoint, `essayer` accepte un
    essai garanti demandé par le script, `w.disposition()` rend les emplacements de la stack.
+   *DISTILL fait le 2026-10-08* (`src/distillation.ts`, 64 lignes ; revue commune `src/revue.ts`,
+   98 lignes) : jumeau de `e2e-s4`, avec un vrai Vitest. `w.lancerTests` accepte une étiquette de
+   preuve (`DISTILL_RED`). Reste DELIVER.
 6. **`tdd`**, puis retrait de `contributes.tasks` si plus personne ne l'utilise.
 
 ## 15. Risques et questions ouvertes

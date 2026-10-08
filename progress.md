@@ -5,6 +5,33 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/10 — DISTILL en workflow dans skraft-workflow
+
+Branche `feat/workflow-rejouable`. Critère `skraft-distill-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 616 tests.
+
+**Fait.**
+- `src/distillation.ts` : agent d'acceptance (emplacement des tests donné par `w.disposition()`),
+  porte gherkin puis porte valeurs, plan de test, RED d'acceptance exécuté par le code
+  (`w.lancerTests({ etiquette: "DISTILL_RED" })`), gel des tests d'acceptance (empreinte et
+  non-régressions écrites une seule fois), revue avec les faits du réducteur.
+- `src/revue.ts` : la revue de DESIGN devient commune (spécialiste, revue, arbitrage, rapports,
+  livrables). `conception.ts` tombe à 83 lignes.
+- Copies : `distill.ts`, `gherkin.ts` et leurs tests ; agent d'acceptance ; quatre skills.
+- Jumeau de `e2e-s4` (vrai Vitest sur un projet TypeScript) ; les jumeaux de S2, S3 et le test de
+  revue vont désormais jusqu'à DISTILL.
+
+**Taille.** `workflow.ts` 155 + `conception.ts` 83 + `distillation.ts` 64 + `revue.ts` 98 = 400
+lignes de code jusqu'à DISTILL.
+
+**Piège.** Le jumeau de S3 vérifiait que le **dernier** commit était celui de DESIGN : faux dès
+que DISTILL commite après lui. On cherche le commit dans l'historique.
+
+**Suite** : DELIVER (sous-machine par scénario, `deliver-machine.ts` et `deliver-effects.ts`,
+≈ 800 lignes dans skraft) : la plus grosse phase, et celle où le script doit le plus gagner.
+
+---
+
 ## 08/10 — DESIGN en workflow dans skraft-workflow (étape 5 de `docs/09` §14, première phase)
 
 Branche `feat/workflow-rejouable`. Critère `skraft-design-en-workflow` ajouté et passé à `true`

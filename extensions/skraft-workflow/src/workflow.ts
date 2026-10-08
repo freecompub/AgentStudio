@@ -14,6 +14,7 @@ import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
 import { parseStory, slugOf, type Story } from "./story.js";
 import { concevoir } from "./conception.js";
+import { distiller } from "./distillation.js";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.js";
 
 export interface EntreeWorkflow {
@@ -51,6 +52,8 @@ async function skraft(w: W, entree: EntreeWorkflow) {
     questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
     reponses: [],
     adrs: [],
+    regressions: [],
+    acceptanceHash: null,
   };
 
   if (!effets.skipResearch) {
@@ -78,8 +81,11 @@ async function skraft(w: W, entree: EntreeWorkflow) {
   if (await concevoir(w, vue, effets.lenses, effets.maxAttempts)) vue.phasesFaites = [...vue.phasesFaites, { phase: "DESIGN", fichiers: [] }];
   else vue.phasesSautees = [...vue.phasesSautees, "DESIGN"];
 
-  await w.informer(`**${story.id}** prête pour DISTILL. Dossier de passation :\n\n${buildBrief(vue, "DISTILL", [])}`);
-  return { slug, niveau };
+  if (await distiller(w, vue, effets.lenses, effets.maxAttempts)) vue.phasesFaites = [...vue.phasesFaites, { phase: "DISTILL", fichiers: [] }];
+  else vue.phasesSautees = [...vue.phasesSautees, "DISTILL"];
+
+  await w.informer(`**${story.id}** prête pour DELIVER. Dossier de passation :\n\n${buildBrief(vue, "DELIVER", [])}`);
+  return { slug, niveau, acceptanceHash: vue.acceptanceHash, regressions: vue.regressions };
 }
 
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */

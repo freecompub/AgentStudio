@@ -606,6 +606,13 @@
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
     },
     {
+      "id": "skraft-distill-en-workflow",
+      "title": "skraft-workflow mène DISTILL : portes gherkin et valeurs, RED d'acceptance exécuté par le code, gel des tests d'acceptance, revue (jumeau de e2e-s4, vrai Vitest)",
+      "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s4-workflow.test.ts test/distill-gates.test.ts test/gherkin.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/distillation.ts : 64 lignes de code ; la revue est commune à DESIGN et DISTILL (src/revue.ts, 98 lignes). Preuve enregistrée sous DISTILL_RED (w.lancerTests({ etiquette })). Le dernier comptage des tests vient du TestRun rendu au script plutôt que du magasin de preuves (même source, D20)."
+    },
+    {
       "id": "skraft-design-en-workflow",
       "title": "skraft-workflow mène DESIGN : porte cohérence, revue à lentilles avec dialogue et arbitrage humain, ratification et amendement (jumeau de e2e-s3, en processus isolé aussi)",
       "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s3-workflow.test.ts test/e2e-revue-workflow.test.ts test/design-gate.test.ts test/review-thread.test.ts",

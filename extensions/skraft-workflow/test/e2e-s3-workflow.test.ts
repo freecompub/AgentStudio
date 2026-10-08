@@ -89,8 +89,10 @@ describe.each([
     const adr = await readFile(join(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md"), "utf8");
     expect(adr).toContain("- Statut : Accepted");
     expect(adr).toContain("Plafond par prise");
-    expect(git(root, "show", "--name-only", "--format=%s", "HEAD")).toMatch(/^docs\(skraft\): design de us-12/);
+    // DISTILL commite ensuite : le commit de DESIGN est dans l'historique, avec l'ADR accepté.
+    expect(git(root, "log", "--format=%s")).toContain("docs(skraft): design de us-12");
+    expect(git(root, "show", "HEAD~1:docs/adr/adr-001-plafond-applique-dans-le-domaine.md")).toContain("- Statut : Accepted");
     expect(git(root, "show", "HEAD:docs/adr/adr-001-plafond-applique-dans-le-domaine.md")).toContain("- Statut : Accepted");
-    expect(app.posted.find((m) => m.includes("prête pour DISTILL"))).toContain("ADR-001 (Accepted) : docs/adr/adr-001-plafond-applique-dans-le-domaine.md");
+    expect(app.posted.find((m) => m.includes("prête pour DELIVER"))).toContain("ADR-001 (Accepted) : docs/adr/adr-001-plafond-applique-dans-le-domaine.md");
   }, 120_000);
 });
