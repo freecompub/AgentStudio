@@ -37,6 +37,11 @@ assouplir seulement si un vrai workflow en a besoin.
 **Piège** : un commit est parti sans sa documentation (`af96695`) parce que le script d'édition a
 échoué sur un texte présent deux fois dans `docs/11` ; complété par le commit suivant.
 
+**Précisé avec le responsable (`docs/11` §8)** : les contrôles de skraft n'utilisent ni heure, ni
+hasard, ni réseau, mais des **calculs purs** venus de modules (sha256 par `node:crypto`, motifs de
+fichiers, YAML de la barre de qualité) : `@agent-studio/workflow` les fournira. L'**heure** est
+ajoutée par un appel journalisé, `w.maintenant()`, identique au rejeu ; `Date` reste interdit.
+
 **Suite** : étape 3, exécution isolée du script (processus dédié, `globalThis` réduit).
 
 ---

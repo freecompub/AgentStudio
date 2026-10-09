@@ -44,7 +44,8 @@ machine ou dans le projet, et qu'on lance par une commande ou que l'agent princi
 ```
 
 Le script n'importe que des fichiers **de son dossier** et `@agent-studio/workflow` (fourni par
-la plateforme). Aucun autre module, aucun accès Node.
+la plateforme : aides, erreurs et calculs purs, §8). Aucun autre module, aucun accès Node ;
+l'heure passe par `w.maintenant()`.
 
 ## 4. Le fichier `workflow.mjs`
 
@@ -153,10 +154,27 @@ aussi, venu d'ailleurs. Même règle pour les deux :
 ## 8. Exécuter
 
 - Le script tourne dans un **processus isolé dédié aux workflows** (`utilityProcess`, comme un hôte
-  d'extension), avec `globalThis` réduit : pas de `Date`, de `Math.random`, de minuteries, de
-  `fetch`, de `process`, de `require` (prévu par `docs/09` §6.4, jamais fait jusqu'ici).
-- Il ne voit que `w` (et `@agent-studio/workflow` : `essayer`, `agir`, erreurs). Les appels `w.*`
-  sont exécutés par le processus principal, bornés par `meta.permissions` et `meta.agents`.
+  d'extension). S'il plante ou boucle, l'application continue ; il ne lui parle que par messages,
+  pour demander une action `w.*`.
+- **Interdit** dans ce processus : tout ce qui rend un résultat différent d'une exécution à l'autre
+  ou touche l'extérieur — `Date` et `Math.random` directs, minuteries, `fetch` et réseau, `fs` et
+  disque, `process`, `child_process`, `require` et modules Node (prévu par `docs/09` §6.4, jamais
+  fait jusqu'ici). Deux raisons : le rejeu (un script qui lit l'heure prendrait un autre chemin
+  après une reprise) et la sécurité (rien ne sort sans passer par `w.*`, donc par le `meta`).
+- **Permis** : les **calculs purs** dont les contrôles ont besoin, fournis par
+  `@agent-studio/workflow` (relevé fait sur skraft le 2026-10-09 : aucune heure, aucun hasard,
+  aucun réseau dans ses contrôles, mais des calculs venus de modules) :
+  - `empreinte(texte)` (sha256 ; skraft l'utilisait par `node:crypto`) ;
+  - `correspond(motifs, chemin)` et la résolution de motifs de fichiers ;
+  - `lireBarreDeQualite(...)`, `couchesManquantes(...)`, `coucheDe(...)` (barre de qualité,
+    ADR 0049) et `lireYaml(texte)` ;
+  - `essayer`, `agir`, les erreurs.
+- **L'heure** est permise par un appel **journalisé**, `w.maintenant()` : à la première exécution,
+  la plateforme note l'heure dans le journal ; au rejeu, le script reçoit la même. C'est la façon
+  dont les moteurs de workflow durables rendent l'heure compatible avec le rejeu. `Date` reste
+  interdit. (Le hasard pourrait suivre le même chemin, `w.aleatoire()`, si un workflow en a besoin.)
+- Le script ne voit que `w` et `@agent-studio/workflow`. Les appels `w.*` sont exécutés par le
+  processus principal, bornés par `meta.permissions` et `meta.agents`.
 - Moteur, journal, rejeu, reprise après crash, sessions : **inchangés** (`docs/09`, ADR 0052, 0053).
   `createWorkflowTask` reçoit le script et le `meta` au lieu d'une déclaration en TypeScript.
 
