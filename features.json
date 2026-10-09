@@ -608,9 +608,9 @@
     {
       "id": "workflow-dossier-chargeur",
       "title": "Les workflows sont trouvés sur la machine et dans le projet (copie à la main comprise), le projet l'emporte, et un meta non littéral ou trop permissif est refusé avec son motif (docs/11 §11, étape 2)",
-      "verify": "À DÉFINIR à l’implémentation (docs/11)",
-      "passes": false,
-      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+      "verify": "pnpm vitest run --project workflow test/chargeur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-09 : packages/workflow/src/chargeur/ (meta.ts lit le meta avec acorn sans exécuter le script ; schema.ts, zod, fermé ; chargeur.ts, deux emplacements, empreinte de tout le dossier). Pas encore branché dans l’application : étapes 3 à 5."
     },
     {
       "id": "workflow-dossier-isole",

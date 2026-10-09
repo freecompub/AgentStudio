@@ -67,7 +67,8 @@ export const meta = {
     blocage: ["po", "developpeur", "architecte", "administrateur"],
   },
   permissions: {
-    ecriture: [".skraft/**", "docs/adr/**"],
+    // tout ce que le script ET ses agents peuvent écrire : un agent ne déclare rien qui n'y soit pas
+    ecriture: [".skraft/**", "docs/adr/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
     tests: true,
     git: ["branche", "commit", "revert"],
   },
@@ -101,9 +102,12 @@ export default async function skraft(w, entree) {
 
 **Le `meta` est une valeur littérale** : objets, tableaux, chaînes, nombres, booléens ; aucune
 variable, aucun appel, aucun gabarit. C'est la condition pour que la plateforme le lise **sans
-exécuter le script** (même contrainte que Claude Code). Il est validé par schéma au chargement :
-un agent appelé par le script et absent du `meta`, une question humaine non déclarée, un outil
-inconnu ou un droit d'écriture plus large que les permissions du script sont refusés.
+exécuter le script** (même contrainte que Claude Code). Il est validé par schéma au chargement
+(`packages/workflow/src/chargeur/`) : champ inconnu, fichier d'agent ou skill absents du dossier,
+chemin qui sort du dossier, outil qui n'est pas de la plateforme, `run_tests` sans
+`permissions.tests`, droit d'écriture d'un agent absent de `permissions.ecriture` : refusés, avec
+leur motif. Un agent ou une question humaine **appelés par le script** sans être déclarés ne se
+voient qu'à l'exécution : l'appel est alors refusé et la tâche échoue avec ce motif.
 
 Les outils d'un agent sont **ceux de la plateforme** (`list_files`, `run_tests`, `run_lint`,
 `report_blocker`, `load_skill`) et sa **sortie** (`report_phase`, `submit_plan`,

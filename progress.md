@@ -5,6 +5,42 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/10 — Chargeur de workflows (étape 2 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-chargeur` passé à `true` après son
+`verify` (25 tests ; paquet `workflow` : 62).
+
+**Fait** (`packages/workflow/src/chargeur/`) :
+- `meta.ts` : lit `export const meta = { … }` avec **acorn**, sans jamais évaluer le script (un
+  test le vérifie par un effet de bord qui ne se produit pas). Littéraux seulement ; refus motivé
+  avec la ligne : variable, appel, gabarit avec expression, étalement, clé calculée, méthode.
+- `schema.ts` : schéma zod **fermé** ; règles croisées : fichier d'agent et skills présents dans
+  le dossier, chemin interne, outils de la plateforme seulement, `run_tests`/`run_lint` exigent
+  `permissions.tests`, écriture d'un agent incluse **telle quelle** dans `permissions.ecriture`.
+- `chargeur.ts` : sous-dossiers à `workflow.mjs` de la machine puis du projet ; projet prioritaire
+  (remplacement signalé) ; workflow invalide écarté sans bloquer les autres ; deux workflows ne
+  partagent ni un nom dans le même emplacement ni une commande ; empreinte de **tout** le dossier
+  (chemins triés et contenus), base de l'accord et du gel.
+- Dépendances ajoutées à `packages/workflow` : `acorn` (MIT, déjà présent en dépendance
+  indirecte), `zod`.
+- Vérifié contre les faux positifs : sans la règle d'écriture, ou sans la priorité du projet, les
+  tests correspondants échouent.
+
+**Écart corrigé dans `docs/11` §4** : un agent ou une question appelés par le script sans être
+déclarés ne peuvent se voir qu'à l'exécution, pas au chargement ; l'exemple de `meta` déclare
+maintenant dans `permissions.ecriture` ce que ses agents écrivent.
+
+**Choix provisoire** : l'inclusion des droits d'écriture se juge sur le texte du motif (pas
+d'inclusion de globs : `src/domaine/**` n'est pas accepté sous `src/**`). Simple et sûr ; à
+assouplir seulement si un vrai workflow en a besoin.
+
+**Piège** : un commit est parti sans sa documentation (`af96695`) parce que le script d'édition a
+échoué sur un texte présent deux fois dans `docs/11` ; complété par le commit suivant.
+
+**Suite** : étape 3, exécution isolée du script (processus dédié, `globalThis` réduit).
+
+---
+
 ## 08/10 — Un workflow est un dossier, pas une extension (ADR 0055, `docs/11`)
 
 Décidé **point par point** avec le responsable, après comparaison avec les workflows dynamiques de
