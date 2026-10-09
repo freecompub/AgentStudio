@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@agent-studio/extension-api": "workspace:*",
-    "@agent-studio/task-engine": "workspace:*"
+    "@agent-studio/task-engine": "workspace:*",
+    "acorn": "^8.18.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@agent-studio/core": "workspace:*"
