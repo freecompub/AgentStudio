@@ -12,6 +12,7 @@ export const API_VERSION = "0.1.0";
 export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
+export { coverageForChanges, baselineProblems } from "@agent-studio/stack-adapters";
 // Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 
@@ -173,7 +174,7 @@ export interface WorkspaceApi {
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;
   /** Fichiers modifiés depuis un checkpoint. */
-  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
+  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted"; lines?: number[] }[]>;
   /** Empreinte des fichiers de test du projet, au sens de l'adaptateur de stack (gel des tests, D21). */
   fingerprintTests(): Promise<string>;
   /** Empreinte des fichiers correspondant aux motifs (`@stack:*` résolus), ex. tests d'acceptance gelés. */

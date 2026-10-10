@@ -6,7 +6,7 @@
 * correction ciblée des défauts (ADR 0046, 0047). Reproduit `deliver-machine.ts` et
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
-import { couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
+import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief } from "./brief.mjs";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, planScenarios } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
@@ -105,7 +105,7 @@ function natures(disp) {
   return { acceptance, unit, resultatAcceptance, production: (p) => !acceptance(p) && !unit(p) };
 }
 /** Barre de qualité du projet (ADR 0049) ; invalide, c'est une panne : la juger à moitié serait attester à tort. */
-async function barreDeQualite(w, disp) {
+export async function barreDeQualite(w, disp) {
   const q = parseQualityBar({ yaml: await lireOu(w, QUALITY), legacyJson: await lireOu(w, QUALITY_LEGACY) });
   if ("error" in q)
     throw new PanneEnvironnement(q.error);
@@ -476,7 +476,8 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
     motifs.push(`Le test d'acceptance du scénario n'est pas vert : ${sc.acceptanceTestId}.`);
   motifs.push(...problemesDeSuite(run.results, enCours(L, i, false), k.resultatAcceptance));
   motifs.push(...checkRedGreenSequence((await w.preuves()).filter((x) => x.stepId === sc.id), unitTests));
-  const sources = (await w.fichiersModifies(depuis)).filter((f) => f.status !== "deleted" && k.production(f.path)).map((f) => f.path).filter((p) => matchesAny(L.disp.sources, p));
+  const changes = (await w.fichiersModifies(depuis)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(L.disp.sources, f.path));
+  const sources = changes.map((f) => f.path);
   if (sources.length) {
     if (!barre.mutation.active)
       notes.push("Mutation désactivée par la barre de qualité du projet.");
@@ -487,9 +488,11 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
       notes.push(...m.notes);
     }
     if (run.coverage) {
-      motifs.push(...checkCoverage(run.coverage, sources, barre));
-      for (const f of run.coverage.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
-        faits.push(`Couverture (${sc.id}) : ${f.file} à ${f.score} %, ${f.covered} ligne(s) sur ${f.total}.`);
+      const diff = couvertureDuDiff(run.coverage, changes);
+      notes.push(...diff.notes);
+      motifs.push(...checkCoverage(diff.report, sources, barre, true));
+      for (const f of diff.report.files)
+        faits.push(`Couverture du diff (${sc.id}) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`);
     }
     else
       notes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
@@ -563,6 +566,25 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
     const changes = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted");
     if (changes.length === 0)
       return { motifs: ["Aucun livrable produit pendant la phase DELIVER."], garanti: false, porte: "livrables" };
+    if (!d.qualityCheckpoint)
+      L.notes = uniq([...L.notes, "Référence de qualité initiale absente (ancienne tâche) : couverture du diff limitée à DELIVER."]);
+    const sources = (await w.fichiersModifies(d.qualityCheckpoint ?? cpPhase))
+      .filter((f) => f.status !== "deleted" && matchesAny(L.disp.sources, f.path) && natures(L.disp).production(f.path));
+    if (sources.length) {
+      const run = await w.lancerTests({ etiquette: "DELIVER_COVERAGE" });
+      const problems = problemesTestsExistants(run);
+      if (problems.length)
+        return { motifs: problems, garanti: false, porte: "suite finale" };
+      if (run.coverage) {
+        const { barre } = await barreDeQualite(w, L.disp);
+        const diff = couvertureDuDiff(run.coverage, sources);
+        const motifs = checkCoverage(diff.report, sources.map((f) => f.path), barre, true);
+        if (motifs.length)
+          return { motifs, garanti: false, porte: "couverture du diff" };
+        L.notes = uniq([...L.notes, ...diff.notes]);
+        L.faits = uniq([...L.faits, ...diff.report.files.map((f) => `Couverture du diff (tâche) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`)]);
+      } else L.notes = uniq([...L.notes, "Couverture non mesurée : la commande de test du projet n'en produit pas."]);
+    }
     const m = await mutationDeFin(w, L, cpPhase);
     if (m.motifs.length) {
       if (L.dernierVert && tentatives() + 1 < max) {

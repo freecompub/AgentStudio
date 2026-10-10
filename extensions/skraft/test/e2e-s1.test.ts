@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, git, type HangPoint, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, fakeSwiftStack, git, type HangPoint, put, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
 
 type App = Awaited<ReturnType<typeof assemble>>;
 
@@ -43,6 +43,73 @@ describe("skraft — critères de sortie de S1", () => {
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
+
+  it.each(["failed", "skipped", "exit", "timeout"] as const)("précontrôle %s : bloque avant le classifieur, sans appel LLM", async (status) => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const stack = fakeSwiftStack();
+    stack.runTests = async () => ({
+      results: [{ id: "test existant", file: "Tests/Existing.swift", status: status === "failed" || status === "skipped" ? status : "passed" }],
+      exitCode: status === "exit" ? 1 : 0, timedOut: status === "timeout", output: "", durationMs: 1,
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED");
+    expect(runtime.history).toEqual([]);
+    expect(app.posted.join("\n")).toContain("bloqué avant tout appel");
+  });
+
+  it("la dette de couverture initiale est notifiée mais ne bloque pas le classifieur", async () => {
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90}}\n');
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const stack = fakeSwiftStack();
+    stack.runTests = async () => ({
+      results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1,
+      coverage: { files: [{ file: "Sources/Domain/BolusCalculator.swift", covered: 1, total: 2, score: 50 }] },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    expect(app.posted.join("\n")).toContain("avertissement non bloquant");
+    expect(app.posted.join("\n")).toContain("50 % (minimum 90 %)");
+    expect(runtime.history).toHaveLength(1);
+  });
+
+  it.each([true, false])("couverture du diff en isolation : ligne modifiée couverte=%s, dette historique inchangée", async (covered) => {
+    const before = "public struct BolusCalculator {}\n\n\n\n\n\n\n// propriété existante non couverte\n";
+    await put(root, "Sources/Domain/BolusCalculator.swift", before);
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
+    const stack = fakeSwiftStack();
+    const original = stack.runTests;
+    stack.runTests = async (opts) => ({
+      ...await original(opts),
+      coverage: { files: [
+        { file: "Sources/Domain/BolusCalculator.swift", covered: covered ? 1 : 0, total: 2, score: covered ? 50 : 0, lines: [{ number: 1, covered }, { number: 8, covered: false }] },
+        { file: "Sources/Domain/BolusCap.swift", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+      ] },
+    });
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        await put(root, "Sources/Domain/BolusCalculator.swift", before.replace("{}", "{ /* raccordement */ }"));
+        await put(root, "Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    const state = stateOf(await app.engine.status(id))!;
+    expect(state.stage).toBe(covered ? "DONE" : "ESCALATED");
+    if (covered) {
+      expect(state.deliver?.facts?.join("\n")).toContain("Couverture du diff (tâche) : Sources/Domain/BolusCalculator.swift à 100 %");
+      expect(app.posted.join("\n")).toContain("avertissement non bloquant");
+    } else {
+      expect(state.escalation?.reason).toContain("Lignes non couvertes : 1.");
+      expect(state.escalation?.reason).not.toContain("non couvertes : 8");
+    }
+  }, 90_000);
 
   it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);

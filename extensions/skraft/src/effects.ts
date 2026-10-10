@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
+import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
@@ -17,7 +17,8 @@ import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./revie
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
-import { contractSymbolsPresent, defectTargetOf, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
+import { checkCoverage } from "./deliver.js";
 import { lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
@@ -70,7 +71,19 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       }
       const parsed = parseStory(raw);
       if (!parsed.ok) return { type: "INIT_FAILED", reasons: parsed.errors };
+      const run = await ctx.stack.runTests({ signal, evidence: tag("INIT_BASELINE") });
+      const problems = baselineProblems(run);
+      if (problems.length) {
+        ctx.chat.post(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
+        return { type: "INIT_FAILED", reasons: problems };
+      }
+      const { bar, notes } = await loadQualityBar(ctx);
+      const sources = (await ctx.workspace.listFiles()).filter((p) => matchesAny(ctx.stack.layout.sources, p));
+      const warnings = run.coverage ? checkCoverage(run.coverage, sources, bar) : ["Couverture initiale non mesurée : la commande de test du projet n'en produit pas."];
+      if (warnings.length || notes.length)
+        ctx.chat.post(`Précontrôle skraft — avertissement non bloquant sur le code existant :\n${[...warnings, ...notes].map((p) => `- ${p}`).join("\n")}\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.`);
       const slug = slugOf(parsed.story.id);
+      const qualityCheckpoint = (await ctx.workspace.checkpoint(`skraft ${slug} : qualité initiale`)).id;
       const branch = `skraft/${slug}`;
       const baseSha = await ctx.git.head();
       await ctx.git.branch(branch);
@@ -79,7 +92,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // objet ici. Le code prépare, l'agent n'a plus à y penser.
       for (const d of dossiersDeLaStory(slug)) await ctx.workspace.ensureDir(d);
       const indicators = computeIndicators(parsed.story, repositoryShape(await ctx.workspace.listFiles()));
-      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators };
+      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators, qualityCheckpoint };
     }
 
     case "classify": {
@@ -293,11 +306,28 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   if (phase !== "DELIVER") return { type: "GATE_OK", artifacts };
+  const { bar } = await loadQualityBar(ctx);
+  const sources = (await ctx.workspace.changedFiles(state.qualityCheckpoint ?? cp))
+    .filter((f) => f.status !== "deleted" && matchesAny(ctx.stack.layout.sources, f.path) && !ctx.stack.isTestFile(f.path));
+  const coverageFacts: string[] = [];
+  const coverageNotes: string[] = state.qualityCheckpoint ? [] : ["Référence de qualité initiale absente (ancienne tâche) : couverture du diff limitée à DELIVER."];
+  if (sources.length) {
+    const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_COVERAGE" } });
+    const problems = baselineProblems(run);
+    if (problems.length) return { type: "GATE_FAIL", gate: "suite finale", reasons: problems };
+    if (run.coverage) {
+      const diff = coverageForChanges(run.coverage, sources);
+      const reasons = checkCoverage(diff.report, sources.map((f) => f.path), bar, true);
+      if (reasons.length) return { type: "GATE_FAIL", gate: "couverture du diff", reasons };
+      coverageNotes.push(...diff.notes);
+      coverageFacts.push(...diff.report.files.map((f) => `Couverture du diff (tâche) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`));
+    } else coverageNotes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
+  }
   // Mutation de fin de DELIVER (ADR 0049) : un mutant survivant est un test trop faible ; le
   // réducteur en fait des défauts adressés au testeur, sans relancer la phase.
   const m = await phaseEndMutation(ctx, state, signal);
   if (m.reasons.length) return { type: "GATE_FAIL", gate: "mutation", reasons: m.reasons };
-  return { type: "GATE_OK", artifacts, ...(m.facts.length ? { facts: m.facts } : {}), ...(m.notes.length ? { notes: m.notes } : {}) };
+  return { type: "GATE_OK", artifacts, facts: [...coverageFacts, ...m.facts], notes: [...coverageNotes, ...m.notes] };
 }
 
 /**

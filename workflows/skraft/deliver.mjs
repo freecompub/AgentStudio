@@ -93,7 +93,7 @@ export { lireBarreDeQualite as parseQualityBar } from "@agent-studio/workflow";
 * Un fichier absent du rapport n'est pas reproché : il n'a pas été mesuré, et le compter à zéro
 * serait attester d'une mesure qui n'a pas eu lieu.
 */
-export function checkCoverage(report, sources, bar) {
+export function checkCoverage(report, sources, bar, diff = false) {
   const reasons = [];
   for (const path of sources) {
     const seuil = bar.coverage[layerOf(path, bar)];
@@ -102,8 +102,10 @@ export function checkCoverage(report, sources, bar) {
     const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
     if (!f)
       continue;
-    if (f.score + 1e-9 < seuil)
-      reasons.push(`Couverture : ${path} à ${round(f.score)} % (minimum ${seuil} %), ${f.covered} ligne(s) couverte(s) sur ${f.total}.`);
+    if (f.score + 1e-9 < seuil) {
+      const missing = diff ? f.lines?.filter((l) => !l.covered).map((l) => l.number) ?? [] : [];
+      reasons.push(`Couverture${diff ? " du diff" : ""} : ${path} à ${round(f.score)} % (minimum ${seuil} %), ${f.covered} ligne(s) couverte(s) sur ${f.total}.${missing.length ? ` Lignes non couvertes : ${missing.join(", ")}.` : ""}`);
+    }
   }
   return reasons;
 }

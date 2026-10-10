@@ -24,18 +24,18 @@ const classe = (filename: string, lignes: [number, number][]) =>
 describe("parseCoberturaReport", () => {
   it("rend un pourcentage par fichier, calculé sur les lignes réellement exécutables", () => {
     const r = parseCoberturaReport(rapport(classe("src/Panier.cs", [[1, 1], [2, 1], [3, 0], [4, 1]])), "/p");
-    expect(r?.files).toEqual([{ file: "src/Panier.cs", covered: 3, total: 4, score: 75 }]);
+    expect(r?.files).toEqual([{ file: "src/Panier.cs", covered: 3, total: 4, score: 75, lines: [{ number: 1, covered: true }, { number: 2, covered: true }, { number: 3, covered: false }, { number: 4, covered: true }] }]);
   });
 
   it("regroupe les classes d'un même fichier : en C# comme en TS, plusieurs classes y cohabitent", () => {
     const r = parseCoberturaReport(rapport(classe("src/A.cs", [[1, 1]]) + classe("src/A.cs", [[2, 0]])), "/p");
-    expect(r?.files).toEqual([{ file: "src/A.cs", covered: 1, total: 2, score: 50 }]);
+    expect(r?.files).toEqual([{ file: "src/A.cs", covered: 1, total: 2, score: 50, lines: [{ number: 1, covered: true }, { number: 2, covered: false }] }]);
   });
 
   it("une ligne comptée deux fois ne l'est qu'une : les partiels ne doivent pas gonfler le total", () => {
     const r = parseCoberturaReport(rapport(classe("src/A.cs", [[1, 1], [1, 0]])), "/p");
     // La ligne 1 est couverte quelque part : elle compte pour couverte, une seule fois.
-    expect(r?.files).toEqual([{ file: "src/A.cs", covered: 1, total: 1, score: 100 }]);
+    expect(r?.files).toEqual([{ file: "src/A.cs", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] }]);
   });
 
   it("ramène les chemins absolus à la racine du projet, liens symboliques résolus", () => {

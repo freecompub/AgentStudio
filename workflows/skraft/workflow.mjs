@@ -142,7 +142,7 @@ export const meta = {
 * celui du réducteur de skraft. Si le script n'est pas nettement plus simple que la partie du
 * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
 */
-import { essayer, PanneEnvironnement, Escalade, TourInterrompu } from "@agent-studio/workflow";
+import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond } from "@agent-studio/workflow";
 import { buildBrief } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
@@ -150,7 +150,8 @@ import { checkResearch } from "./research.mjs";
 import { parseStory, slugOf } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
 import { distiller } from "./distillation.mjs";
-import { livrer } from "./livraison.mjs";
+import { livrer, barreDeQualite } from "./livraison.mjs";
+import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
 const RELANCER_OU_ABANDONNER = [
   { id: "relancer", label: "Relancer" },
@@ -158,6 +159,19 @@ const RELANCER_OU_ABANDONNER = [
 ];
 export default async function skraft(w, entree) {
   const { story, slug, indicateurs } = await preparer(w, entree.story);
+  const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
+  const problems = problemesTestsExistants(run);
+  if (problems.length) {
+    await w.informer(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
+    throw new PanneEnvironnement(problems.join(" ; "));
+  }
+  const disp = await w.disposition();
+  const { barre, notes } = await barreDeQualite(w, disp);
+  const sources = (await w.listerFichiers()).filter((p) => correspond(disp.sources, p));
+  const warnings = run.coverage ? checkCoverage(run.coverage, sources, barre) : ["Couverture initiale non mesurée : la commande de test du projet n'en produit pas."];
+  if (warnings.length || notes.length)
+    await w.informer(`Précontrôle skraft — avertissement non bloquant sur le code existant :\n${[...warnings, ...notes].map((p) => `- ${p}`).join("\n")}\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.`);
+  const qualityCheckpoint = await w.checkpoint(`skraft ${slug} : qualité initiale`);
   const niveau = await evaluerDifficulte(w, story, indicateurs, !entree.auto);
   const effets = levelEffects(niveau);
   // Ce que le dossier de passation raconte, tenu à jour au fil du script.
@@ -172,6 +186,7 @@ export default async function skraft(w, entree) {
     adrs: [],
     regressions: [],
     acceptanceHash: null,
+    qualityCheckpoint,
   };
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.

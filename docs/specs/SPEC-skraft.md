@@ -191,7 +191,7 @@ Validation par schéma (Zod) à chaque chargement ; un état invalide met la tâ
 
 | Stage | Événement | Garde | Stage suivant | Effets |
 | --- | --- | --- | --- | --- |
-| INIT | `START` (état neuf) | story valide (6.1) | CLASSIFY | créer branche, enregistrer `baseSha`, calculer indicateurs, relever un éventuel transfert amont (8.1) |
+| INIT | `START` (état neuf) | story valide (6.1), précontrôle des tests verts | CLASSIFY | notifier la dette de couverture, enregistrer le checkpoint qualité initial, créer branche, enregistrer `baseSha`, calculer indicateurs, relever un éventuel transfert amont (8.1) |
 | INIT | `START` (état existant) | — | stage persisté | reprise (SPEC.md 6.3) |
 | CLASSIFY | `DIFFICULTY_PROPOSED` | niveau dans l'enum | CONFIRM_DIFFICULTY | demande d'interaction (mode simple) ou confirmation auto |
 | CONFIRM_DIFFICULTY | `HUMAN_DECISION` | — | ROUTE | écrire `difficulty` ; régler budget, granularité et lentilles (8.4) |
@@ -254,6 +254,12 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 ```
 
 Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3).
+
+**Précontrôle avant tout appel LLM (ADR 0060)** : le code exécute les tests existants
+(`INIT_BASELINE`). Échec, test ignoré, délai dépassé ou sortie non nulle bloquent le
+lancement avec motifs explicites. Une couverture existante sous les seuils déclarés
+déclenche un avertissement non bloquant ; une couverture absente est annoncée non mesurée.
+Un checkpoint de qualité initial conserve le périmètre de la tâche pour la couverture du diff.
 
 ### 6.2 Arborescence des artefacts
 
@@ -392,7 +398,12 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 | Erreur de syntaxe, crash de setup | Rejeté |
 | Réussi | Signalé : requalifié en test de non-régression (champ `role: "regression"` dans `test-plan.md`), visible des lentilles ; rejeté si le scénario était censé piloter un nouveau comportement et qu'aucune justification n'est donnée |
 
-À la sortie de la porte : **empreinte de tous les tests d'acceptance** enregistrée ; ils sont gelés pour toute la suite du pipeline.
+À la sortie de la porte : **empreinte de tous les tests d'acceptance** enregistrée pour la revue
+de l'essai courant. Si la revue refuse DISTILL, le gel est levé pour permettre la correction,
+y compris l'ajout de tests par `skraft-acceptance` ; les portes sont rejouées et une nouvelle
+empreinte est enregistrée. Une interruption, une panne ou un rembobinage de DISTILL invalide
+aussi cette empreinte. Après approbation de DISTILL, les tests sont gelés pour toute la suite
+du pipeline : un refus de revue en DELIVER ne lève pas ce gel (ADR 0059).
 
 **Revue** : lentilles `cold-reader` et `test-integrity`.
 
@@ -426,12 +437,19 @@ export interface DeliverState {
 | Test d'acceptance du scénario | Vert |
 | Suite complète | Verte, aucun test ignoré |
 | Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
+| Couverture | Seuils déclarés par couche sur les seules lignes exécutables ajoutées ou modifiées depuis le checkpoint du scénario ; dette historique inchangée exclue, numéros des lignes non couvertes dans le rejet (ADR 0060) |
 | Mutation (profil de stack) | Seuils du profil ; par défaut 100 % domaine et application, 90 % API et infrastructure. Capacité absente : porte non disponible, selon la politique du projet |
 | Règle de dépendance | Couches et imports autorisés déclarés dans le profil ; capacité absente : porte non disponible |
 | Qualité de forme | Le **linter du projet** (ESLint, SwiftLint…), avec ses propres règles : longueur de méthode, imbrication, taille des types. Capacité absente : porte non disponible, constat « non mesurée » |
 | Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
 
 Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables par projet (`ctx.settings`).
+
+La fin de DELIVER revérifie aussi la couverture du diff depuis le checkpoint de qualité
+initial de **toute la tâche**, y compris les sources écrites avant DELIVER. Le détail
+par ligne ou un fichier absent du rapport est signalé non mesuré, jamais remplacé par
+un taux global ni supposé conforme. Le checkpoint initial est conservé au redémarrage ;
+un ancien état qui n'en possède pas est vérifié depuis DELIVER avec avertissement explicite.
 
 **Preuves** : on reprend le schéma de `quality-gates-evidence-contract` (sortie, code de sortie, empreintes sha256, instantanés rouge et vert) ; l'écrivain est `run_tests`, jamais l'agent.
 

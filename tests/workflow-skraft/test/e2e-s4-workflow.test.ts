@@ -22,6 +22,7 @@ async function createTsProject(): Promise<string> {
   await put(root, ".gitignore", "node_modules\n");
   await put(root, "package.json", '{"name":"bolus","type":"module","devDependencies":{"vitest":"*"}}\n');
   await put(root, "src/bolus.ts", "export const proposeDose = (calcul: number): number => calcul;\n");
+  await put(root, "tests/bolus.test.ts", 'import { it, expect } from "vitest";\nimport { proposeDose } from "../src/bolus";\nit("comportement existant", () => expect(proposeDose(7)).toBe(7));\n');
   await put(root, "stories/us-12.md", US12);
   for (const args of [["init", "-q", "-b", "main"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@localhost", "commit", "-qm", "init"]])
     execFileSync("git", args, { cwd: root });
@@ -66,9 +67,10 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
-  it("valeur arrondie rejetée, test déjà vert rejeté puis requalifié avec justification, tests d'acceptance gelés", async () => {
+  it("portes puis refus de revue : ajout d'un test en DISTILL, gel final accepté à l'entrée de DELIVER", async () => {
     const prompts: string[] = [];
     let deliverPrompt = "";
+    let revuesDistill = 0;
     const acceptance: ScriptedBehavior = async (t) => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
@@ -77,9 +79,11 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
       await put(
         root,
         ".skraft/us-12/distill/test-plan.md",
-        attempt === 3 ? "# Plan\n- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : "# Plan\n",
+        attempt >= 3 ? "# Plan\n- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : "# Plan\n",
       );
       await put(root, "tests/acceptance/plafond.test.ts", ACCEPTANCE);
+      if (attempt === 4)
+        await put(root, "tests/acceptance/complement.test.ts", `import { it, expect } from "vitest";\nit("ac-2 complément", () => expect(0).toBe(1));\n`);
       await t.callTool("report_phase", { summary: "scénarios", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
@@ -88,6 +92,15 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
         await t.callTool("report_phase", { summary: "m", files: [] });
       },
       "skraft-acceptance": acceptance,
+      "skraft-lens-test-integrity": async (t) => {
+        if (!t.prompt.includes("phase DISTILL"))
+          return void await t.callTool("submit_lens_verdict", { lens: "test-integrity", verdict: "APPROVED", defects: [] });
+        revuesDistill++;
+        await t.callTool("submit_lens_verdict", {
+          lens: "test-integrity", verdict: revuesDistill === 1 ? "CHANGES_REQUESTED" : "APPROVED",
+          defects: revuesDistill === 1 ? [{ severity: "major", target: "test", description: "Ajouter le cas complémentaire.", file: "tests/acceptance/plafond.test.ts" }] : [],
+        });
+      },
       // Arrêt au premier pas de DELIVER : le test d'origine s'arrête à la fin de DISTILL.
       "skraft-test": async (t) => {
         deliverPrompt = t.prompt;
@@ -104,7 +117,8 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
 
     // DELIVER commence : son premier agent reçoit le gel et la non-régression dans son dossier.
     await until(async () => deliverPrompt !== "", 120_000);
-    expect(prompts).toHaveLength(3);
+    expect(prompts).toHaveLength(4);
+    expect(prompts[3]).not.toContain("Les tests d'acceptance sont gelés");
     // 1. porte valeurs : « 12 U » au lieu de « 12,5 U »
     expect(prompts[1]).toContain("La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us-12/distill/features/plafond.feature).");
     // 2. porte RED : ac-3 déjà vert sans justification
@@ -117,6 +131,7 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
     const evidence = await import("@agent-studio/core").then(({ createJsonEvidenceStore }) => createJsonEvidenceStore(join(tasksDir, "evidence")).list(id));
     const redRuns = evidence.filter((e) => e.phase === "DISTILL_RED");
     expect(redRuns.at(-1)?.failing.map((f) => [f.id, f.failureKind])).toEqual([
+      ["tests/acceptance/complement.test.ts > ac-2 complément", "assertion"],
       ["tests/acceptance/plafond.test.ts > ac-1 dose sous le plafond (10 U, 6 U)", "missing_symbol"],
       ["tests/acceptance/plafond.test.ts > ac-2 dose plafonnée (12,5 U)", "missing_symbol"],
     ]);

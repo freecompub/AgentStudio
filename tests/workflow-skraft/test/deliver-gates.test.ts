@@ -1,6 +1,7 @@
 // Repris de extensions/skraft-workflow/test/deliver-gates.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import type { Evidence } from "@agent-studio/extension-api";
+import { coverageForChanges } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
 
@@ -10,6 +11,20 @@ const bar = (raw: string | null = null): QualityBar => {
   if ("error" in r) throw new Error(r.error);
   return r.bar;
 };
+
+describe("seuils sur le diff, pas sur la dette historique", () => {
+  const path = "Sources/Domain/Panier.swift";
+  const report = { files: [{ file: path, covered: 1, total: 2, score: 50, lines: [{ number: 8, covered: false }, { number: 20, covered: true }] }] };
+  const b = bar('{"coverage":{"core":90}}');
+  it("l'ancienne ligne non couverte ne bloque pas un ajout couvert", () => {
+    expect(checkCoverage(coverageForChanges(report, [{ path, lines: [20] }]).report, [path], b, true)).toEqual([]);
+  });
+  it("modifier la ligne non couverte déclenche le seuil et donne son numéro exact", () => {
+    expect(checkCoverage(coverageForChanges(report, [{ path, lines: [8, 20] }]).report, [path], b, true)).toEqual([
+      `Couverture du diff : ${path} à 50 % (minimum 90 %), 1 ligne(s) couverte(s) sur 2. Lignes non couvertes : 8.`,
+    ]);
+  });
+});
 
 describe("planScenarios", () => {
   const ids = [

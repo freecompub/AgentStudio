@@ -79,11 +79,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
         const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
         return {
-          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions },
+          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}) },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
         };
       }
-      if (e.type === "INIT_FAILED") return escalateFrom(s, "INIT", `Story invalide : ${e.reasons.join(" ; ")}`, ["retry", "abort"]);
+      if (e.type === "INIT_FAILED") return escalateFrom(s, "INIT", `Préparation skraft refusée : ${e.reasons.join(" ; ")}`, ["retry", "abort"]);
       break;
 
     case "CLASSIFY":
@@ -155,8 +155,8 @@ export function transition(s0: SkraftState, e: Ev): Out {
           ...(p === "DELIVER" && s.deliver && (e.facts?.length || e.notes?.length)
             ? { deliver: { ...s.deliver, facts: [...new Set([...(s.deliver.facts ?? []), ...(e.facts ?? [])])], notes: [...new Set([...s.deliver.notes, ...(e.notes ?? [])])] } }
             : {}),
-          // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
-          ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
+          // Empreinte de l'essai validé ; un refus de DISTILL l'invalide avant correction.
+          ...(p === "DISTILL" && e.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
@@ -402,7 +402,14 @@ function rembobiner(s: SkraftState): SkraftEffect[] {
   return [{ kind: "rollback", to: cp }, ...(s.phase ? [{ kind: "forgetSessions", roles: phaseRoles(s.phase) } as SkraftEffect] : [])];
 }
 
-function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
+function leverGelDistill(s: SkraftState): SkraftState {
+  return s.phase === "DISTILL" && !s.phasesCompleted.includes("DISTILL")
+    ? { ...s, acceptanceHash: null, regressions: [] }
+    : s;
+}
+
+function failure(etat: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
+  const s0 = leverGelDistill(etat);
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
@@ -419,7 +426,8 @@ function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti 
 }
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */
-function escalate(s: SkraftState, reason: string): Out {
+function escalate(etat: SkraftState, reason: string): Out {
+  const s = leverGelDistill(etat);
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);

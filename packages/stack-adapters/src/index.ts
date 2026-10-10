@@ -1,4 +1,5 @@
 export type * from "./protocols.js";
+export { coverageForChanges, baselineProblems } from "./coverage/changed-coverage.js";
 export { createTypeScriptAdapter, type TypeScriptAdapterDeps } from "./typescript/typescript-adapter.js";
 export { parseVitestReport, classifyFailure } from "./typescript/vitest-report.js";
 export { parseEslintReport } from "./typescript/eslint-report.js";

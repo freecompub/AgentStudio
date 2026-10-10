@@ -135,6 +135,8 @@ export interface SkraftState {
   phasesCompleted: Phase[];
   difficulty: { level: Difficulty; indicators: DifficultyIndicators; confirmedBy: "user" | "auto" } | null;
   baseSha: string;
+  /** Référence de la couverture du diff de toute la tâche, conservée au redémarrage. */
+  qualityCheckpoint?: string;
   branch: string;
   checkpoints: Partial<Record<Phase, string>>;
   artifacts: Record<Phase, ArtifactRecord[]>;
@@ -188,6 +190,7 @@ export type SkraftEvent =
       slug: string;
       story: Story;
       baseSha: string;
+      qualityCheckpoint?: string;
       branch: string;
       indicators: DifficultyIndicators;
     }
@@ -312,6 +315,7 @@ const stateSchema = z.object({
   phasesCompleted: z.array(phase),
   difficulty: z.object({ level: z.enum(["simple", "medium", "medium-hard", "challenging"]), indicators: z.unknown(), confirmedBy: z.enum(["user", "auto"]) }).nullable(),
   baseSha: z.string(),
+  qualityCheckpoint: z.string().optional(),
   branch: z.string(),
   checkpoints: z.record(z.string(), z.string()),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),

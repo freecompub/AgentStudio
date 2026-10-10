@@ -17,27 +17,46 @@ export async function distiller(w, d, lentilles, max) {
     for (const r of suivi.revues)
       await ecrireRapport(w, d.slug, "DISTILL", r.essai, r.lentilles);
     return true;
-  }, { commit: commitMessage("DISTILL", d.slug), apresRembobinage: () => creerDossiers(w, d.slug) });
+  }, {
+    commit: commitMessage("DISTILL", d.slug),
+    apresRembobinage: () => {
+      d.acceptanceHash = null;
+      d.regressions = [];
+      return creerDossiers(w, d.slug);
+    },
+  });
   return faite === true;
 }
 async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
-  const disp = await w.disposition();
-  // Seul l'emplacement est dynamique : il vient de la stack ; la norme vit dans l'agent (ADR 0024, 0043).
-  await specialiste(w, d, s, "DISTILL", "skraft-acceptance", motifs, `\nTests d'acceptance à écrire dans : ${disp.acceptanceTests.join(", ")}`);
-  const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai);
-  if (porte.motifs.length)
-    return porte;
-  const faits = [
-    ...reviewFacts(s.livrables, "DISTILL"),
-    `Tests d'acceptance gelés, empreinte ${d.acceptanceHash.slice(0, 12)}.`,
-    ...d.regressions.map((r) => `Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`),
-    ...(d.derniereExecution ? [d.derniereExecution] : []),
-  ];
-  return (await reviser(w, d, s, cp, "DISTILL", lentilles, essai, faits)) ?? [];
+  d.acceptanceHash = null;
+  d.regressions = [];
+  let approuve = false;
+  try {
+    const disp = await w.disposition();
+    // Seul l'emplacement est dynamique : il vient de la stack ; la norme vit dans l'agent (ADR 0024, 0043).
+    await specialiste(w, d, s, "DISTILL", "skraft-acceptance", motifs, `\nTests d'acceptance à écrire dans : ${disp.acceptanceTests.join(", ")}`);
+    const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai);
+    if (porte.motifs.length)
+      return porte;
+    const faits = [
+      ...reviewFacts(s.livrables, "DISTILL"),
+      `Tests d'acceptance gelés, empreinte ${d.acceptanceHash.slice(0, 12)}.`,
+      ...d.regressions.map((r) => `Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`),
+      ...(d.derniereExecution ? [d.derniereExecution] : []),
+    ];
+    const rejet = await reviser(w, d, s, cp, "DISTILL", lentilles, essai, faits);
+    approuve = rejet === undefined;
+    return rejet ?? [];
+  } finally {
+    if (!approuve) {
+      d.acceptanceHash = null;
+      d.regressions = [];
+    }
+  }
 }
 /**
 * Porte gherkin AVANT la porte valeurs : un scénario couplé à un détail technique doit être refusé
-* avant le gel, passé lequel plus personne ne peut le réécrire. Puis RED d'acceptance (ADR 0041).
+* avant la revue et le gel définitif de DISTILL. Puis RED d'acceptance (ADR 0041).
 */
 async function portes(w, d, s, cp, globsAcceptance, essai) {
   const dir = `.skraft/${d.slug}/distill`;
@@ -68,10 +87,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   const compte = (st) => run.results.filter((r) => r.status === st).length;
   d.derniereExecution = `Dernière exécution des tests par le code (DISTILL_RED) : ${compte("passed")} réussi(s), ${compte("failed")} en échec, ${compte("skipped")} ignoré(s).`;
   await enregistrerLivrables(w, s, (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted").map((f) => f.path), essai, sha256);
-  // Gel des tests d'acceptance, écrit une seule fois.
-  if (!d.acceptanceHash) {
-    d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
-    d.regressions = red.regressions;
-  }
+  d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
+  d.regressions = red.regressions;
   return { motifs: [], porte: "" };
 }

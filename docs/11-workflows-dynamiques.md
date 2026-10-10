@@ -195,6 +195,10 @@ n'est vue qu'à la reprise suivante (le code déjà chargé continue).
   - `correspond(motifs, chemin)` et la résolution de motifs de fichiers ;
   - `lireBarreDeQualite(...)`, `couchesManquantes(...)`, `coucheDe(...)` (barre de qualité,
     ADR 0049) et `lireYaml(texte)` ;
+  - `problemesTestsExistants(execution)` et `couvertureDuDiff(rapport, changements)`
+    (ADR 0060). `w.fichiersModifies(checkpoint)` fournit aussi `lines`, les numéros
+    des lignes ajoutées ou remplacées dans l'arbre courant ; les rapports de couverture
+    peuvent fournir le détail `lines: [{ number, covered }]` ;
   - `essayer`, `agir`, les erreurs.
 - **L'heure** est permise par un appel **journalisé**, `w.maintenant()` : à la première exécution,
   la plateforme note l'heure dans le journal ; au rejeu, le script reçoit la même. C'est la façon

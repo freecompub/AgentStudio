@@ -122,7 +122,7 @@ export interface W {
   humain(id: string, question: string, options: readonly OptionHumaine[], opts?: { detail?: string; texteLibre?: boolean }): Promise<Decision>;
   lireFichier(chemin: string): Promise<string>;
   listerFichiers(): Promise<string[]>;
-  fichiersModifies(depuis: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
+  fichiersModifies(depuis: string): Promise<{ path: string; status: "added" | "modified" | "deleted"; lines?: number[] }[]>;
   ecrireFichier(chemin: string, contenu: string): Promise<void>;
   creerDossier(chemin: string): Promise<void>;
   /** Tests du projet par le cœur : la preuve est enregistrée sous `etiquette`, sinon sous la phase en cours (D20). */

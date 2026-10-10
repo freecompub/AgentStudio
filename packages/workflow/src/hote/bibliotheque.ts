@@ -4,7 +4,7 @@
  * contrôles de skraft en ont besoin (empreinte, motifs de fichiers, barre de qualité) ; les donner
  * ici évite que le dossier embarque des modules, et garde le rejeu exact.
  */
-import { coreFilesMissing, layerOf, matchesAny, parseQualityBar } from "@agent-studio/stack-adapters";
+import { baselineProblems, coverageForChanges, coreFilesMissing, layerOf, matchesAny, parseQualityBar } from "@agent-studio/stack-adapters";
 import { parse as parseYaml } from "yaml";
 import { agir, essayer, motifsInterruption } from "../aides.js";
 import { empreinteDe } from "../contenus.js";
@@ -28,6 +28,8 @@ export const bibliotheque = Object.freeze({
   lireBarreDeQualite: parseQualityBar,
   couchesManquantes: coreFilesMissing,
   coucheDe: layerOf,
+  couvertureDuDiff: coverageForChanges,
+  problemesTestsExistants: baselineProblems,
 });
 
 export type Bibliotheque = typeof bibliotheque;

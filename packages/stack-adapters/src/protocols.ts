@@ -30,7 +30,7 @@ export interface TestRun {
 
 /** Couverture de lignes, par fichier. Produite par la même exécution que les tests (§9.7). */
 export interface CoverageReport {
-  files: { file: string; covered: number; total: number; score: number }[];
+  files: { file: string; covered: number; total: number; score: number; lines?: { number: number; covered: boolean }[] }[];
 }
 
 export interface RunTestsOptions {

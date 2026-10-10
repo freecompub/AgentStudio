@@ -1,4 +1,4 @@
-import { EnvFailureError, matchesAny } from "@agent-studio/extension-api";
+import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "./deliver.js";
@@ -398,9 +398,11 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     // rapport, on le DIT — c'est ce que la lentille `quality-gates` croyait acquis alors qu'aucun
     // fait n'était jamais produit.
     if (run.coverage) {
-      reasons.push(...checkCoverage(run.coverage, sources, bar));
-      for (const f of run.coverage.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))))
-        facts.push(`Couverture (${e.scenarioId}) : ${f.file} à ${f.score} %, ${f.covered} ligne(s) sur ${f.total}.`);
+      const diff = coverageForChanges(run.coverage, changed.filter((f) => sources.includes(f.path)));
+      notes.push(...diff.notes);
+      reasons.push(...checkCoverage(diff.report, sources, bar, true));
+      for (const f of diff.report.files)
+        facts.push(`Couverture du diff (${e.scenarioId}) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`);
     } else notes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
     // Qualité de forme : le linter du projet, avec ses propres règles. Sans linter, on le dit
     // au lieu de produire un fait — une porte qui n'a rien mesuré n'atteste de rien.

@@ -86,7 +86,7 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
   it("INIT + story invalide → escalade avec les raisons", () => {
     const { state, effects } = play([{ type: "INIT_FAILED", reasons: ["aucun critère"] }]);
     expect(state.stage).toBe("ESCALATED");
-    expect(effects).toEqual([{ kind: "askEscalation", reason: "Story invalide : aucun critère", options: ["retry", "abort"] }]);
+    expect(effects).toEqual([{ kind: "askEscalation", reason: "Préparation skraft refusée : aucun critère", options: ["retry", "abort"] }]);
     const retry = play([{ type: "INIT_FAILED", reasons: ["x"] }, DECIDE("retry")]);
     expect(retry.effects).toEqual([{ kind: "init", storyPath: "stories/us-12.md" }]);
   });
@@ -393,6 +393,47 @@ const GREEN_OK = (acceptanceGreen: boolean, n = 1, passed: string[] = ["U > old"
 const FAIL = (reason = "motif"): Ev => ({ type: "STEP_FAIL", reason });
 const DISTILL_FROZEN: Ev[] = [CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc" } as Ev, LENSES(lens("APPROVED")), COMMITTED];
 const toDeliver = (level = "medium-hard") => [...toFirstPhase(level), ...researchPhase, ...designPhase, ...DISTILL_FROZEN, CP("DELIVER")];
+
+describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
+  const toReview = () => [
+    ...toFirstPhase(), ...researchPhase, ...designPhase,
+    CP("DISTILL"), REPORTED,
+    { ...GATE_OK, acceptanceHash: "avant", regressions: ["ancienne"] } as Ev,
+  ];
+
+  it("un refus de revue lève le gel, puis les portes enregistrent l'ensemble corrigé pour DELIVER", () => {
+    const refus = [...toReview(), LENSES(lens("CHANGES_REQUESTED", ["major"]))];
+    expect(play(refus).state).toMatchObject({ stage: "SPECIALIST", phase: "DISTILL", acceptanceHash: null, regressions: [] });
+    const correction = [...refus, REPORTED, { ...GATE_OK, acceptanceHash: "apres", regressions: ["nouvelle"] } as Ev];
+    expect(play(correction).state).toMatchObject({ stage: "REVIEW", acceptanceHash: "apres", regressions: ["nouvelle"] });
+    const approuve = [...correction, LENSES(lens("APPROVED")), COMMITTED, CP("DELIVER"), PLANNED];
+    expect(play(approuve).state.deliver?.acceptanceHash).toBe("apres");
+  });
+
+  it.each([
+    ["délai de revue", TIMEOUT("silence")],
+    ["panne de revue", { type: "ENV_FAILURE", reason: "runtime indisponible" } as Ev],
+    ["rejet définitif", LENSES(lens("REJECTED"))],
+  ])("%s : invalide le gel de DISTILL avant une reprise", (_nom, evenement) => {
+    expect(play([...toReview(), evenement]).state).toMatchObject({ acceptanceHash: null, regressions: [] });
+  });
+
+  it("un deuxième refus à budget épuisé lève le gel avant rembobinage", () => {
+    const s = play([
+      ...toReview(), LENSES(lens("CHANGES_REQUESTED", ["major"])), REPORTED,
+      { ...GATE_OK, acceptanceHash: "apres" } as Ev,
+    ]).state;
+    const r = transition({ ...s, attempts: 99 }, LENSES(lens("CHANGES_REQUESTED", ["major"])));
+    expect(r.state).toMatchObject({ stage: "ESCALATED", acceptanceHash: null, regressions: [] });
+    expect(r.effects.map((e) => e.kind)).toContain("rollback");
+  });
+
+  it("un refus de revue en DELIVER conserve le gel d'acceptance", () => {
+    const s = play(toDeliver()).state;
+    const r = transition({ ...s, stage: "REVIEW" }, LENSES(lens("CHANGES_REQUESTED", ["major"])));
+    expect(r.state.acceptanceHash).toBe("acc");
+  });
+});
 
 describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   it("début de DELIVER : plan des scénarios par le code ; les non-régressions sont déjà faites ; empreinte gelée reprise", () => {
