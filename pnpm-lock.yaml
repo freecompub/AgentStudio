@@ -23,6 +23,9 @@ importers:
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:packages/runtime-copilot
+      '@agent-studio/workflow':
+        specifier: workspace:*
+        version: link:packages/workflow
       '@agent-studio/workspace':
         specifier: workspace:*
         version: link:packages/workspace

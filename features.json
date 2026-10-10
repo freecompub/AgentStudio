@@ -656,10 +656,10 @@
     },
     {
       "id": "mesure-banc-commun",
-      "title": "Le banc de mesure lance skraft ou skraft-workflow et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
-      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "title": "Le banc de mesure lance l'extension skraft ou le workflow skraft et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
+      "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md 45 --workflow (consomme des requêtes Copilot)",
       "passes": false,
-      "notes": "À FAIRE. Planifié le 2026-10-08."
+      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Reste P6 (rapport de comparaison) et le découpage commun en étapes."
     },
     {
       "id": "mesure-repondeur-commun",

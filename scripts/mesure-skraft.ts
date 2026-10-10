@@ -6,6 +6,15 @@
  *
  *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--pousser]
  *                                     [--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini]
+ *                                     [--workflow] [--reponses=FICHIER] [--plafond-requetes=N]
+ *
+ * `--workflow` : lance le **workflow** `workflows/skraft` (ADR 0055) au lieu de l'extension skraft —
+ * installé dans la copie du projet (`.agent-studio/workflows/`, commité), activé et exécuté isolé,
+ * comme dans l'application. Sert à la comparaison de `docs/10`. Incompatible avec `--depuis`.
+ *
+ * `--reponses` : réponses humaines (`docs/runs/reponses-us-2.json` par défaut), données par le
+ * répondeur commun (`scripts/banc/repondeur.ts`) : même décision à la même question, dans les deux
+ * modes. `--plafond-requetes` (250 par défaut) : au-delà, le run est annulé et le rapport le dit.
  *
  * `--modeles` associe des classes de rôle à des modèles (ADR 0048) ; une classe absente laisse le
  * runtime décider.
@@ -24,7 +33,7 @@
  * tour qui dérapait.
  */
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -50,7 +59,9 @@ import {
 } from "@agent-studio/core";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
-import { activateInProcess, type HostDeps } from "@agent-studio/extension-host";
+import { activateInProcess, bundle, createNodeLauncher, type HostDeps } from "@agent-studio/extension-host";
+import { activerWorkflow, createJsonAccordStore, trouverWorkflows, type EtatWorkflow } from "@agent-studio/workflow";
+import { repondre as choisir, type Reponses } from "./banc/repondeur.js";
 import { createProfileAdapter, parseStackProfile } from "../packages/stack-adapters/src/index.js";
 import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/src/index.js";
 import { openWorkspace } from "@agent-studio/workspace";
@@ -86,12 +97,18 @@ const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".le
 // donc sous les yeux de l'utilisateur, avec son historique et ses branches — c'est tout l'intérêt,
 // et c'est aussi le risque : le pipeline commite, crée une branche et peut rembobiner.
 const enPlace = args.includes("--en-place");
+// `--workflow` : le workflow en dossier au lieu de l'extension (docs/10, ADR 0055).
+const modeWorkflow = args.includes("--workflow");
+const fichierReponses = args.find((a) => a.startsWith("--reponses="))?.slice("--reponses=".length) ?? join(process.cwd(), "docs/runs/reponses-us-2.json");
+const plafondRequetes = Number(args.find((a) => a.startsWith("--plafond-requetes="))?.slice("--plafond-requetes=".length) ?? 250);
 const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
 if (!source || !storyPath)
   throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--en-place] [--pousser] [--modeles=…]");
 // `--base` choisit la branche à COPIER ; `--en-place` travaille sur l'état courant du dépôt, sans copie.
 if (enPlace && args.some((a) => a.startsWith("--base="))) throw new Error("--base et --en-place sont incompatibles : en place, le banc part de l'état courant du dépôt.");
 const limite = Number(minutes ?? 90) * 60_000;
+if (modeWorkflow && args.some((a) => a.startsWith("--depuis="))) throw new Error("--depuis et --workflow sont incompatibles : le workflow part toujours du début.");
+const MODE = modeWorkflow ? "workflow skraft" : "extension skraft";
 // `indexOf` rend -1 sur une phase inconnue, et `slice(-1)` rendrait la DERNIÈRE phase : une faute
 // de frappe lancerait DELIVER seul. L'index est donc vérifié avant d'être utilisé.
 const iDepuis = depuis ? PHASE_ORDER.indexOf(depuis as (typeof PHASE_ORDER)[number]) : 0;
@@ -256,9 +273,10 @@ function suivre(e: TraceEntry): void {
       console.log(`§ ${horo()} ▶ étape ${e.phase}${e.essais ? ` (essai ${e.essais + 1})` : ""}${reserve ? ` — réserve ${reserve.restantes}/${reserve.total}` : ""}`);
     }
     if (e.kind === "rejet") console.log(`§ ${horo()} ✖ REJET ${etapeCourante} par « ${e.porte} » :\n${e.motifs.slice(0, 5).map((m) => `§      - ${m.slice(0, 220)}`).join("\n")}${e.motifs.length > 5 ? `\n§      (+${e.motifs.length - 5} autres)` : ""}`);
-    if (e.kind === "tour-fin" && e.fin !== "output" && e.fin !== "blocker") console.log(`§ ${horo()} ⚠ tour ${e.role?.replace("agent-studio.skraft/", "") ?? "?"} terminé : ${e.fin}${e.raison ? ` (${e.raison.slice(0, 200)})` : ""}`);
-    if (e.kind === "tour-fin" && e.fin === "blocker") console.log(`§ ${horo()} ❓ blocage déclaré par ${e.role?.replace("agent-studio.skraft/", "") ?? "?"}`);
-    if (e.kind === "transition" && e.événement === "COMMITTED") await pousserBranche("phase commitée");
+    if (e.kind === "tour-fin" && e.fin !== "output" && e.fin !== "blocker") console.log(`§ ${horo()} ⚠ tour ${e.role?.replace(/^(agent-studio\.skraft|workflow\.skraft-workflow)\//, "") ?? "?"} terminé : ${e.fin}${e.raison ? ` (${e.raison.slice(0, 200)})` : ""}`);
+    if (e.kind === "tour-fin" && e.fin === "blocker") console.log(`§ ${horo()} ❓ blocage déclaré par ${e.role?.replace(/^(agent-studio\.skraft|workflow\.skraft-workflow)\//, "") ?? "?"}`);
+    // Le workflow n'a pas d'événement COMMITTED : on pousse dès que HEAD a bougé (`pousserBranche` le vérifie).
+    if (e.kind === "transition" && (e.événement === "COMMITTED" || modeWorkflow)) await pousserBranche("phase commitée");
   });
 }
 /** Même trace pour le moteur et les agents : le suivi voit transitions, rejets et tours ensemble. */
@@ -288,45 +306,21 @@ const interactions = createInteractionService({
   deliver: (taskId, option, comment) => engine.dispatch(taskId, { type: "HUMAN_DECISION", decision: option, ...(comment ? { comment } : {}) }),
 });
 
-// Réponses rejouées du run du 28/09, pour que la mesure soit comparable. À défaut : première option.
-const REPONSES: [RegExp, string][] = [
-  [/Difficult/i, "medium-hard"],
-  [/paliers.*communs|communs.*paliers|par référence/i, "Les mêmes paliers s'appliquent à toutes les références"],
-  [/mode d.arrondi|arrondi au plus proche/i, "Arrondi au plus proche, avec les demi-centimes arrondis vers le haut (comme l’exemple US-5)."],
-  [/arrondir chaque remise|deux règles absentes/i, "Arrondir chaque remise de ligne à deux décimales et soustraire la remise de ATPayer"],
-  [/plafond|dépasse le sous-total/i, "Taux non négatifs sans plafond ; plafonner la remise au sous-total de ligne."],
-];
+// Répondeur commun (docs/10 P4) : la même décision à la même question, extension ou workflow.
+const reponses = JSON.parse(await readFile(fichierReponses, "utf8")) as Reponses;
 const repondues = new Set<string>();
-/**
- * Escalades déjà relancées, par motif. Le banc répond « relancer » par défaut : face à une panne
- * qui se reproduit à l'identique, il relancerait sans fin. Au troisième motif identique, il abandonne.
- */
-const escalades = new Map<string, number>();
-const MAX_ESCALADES_IDENTIQUES = 3;
+const memoireEscalades = new Map<string, number>();
 const repondre = async () => {
   for (const q of await interactions.pending()) {
     if (repondues.has(q.id)) continue;
     repondues.add(q.id);
-    const texte = `${q.title}\n${q.detail ?? ""}`;
-    const voulue = REPONSES.find(([re]) => re.test(texte))?.[1];
-    let choix = q.options.find((o) => o.id === voulue || o.label === voulue) ?? q.options[0]!;
-    const abandon = q.options.find((o) => o.id === "abort");
-    if (abandon && !voulue) {
-      const motif = (q.detail ?? q.title).replace(/Request ID: [^)]*/g, "");
-      const n = (escalades.get(motif) ?? 0) + 1;
-      escalades.set(motif, n);
-      if (n >= MAX_ESCALADES_IDENTIQUES) {
-        choix = abandon;
-        console.log(`§ ✖ même escalade ${n} fois de suite : abandon de la tâche.\n§      ${motif.split("\n")[0]?.slice(0, 200)}`);
-      }
-    }
-    // Le profil doit être accepté par la demande : l'escalade n'admet ni le PO ni le testeur
-    // (`requiredRoles`). Répondre « po » à tout laissait la demande sans réponse, donc la tâche en
-    // attente définitive — deux runs gelés le 29/09 avant qu'on le voie.
-    const role = q.requiredRoles?.length && !q.requiredRoles.includes("po") ? q.requiredRoles[0]! : "po";
-    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${choix.label.slice(0, 110)}${role === "po" ? "" : ` (profil ${role})`}`);
+    const c = choisir(q, reponses, memoireEscalades);
+    const label = q.options.find((o) => o.id === c.option)?.label ?? c.option;
+    if (c.nature === "inconnue") console.log(`§ ⚠ question inconnue du répondeur : « ${q.title} » — première option`);
+    if (c.nature === "escalade" && /abort|abandonner/.test(c.option)) console.log(`§ ✖ même escalade relancée ${reponses.relancesParEscalade} fois : abandon de la tâche.`);
+    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${label.slice(0, 110)}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${c.role === "po" ? "" : ` (profil ${c.role})`}`);
     try {
-      await interactions.respond(q.id, choix.id, undefined, { role });
+      await interactions.respond(q.id, c.option, c.commentaire, { role: c.role as never });
     } catch (err) {
       // JAMAIS en silence : c'est le seul mécanisme qui débloque la tâche. Un refus avalé ne se
       // distingue pas d'un agent qui réfléchit, et le banc attend jusqu'au plafond.
@@ -359,7 +353,26 @@ const hostDeps: HostDeps = {
   ids: { next: () => randomUUID() },
 };
 if (Object.keys(classesModeles).length) console.log(`Modèles par classe : ${Object.entries(classesModeles).map(([k, v]) => `${k} → ${v}`).join(", ")}`);
-await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
+if (!modeWorkflow) await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
+else {
+  // Comme dans l'application (docs/11) : le workflow est dans le projet, commité, puis activé et
+  // exécuté isolé. Non suivi, un rembobinage (`git clean`) l'effacerait.
+  await cp(join(process.cwd(), "workflows/skraft"), join(root, ".agent-studio/workflows/skraft-workflow"), { recursive: true });
+  execFileSync("git", ["add", "-A", ".agent-studio/workflows"], { cwd: root });
+  if (execFileSync("git", ["status", "--porcelain", ".agent-studio/workflows"], { cwd: root, encoding: "utf8" }).trim())
+    execFileSync("git", ["-c", "user.name=banc", "-c", "user.email=banc@localhost", "commit", "-qm", "chore: workflow skraft (banc de comparaison)"], { cwd: root });
+  const runtimeEnfant = join(tasksDir, "runtime", "workflow-child.mjs");
+  await bundle(join(process.cwd(), "packages/workflow/src/hote/enfant-entree.ts"), runtimeEnfant);
+  const recherche = await trouverWorkflows({ projet: join(root, ".agent-studio/workflows") });
+  if (recherche.erreurs.length) throw new Error(`Workflow écarté : ${JSON.stringify(recherche.erreurs)}`);
+  const r = await activerWorkflow(recherche.workflows[0]!, hostDeps, {
+    isolation: { launcher: createNodeLauncher({ onStderr: (c) => process.stderr.write(c) }), runtimeEntry: runtimeEnfant },
+    accords: createJsonAccordStore(join(tasksDir, "accords.json")),
+    confirmer: { confirm: async () => "allow-always" },
+  });
+  if (!r.ok) throw new Error(`Workflow non activé : ${r.motifs.join(" ; ")}`);
+}
+console.log(`Mode : ${MODE} ; réponses : ${fichierReponses} ; plafond : ${plafondRequetes} requêtes premium`);
 
 // ---------- Lancement ------------------------------------------------------------------------
 // Réserve Copilot AVANT de lancer (ADR 0044) : une tâche skraft consomme des dizaines de requêtes
@@ -372,7 +385,9 @@ else {
   console.log(`Réserve Copilot : ${quota.restantes}/${quota.total} requêtes premium (${quota.pourcentageRestant} %), remise à zéro le ${quota.remiseAZero}${alerte}\n`);
 }
 
-const taskId = await engine.start("agent-studio.skraft/skraft-pipeline", { storyPath, confirmDifficulty: true, ...(phaseOrder ? { phaseOrder } : {}) });
+const taskId = modeWorkflow
+  ? await engine.start("workflow.skraft-workflow/skraft-workflow", { story: storyPath, auto: false })
+  : await engine.start("agent-studio.skraft/skraft-pipeline", { storyPath, confirmDifficulty: true, ...(phaseOrder ? { phaseOrder } : {}) });
 if (phaseOrder)
   console.log(
     `Reprise à ${depuis} : phases ${phaseOrder.join(" → ")}.\n` +
@@ -386,9 +401,19 @@ const fini = async () => {
   return r?.status === "finished";
 };
 const debut = Date.now();
+let arret: string | null = null;
 while (!(await fini())) {
   if (Date.now() - debut > limite) {
+    arret = `limite de durée (${minutes ?? 90} min)`;
     console.log("\n⏱  Limite du banc atteinte : annulation.");
+    await engine.cancel(taskId);
+    break;
+  }
+  // Plafond de coût (docs/10 P5), compté par le SDK dans la trace : borne un run qui dérape.
+  const depense = requetes(resumerTrace(vues).total.nanoAiu);
+  if (depense > plafondRequetes) {
+    arret = `plafond de ${plafondRequetes} requêtes premium (${depense} dépensées)`;
+    console.log(`\n💰 ${arret} : annulation.`);
     await engine.cancel(taskId);
     break;
   }
@@ -397,12 +422,17 @@ while (!(await fini())) {
 
 // ---------- Rapport --------------------------------------------------------------------------
 const record = await engine.status(taskId);
-const state = record?.state as SkraftState | undefined;
+const state = modeWorkflow ? undefined : (record?.state as SkraftState | undefined);
+const etatWorkflow = modeWorkflow ? (record?.state as EtatWorkflow | undefined) : undefined;
+/** État final, lisible pour les deux modes : stade du réducteur, ou issue du workflow. */
+const etatFinal = modeWorkflow
+  ? `${etatWorkflow?.fin ? (etatWorkflow.fin.statut === "echec" ? `échec (${etatWorkflow.fin.motif.slice(0, 200)})` : etatWorkflow.fin.statut) : "inachevé"} / ${record?.phase ?? "—"}`
+  : `${state?.stage} / ${state?.phase ?? "—"}`;
 const s = (ms: number) => `${Math.floor(ms / 60000)}m${String(Math.round((ms % 60000) / 1000)).padStart(2, "0")}`;
 const lignes = tours.map((t, i) => {
   const entree = t.appels.reduce((n, a) => n + a.inputTokens, 0);
   const sortie = t.appels.reduce((n, a) => n + a.outputTokens, 0);
-  return { "#": i + 1, role: t.role.replace("agent-studio.skraft/", ""), duree: s((t.fin ?? Date.now()) - t.debut), appels: t.appels.length, entree, sortie };
+  return { "#": i + 1, role: t.role.replace(/^(agent-studio\.skraft|workflow\.skraft-workflow)\//, ""), duree: s((t.fin ?? Date.now()) - t.debut), appels: t.appels.length, entree, sortie };
 });
 console.log("\n\n===== TOURS =====");
 console.table(lignes);
@@ -412,7 +442,7 @@ console.log(
     : "\n✖ AUCUNE mesure d'occupation reçue : le plafond de l'ADR 0031 est AVEUGLE sur ce runtime.",
 );
 console.log(`\nTotal : ${s(Date.now() - t0)}, ${lignes.reduce((n, l) => n + l.entree, 0)} tokens d'entrée, ${tours.length} tours.`);
-console.log(`État final : ${state?.stage} / ${state?.phase}, essais ${state?.attempts}`);
+console.log(`État final : ${etatFinal}${state ? `, essais ${state.attempts}` : ""}${arret ? ` — arrêté : ${arret}` : ""}`);
 console.log("Usage par phase :");
 console.table(await usage.report(taskId));
 await suivi;
@@ -433,13 +463,14 @@ console.log(
 
 // Rapport versé dans AgentStudio (docs/runs/) : le code produit est sur la branche du projet
 // d'essai, l'instrumentation reste ici.
-const rapportDir = join(process.cwd(), "docs/runs", `${jour}-${basename(storyPath, ".md").toLowerCase()}-${taskId.slice(0, 8)}`);
+const rapportDir = join(process.cwd(), "docs/runs", `${jour}-${basename(storyPath, ".md").toLowerCase()}-${modeWorkflow ? "workflow" : "extension"}-${taskId.slice(0, 8)}`);
 await mkdir(rapportDir, { recursive: true });
 const md = [
-  `# Run skraft — ${basename(storyPath)} — ${jour}`,
+  `# Run skraft — ${basename(storyPath)} — ${jour} — ${MODE}`,
   "",
+  `- Mode : ${MODE} ; réponses humaines : \`${fichierReponses}\` ; plafond : ${plafondRequetes} requêtes premium${arret ? ` ; **arrêté : ${arret}**` : ""}`,
   `- Projet : \`${source}\`${distant ? `, branche poussée \`${brancheRun}\`` : ""}`,
-  `- État final : ${state?.stage} / ${state?.phase ?? "—"}`,
+  `- État final : ${etatFinal}`,
   `- Durée : ${hms(Date.now() - t0)}, ${resume.total.tours} tours, ${resume.total.rejets} rejets, ${resume.total.entrée} tokens d'entrée`,
   `- Requêtes premium : ${requetes(resume.total.nanoAiu)} d'après le SDK (${resume.total.appels} appels), écart de réserve ${consoReelle ?? "illisible"}`,
   "",
@@ -458,9 +489,9 @@ const md = [
   "",
 ].join("\n");
 await writeFile(join(rapportDir, "rapport.md"), md);
-await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ resume, releves, brancheRun: distant ? brancheRun : null, etatFinal: { stage: state?.stage, phase: state?.phase } }, null, 2));
+await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ mode: MODE, arret, resume, releves, brancheRun: distant ? brancheRun : null, etatFinal: modeWorkflow ? { fin: etatWorkflow?.fin ?? null, phase: record?.phase ?? null } : { stage: state?.stage, phase: state?.phase } }, null, 2));
 console.log(`\nRapport : ${join(rapportDir, "rapport.md")}`);
-await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state }, null, 2));
+await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state: state ?? etatWorkflow }, null, 2));
 console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\n${enPlace ? "Dépôt (modifié en place)" : "Copie du projet"} : ${root}`);
 await agents.releaseTask(taskId);
 await runtime.stop();

@@ -5,6 +5,29 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Banc de mesure : mode workflow, répondeur commun, plafond de coût (point 1)
+
+`scripts/mesure-skraft.ts`, typé, **jamais lancé** (il consomme des requêtes Copilot) ; suite
+complète : 1 711 tests.
+
+**Fait.**
+- `--workflow` : copie `workflows/skraft` dans la copie du projet (`.agent-studio/workflows/`),
+  la commite (sinon un rembobinage l'efface), construit le runtime enfant, active le workflow
+  (`activerWorkflow`, accord « toujours ») et lance `workflow.skraft-workflow/skraft-workflow`.
+  Incompatible avec `--depuis`.
+- Répondeur commun pour **les deux modes** (`scripts/banc/repondeur.ts`, `--reponses=`, défaut
+  `docs/runs/reponses-us-2.json`) : les questions ouvertes reçoivent enfin leur texte.
+- `--plafond-requetes=N` (250 par défaut), compté sur la trace par le SDK ; l'arrêt est dit dans
+  le rapport. Rapport et `resume.json` : mode, arrêt, état final propre à chaque mode ; dossier
+  `docs/runs/<date>-<story>-<extension|workflow>-<id>/`.
+- Le workflow n'a pas d'événement `COMMITTED` : le banc pousse (`--pousser`) dès que HEAD bouge.
+- `@agent-studio/workflow` ajouté aux dépendances de développement de la racine (pour `scripts/`).
+
+**Reste avant la campagne** : le découpage commun en étapes (point 4), la durée des effets
+(point 5), le rapport de comparaison (P6) ; la réserve et le prix (décision du responsable).
+
+---
+
 ## 10/10 — Répondeur commun du banc (point 3 avant la comparaison US-2)
 
 Critère `mesure-repondeur-commun` passé à `true` (7 tests, projet Vitest `banc`).

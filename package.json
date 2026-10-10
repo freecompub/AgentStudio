@@ -25,6 +25,7 @@
     "@agent-studio/extension-packaging": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.19.0",
