@@ -62,6 +62,7 @@ import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime
 import { activateInProcess, bundle, createNodeLauncher, type HostDeps } from "@agent-studio/extension-host";
 import { activerWorkflow, createJsonAccordStore, trouverWorkflows, type EtatWorkflow } from "@agent-studio/workflow";
 import { repondre as choisir, type Reponses } from "./banc/repondeur.js";
+import { resumerParEtape } from "./banc/etapes.js";
 import { createProfileAdapter, parseStackProfile } from "../packages/stack-adapters/src/index.js";
 import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/src/index.js";
 import { openWorkspace } from "@agent-studio/workspace";
@@ -299,8 +300,9 @@ const engine = createTaskEngine({
   logger,
   trace,
 });
+const demandes = createJsonInteractionStore(join(tasksDir, "interactions"));
 const interactions = createInteractionService({
-  store: createJsonInteractionStore(join(tasksDir, "interactions")),
+  store: demandes,
   clock: { now: () => new Date() },
   ids: { next: () => randomUUID() },
   deliver: (taskId, option, comment) => engine.dispatch(taskId, { type: "HUMAN_DECISION", decision: option, ...(comment ? { comment } : {}) }),
@@ -428,6 +430,10 @@ const etatWorkflow = modeWorkflow ? (record?.state as EtatWorkflow | undefined) 
 const etatFinal = modeWorkflow
   ? `${etatWorkflow?.fin ? (etatWorkflow.fin.statut === "echec" ? `échec (${etatWorkflow.fin.motif.slice(0, 200)})` : etatWorkflow.fin.statut) : "inachevé"} / ${record?.phase ?? "—"}`
   : `${state?.stage} / ${state?.phase ?? "—"}`;
+/** Livré : fini avec la phase DELIVER faite (une phase sautée par l'humain ne compte pas). */
+const livre = modeWorkflow
+  ? etatWorkflow?.fin?.statut === "fini" && ((etatWorkflow.fin.valeur as { clair?: { phases?: string[] } } | undefined)?.clair?.phases ?? []).includes("DELIVER")
+  : state?.stage === "DONE" && state.phasesCompleted.includes("DELIVER");
 const s = (ms: number) => `${Math.floor(ms / 60000)}m${String(Math.round((ms % 60000) / 1000)).padStart(2, "0")}`;
 const lignes = tours.map((t, i) => {
   const entree = t.appels.reduce((n, a) => n + a.inputTokens, 0);
@@ -450,6 +456,8 @@ await pousserBranche("fin du run");
 const reserveFin = await lireReserve();
 releves.push({ at: new Date().toISOString(), etape: "fin", restantes: reserveFin?.restantes ?? null });
 const resume = resumerTrace(await traceBrute.list(taskId));
+// Découpage commun aux deux modes (docs/10 §3), attente humaine retirée : c'est lui qu'on compare.
+const comparable = resumerParEtape(resume, (await demandes.list()).filter((q) => q.taskId === taskId), new Date().toISOString());
 const r0 = releves[0]?.restantes;
 const consoReelle = typeof r0 === "number" && reserveFin ? r0 - reserveFin.restantes : null;
 console.log("\n===== ÉTAPES (lues dans la trace) =====");
@@ -480,6 +488,12 @@ const md = [
   "|---|---|---|---|---|---|---|---|---|",
   ...resume.etapes.map((et) => `| ${et.phase} | ${hms(et.duréeMs)} | ${et.tours} | ${et.rejets.length} | ${et.finsAnormales.map((f) => f.fin).join(", ")} | ${et.appels} | ${requetes(et.nanoAiu)} | ${et.modèles.join(", ")} | ${et.entrée} |`),
   "",
+  "## Étapes communes (docs/10 §3)",
+  "",
+  "| Étape | Sous-étapes | Durée | Attente humaine | Hors attente | Agents | Code | Moteur | Tours | Appels | Requêtes premium | Tokens entrée | Tokens sortie | Rejets |",
+  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+  ...comparable.etapes.map((l) => `| ${l.etape} | ${l.sousEtapes.join(", ")} | ${hms(l.duréeMs)} | ${hms(l.attenteHumaineMs)} | ${hms(l.horsAttenteMs)} | ${hms(l.agentsMs)} | ${hms(l.codeMs)} | ${hms(l.moteurMs)} | ${l.tours} | ${l.appels} | ${requetes(l.nanoAiu)} | ${l.entrée} | ${l.sortie} | ${l.rejets} |`),
+  "",
   "## Rejets et leurs motifs",
   "",
   ...resume.etapes.flatMap((et) => et.rejets.flatMap((r) => [`### ${et.phase} — porte « ${r.porte} »`, "", ...r.motifs.map((m) => `- ${m}`), ""])),
@@ -489,7 +503,7 @@ const md = [
   "",
 ].join("\n");
 await writeFile(join(rapportDir, "rapport.md"), md);
-await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ mode: MODE, arret, resume, releves, brancheRun: distant ? brancheRun : null, etatFinal: modeWorkflow ? { fin: etatWorkflow?.fin ?? null, phase: record?.phase ?? null } : { stage: state?.stage, phase: state?.phase } }, null, 2));
+await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ mode: MODE, livre, arret, resume, comparable, releves, brancheRun: distant ? brancheRun : null, etatFinal: modeWorkflow ? { fin: etatWorkflow?.fin ?? null, phase: record?.phase ?? null } : { stage: state?.stage, phase: state?.phase } }, null, 2));
 console.log(`\nRapport : ${join(rapportDir, "rapport.md")}`);
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state: state ?? etatWorkflow }, null, 2));
 console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\n${enPlace ? "Dépôt (modifié en place)" : "Copie du projet"} : ${root}`);

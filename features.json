@@ -1,6 +1,6 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-08",
+  "updated": "2026-10-10",
   "branch": "feat/workflow-rejouable",
   "items": [
     {
@@ -645,28 +645,35 @@
       "title": "Chaque rejeu du workflow est tracé avec son étape, sa porte et ses motifs exacts (prérequis P1 de docs/10)",
       "verify": "pnpm vitest run --project workflow test/aides.test.ts test/rejeu.test.ts && pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/e2e-s5-workflow.test.ts",
       "passes": true,
-      "notes": "Fait le 2026-10-10 : w.rejet(porte, motifs) journalisé ; essayer l’appelle à chaque essai refusé (porte nommée, « revue », « délai ») ; DELIVER trace pas refusés, scénarios repris, corrections et réessais de phase ; l’état du workflow expose rejections et lastRejection, que le moteur trace déjà. Reste de P1 : le découpage commun en étapes (CLASSIFY, REVIEW…), point 4 de la liste."
+      "notes": "Fait le 2026-10-10 : w.rejet(porte, motifs) journalisé ; essayer l’appelle à chaque essai refusé (porte nommée, « revue », « délai ») ; DELIVER trace pas refusés, scénarios repris, corrections et réessais de phase ; l’état du workflow expose rejections et lastRejection, que le moteur trace déjà. Complété le même jour : le workflow annonce ses étapes par w.etape avec les noms de l’extension (INIT, CLASSIFY, CONFIRM_DIFFICULTY, ROUTE, REVIEW, ARBITRATION, RATIFICATION, BLOCKED, ESCALATED, DONE), et le banc les ramène au découpage commun (scripts/banc/etapes.ts)."
     },
     {
       "id": "mesure-durees-effets",
       "title": "La trace donne la durée de chaque effet et de chaque transition, pour skraft et skraft-workflow (prérequis P2 de docs/10)",
-      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
-      "passes": false,
-      "notes": "À FAIRE. Planifié le 2026-10-08."
+      "verify": "pnpm vitest run --project task-engine && pnpm vitest run --project core packages/core/test/run-summary.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10, dans le moteur de tâches donc pour les deux : chaque transition porte sa durée de calcul (duréeMs, rejeu du script compris pour le workflow) ; chaque effet produit une entrée `effet` {effet, phase, duréeMs, issue ok|erreur|attente}. Nouveau crochet optionnel TaskDefinition.estUnEchec(event) : un effet qui rend ERREUR (workflow) compte comme échec. resumerTrace en tire agentsMs, effetsMs, codeMs (effets moins tours d’agent) et moteurMs par étape."
     },
     {
       "id": "mesure-banc-commun",
       "title": "Le banc de mesure lance l'extension skraft ou le workflow skraft et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
       "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md 45 --workflow (consomme des requêtes Copilot)",
       "passes": false,
-      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Reste P6 (rapport de comparaison) et le découpage commun en étapes."
+      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable)."
     },
     {
       "id": "mesure-repondeur-commun",
       "title": "Un répondeur scripté par fichier donne les mêmes réponses humaines à l'extension skraft et au workflow skraft (prérequis P4 de docs/10)",
       "verify": "pnpm vitest run --project banc",
       "passes": true,
-      "notes": "Fait le 2026-10-10 : scripts/banc/repondeur.ts (pur), options reconnues par leur action (id, « action:… » ou « …:action ») et non par leur libellé ; questions ouvertes répondues avec du texte (fini les réponses vides) ; escalade relancée deux fois par motif puis abandonnée. Fichier de réponses : docs/runs/reponses-us-2.json. Pas encore branché dans le banc : point 1."
+      "notes": "Fait le 2026-10-10 : scripts/banc/repondeur.ts (pur), options reconnues par leur action (id, « action:… » ou « …:action ») et non par leur libellé ; questions ouvertes répondues avec du texte (fini les réponses vides) ; escalade relancée deux fois par motif puis abandonnée. Fichier de réponses : docs/runs/reponses-us-2.json. Branché dans le banc le même jour (--reponses)."
+    },
+    {
+      "id": "mesure-rapport-comparaison",
+      "title": "Un script lit les resume.json des runs et produit le rapport de comparaison de docs/10 §7 (prérequis P6)",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : scripts/banc/comparer.ts, `comparer` pur (synthèse en médiane et valeurs brutes, une ligne par étape et par run, rejeux run par run avec motifs entiers, rejeux mis en regard par famille de porte avec « à expliquer » quand un seul côté rejette, différences assumées de §2). Les deux nommages d’une même porte sont rapprochés par `famille` (DELIVER et pas test (s1) → pas ; DELIVER : mutation → mutation). Commande : tsx scripts/banc/comparer.ts [--story=us-2] [--prix=…] <dossiers de runs>. NON FAIT : durée et coût perdus par rejeu (la trace ne délimite pas un essai), à ajouter si la lecture des runs le demande."
     },
     {
       "id": "comparaison-us-2",

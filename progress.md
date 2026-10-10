@@ -5,6 +5,37 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Étapes communes, durée des effets, rapport de comparaison (points 4, 5, 7)
+
+Suite complète : 1 728 tests ; typage propre. Le banc n'a toujours **jamais tourné**.
+
+**Fait.**
+- Point 5 (P2), dans le moteur de tâches : `duréeMs` sur chaque transition (rejeu compris pour
+  le workflow), entrée `effet` {effet, phase, duréeMs, issue}. Crochet optionnel
+  `TaskDefinition.estUnEchec(event)` : sans lui, un effet du workflow qui rend `ERREUR` passait
+  pour `ok`. `resumerTrace` donne `agentsMs`, `effetsMs`, `codeMs`, `moteurMs`.
+- Point 4 : le workflow appelle `w.etape(...)` avec **les noms de stade de l'extension**, plutôt
+  qu'un vocabulaire à lui qu'il aurait fallu traduire. Conséquences sur les jumeaux : les
+  questions ouvertes attendent en `ROUTE` (et non plus `RESEARCH`) ; l'usage se lit par
+  `CLASSIFY`, `REVIEW`… et non plus `DÉBUT`. `w.phase` annonce `ESCALATED` avant sa question.
+  `scripts/banc/etapes.ts` ramène les deux traces au découpage du §3 de `docs/10` ; une revue,
+  un arbitrage, une escalade ou un blocage comptent dans l'étape en cours. L'attente humaine
+  vient des demandes d'interaction (`createdAt` → `answeredAt`), comptée dans l'étape où la
+  question est posée.
+- Point 7 (P6) : `scripts/banc/comparer.ts`, pur sauf sa commande.
+
+**Pièges.**
+- Les deux implémentations nomment différemment une même porte (`DELIVER` pour un pas refusé
+  côté extension, `pas test (s1)` côté workflow ; `DELIVER : mutation` / `mutation`) : la mise
+  en regard passe par `famille()`. Une nouvelle porte d'un seul côté apparaîtra « à expliquer ».
+- `features.json` : la racine est `{ items: [...] }`, et un texte de notes (« À FAIRE. Planifié
+  le 2026-10-08. ») y figure deux fois ; l'éditer par identifiant, pas par texte.
+
+**Prochaine étape** : un run à blanc du banc, puis le premier couple de runs réels (accord du
+responsable, réserve Copilot et prix unitaire).
+
+---
+
 ## 10/10 — Banc de mesure : mode workflow, répondeur commun, plafond de coût (point 1)
 
 `scripts/mesure-skraft.ts`, typé, **jamais lancé** (il consomme des requêtes Copilot) ; suite

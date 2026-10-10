@@ -1,6 +1,7 @@
 # Plan de test : skraft (réducteur) contre skraft-workflow, sur US-2
 
-- Statut : **plan**, 2026-10-08. Rien n'est lancé ; les prérequis (§5) sont à développer d'abord.
+- Statut : **prêt à lancer**, 2026-10-10. Les prérequis P1 à P6 (§5) sont faits et testés sur
+  agents simulés ; aucun run n'est lancé (accord du responsable, réserve et prix attendus).
 - Contexte : ADR 0054 (les deux extensions coexistent le temps de les comparer), `docs/09`.
 - **Depuis l'ADR 0055**, l'objet comparé au réducteur est le **workflow `skraft`** au nouveau format
   (dossier, `docs/11`), une fois converti ; le banc (P3) lance une commande, extension ou workflow.
@@ -126,6 +127,26 @@ noté invalide pour Q4 et le banc corrigé avant le run suivant.
 | P6 | **Rapport de comparaison** : un script lit les `resume.json` des runs et produit le tableau du §7 | évite les recopies à la main | tableau produit sur les deux runs à blanc |
 
 P1 et P2 sont des changements de code : branche `feat/mesure-comparee`, TDD, `features.json`.
+
+**Réalisé le 2026-10-10**, sur `feat/workflow-rejouable` :
+
+- P1 : `w.rejet` à chaque essai refusé ; `w.etape` annonce les étapes **avec les noms de
+  l'extension** (`INIT`, `CLASSIFY`, `CONFIRM_DIFFICULTY`, `ROUTE`, `REVIEW`, `ARBITRATION`,
+  `RATIFICATION`, `BLOCKED`, `ESCALATED`, `DONE`), si bien que les deux traces se lisent pareil ;
+- P2 : entrée `effet` (durée, issue) et `duréeMs` des transitions, dans le moteur de tâches ;
+  `resumerTrace` en tire temps agent, code et moteur ;
+- P3 : `scripts/mesure-skraft.ts --workflow` ; la correspondance du §3 est
+  `scripts/banc/etapes.ts` (`resumerParEtape`, attente humaine retirée d'après les demandes
+  d'interaction), écrite dans `resume.json` (`comparable`, `livre`) ;
+- P4 : `scripts/banc/repondeur.ts`, `docs/runs/reponses-us-2.json` ;
+- P5 : `--plafond-requetes` (250) ;
+- P6 : `tsx scripts/banc/comparer.ts [--story=us-2] [--prix=…] <dossiers de runs>`, qui écrit
+  `docs/runs/<date>-comparaison-us-2.md`. Les noms de porte des deux côtés sont rapprochés par
+  famille (`DELIVER` et `pas test (s1)` → `pas`). **Non fait** : durée et coût perdus par rejeu,
+  la trace ne délimitant pas un essai ; à ajouter si la lecture des runs le demande.
+
+Le critère « un run à blanc sur agents simulés » de P3 et P6 est couvert par les tests unitaires
+du banc et les jumeaux du workflow ; le banc lui-même n'a jamais tourné.
 
 ## 6. Protocole
 
