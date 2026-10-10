@@ -1,0 +1,38 @@
+{
+  "id": "62113961-0db6-4253-92f7-a8f3ecd5a201",
+  "taskId": "521f0098-3032-4c26-9846-0f2c530be45b",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "Pour définir les invariants des objets-valeurs de palier sans inventer de règle, quel contrat faut-il appliquer aux configurations invalides : seuil nul ou négatif, taux négatif ou supérieur à 100 %, plusieurs paliers au même seuil ? Les critères ne couvrent que des paliers valides et l'absence de paliers (`stories/US-2.md:7-11`) ; les validations existantes concernent uniquement les quantités et les montants (`src/Tarification.Domaine/Quantite.cs:10-11`, `src/Tarification.Domaine/Montant.cs:13-14`). La recherche laisse explicitement cette question ouverte (`.skraft/us-2/research/research.md:134-136`).",
+  "options": [
+    {
+      "id": "Refuser les seuils < 1 et les taux hors [0 %, 100 %] ; autoriser les seuils identiques et retenir la remise la plus avantageuse.",
+      "label": "Refuser les seuils < 1 et les taux hors [0 %, 100 %] ; autoriser les seuils identiques et retenir la remise la plus avantageuse."
+    },
+    {
+      "id": "Refuser les seuils < 1, les taux hors [0 %, 100 %] et tout seuil dupliqué.",
+      "label": "Refuser les seuils < 1, les taux hors [0 %, 100 %] et tout seuil dupliqué."
+    },
+    {
+      "id": "Limiter US-2 aux configurations valides des critères ; traiter la validation des configurations dans une story ultérieure.",
+      "label": "Limiter US-2 aux configurations valides des critères ; traiter la validation des configurations dans une story ultérieure."
+    },
+    {
+      "id": "Autre contrat métier à préciser.",
+      "label": "Autre contrat métier à préciser."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T18:49:18.882Z",
+  "status": "answered",
+  "answer": {
+    "option": "Refuser les seuils < 1 et les taux hors [0 %, 100 %] ; autoriser les seuils identiques et retenir la remise la plus avantageuse.",
+    "answeredAt": "2026-10-10T18:49:18.886Z"
+  }
+}

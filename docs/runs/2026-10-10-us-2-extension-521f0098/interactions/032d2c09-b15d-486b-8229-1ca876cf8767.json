@@ -1,0 +1,34 @@
+{
+  "id": "032d2c09-b15d-486b-8229-1ca876cf8767",
+  "taskId": "521f0098-3032-4c26-9846-0f2c530be45b",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question de l'agent (RESEARCH)",
+  "detail": "Les paliers de remise sont-ils communs à toutes les références ou configurés par référence ? Cette règle est explicitement laissée ouverte dans stories/US-2.md:13-14, et aucun fichier analysé ne la résout. La réponse est nécessaire pour comparer les approches de configuration et formuler une recommandation sans inventer de règle métier.",
+  "options": [
+    {
+      "id": "Les mêmes paliers s'appliquent à toutes les références.",
+      "label": "Les mêmes paliers s'appliquent à toutes les références."
+    },
+    {
+      "id": "Chaque référence possède ses propres paliers ; une référence sans palier n'a aucune remise.",
+      "label": "Chaque référence possède ses propres paliers ; une référence sans palier n'a aucune remise."
+    },
+    {
+      "id": "Des paliers communs s'appliquent par défaut, avec des exceptions par référence (préciser leur règle de priorité).",
+      "label": "Des paliers communs s'appliquent par défaut, avec des exceptions par référence (préciser leur règle de priorité)."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T18:46:29.810Z",
+  "status": "answered",
+  "answer": {
+    "option": "Les mêmes paliers s'appliquent à toutes les références.",
+    "answeredAt": "2026-10-10T18:46:29.813Z"
+  }
+}

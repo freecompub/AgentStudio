@@ -1,0 +1,28 @@
+{
+  "id": "dc7b47fc-9ff3-452a-9b28-cfd9f67810dc",
+  "taskId": "521f0098-3032-4c26-9846-0f2c530be45b",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Difficulté de US-2 : Assez difficile ?",
+  "detail": "Je confirme medium-hard : la remise par palier de quantité implique une logique tarifaire à seuils, dont les règles métier sont renforcées par une question encore ouverte.",
+  "options": [
+    {
+      "id": "medium-hard",
+      "label": "Confirmer : Assez difficile"
+    },
+    {
+      "id": "challenging",
+      "label": "Difficile"
+    },
+    {
+      "id": "medium",
+      "label": "Moyenne"
+    }
+  ],
+  "createdAt": "2026-10-10T18:46:01.531Z",
+  "status": "answered",
+  "answer": {
+    "option": "medium-hard",
+    "answeredAt": "2026-10-10T18:46:01.535Z"
+  }
+}

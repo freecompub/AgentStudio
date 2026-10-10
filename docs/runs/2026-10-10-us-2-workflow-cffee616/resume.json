@@ -1,0 +1,1080 @@
+{
+  "mode": "workflow skraft",
+  "livre": true,
+  "correctionMesure": "Indicateur recalculé le 10/10 avec workflowLivre sur l'état persisté : résolution de fin.valeur.ref dans contenus, phases incluant DELIVER. Valeur initiale du banc : false (défaut de lecture).",
+  "arret": null,
+  "resume": {
+    "etapes": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T15:03:21.549Z",
+        "duréeMs": 5331,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4575,
+        "codeMs": 4575,
+        "moteurMs": 12
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T15:03:26.880Z",
+        "duréeMs": 7049,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15015,
+        "sortie": 123,
+        "nanoAiu": 174447000,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 6378,
+        "effetsMs": 6909,
+        "codeMs": 531,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T15:03:33.929Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 1
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T15:03:33.939Z",
+        "duréeMs": 133233,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 12,
+        "entrée": 432772,
+        "sortie": 16035,
+        "nanoAiu": 1688818950,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 132950,
+        "effetsMs": 133096,
+        "codeMs": 146,
+        "moteurMs": 11
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T15:05:47.172Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 3
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T15:05:47.185Z",
+        "duréeMs": 253237,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+              "`stories/US-3.md:14-16` : plage hors du fichier, qui compte 15 lignes.",
+              "`stories/US-5.md:8-14` : plage hors du fichier, qui compte 13 lignes.",
+              "`stories/US-2.md:8-15` : plage hors du fichier, qui compte 14 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 51,
+        "entrée": 3518952,
+        "sortie": 15752,
+        "nanoAiu": 5341309200,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 251831,
+        "effetsMs": 252050,
+        "codeMs": 219,
+        "moteurMs": 153
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T15:10:00.422Z",
+        "duréeMs": 38,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 5,
+        "codeMs": 5,
+        "moteurMs": 15
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T15:10:00.460Z",
+        "duréeMs": 304474,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 17,
+        "entrée": 682188,
+        "sortie": 18157,
+        "nanoAiu": 46378017000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 303136,
+        "effetsMs": 303561,
+        "codeMs": 425,
+        "moteurMs": 162
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:15:04.934Z",
+        "duréeMs": 114380,
+        "tours": 3,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 15,
+        "entrée": 383688,
+        "sortie": 6894,
+        "nanoAiu": 21046416750,
+        "modèles": [
+          "gpt-6-luna",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 113234,
+        "effetsMs": 113493,
+        "codeMs": 259,
+        "moteurMs": 54
+      },
+      {
+        "phase": "RATIFICATION",
+        "début": "2026-10-10T15:16:59.314Z",
+        "duréeMs": 462,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 75,
+        "codeMs": 75,
+        "moteurMs": 19
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T15:16:59.776Z",
+        "duréeMs": 108871,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 255098,
+        "sortie": 6424,
+        "nanoAiu": 18043209000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 105627,
+        "effetsMs": 108397,
+        "codeMs": 2770,
+        "moteurMs": 120
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:18:48.647Z",
+        "duréeMs": 85261,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, major, test] Le scénario AC-3 ne distingue pas la règle formulée comme « remise la plus avantageuse » du choix du palier au seuil le plus élevé : avec des taux croissants (5 % au seuil 10, 12 % au seuil 50), ces deux stratégies donnent toutes deux 12,00 €. Or le modèle de domaine et le plan d’implémentation précisent que les taux ne sont pas supposés croissants et que la remise maximale doit être retenue. Ajoutez une acceptation discriminante avec un taux plus élevé sur un seuil inférieur, afin que l’intention métier soit vérifiable sans déduire qu’un seuil supérieur est toujours préférable. (.skraft/us-2/distill/features/tarification-remise-quantite.feature:14)",
+              "[test-integrity#1.1, major, test] Le test du « plus avantageux » utilise des seuils et taux croissants, avec le meilleur palier en dernière position. Toute la suite laisserait donc passer une sélection du plus grand seuil ou du dernier palier applicable, au lieu du montant maximal. Le DESIGN exige explicitement de vérifier un taux plus avantageux sur un seuil inférieur (consistency-matrix.md), mais cette vérification manque dans les acceptances ; la couverture annoncée comme saturée ne l'est pas sur cette règle. Ajouter une variante d'acceptance avec deux paliers atteints dont le seuil inférieur donne la meilleure remise, et vérifier l'indépendance du résultat à leur ordre. Il ne s'agit pas d'ajouter un test unitaire dupliquant une acceptance existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:40)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 253045,
+        "sortie": 4957,
+        "nanoAiu": 11429403300,
+        "modèles": [
+          "gpt-6-luna",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 83982,
+        "effetsMs": 84235,
+        "codeMs": 253,
+        "moteurMs": 79
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T15:20:13.908Z",
+        "duréeMs": 53420,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 5,
+        "entrée": 257141,
+        "sortie": 2614,
+        "nanoAiu": 9315810000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 50240,
+        "effetsMs": 52881,
+        "codeMs": 2641,
+        "moteurMs": 148
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:21:07.328Z",
+        "duréeMs": 60654,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 308706,
+        "sortie": 4492,
+        "nanoAiu": 8226429300,
+        "modèles": [
+          "gpt-6-luna",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 58529,
+        "effetsMs": 58898,
+        "codeMs": 369,
+        "moteurMs": 134
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T15:22:07.982Z",
+        "duréeMs": 1959395,
+        "tours": 6,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "pas test (ac-2)",
+            "motifs": [
+              "Aucune activité de l'agent depuis 300 s"
+            ]
+          },
+          {
+            "porte": "pas dev (ac-2)",
+            "motifs": [
+              "Aucune activité de l'agent depuis 300 s"
+            ]
+          }
+        ],
+        "finsAnormales": [
+          {
+            "fin": "silence",
+            "raison": "Aucune activité de l'agent depuis 300 s"
+          },
+          {
+            "fin": "silence",
+            "raison": "Aucune activité de l'agent depuis 300 s"
+          }
+        ],
+        "appels": 22,
+        "entrée": 583725,
+        "sortie": 5052,
+        "nanoAiu": 43716375000,
+        "modèles": [
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 1925349,
+        "effetsMs": 1953274,
+        "codeMs": 27925,
+        "moteurMs": 1417
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:54:47.377Z",
+        "duréeMs": 78749,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "revue (correction ciblée)",
+            "motifs": [
+              "[cold-reader#1.1, major, code] Le calcul choisit le taux maximal mais le type ne borne ni ne valide `Pourcentage`. Or `Montant` interdit les valeurs négatives et `Facture.ATPayer` soustrait la remise du total : un taux négatif échoue lors de `Montant.De`, tandis qu'un taux supérieur à 100 % peut faire échouer le calcul du montant payable. La règle métier sur les taux admissibles n'est pas visible dans ces fichiers, ce qui laisse l'appelant face à une entrée apparemment permise mais à un échec tardif. Rendre l'invariant explicite et rejeter une configuration invalide à sa création, ou exprimer autrement la politique autorisée. (src/Tarification.Domaine/PaliersDeQuantite.cs:7)",
+              "[test-integrity#1.1, major, test] L'addition des remises de plusieurs lignes n'est discriminée par aucune acceptance du projet : tous les cas positifs ont une seule ligne, et le seul cas à deux lignes attend zéro. Dans Panier.SommeDesRemises, remplacer `total + paliers.RemisePour(ligne)` par `paliers.RemisePour(ligne)` laisserait donc toute la suite verte tout en ne conservant que la remise de la dernière ligne. La couverture de lignes à 100 % ne protège pas cette règle du DESIGN. Ajouter une acceptance à la frontière Chiffrer avec deux références bénéficiant chacune d'une remise positive différente, et affirmer leur somme dans Facture.Remise ainsi que le montant payable ; par exemple 10 × 2,00 € et 20 × 2,00 €, palier 10 / 5 %, remise totale 3,00 € et montant payable 57,00 €. Aucun test unitaire dupliqué n'est demandé. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:67)",
+              "[architecture#1.1, major, code] La responsabilité du calcul de remise a été déplacée par rapport au DESIGN approuvé : contracts.md attribue explicitement le calcul indépendant à LigneDePanier et la somme à Panier. Ici, PaliersDeQuantite.RemisePour inspecte la quantité et le sous-total de la ligne et effectue tout le calcul ; LigneDePanier reste dépourvue de ce comportement et Panier appelle directement la collection de paliers. Les couches restent conformes à ADR-001, mais la répartition des responsabilités ne respecte pas le modèle retenu. Porter le calcul de remise sur LigneDePanier et faire sommer ces résultats par Panier ; PaliersDeQuantite peut conserver la sélection du palier applicable. (src/Tarification.Domaine/PaliersDeQuantite.cs:5)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 11,
+        "entrée": 500225,
+        "sortie": 4093,
+        "nanoAiu": 34444946700,
+        "modèles": [
+          "gpt-6-luna",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 76310,
+        "effetsMs": 76902,
+        "codeMs": 592,
+        "moteurMs": 258
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T15:56:06.126Z",
+        "duréeMs": 66440,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 312319,
+        "sortie": 2403,
+        "nanoAiu": 7372548000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 52696,
+        "effetsMs": 64130,
+        "codeMs": 11434,
+        "moteurMs": 884
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:57:12.566Z",
+        "duréeMs": 84935,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 19,
+        "entrée": 583591,
+        "sortie": 6323,
+        "nanoAiu": 57074184000,
+        "modèles": [
+          "claude-opus-5.5",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 82479,
+        "effetsMs": 82828,
+        "codeMs": 349,
+        "moteurMs": 287
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-10T15:58:37.501Z",
+        "duréeMs": 29,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 37
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T15:03:21.549Z",
+        "duréeMs": 5331,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4575,
+        "codeMs": 4575,
+        "moteurMs": 12
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T15:03:26.880Z",
+        "duréeMs": 7049,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15015,
+        "sortie": 123,
+        "nanoAiu": 174447000,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 6378,
+        "effetsMs": 6909,
+        "codeMs": 531,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T15:03:33.929Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 1
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T15:03:33.939Z",
+        "duréeMs": 386470,
+        "tours": 3,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+              "`stories/US-3.md:14-16` : plage hors du fichier, qui compte 15 lignes.",
+              "`stories/US-5.md:8-14` : plage hors du fichier, qui compte 13 lignes.",
+              "`stories/US-2.md:8-15` : plage hors du fichier, qui compte 14 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 63,
+        "entrée": 3951724,
+        "sortie": 31787,
+        "nanoAiu": 7030128150,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 384781,
+        "effetsMs": 385146,
+        "codeMs": 365,
+        "moteurMs": 164
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T15:05:47.172Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 3
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T15:10:00.422Z",
+        "duréeMs": 38,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 5,
+        "codeMs": 5,
+        "moteurMs": 15
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T15:10:00.460Z",
+        "duréeMs": 304474,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 17,
+        "entrée": 682188,
+        "sortie": 18157,
+        "nanoAiu": 46378017000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 303136,
+        "effetsMs": 303561,
+        "codeMs": 425,
+        "moteurMs": 162
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T15:15:04.934Z",
+        "duréeMs": 423979,
+        "tours": 19,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, major, test] Le scénario AC-3 ne distingue pas la règle formulée comme « remise la plus avantageuse » du choix du palier au seuil le plus élevé : avec des taux croissants (5 % au seuil 10, 12 % au seuil 50), ces deux stratégies donnent toutes deux 12,00 €. Or le modèle de domaine et le plan d’implémentation précisent que les taux ne sont pas supposés croissants et que la remise maximale doit être retenue. Ajoutez une acceptation discriminante avec un taux plus élevé sur un seuil inférieur, afin que l’intention métier soit vérifiable sans déduire qu’un seuil supérieur est toujours préférable. (.skraft/us-2/distill/features/tarification-remise-quantite.feature:14)",
+              "[test-integrity#1.1, major, test] Le test du « plus avantageux » utilise des seuils et taux croissants, avec le meilleur palier en dernière position. Toute la suite laisserait donc passer une sélection du plus grand seuil ou du dernier palier applicable, au lieu du montant maximal. Le DESIGN exige explicitement de vérifier un taux plus avantageux sur un seuil inférieur (consistency-matrix.md), mais cette vérification manque dans les acceptances ; la couverture annoncée comme saturée ne l'est pas sur cette règle. Ajouter une variante d'acceptance avec deux paliers atteints dont le seuil inférieur donne la meilleure remise, et vérifier l'indépendance du résultat à leur ordre. Il ne s'agit pas d'ajouter un test unitaire dupliquant une acceptance existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:40)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          },
+          {
+            "porte": "revue (correction ciblée)",
+            "motifs": [
+              "[cold-reader#1.1, major, code] Le calcul choisit le taux maximal mais le type ne borne ni ne valide `Pourcentage`. Or `Montant` interdit les valeurs négatives et `Facture.ATPayer` soustrait la remise du total : un taux négatif échoue lors de `Montant.De`, tandis qu'un taux supérieur à 100 % peut faire échouer le calcul du montant payable. La règle métier sur les taux admissibles n'est pas visible dans ces fichiers, ce qui laisse l'appelant face à une entrée apparemment permise mais à un échec tardif. Rendre l'invariant explicite et rejeter une configuration invalide à sa création, ou exprimer autrement la politique autorisée. (src/Tarification.Domaine/PaliersDeQuantite.cs:7)",
+              "[test-integrity#1.1, major, test] L'addition des remises de plusieurs lignes n'est discriminée par aucune acceptance du projet : tous les cas positifs ont une seule ligne, et le seul cas à deux lignes attend zéro. Dans Panier.SommeDesRemises, remplacer `total + paliers.RemisePour(ligne)` par `paliers.RemisePour(ligne)` laisserait donc toute la suite verte tout en ne conservant que la remise de la dernière ligne. La couverture de lignes à 100 % ne protège pas cette règle du DESIGN. Ajouter une acceptance à la frontière Chiffrer avec deux références bénéficiant chacune d'une remise positive différente, et affirmer leur somme dans Facture.Remise ainsi que le montant payable ; par exemple 10 × 2,00 € et 20 × 2,00 €, palier 10 / 5 %, remise totale 3,00 € et montant payable 57,00 €. Aucun test unitaire dupliqué n'est demandé. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:67)",
+              "[architecture#1.1, major, code] La responsabilité du calcul de remise a été déplacée par rapport au DESIGN approuvé : contracts.md attribue explicitement le calcul indépendant à LigneDePanier et la somme à Panier. Ici, PaliersDeQuantite.RemisePour inspecte la quantité et le sous-total de la ligne et effectue tout le calcul ; LigneDePanier reste dépourvue de ce comportement et Panier appelle directement la collection de paliers. Les couches restent conformes à ADR-001, mais la répartition des responsabilités ne respecte pas le modèle retenu. Porter le calcul de remise sur LigneDePanier et faire sommer ces résultats par Panier ; PaliersDeQuantite peut conserver la sélection du palier applicable. (src/Tarification.Domaine/PaliersDeQuantite.cs:5)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 61,
+        "entrée": 2029255,
+        "sortie": 26759,
+        "nanoAiu": 132221380050,
+        "modèles": [
+          "gpt-6-luna",
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 414534,
+        "effetsMs": 416356,
+        "codeMs": 1822,
+        "moteurMs": 812
+      },
+      {
+        "phase": "RATIFICATION",
+        "début": "2026-10-10T15:16:59.314Z",
+        "duréeMs": 462,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 75,
+        "codeMs": 75,
+        "moteurMs": 19
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T15:16:59.776Z",
+        "duréeMs": 162291,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 12,
+        "entrée": 512239,
+        "sortie": 9038,
+        "nanoAiu": 27359019000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 155867,
+        "effetsMs": 161278,
+        "codeMs": 5411,
+        "moteurMs": 268
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T15:22:07.982Z",
+        "duréeMs": 2025835,
+        "tours": 8,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "pas test (ac-2)",
+            "motifs": [
+              "Aucune activité de l'agent depuis 300 s"
+            ]
+          },
+          {
+            "porte": "pas dev (ac-2)",
+            "motifs": [
+              "Aucune activité de l'agent depuis 300 s"
+            ]
+          }
+        ],
+        "finsAnormales": [
+          {
+            "fin": "silence",
+            "raison": "Aucune activité de l'agent depuis 300 s"
+          },
+          {
+            "fin": "silence",
+            "raison": "Aucune activité de l'agent depuis 300 s"
+          }
+        ],
+        "appels": 31,
+        "entrée": 896044,
+        "sortie": 7455,
+        "nanoAiu": 51088923000,
+        "modèles": [
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 1978045,
+        "effetsMs": 2017404,
+        "codeMs": 39359,
+        "moteurMs": 2301
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-10T15:58:37.501Z",
+        "duréeMs": 29,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 37
+      }
+    ],
+    "total": {
+      "duréeMs": 3315981,
+      "tours": 35,
+      "appels": 185,
+      "entrée": 8086465,
+      "sortie": 93319,
+      "nanoAiu": 264251914200,
+      "agentsMs": 3242741,
+      "effetsMs": 3295315,
+      "codeMs": 52574,
+      "moteurMs": 3795,
+      "rejets": 5
+    }
+  },
+  "comparable": {
+    "etapes": [
+      {
+        "etape": "PRÉPARATION",
+        "sousEtapes": [],
+        "duréeMs": 5331,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 5331,
+        "agentsMs": 0,
+        "codeMs": 4575,
+        "moteurMs": 12,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DIFFICULTÉ",
+        "sousEtapes": [
+          "classifieur",
+          "confirmation"
+        ],
+        "duréeMs": 7059,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 7056,
+        "agentsMs": 6378,
+        "codeMs": 533,
+        "moteurMs": 2,
+        "tours": 1,
+        "appels": 1,
+        "nanoAiu": 174447000,
+        "entrée": 15015,
+        "sortie": 123,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "RESEARCH",
+        "sousEtapes": [
+          "blocage"
+        ],
+        "duréeMs": 386483,
+        "attenteHumaineMs": 4,
+        "horsAttenteMs": 386479,
+        "agentsMs": 384781,
+        "codeMs": 368,
+        "moteurMs": 167,
+        "tours": 3,
+        "appels": 63,
+        "nanoAiu": 7030128150,
+        "entrée": 3951724,
+        "sortie": 31787,
+        "essaisMax": 0,
+        "rejets": 1,
+        "interventions": 1
+      },
+      {
+        "etape": "QUESTIONS",
+        "sousEtapes": [],
+        "duréeMs": 38,
+        "attenteHumaineMs": 13,
+        "horsAttenteMs": 25,
+        "agentsMs": 0,
+        "codeMs": 5,
+        "moteurMs": 15,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 3
+      },
+      {
+        "etape": "DESIGN",
+        "sousEtapes": [
+          "revue",
+          "ratification"
+        ],
+        "duréeMs": 419316,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 419316,
+        "agentsMs": 416370,
+        "codeMs": 759,
+        "moteurMs": 235,
+        "tours": 5,
+        "appels": 32,
+        "nanoAiu": 67424433750,
+        "entrée": 1065876,
+        "sortie": 25051,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 308206,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 308206,
+        "agentsMs": 298378,
+        "codeMs": 6033,
+        "moteurMs": 481,
+        "tours": 10,
+        "appels": 28,
+        "nanoAiu": 47014851600,
+        "entrée": 1073990,
+        "sortie": 18487,
+        "essaisMax": 0,
+        "rejets": 1,
+        "interventions": 0
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 2189519,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 2189519,
+        "agentsMs": 2136834,
+        "codeMs": 40300,
+        "moteurMs": 2846,
+        "tours": 16,
+        "appels": 61,
+        "nanoAiu": 142608053700,
+        "entrée": 1979860,
+        "sortie": 17871,
+        "essaisMax": 0,
+        "rejets": 3,
+        "interventions": 0
+      },
+      {
+        "etape": "BILAN",
+        "sousEtapes": [],
+        "duréeMs": 29,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 29,
+        "agentsMs": 0,
+        "codeMs": 1,
+        "moteurMs": 37,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      }
+    ],
+    "rejeux": [
+      {
+        "etape": "RESEARCH",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "citations",
+        "motifs": [
+          "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+          "`stories/US-3.md:14-16` : plage hors du fichier, qui compte 15 lignes.",
+          "`stories/US-5.md:8-14` : plage hors du fichier, qui compte 13 lignes.",
+          "`stories/US-2.md:8-15` : plage hors du fichier, qui compte 14 lignes."
+        ]
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtape": "revue",
+        "essai": 1,
+        "nature": "revue",
+        "porte": "revue",
+        "motifs": [
+          "[cold-reader#1.1, major, test] Le scénario AC-3 ne distingue pas la règle formulée comme « remise la plus avantageuse » du choix du palier au seuil le plus élevé : avec des taux croissants (5 % au seuil 10, 12 % au seuil 50), ces deux stratégies donnent toutes deux 12,00 €. Or le modèle de domaine et le plan d’implémentation précisent que les taux ne sont pas supposés croissants et que la remise maximale doit être retenue. Ajoutez une acceptation discriminante avec un taux plus élevé sur un seuil inférieur, afin que l’intention métier soit vérifiable sans déduire qu’un seuil supérieur est toujours préférable. (.skraft/us-2/distill/features/tarification-remise-quantite.feature:14)",
+          "[test-integrity#1.1, major, test] Le test du « plus avantageux » utilise des seuils et taux croissants, avec le meilleur palier en dernière position. Toute la suite laisserait donc passer une sélection du plus grand seuil ou du dernier palier applicable, au lieu du montant maximal. Le DESIGN exige explicitement de vérifier un taux plus avantageux sur un seuil inférieur (consistency-matrix.md), mais cette vérification manque dans les acceptances ; la couverture annoncée comme saturée ne l'est pas sur cette règle. Ajouter une variante d'acceptance avec deux paliers atteints dont le seuil inférieur donne la meilleure remise, et vérifier l'indépendance du résultat à leur ordre. Il ne s'agit pas d'ajouter un test unitaire dupliquant une acceptance existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:40)",
+          "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "pas test (ac-2)",
+        "motifs": [
+          "Aucune activité de l'agent depuis 300 s"
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 2,
+        "nature": "porte",
+        "porte": "pas dev (ac-2)",
+        "motifs": [
+          "Aucune activité de l'agent depuis 300 s"
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtape": "revue",
+        "essai": 3,
+        "nature": "porte",
+        "porte": "revue (correction ciblée)",
+        "motifs": [
+          "[cold-reader#1.1, major, code] Le calcul choisit le taux maximal mais le type ne borne ni ne valide `Pourcentage`. Or `Montant` interdit les valeurs négatives et `Facture.ATPayer` soustrait la remise du total : un taux négatif échoue lors de `Montant.De`, tandis qu'un taux supérieur à 100 % peut faire échouer le calcul du montant payable. La règle métier sur les taux admissibles n'est pas visible dans ces fichiers, ce qui laisse l'appelant face à une entrée apparemment permise mais à un échec tardif. Rendre l'invariant explicite et rejeter une configuration invalide à sa création, ou exprimer autrement la politique autorisée. (src/Tarification.Domaine/PaliersDeQuantite.cs:7)",
+          "[test-integrity#1.1, major, test] L'addition des remises de plusieurs lignes n'est discriminée par aucune acceptance du projet : tous les cas positifs ont une seule ligne, et le seul cas à deux lignes attend zéro. Dans Panier.SommeDesRemises, remplacer `total + paliers.RemisePour(ligne)` par `paliers.RemisePour(ligne)` laisserait donc toute la suite verte tout en ne conservant que la remise de la dernière ligne. La couverture de lignes à 100 % ne protège pas cette règle du DESIGN. Ajouter une acceptance à la frontière Chiffrer avec deux références bénéficiant chacune d'une remise positive différente, et affirmer leur somme dans Facture.Remise ainsi que le montant payable ; par exemple 10 × 2,00 € et 20 × 2,00 €, palier 10 / 5 %, remise totale 3,00 € et montant payable 57,00 €. Aucun test unitaire dupliqué n'est demandé. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:67)",
+          "[architecture#1.1, major, code] La responsabilité du calcul de remise a été déplacée par rapport au DESIGN approuvé : contracts.md attribue explicitement le calcul indépendant à LigneDePanier et la somme à Panier. Ici, PaliersDeQuantite.RemisePour inspecte la quantité et le sous-total de la ligne et effectue tout le calcul ; LigneDePanier reste dépourvue de ce comportement et Panier appelle directement la collection de paliers. Les couches restent conformes à ADR-001, mais la répartition des responsabilités ne respecte pas le modèle retenu. Porter le calcul de remise sur LigneDePanier et faire sommer ces résultats par Panier ; PaliersDeQuantite peut conserver la sélection du palier applicable. (src/Tarification.Domaine/PaliersDeQuantite.cs:5)",
+          "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+        ]
+      }
+    ],
+    "total": {
+      "duréeMs": 3315981,
+      "attenteHumaineMs": 20,
+      "horsAttenteMs": 3315961,
+      "agentsMs": 3242741,
+      "codeMs": 52574,
+      "moteurMs": 3795,
+      "tours": 35,
+      "appels": 185,
+      "nanoAiu": 264251914200,
+      "entrée": 8086465,
+      "sortie": 93319,
+      "rejets": 5,
+      "interventions": 5
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-10T15:03:21.484Z",
+      "etape": "départ",
+      "restantes": 40773
+    },
+    {
+      "at": "2026-10-10T15:03:21.553Z",
+      "etape": "INIT",
+      "restantes": 40773
+    },
+    {
+      "at": "2026-10-10T15:03:26.880Z",
+      "etape": "CLASSIFY",
+      "restantes": 40773
+    },
+    {
+      "at": "2026-10-10T15:03:33.929Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 40773
+    },
+    {
+      "at": "2026-10-10T15:03:33.939Z",
+      "etape": "RESEARCH",
+      "restantes": 40773
+    },
+    {
+      "at": "2026-10-10T15:05:47.172Z",
+      "etape": "BLOCKED",
+      "restantes": 40731
+    },
+    {
+      "at": "2026-10-10T15:05:47.185Z",
+      "etape": "RESEARCH",
+      "restantes": 40731
+    },
+    {
+      "at": "2026-10-10T15:10:00.422Z",
+      "etape": "ROUTE",
+      "restantes": 40722
+    },
+    {
+      "at": "2026-10-10T15:10:00.460Z",
+      "etape": "DESIGN",
+      "restantes": 40722
+    },
+    {
+      "at": "2026-10-10T15:15:04.934Z",
+      "etape": "REVIEW",
+      "restantes": 40686
+    },
+    {
+      "at": "2026-10-10T15:16:59.314Z",
+      "etape": "RATIFICATION",
+      "restantes": 40686
+    },
+    {
+      "at": "2026-10-10T15:16:59.776Z",
+      "etape": "DISTILL",
+      "restantes": 40686
+    },
+    {
+      "at": "2026-10-10T15:18:48.647Z",
+      "etape": "REVIEW",
+      "restantes": 40686
+    },
+    {
+      "at": "2026-10-10T15:20:13.908Z",
+      "etape": "DISTILL",
+      "restantes": 40632
+    },
+    {
+      "at": "2026-10-10T15:21:07.328Z",
+      "etape": "REVIEW",
+      "restantes": 40632
+    },
+    {
+      "at": "2026-10-10T15:22:07.982Z",
+      "etape": "DELIVER",
+      "restantes": 40632
+    },
+    {
+      "at": "2026-10-10T15:54:47.377Z",
+      "etape": "REVIEW",
+      "restantes": 40569
+    },
+    {
+      "at": "2026-10-10T15:56:06.126Z",
+      "etape": "DELIVER",
+      "restantes": 40569
+    },
+    {
+      "at": "2026-10-10T15:57:12.566Z",
+      "etape": "REVIEW",
+      "restantes": 40569
+    },
+    {
+      "at": "2026-10-10T15:58:37.501Z",
+      "etape": "DONE",
+      "restantes": 40472
+    },
+    {
+      "at": "2026-10-10T15:58:40.941Z",
+      "etape": "fin",
+      "restantes": 40472
+    }
+  ],
+  "brancheRun": "tests/us-2/workflow-1",
+  "etatFinal": {
+    "fin": {
+      "statut": "fini",
+      "valeur": {
+        "ref": "sha256:a000be0047656e319c9edf77fa7b2551aa35104425e14ff058f5cdc7895ea5b6"
+      }
+    },
+    "phase": "DONE"
+  }
+}

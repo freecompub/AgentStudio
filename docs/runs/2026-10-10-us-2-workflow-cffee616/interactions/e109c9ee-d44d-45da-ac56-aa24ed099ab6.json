@@ -1,0 +1,28 @@
+{
+  "id": "e109c9ee-d44d-45da-ac56-aa24ed099ab6",
+  "taskId": "cffee616-6ba6-4a79-b64a-df8e13c264ed",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Difficulté de US-2 : Assez difficile ?",
+  "detail": "Je confirme le niveau proposé : la remise par palier de quantité implique une règle métier de tarification, avec une question métier encore ouverte.",
+  "options": [
+    {
+      "id": "20:medium-hard",
+      "label": "Confirmer : Assez difficile"
+    },
+    {
+      "id": "20:challenging",
+      "label": "Difficile"
+    },
+    {
+      "id": "20:medium",
+      "label": "Moyenne"
+    }
+  ],
+  "createdAt": "2026-10-10T15:03:33.932Z",
+  "status": "answered",
+  "answer": {
+    "option": "20:medium-hard",
+    "answeredAt": "2026-10-10T15:03:33.935Z"
+  }
+}

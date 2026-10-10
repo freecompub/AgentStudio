@@ -4,6 +4,41 @@
   "branch": "feat/workflow-rejouable",
   "items": [
     {
+      "id": "banc-modeles-par-role",
+      "title": "Le banc verrouille les modèles par rôle et détecte les écarts signalés par le SDK",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "35 tests banc verts, typage vert. --modeles-roles appliqué à openSession pour les deux modes, sans Auto pour un rôle absent ; comparaison du modèle usage et annulation si différent, association archivée dans resume.json. Run réel workflow 0b3184b5 DONE, tous les modèles usage conformes : classifier gpt-6-luna, architect-model claude-sonnet-5.5, autres gpt-6.1-sol. Cold-reader fixé à gpt-6.1-sol par décision utilisateur. Avant publication : neuf projets revérifiés (1 279 verts, neuf sautés, deux échecs sous concurrence puis 12/12 verts au rejeu des deux fichiers avec un worker), typage vert."
+    },
+    {
+      "id": "banc-livraison-workflow-reference",
+      "title": "Le banc détecte la livraison d'un workflow avec résultat en clair ou référencé",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "32 tests verts, dont 4 sur la livraison. Réutilise relire du moteur pour résoudre fin.valeur dans contenus ; référence absente = erreur explicite. Résultat réel cffee616 vérifié livré, indicateur du résumé corrigé avec annotation de son ancienne valeur false. Aucun run Copilot nécessaire pour ce correctif."
+    },
+    {
+      "id": "skraft-qualite-diff-precontrole",
+      "title": "Les tests existants bloquent skraft avant tout LLM, la dette de couverture est notifiée et les seuils portent sur le code modifié dans les deux versions",
+      "verify": "TMPDIR=\"$(cd \"$TMPDIR\" && pwd -P)\" pnpm vitest run --project ext-skraft --project workflow-skraft",
+      "passes": true,
+      "notes": "ADR 0060. 659 tests verts, 4 Swift sautés ; pnpm typecheck vert. INIT_BASELINE bloque rouge/ignoré/délai/sortie en erreur avant tout agent ; couverture globale sous seuil notifiée sans bloquer. Lignes de diff produites par Workspace (fichiers nouveaux/non suivis inclus) et détail Cobertura partagés via la plateforme ; seuils par couche sur leur intersection aux portes de scénario et en fin de tâche depuis un checkpoint initial persisté. Dette inchangée exclue, lignes modifiées non couvertes listées. Détail absent explicitement non mesuré ; aucun taux fictif. Tests jumeaux en isolation : baseline rouge sans sessions, avertissement non bloquant, livraison malgré dette, refus sur ligne modifiée. Packages communs vérifiés aussi (un défaut Git préexistant corrigé uniquement dans l'environnement du runner puis sync 11/11). Aucun appel Copilot réel. Une nouvelle tâche sur les tests d'acceptance rouges d'un ancien run est bloquée : --depuis n'est pas une réouverture de tâche."
+    },
+    {
+      "id": "connexion-gh-code-enterprise",
+      "title": "Les deux formats de code gh sont reconnus et l'interface ouvre la page de connexion Enterprise",
+      "verify": "pnpm vitest run --project github-auth --project desktop packages/github-auth/test/gh-auth.test.ts apps/desktop/test/app-controller.test.ts apps/desktop/test/renderer/app.test.tsx",
+      "passes": true,
+      "notes": "ADR 0058 : format gh 2.101 sans terminal (code entre parenthèses) et ancien format, sortie fragmentée, Entrée uniquement si demandée. L'adresse de la connexion en cours remplace github.com pour le bouton de réouverture. À réception du code, ouverture via IPC ; en cas d'échec, erreur et adresse affichées sans perdre le code. 103 tests ciblés réussis. Le parcours OAuth réel dans le navigateur reste à confirmer par l'utilisateur."
+    },
+    {
+      "id": "copilot-enterprise-cloud-hote",
+      "title": "Le runtime reçoit le jeton gh avec son hôte GitHub Enterprise Cloud",
+      "verify": "pnpm vitest run --project runtime-copilot --project desktop packages/runtime-copilot/test/copilot-client.test.ts apps/desktop/test/app-controller.test.ts apps/desktop/test/mode-essai.test.ts",
+      "passes": true,
+      "notes": "ADR 0057 : GH_HOST et gitHubToken associés, sans mode GHES offline. L'application transmet l'hôte courant ou restauré au runtime ; même client dans le banc. Vérifié le 10/10 : 62 tests ciblés ; précontrôle réel sur byb.ghe.com avec le SDK 1.0.14, 23 modèles et création de session réussie. Après confirmation utilisateur de la connexion UI, un prompt minimal réel avec le jeton gh actuel a reçu exactement COPILOT_OK, sans outils ni lecture de fichiers ; session fermée et supprimée. La campagne comparative reste à lancer."
+    },
+    {
       "id": "j5-profil-schema",
       "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts",
@@ -162,6 +197,7 @@
       "title": "La vraie application Electron démarre et ouvre un projet, vérifié en CI",
       "verify": "pnpm build && pnpm e2e",
       "passes": true,
+      "derniereVerification": "2026-10-10 : build et 2 essais Electron réussis après externalisation d'Acorn et d'esbuild (ADR 0056), sans requête Copilot.",
       "notes": "Playwright pilote la VRAIE application : vrai processus principal, vrai préchargement, vrai IPC. Aucune requête à Copilot — le mode d'essai (`mode-essai.ts`) substitue un runtime scripté, et il est IMPOSSIBLE dans une application empaquetée (garde `!app.isPackaged`, testée). Job de CI séparé : il exige le binaire Electron que le job principal ne télécharge pas. Couvre la classe de défauts la plus coûteuse — les trois bugs de câblage du 24/09. Vérifie aussi que le profil utilisateur est jetable (`--user-data-dir`), sans quoi l'essai lirait et écraserait les réglages réels du développeur. PIÈGE ÉVITÉ : la première version affirmait `getByRole(\"textbox\")`, qui matchait un champ de l'écran PROJET — l'essai passait sans avoir ouvert le projet."
     },
     {
@@ -657,9 +693,9 @@
     {
       "id": "mesure-banc-commun",
       "title": "Le banc de mesure lance l'extension skraft ou le workflow skraft et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
-      "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md 45 --workflow (consomme des requêtes Copilot)",
+      "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md --workflow (consomme des requêtes Copilot)",
       "passes": false,
-      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable). Run à blanc impossible sans mode simulé (non développé) : le premier run réel de la campagne servira de vérification."
+      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (350 par défaut), sans limite de durée ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable). Run à blanc impossible sans mode simulé (non développé) : le premier run réel de la campagne servira de vérification. Les 350 requêtes équivalentes SDK ne sont pas 3500 crédits Copilot ; les crédits dépendent du modèle et des tokens."
     },
     {
       "id": "mesure-repondeur-commun",
@@ -680,7 +716,19 @@
       "title": "Campagne de quatre runs réels sur US-2 en alternance, rapport de comparaison avec la raison de chaque rejeu, durée et coût par étape (docs/10)",
       "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
       "passes": false,
-      "notes": "Prête à lancer le 2026-10-10, pas lancée. Environnement vérifié : .NET 10.0.401 dans ~/.dotnet (absent du PATH par défaut : exporter PATH=$HOME/.dotnet:$PATH et DOTNET_ROOT), suite du projet d'essai verte (5 tests), gh connecté, projet propre au commit a7cf6db. Le lancement par l'agent a été refusé par le mode automatique (requêtes Copilot payantes, poussée GitHub) : c'est l'utilisateur qui lance, ou qui autorise `pnpm tsx scripts/mesure-skraft.ts`. Run à blanc (§6 point 1) non fait : le banc n'a pas de mode simulé, le premier run réel le vérifiera. Commande du run 1 (extension) : PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet pnpm tsx scripts/mesure-skraft.ts /home/diabeo/Projets/exemple-dotnet-tdd stories/US-2.md 45 --pousser ; runs 2 et 4 avec --workflow. Puis tsx scripts/banc/comparer.ts <dossiers docs/runs/…>. Au plus 250 requêtes par run, 1 000 pour la campagne."
+      "workflowModelesFixes": "0b3184b5 DONE en 17m58, 335,4 requêtes équivalentes SDK, 29 tours, 111 appels, un rejet ; 24/24 tests indépendants verts. Workflow-2 à 69a9c8a, main inchangé. Tous les modèles effectifs vérifiés conformes à l'association demandée ; exception cold-reader décidée (gpt-6.1-sol fixe). Questions DESIGN désormais posées, mais réponse automatique autorise taux zéro contrairement à l'extension : contrats pas entièrement identiques. Comparaison distincte docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md. Aucun run actif.",
+      "productionsModelesFixes": "Code/tests et documents comparés en §6 du rapport à modèles fixés : cinq critères satisfaits, workflow plus complet en acceptance (19 exemples, somme positive multi-lignes et invalides), extension plus défensive et teste l'immuabilité. Workflow copie son barème mais n'éprouve pas la mutation source ; extension ne teste pas la somme de deux remises positives. Aucun code ni artefact de run modifié.",
+      "lectureDocuments": "Lecture comparée des deux livraisons contre US-2 consignée en §6 de docs/runs/2026-10-10-comparaison-us-2-extension-600.md. Cinq critères présents ; contrats supplémentaires différents (invariants extension décidés par répondeur automatique). Workflow discrimine AC-3 dès DISTILL et somme multi-lignes après revue ; extension récupère AC-3 seulement en DELIVER, aucun test de somme de deux remises positives dans sa livraison. Aucun artefact des runs ni code modifié par cette analyse.",
+      "essaiExtension600": "c4433175 terminé DONE en 17m35, 35 tours, 128 appels, 232,2 requêtes équivalentes SDK, 4 rejets. Plafond 600 non atteint, consommation inférieure à 350. Extension-2 à 59f2454, main inchangé a7cf6db, arbre propre ; dotnet test indépendant 21/21, ac-1 à ac-5 présents. Rapport, trace, preuves, interactions archivés. Comparaison distincte docs/runs/2026-10-10-comparaison-us-2-extension-600.md. Ancien essai 521f0098 conservé. Aucun run actif. Variabilité des modèles et des choix métier : pas de conclusion causale sur le moteur ni sur l'augmentation du plafond.",
+      "dernierCouple": "Workflow cffee616 livré (264,3 requêtes équivalentes SDK, 55m21). Extension 521f0098 arrêtée au plafond : ABORTED / DISTILL, 352,5 requêtes après franchissement par un appel, 16m48, 22 tours, 99 appels, 3 rejets ; DESIGN avec revues coûte 297. Aucun DELIVER lancé. Branche extension-2 à 8333982, main inchangé a7cf6db. Rapports et preuves archivés ; comparaison docs/runs/2026-10-10-comparaison-us-2.md. Aucun run actif. Modèles non imposés et précisions métier aux blocages potentiellement différentes : résultat préliminaire, pas preuve d'un écart causal du moteur.",
+      "notes": "Campagne incomplète. Essais extension 63e98c3d et eda055a6 abandonnés, conservés ; défauts gel et périmètre couverture corrigés dans les deux versions (ADR 0059/0060). Nouvelle séquence workflow en premier : cffee616 terminé fini / DONE, 55m21, 35 tours, 185 appels, 264,3 requêtes équivalentes SDK, 5 rejets ; écart de réserve 301. Rapport, trace, preuves et interactions : docs/runs/2026-10-10-us-2-workflow-cffee616/. Branche tests/us-2/workflow-1 à b7b6928, main inchangé a7cf6db, arbre propre ; dotnet test indépendant vert 13/13, critères ac-1 à ac-5 présents. Précontrôle avec avertissement de dette historique, correction de revue DISTILL puis gel franchi. Deux silences de 300 s pendant DELIVER, corrections après revue finale. Défaut de mesure à résoudre : resume.json livre=false car fin.valeur est une référence, pas clair.phases accessible directement ; résultat brut conservé, ne pas utiliser cet indicateur dans la comparaison avant correction du banc. Aucun nouveau run extension automatiquement lancé. Plafond 350 requêtes équivalentes SDK, sans limite murale ni taux fixe vers les crédits Copilot."
+    },
+    {
+      "id": "gel-distill-apres-correction-revue",
+      "title": "Un refus de DISTILL lève le gel, les portes valident les tests corrigés et DELIVER reprend leur nouvelle empreinte dans les deux implémentations",
+      "verify": "TMPDIR=\"$(cd \"$TMPDIR\" && pwd -P)\" pnpm vitest run --project ext-skraft --project workflow-skraft extensions/skraft/test/reducer.test.ts extensions/skraft/test/e2e-s4.test.ts tests/workflow-skraft/test/e2e-s4-workflow.test.ts extensions/skraft/test/deliver-gates.test.ts tests/workflow-skraft/test/deliver-gates.test.ts extensions/skraft/test/distill-gates.test.ts tests/workflow-skraft/test/distill-gates.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 (ADR 0059). 230 tests ciblés verts et pnpm typecheck. Réducteur : invalidation lors des réessais et escalades de DISTILL, nouvelle empreinte à chaque porte réussie. Workflow : invalidation avant chaque essai, après refus ou exception, et après rembobinage. S4 jumeaux : ajout d'un fichier après refus de revue, nouvelle porte RED, arrivée réelle au premier agent DELIVER sans mismatch. Les non-régressions sont recalculées avec l'empreinte ; les tests purs couvrent timeout, panne, REJECTED et budget épuisé. Un refus de DELIVER conserve le gel ; ses portes restent strictes. TMPDIR canonique nécessaire sur macOS pour éviter le défaut préexistant du compilateur sur les alias /var et /private/var. Validation automatisée sans Copilot. Essai réel de reprise par phase eda055a6 depuis a845e0f terminé : DISTILL approuvé, DELIVER démarré sans mismatch, puis ABORTED sur couverture du scénario ac-2 (CalculDuPanier 75 %, Panier 87,5 %, minimum 90 %), après deux reprises. Rapport docs/runs/2026-10-10-us-2-extension-eda055a6/, 11m43, 32 tours, 113 appels, 113,6 requêtes équivalentes SDK, aucune poussée. Ni réouverture de la tâche ABORTED ni run complet comparable ; ce run ne comporte pas de refus de revue DISTILL."
     },
     {
       "id": "skraft-deliver-en-workflow",

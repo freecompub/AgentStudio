@@ -1,7 +1,36 @@
 # Plan de test : skraft (réducteur) contre skraft-workflow, sur US-2
 
-- Statut : **prêt à lancer**, 2026-10-10. Les prérequis P1 à P6 (§5) sont faits et testés sur
-  agents simulés ; aucun run n'est lancé (accord du responsable, réserve et prix attendus).
+- Statut : **premier workflow terminé DONE**, 2026-10-10. Après deux essais extension abandonnés
+  et les correctifs ADR 0059/0060, l'utilisateur demande une nouvelle séquence avec le
+  workflow en premier : tâche `cffee616`, branche `tests/us-2/workflow-1`, base `a7cf6db`.
+  Rapport `docs/runs/2026-10-10-us-2-workflow-cffee616/` : 55m21, 264,3 requêtes
+  équivalentes SDK, livrable vérifié 13/13 tests verts. Campagne incomplète ; l'indicateur
+  `livre` du banc est corrigé et recalculé depuis le résultat persisté, avec annotation
+  de la correction dans le rapport.
+  Extension suivante `521f0098` arrêtée au plafond pendant la revue DISTILL :
+  352,5 requêtes équivalentes, 16m48, aucun DELIVER. Premier couple dans
+  `docs/runs/2026-10-10-comparaison-us-2.md`. Modèles effectifs non identiques
+  (associations laissées au runtime) : comparaison préliminaire, pas attribution
+  causale des écarts au moteur.
+  Nouvel essai extension `c4433175` lancé depuis la même base avec plafond
+  **600**, demandé par l'utilisateur après l'arrêt au plafond 350. La branche
+  `extension-2` est réinitialisée avec accord explicite ; le précédent résultat
+  reste archivé. Ce plafond différent doit être signalé dans toute comparaison.
+  Essai terminé **DONE** : 17m35, 232,2 requêtes équivalentes (donc moins de 350),
+  livrable vérifié 21/21 tests verts. Comparaison distincte :
+  `docs/runs/2026-10-10-comparaison-us-2-extension-600.md`. Aucun run actif.
+  Workflow supplémentaire `0b3184b5` avec `--modeles-roles` verrouillés :
+  DONE, 17m58, 335,4 requêtes équivalentes, 24/24 tests verts ; aucun écart de
+  modèle dans les usages. Cold-reader fixé à gpt-6.1-sol par choix utilisateur
+  (l'extension avait aussi employé mai-code-1.1-flash). Comparaison distincte
+  `docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md`. Le workflow pose
+  désormais les questions d'invariants, mais le répondeur choisit une autre
+  borne (zéro autorisé) : les contrats restent différents.
+
+Le banc propose `--modeles-roles=skraft-architect-model:claude-sonnet-5.5,…`
+pour imposer une association complète par rôle plutôt que par classe. Un rôle
+absent est refusé ; un modèle usage différent provoque l'annulation du run.
+Les associations sont archivées dans `resume.json`.
 - Contexte : ADR 0054 (les deux extensions coexistent le temps de les comparer), `docs/09`.
 - **Depuis l'ADR 0055**, l'objet comparé au réducteur est le **workflow `skraft`** au nouveau format
   (dossier, `docs/11`), une fois converti ; le banc (P3) lance une commande, extension ou workflow.
@@ -18,7 +47,7 @@
 |---|---|---|
 | Q1 | Les deux livrent-ils US-2 ? | état final ; tests verts sur la branche livrée ; revue finale |
 | Q2 | Combien de temps prend **chaque étape**, et où passe ce temps ? | durée murale par étape, découpée en temps agent, temps code (tests, mutation, lint), attente humaine |
-| Q3 | Combien coûte **chaque étape** ? | requêtes premium (SDK, `nanoAiu`), tokens d'entrée et de sortie, écart de réserve Copilot |
+| Q3 | Combien coûte **chaque étape** ? | requêtes équivalentes SDK (`nanoAiu`), tokens d'entrée et de sortie, écart de réserve Copilot |
 | Q4 | Combien de rejeux, et **pourquoi chacun** ? | liste exhaustive : étape, essai, nature, porte, motifs exacts, coût et durée de l'essai perdu |
 | Q5 | Combien d'interventions humaines ? | questions posées, par nature, et temps d'attente |
 | Q6 | Lequel est plus facile à **corriger** quand un run révèle un défaut ? | §8, qualitatif, sur le premier défaut rencontré |
@@ -90,7 +119,8 @@ scripté répond en moins d'une seconde, mais on le mesure quand même.
 | Requêtes premium par appel | `nanoAiu` de chaque événement `usage` (10⁹ nanoAiu = 1 requête, vérifié le 03/10) |
 | Tokens d'entrée et de sortie | événements `usage` |
 | Contrôle global | réserve Copilot avant et après (mise à jour avec retard : relevée aussi 10 min après la fin) |
-| Coût en euros | requêtes premium × prix unitaire. **Prix à confirmer** par le responsable selon le forfait (le dépassement est facturé à la requête) ; le rapport donne les requêtes, l'euro n'est qu'une colonne calculée |
+| Crédits Copilot | mesurés par Copilot selon les tokens et le modèle ; une requête équivalente SDK n'a pas de conversion fixe en crédits. 1 crédit IA = 0,01 USD. Le relevé de réserve et la facturation Copilot font foi. |
+| Coût en euros | ne pas calculer à partir du nombre de requêtes équivalentes. À produire seulement si l'usage en crédits et le taux de change sont disponibles. |
 
 Chaque coût est rattaché à **l'étape, la sous-étape, le rôle et l'essai** qui l'ont produit.
 
@@ -123,7 +153,7 @@ noté invalide pour Q4 et le banc corrigé avant le run suivant.
 | P2 | **Durée de chaque effet et de chaque transition dans la trace** (moteur de tâches, commun aux deux) | séparer temps agent, temps code et coût du moteur (Q2) | une entrée `effet` (nom, durée) par effet, et la durée de transition, pour les deux extensions |
 | P3 | **Banc commun** : `scripts/mesure-skraft.ts` lance l'extension `skraft` ou le workflow `workflows/skraft` (installé dans la copie du projet, `.agent-studio/workflows/`), lit le résultat sans dépendre de `SkraftState`, découpe en étapes selon §3, produit le même rapport | le banc actuel ne sait lancer que skraft | un run à blanc sur agents simulés produit deux rapports au même format |
 | P4 | **Répondeur scripté commun**, piloté par un fichier (`docs/runs/reponses-us-2.json`) : difficulté (confirmer la proposition), question ouverte (« par référence »), ratification (accepter), arbitrage (donner raison à la lentille), escalade (relancer deux fois, puis abandonner) ; reconnaissance par **libellé**, pas par identifiant (les identifiants diffèrent : `abort` contre `<n>:abandonner`) | sans réponses identiques, les runs ne sont pas comparables ; aujourd'hui les questions ouvertes reçoivent une réponse vide | même fichier, même décision prise pour la même question dans les deux runs à blanc |
-| P5 | **Plafond par run** : 250 requêtes premium et 45 min ; au-delà, arrêt propre et rapport | borne le coût d'un run qui dérape (le 03/10, un run a consommé 404 requêtes) | arrêt testé sur agents simulés |
+| P5 | **Plafond par run** : 350 requêtes équivalentes SDK ; aucune limite de durée ; au plafond, arrêt propre et rapport | borne la consommation sans interrompre un run uniquement parce qu'il est long (un run a consommé 404 requêtes le 03/10) | contrôle présent ; arrêt à valider pendant le premier run réel (pas de mode simulé) |
 | P6 | **Rapport de comparaison** : un script lit les `resume.json` des runs et produit le tableau du §7 | évite les recopies à la main | tableau produit sur les deux runs à blanc |
 
 P1 et P2 sont des changements de code : branche `feat/mesure-comparee`, TDD, `features.json`.
@@ -139,11 +169,16 @@ P1 et P2 sont des changements de code : branche `feat/mesure-comparee`, TDD, `fe
   `scripts/banc/etapes.ts` (`resumerParEtape`, attente humaine retirée d'après les demandes
   d'interaction), écrite dans `resume.json` (`comparable`, `livre`) ;
 - P4 : `scripts/banc/repondeur.ts`, `docs/runs/reponses-us-2.json` ;
-- P5 : `--plafond-requetes` (250) ;
+- P5 : `--plafond-requetes` (350 par défaut), sans limite de durée ;
 - P6 : `tsx scripts/banc/comparer.ts [--story=us-2] [--prix=…] <dossiers de runs>`, qui écrit
   `docs/runs/<date>-comparaison-us-2.md`. Les noms de porte des deux côtés sont rapprochés par
   famille (`DELIVER` et `pas test (s1)` → `pas`). **Non fait** : durée et coût perdus par rejeu,
   la trace ne délimitant pas un essai ; à ajouter si la lecture des runs le demande.
+- Les quatre runs poussent chacun vers une branche dédiée, jamais vers `main` :
+  `tests/us-2/extension-1`, `tests/us-2/workflow-1`, `tests/us-2/extension-2`,
+  `tests/us-2/workflow-2`. Le banc exige `--branche-run=<nom>` avec `--pousser`, refuse tout
+  autre nom, vérifie que la branche distante existe au même commit de départ et utilise un lease
+  explicite pour empêcher l'écrasement d'une mise à jour concurrente.
 
 Le critère « un run à blanc sur agents simulés » de P3 et P6 est couvert par les tests unitaires
 du banc et les jumeaux du workflow ; le banc lui-même n'a jamais tourné.
@@ -153,16 +188,18 @@ du banc et les jumeaux du workflow ; le banc lui-même n'a jamais tourné.
 1. **Run à blanc** de chaque extension sur agents simulés (pile Swift simulée) : vérifie P1 à P6
    sans rien consommer.
 2. **Campagne** : quatre runs réels, **en alternance** pour ne pas mêler l'effet de l'heure ou de
-   la charge du service à celui de l'approche : skraft, workflow, skraft, workflow. Un troisième
+   la charge du service à celui de l'approche : workflow, skraft, workflow, skraft
+   (ordre demandé le 10/10 après les correctifs). Un troisième
    couple seulement si les deux premiers divergent sur Q1 ou de plus de 30 % sur le coût.
 3. Pour chaque run :
    - relever la réserve Copilot, `dotnet --version`, le commit du projet, les modèles ;
-   - lancer `pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md 45 --extension=… --modeles=… --pousser` ;
+   - lancer `pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md --hote-copilot=byb.ghe.com --pousser --branche-run=tests/us-2/extension-1` (puis les trois autres branches ; ajouter `--workflow` pour ses deux runs) ; `--hote-copilot` choisit uniquement l'authentification/la réserve Copilot, le dépôt de test reste `<projet>`. Le jeton OAuth de `gh` est associé à `GH_HOST` dans le runtime (ADR 0057), sans mode GHES offline. Précontrôle sans prompt réussi le 10/10 : 23 modèles et création de session ;
    - ne pas intervenir à la main : seul le répondeur répond. Toute intervention manuelle est notée
      et invalide le run pour Q2 et Q3 ;
    - relever la réserve 10 min après la fin ;
    - archiver dans `docs/runs/<date>-us-2-<extension>-<id>/` : `rapport.md`, `resume.json`, trace
-     JSONL, interactions, preuves ; la branche du projet est poussée sous `run/…`.
+     JSONL, interactions, preuves ; la branche du projet est poussée sur la branche dédiée passée
+     avec `--branche-run`.
 4. **Vérification du livrable** (Q1) : sur la branche livrée, `dotnet test` vert ; les cinq
    critères couverts par un test d'acceptance marqué `ac-<n>` ; aucun test d'acceptance modifié
    depuis DISTILL (empreinte) ; revue finale `APPROVED`.
@@ -173,12 +210,13 @@ D'après les runs du 03/10 sur US-2 : 150 à 400 requêtes premium et 5 à 15 mi
 
 | Campagne | Requêtes premium (estimation) |
 |---|---|
-| 4 runs | 600 à 1 600 |
-| 6 runs (si troisième couple) | 900 à 2 400 |
+| 4 runs | jusqu'à 1 400 requêtes équivalentes SDK |
+| 6 runs (si troisième couple) | jusqu'à 2 100 requêtes équivalentes SDK |
 
-**À valider par le responsable** avant de lancer : la réserve disponible et le prix unitaire.
-Le plafond P5 borne chaque run à 250 requêtes : la campagne de quatre runs coûte au plus 1 000
-requêtes, au prix d'un run éventuellement arrêté avant la fin (noté « non livré au plafond »).
+**À valider par le responsable** avant de lancer : la réserve Copilot disponible. 350 requêtes
+équivalentes ne signifient pas 3 500 crédits : GitHub facture en crédits IA selon le modèle et les
+tokens consommés, et 1 crédit vaut 0,01 USD. Le plafond borne chaque run à 350 requêtes équivalentes
+SDK ; un run peut être arrêté avant la fin (noté « non livré au plafond »).
 
 ## 7. Le rapport de comparaison
 
@@ -202,6 +240,24 @@ Le premier défaut d'orchestration que la campagne révèle (s'il y en a un) est
 deux** extensions, et l'on note pour chacune : fichiers touchés, lignes modifiées, tests ajoutés,
 temps passé. C'est la mesure de lisibilité que les tailles de fichiers ne donnent pas. Sans
 défaut révélé, Q6 reste sans réponse ; on ne fabrique pas de défaut pour la remplir.
+
+Premier défaut observé le 10/10 : run extension `63e98c3d` abandonné à l'entrée de DELIVER,
+car le gel conservait l'ensemble précédant une correction de revue de DISTILL. Corrigé dans
+les deux implémentations (ADR 0059) : `extensions/skraft/src/reducer.ts` invalide le gel
+sur réessai/escalade de DISTILL et actualise l'empreinte aux portes ;
+`workflows/skraft/distillation.mjs` invalide l'essai refusé ou interrompu, ainsi que le gel
+après rembobinage. Tests du réducteur et scénarios S4 jumeaux : ajout d'un fichier après
+refus, nouvelle validation, arrivée réelle au premier agent DELIVER. Le gel strict de
+DELIVER reste vérifié. Le temps passé n'a pas été chronométré ; pas de conclusion comparative
+sur ce seul correctif ni de relance réelle à ce stade.
+
+Deuxième défaut observé dans l'essai de reprise `eda055a6` : les seuils de couverture
+sur un fichier entier obligent le scénario à réparer deux lignes préexistantes non
+couvertes. ADR 0060 : précontrôle des tests avant tout LLM, dette initiale notifiée,
+seuils sur les lignes exécutables du diff. Les deux implémentations sont corrigées,
+avec portes de scénario et contrôle final depuis le checkpoint initial de la tâche.
+L'essai de reprise reste abandonné ; il n'est pas un run complet comparable, et aucune
+nouvelle mesure réelle n'a été lancée après ce changement de politique.
 
 ## 9. Décision attendue
 

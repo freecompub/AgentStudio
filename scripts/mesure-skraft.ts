@@ -4,9 +4,11 @@
  * Hors CI, consomme de vraies requêtes Copilot. Travaille sur une **copie** du projet d'essai :
  * le dépôt d'origine n'est jamais touché.
  *
- *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--pousser]
+ *   pnpm tsx scripts/mesure-skraft.ts <projet> <story> [--depuis=PHASE] [--base=BRANCHE] [--pousser --branche-run=BRANCHE]
  *                                     [--modeles=strong:claude-sonnet-5.5,light:gpt-5-mini]
+ *                                     [--modeles-roles=skraft-architect-model:claude-sonnet-5.5,…]
  *                                     [--workflow] [--reponses=FICHIER] [--plafond-requetes=N]
+ *                                     [--hote-copilot=github.com]
  *
  * `--workflow` : lance le **workflow** `workflows/skraft` (ADR 0055) au lieu de l'extension skraft —
  * installé dans la copie du projet (`.agent-studio/workflows/`, commité), activé et exécuté isolé,
@@ -14,14 +16,17 @@
  *
  * `--reponses` : réponses humaines (`docs/runs/reponses-us-2.json` par défaut), données par le
  * répondeur commun (`scripts/banc/repondeur.ts`) : même décision à la même question, dans les deux
- * modes. `--plafond-requetes` (250 par défaut) : au-delà, le run est annulé et le rapport le dit.
+ * modes. `--plafond-requetes` (350 par défaut) : au-delà, le run est annulé et le rapport le dit.
+ * Il n'y a pas de limite murale.
+ * `--hote-copilot` choisit l'hôte `gh` utilisé pour l'authentification Copilot et la réserve ;
+ * le dépôt du projet reste celui donné par `<projet>`.
  *
  * `--modeles` associe des classes de rôle à des modèles (ADR 0048) ; une classe absente laisse le
  * runtime décider.
  *
- * `--pousser` : pousse le travail de la copie sur une branche `run/<story>-<date>-<id>` du dépôt
- * GitHub du projet, après chaque phase commitée puis à la fin. C'est le banc qui pousse, jamais
- * l'agent (le contrat lui interdit Git), et jamais sur `main`.
+ * `--pousser --branche-run=…` : pousse uniquement vers l'une des quatre branches réservées à la
+ * campagne US-2. Le script vérifie que la branche distante existe au commit de départ et utilise
+ * un lease explicite pour refuser tout écrasement concurrent. Il ne peut pas pousser sur `main`.
  *
  * Suivi : chaque changement d'étape, rejet et fin de tour anormale est annoncé en direct par une
  * ligne commençant par `§`, lue dans la trace (ADR 0032) — la même source que le bilan final.
@@ -63,6 +68,9 @@ import { activateInProcess, bundle, createNodeLauncher, type HostDeps } from "@a
 import { activerWorkflow, createJsonAccordStore, trouverWorkflows, type EtatWorkflow } from "@agent-studio/workflow";
 import { repondre as choisir, type Reponses } from "./banc/repondeur.js";
 import { resumerParEtape } from "./banc/etapes.js";
+import { verifierBrancheCampagneUs2 } from "./banc/branches-campagne.js";
+import { workflowLivre } from "./banc/livraison.js";
+import { lireModelesRoles, modelePourRole } from "./banc/modeles-roles.js";
 import { createProfileAdapter, parseStackProfile } from "../packages/stack-adapters/src/index.js";
 import { createJsonTaskStore, createTaskEngine } from "../packages/task-engine/src/index.js";
 import { openWorkspace } from "@agent-studio/workspace";
@@ -80,6 +88,13 @@ const args = process.argv.slice(2);
 // faites. Sert à réessayer une phase tardive sans repayer celles d'avant — le dépôt source doit
 // alors DÉJÀ contenir leurs livrables, le banc ne les fabrique pas.
 const pousser = args.includes("--pousser");
+const hoteCopilot = args.find((a) => a.startsWith("--hote-copilot="))?.slice("--hote-copilot=".length) ?? "github.com";
+const brancheRunArg = args.find((a) => a.startsWith("--branche-run="))?.slice("--branche-run=".length);
+if (pousser && !brancheRunArg)
+  throw new Error("--pousser exige --branche-run=<branche dédiée de la campagne US-2>.");
+if (!pousser && brancheRunArg)
+  throw new Error("--branche-run ne peut être utilisé qu'avec --pousser.");
+if (brancheRunArg) verifierBrancheCampagneUs2(brancheRunArg);
 // `--base=<branche>` : partir d'une branche du dépôt source plutôt que de `main` — typiquement la
 // branche `run/…` poussée par un run précédent, pour reprendre avec `--depuis` sans repayer les
 // phases déjà validées.
@@ -94,6 +109,7 @@ const classesModeles = Object.fromEntries(
 for (const k of Object.keys(classesModeles))
   if (!(MODEL_CLASSES as readonly string[]).includes(k)) throw new Error(`--modeles : classe inconnue « ${k} » (attendu : ${MODEL_CLASSES.join(", ")})`);
 const depuis = args.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length)?.toUpperCase();
+const modelesRoles = lireModelesRoles(args.find((a) => a.startsWith("--modeles-roles="))?.slice("--modeles-roles=".length) ?? "");
 // `--en-place` : travailler DANS le dépôt donné, au lieu d'une copie jetable. Les livrables restent
 // donc sous les yeux de l'utilisateur, avec son historique et ses branches — c'est tout l'intérêt,
 // et c'est aussi le risque : le pipeline commite, crée une branche et peut rembobiner.
@@ -101,13 +117,17 @@ const enPlace = args.includes("--en-place");
 // `--workflow` : le workflow en dossier au lieu de l'extension (docs/10, ADR 0055).
 const modeWorkflow = args.includes("--workflow");
 const fichierReponses = args.find((a) => a.startsWith("--reponses="))?.slice("--reponses=".length) ?? join(process.cwd(), "docs/runs/reponses-us-2.json");
-const plafondRequetes = Number(args.find((a) => a.startsWith("--plafond-requetes="))?.slice("--plafond-requetes=".length) ?? 250);
-const [source, storyPath, minutes] = args.filter((a) => !a.startsWith("--"));
+const plafondRequetes = Number(args.find((a) => a.startsWith("--plafond-requetes="))?.slice("--plafond-requetes=".length) ?? 350);
+if (!Number.isSafeInteger(plafondRequetes) || plafondRequetes < 1)
+  throw new Error("--plafond-requetes doit être un entier positif.");
+const positionnels = args.filter((a) => !a.startsWith("--"));
+const [source, storyPath] = positionnels;
 if (!source || !storyPath)
-  throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [minutes-max] [--depuis=PHASE] [--base=BRANCHE] [--en-place] [--pousser] [--modeles=…]");
+  throw new Error("Utilisation : mesure-skraft.ts <projet> <story> [--depuis=PHASE] [--base=BRANCHE] [--en-place] [--pousser --branche-run=BRANCHE] [--modeles=…]");
+if (positionnels.length > 2)
+  throw new Error("Seuls <projet> et <story> sont des arguments positionnels ; la limite de durée a été supprimée.");
 // `--base` choisit la branche à COPIER ; `--en-place` travaille sur l'état courant du dépôt, sans copie.
 if (enPlace && args.some((a) => a.startsWith("--base="))) throw new Error("--base et --en-place sont incompatibles : en place, le banc part de l'état courant du dépôt.");
-const limite = Number(minutes ?? 90) * 60_000;
 if (modeWorkflow && args.some((a) => a.startsWith("--depuis="))) throw new Error("--depuis et --workflow sont incompatibles : le workflow part toujours du début.");
 const MODE = modeWorkflow ? "workflow skraft" : "extension skraft";
 // `indexOf` rend -1 sur une phase inconnue, et `slice(-1)` rendrait la DERNIÈRE phase : une faute
@@ -142,19 +162,28 @@ if (enPlace) {
   console.log(`Copie : ${root}\nBase  : ${execFileSync("git", ["log", "--oneline", "-1"], { cwd: root, encoding: "utf8" }).trim()}`);
 }
 
-// ---------- Branche de run sur GitHub (--pousser) ---------------------------------------------
+// ---------- Branche dédiée de run sur le dépôt distant (--pousser) -----------------------------
 // La copie est clonée depuis le dépôt local : son `origin` est un chemin. On pousse vers l'`origin`
-// du dépôt source, c'est-à-dire GitHub. Une branche par run, jamais `main` : chaque run reste
-// lisible et comparable aux autres.
+// du dépôt source, après validation stricte de la branche dédiée et de son commit de départ.
 const jour = new Date().toISOString().slice(0, 10);
-const brancheRun = `run/${basename(storyPath, ".md").toLowerCase()}-${jour}-${randomUUID().slice(0, 4)}`;
+const brancheRun = brancheRunArg ?? `run/${basename(storyPath, ".md").toLowerCase()}-${jour}-${randomUUID().slice(0, 4)}`;
 const distant = pousser ? execFileSync("git", ["remote", "get-url", "origin"], { cwd: source, encoding: "utf8" }).trim() : null;
 // En place, la « copie » EST le dépôt de l'utilisateur : son `origin` pointe déjà vers GitHub, et
 // lui ajouter un remote modifierait durablement sa configuration. Dans une copie, `origin` est un
 // chemin local : on y déclare le vrai distant sous un autre nom.
 const nomDistant = enPlace ? "origin" : "github";
+let shaAttendue = "";
 if (distant) {
   if (!enPlace) execFileSync("git", ["remote", "add", nomDistant, distant], { cwd: root });
+  const shaDepart = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const distantBranch = execFileSync("git", ["ls-remote", "--heads", distant, `refs/heads/${brancheRun}`], { encoding: "utf8" }).trim();
+  const shaBranche = distantBranch.split(/\s+/)[0];
+  if (shaBranche !== shaDepart)
+    throw new Error(
+      `Poussée refusée : ${brancheRun} doit exister sur le dépôt distant au commit de départ ${shaDepart}; ` +
+      `${shaBranche ? `elle pointe sur ${shaBranche}` : "elle n'existe pas"}.`,
+    );
+  shaAttendue = shaDepart;
   console.log(`Poussée : ${distant} → ${brancheRun}`);
 }
 let derniereSha = "";
@@ -164,10 +193,14 @@ async function pousserBranche(motif: string): Promise<void> {
   const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   if (sha === derniereSha) return;
   try {
-    // `--force-with-lease` : la branche appartient à ce seul run, et un rollback peut légitimement
-    // réécrire ce qu'on y a poussé. Elle ne peut pas écraser le travail de quelqu'un d'autre.
-    await execFileAsync("git", ["push", "-q", "--force-with-lease", nomDistant, `HEAD:refs/heads/${brancheRun}`], { cwd: root });
+    // Le lease explicite autorise les rembobinages sans écraser une mise à jour concurrente.
+    await execFileAsync(
+      "git",
+      ["push", "-q", `--force-with-lease=refs/heads/${brancheRun}:${shaAttendue}`, nomDistant, `HEAD:refs/heads/${brancheRun}`],
+      { cwd: root },
+    );
     derniereSha = sha;
+    shaAttendue = sha;
     console.log(`§ ⇪ poussé sur ${brancheRun} (${sha.slice(0, 7)}, ${motif})`);
   } catch (err) {
     console.log(`§ ✖ poussée impossible (${motif}) : ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
@@ -181,13 +214,16 @@ const tours: Tour[] = [];
 const t0 = Date.now();
 /** Combien d'événements `context` le runtime a réellement émis. Zéro = le plafond de l'ADR 0031 est aveugle. */
 let contextes = 0;
+let ecartModele: string | null = null;
 
 /** Enveloppe du runtime : horodate l'ouverture de chaque session et chaque événement `usage`. */
 function instrumente(rt: AgentRuntime): AgentRuntime {
   return {
     ...rt,
     async openSession(cfg) {
-      const session = await rt.openSession(cfg);
+      const modeleFixe = modelePourRole(modelesRoles, cfg.role);
+      const session = await rt.openSession(modeleFixe ? { ...cfg, model: modeleFixe } : cfg);
+      if (modeleFixe) console.log(`Modèle fixé : ${cfg.role} → ${modeleFixe}`);
       const tour: Tour = { role: cfg.role, sessionId: session.id, debut: Date.now(), appels: [] };
       tours.push(tour);
       console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ▶ ${cfg.role}  (prompt système ${cfg.systemPrompt.length} car.)`);
@@ -204,6 +240,10 @@ function instrumente(rt: AgentRuntime): AgentRuntime {
           return;
         }
         if (e.type !== "usage") return;
+        if (modeleFixe && e.model && e.model !== modeleFixe) {
+          ecartModele = `${cfg.role} : modèle demandé ${modeleFixe}, reçu ${e.model}`;
+          console.error(`Écart de modèle : ${ecartModele}`);
+        }
         tour.appels.push({ at: Date.now(), inputTokens: e.inputTokens ?? 0, outputTokens: e.outputTokens ?? 0 });
         const cumul = tour.appels.reduce((n, a) => n + a.inputTokens, 0);
         const precedent = tour.appels.at(-2)?.at ?? tour.debut;
@@ -218,25 +258,27 @@ function instrumente(rt: AgentRuntime): AgentRuntime {
 
 // ---------- Câblage réel ---------------------------------------------------------------------
 const logger = createJsonLogger({ write: (l) => process.stderr.write(`${l}\n`), level: "info" });
-const auth = createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() });
+const auth = createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner(), hostname: hoteCopilot });
 // Un jeton que Copilot refuse rend `400 Bad Request` à chaque tour : sans ce contrôle, le banc
 // relançait l'escalade en boucle (03/10, un PAT classique `ghp_` sur une machine Linux).
 const etatAuth = await auth.status();
 if (!etatAuth.loggedIn || !etatAuth.copilotCompatible) {
   console.error(
     `Jeton GitHub refusé par Copilot (${etatAuth.loggedIn ? `type ${etatAuth.tokenKind}` : "non connecté"}).\n` +
-      "Se connecter en OAuth : gh auth login --hostname github.com --git-protocol https --web",
+      `Se connecter en OAuth : gh auth login --hostname ${hoteCopilot} --git-protocol https --web`,
   );
   process.exit(2);
 }
-const runtime = instrumente(createCopilotRuntime({ client: createCopilotClient({ gitHubToken: await auth.token() }), logger }));
+const jetonCopilot = await auth.token();
+const optionsCopilot = { gitHubToken: jetonCopilot, hostname: hoteCopilot };
+const runtime = instrumente(createCopilotRuntime({ client: createCopilotClient(optionsCopilot), logger }));
 await runtime.start();
 
 const tasksDir = await mkdtemp(join(tmpdir(), "mesure-taches-"));
 
 // ---------- Suivi en direct, lu dans la trace -----------------------------------------------
 const ghRunner = { run: async (cmd: string, a: readonly string[]) => execFileAsync(cmd, [...a]).then((r) => ({ code: 0, ...r })).catch((e) => ({ code: e.code ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? String(e) })) };
-const lireReserve = () => createGhAuth({ runner: ghRunner, spawner: null as never }).copilotQuota().catch(() => null);
+const lireReserve = () => createGhAuth({ runner: ghRunner, spawner: null as never, hostname: hoteCopilot }).copilotQuota().catch(() => null);
 /** Réserve relevée à chaque changement d'étape : l'écart entre deux relevés est la consommation réelle. */
 const releves: { at: string; etape: string; restantes: number | null }[] = [];
 const traceBrute = createJsonlTraceStore(join(tasksDir, "traces"));
@@ -355,6 +397,7 @@ const hostDeps: HostDeps = {
   ids: { next: () => randomUUID() },
 };
 if (Object.keys(classesModeles).length) console.log(`Modèles par classe : ${Object.entries(classesModeles).map(([k, v]) => `${k} → ${v}`).join(", ")}`);
+if (modelesRoles.size) console.log(`Modèles verrouillés par rôle : ${JSON.stringify(Object.fromEntries(modelesRoles))} ; rôle absent ou modèle différent interdit.`);
 if (!modeWorkflow) await activateInProcess({ manifest, module: skraftExtension, directory: join(process.cwd(), "extensions/skraft") }, hostDeps);
 else {
   // Comme dans l'application (docs/11) : le workflow est dans le projet, commité, puis activé et
@@ -402,19 +445,17 @@ const fini = async () => {
   const r = await engine.status(taskId);
   return r?.status === "finished";
 };
-const debut = Date.now();
 let arret: string | null = null;
 while (!(await fini())) {
-  if (Date.now() - debut > limite) {
-    arret = `limite de durée (${minutes ?? 90} min)`;
-    console.log("\n⏱  Limite du banc atteinte : annulation.");
+  if (ecartModele) {
+    arret = `écart de modèle : ${ecartModele}`;
     await engine.cancel(taskId);
     break;
   }
   // Plafond de coût (docs/10 P5), compté par le SDK dans la trace : borne un run qui dérape.
   const depense = requetes(resumerTrace(vues).total.nanoAiu);
-  if (depense > plafondRequetes) {
-    arret = `plafond de ${plafondRequetes} requêtes premium (${depense} dépensées)`;
+  if (depense >= plafondRequetes) {
+    arret = `plafond de ${plafondRequetes} requêtes premium atteint (${depense} comptabilisées)`;
     console.log(`\n💰 ${arret} : annulation.`);
     await engine.cancel(taskId);
     break;
@@ -432,7 +473,7 @@ const etatFinal = modeWorkflow
   : `${state?.stage} / ${state?.phase ?? "—"}`;
 /** Livré : fini avec la phase DELIVER faite (une phase sautée par l'humain ne compte pas). */
 const livre = modeWorkflow
-  ? etatWorkflow?.fin?.statut === "fini" && ((etatWorkflow.fin.valeur as { clair?: { phases?: string[] } } | undefined)?.clair?.phases ?? []).includes("DELIVER")
+  ? workflowLivre(etatWorkflow)
   : state?.stage === "DONE" && state.phasesCompleted.includes("DELIVER");
 const s = (ms: number) => `${Math.floor(ms / 60000)}m${String(Math.round((ms % 60000) / 1000)).padStart(2, "0")}`;
 const lignes = tours.map((t, i) => {
@@ -503,7 +544,7 @@ const md = [
   "",
 ].join("\n");
 await writeFile(join(rapportDir, "rapport.md"), md);
-await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ mode: MODE, livre, arret, resume, comparable, releves, brancheRun: distant ? brancheRun : null, etatFinal: modeWorkflow ? { fin: etatWorkflow?.fin ?? null, phase: record?.phase ?? null } : { stage: state?.stage, phase: state?.phase } }, null, 2));
+await writeFile(join(rapportDir, "resume.json"), JSON.stringify({ mode: MODE, livre, arret, modelesRoles: Object.fromEntries(modelesRoles), resume, comparable, releves, brancheRun: distant ? brancheRun : null, etatFinal: modeWorkflow ? { fin: etatWorkflow?.fin ?? null, phase: record?.phase ?? null } : { stage: state?.stage, phase: state?.phase } }, null, 2));
 console.log(`\nRapport : ${join(rapportDir, "rapport.md")}`);
 await writeFile(join(tasksDir, "mesure.json"), JSON.stringify({ tours, lignes, state: state ?? etatWorkflow }, null, 2));
 console.log(`\nDétail : ${join(tasksDir, "mesure.json")}\nTrace : ${join(tasksDir, "traces", `${taskId}.jsonl`)}\n${enPlace ? "Dépôt (modifié en place)" : "Copie du projet"} : ${root}`);

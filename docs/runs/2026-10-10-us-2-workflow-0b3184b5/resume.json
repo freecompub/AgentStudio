@@ -1,0 +1,1000 @@
+{
+  "mode": "workflow skraft",
+  "livre": true,
+  "arret": null,
+  "modelesRoles": {
+    "skraft-classifier": "gpt-6-luna",
+    "skraft-researcher": "gpt-6.1-sol",
+    "skraft-architect-model": "claude-sonnet-5.5",
+    "skraft-architect-decide": "gpt-6.1-sol",
+    "skraft-acceptance": "gpt-6.1-sol",
+    "skraft-test": "gpt-6.1-sol",
+    "skraft-dev": "gpt-6.1-sol",
+    "skraft-lens-cold-reader": "gpt-6.1-sol",
+    "skraft-lens-test-integrity": "gpt-6.1-sol",
+    "skraft-lens-architecture": "gpt-6.1-sol",
+    "skraft-lens-quality-gates": "gpt-6.1-sol"
+  },
+  "resume": {
+    "etapes": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T19:52:29.416Z",
+        "duréeMs": 4484,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3710,
+        "codeMs": 3710,
+        "moteurMs": 13
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T19:52:33.900Z",
+        "duréeMs": 4813,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15038,
+        "sortie": 55,
+        "nanoAiu": 190717500,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 4061,
+        "effetsMs": 4651,
+        "codeMs": 590,
+        "moteurMs": 2
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T19:52:38.713Z",
+        "duréeMs": 11,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 1
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T19:52:38.724Z",
+        "duréeMs": 18672,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 3,
+        "entrée": 57323,
+        "sortie": 922,
+        "nanoAiu": 6873420000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 18387,
+        "effetsMs": 18543,
+        "codeMs": 156,
+        "moteurMs": 10
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T19:52:57.396Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 3
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T19:52:57.406Z",
+        "duréeMs": 127388,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "Section manquante : « Recommandation ».",
+              "Section manquante : « Passage de relais »."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 10,
+        "entrée": 414381,
+        "sortie": 7883,
+        "nanoAiu": 36493310000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 125893,
+        "effetsMs": 126068,
+        "codeMs": 175,
+        "moteurMs": 229
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T19:55:04.794Z",
+        "duréeMs": 14,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 5
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:55:04.808Z",
+        "duréeMs": 109428,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 10,
+        "entrée": 432338,
+        "sortie": 12135,
+        "nanoAiu": 40381240000,
+        "modèles": [
+          "claude-sonnet-5.5",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 108910,
+        "effetsMs": 109049,
+        "codeMs": 139,
+        "moteurMs": 38
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T19:56:54.236Z",
+        "duréeMs": 20,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 10
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:56:54.256Z",
+        "duréeMs": 6469,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 36580,
+        "sortie": 328,
+        "nanoAiu": 9472850000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 6325,
+        "effetsMs": 6336,
+        "codeMs": 11,
+        "moteurMs": 8
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T19:57:00.725Z",
+        "duréeMs": 19,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 9
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:57:00.744Z",
+        "duréeMs": 4209,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 38031,
+        "sortie": 189,
+        "nanoAiu": 1443240000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 4042,
+        "effetsMs": 4053,
+        "codeMs": 11,
+        "moteurMs": 7
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T19:57:04.953Z",
+        "duréeMs": 18,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 9
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:57:04.971Z",
+        "duréeMs": 177568,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 473014,
+        "sortie": 12559,
+        "nanoAiu": 25064510000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 176653,
+        "effetsMs": 176920,
+        "codeMs": 267,
+        "moteurMs": 156
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T20:00:02.539Z",
+        "duréeMs": 63567,
+        "tours": 3,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 11,
+        "entrée": 269160,
+        "sortie": 3107,
+        "nanoAiu": 27368630000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 62567,
+        "effetsMs": 62804,
+        "codeMs": 237,
+        "moteurMs": 67
+      },
+      {
+        "phase": "RATIFICATION",
+        "début": "2026-10-10T20:01:06.106Z",
+        "duréeMs": 426,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 73,
+        "codeMs": 73,
+        "moteurMs": 23
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T20:01:06.532Z",
+        "duréeMs": 182310,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 331102,
+        "sortie": 11922,
+        "nanoAiu": 28175500000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 179175,
+        "effetsMs": 181783,
+        "codeMs": 2608,
+        "moteurMs": 169
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T20:04:08.842Z",
+        "duréeMs": 57048,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 234066,
+        "sortie": 2894,
+        "nanoAiu": 57381140000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 55436,
+        "effetsMs": 55758,
+        "codeMs": 322,
+        "moteurMs": 133
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T20:05:05.890Z",
+        "duréeMs": 258337,
+        "tours": 8,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 40,
+        "entrée": 1368252,
+        "sortie": 7015,
+        "nanoAiu": 72849280000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 192026,
+        "effetsMs": 248603,
+        "codeMs": 56577,
+        "moteurMs": 4121
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T20:09:24.227Z",
+        "duréeMs": 57701,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 349909,
+        "sortie": 2573,
+        "nanoAiu": 29671380000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 55431,
+        "effetsMs": 55805,
+        "codeMs": 374,
+        "moteurMs": 459
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-10T20:10:21.928Z",
+        "duréeMs": 58,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 75
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T19:52:29.416Z",
+        "duréeMs": 4484,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3710,
+        "codeMs": 3710,
+        "moteurMs": 13
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T19:52:33.900Z",
+        "duréeMs": 4813,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15038,
+        "sortie": 55,
+        "nanoAiu": 190717500,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 4061,
+        "effetsMs": 4651,
+        "codeMs": 590,
+        "moteurMs": 2
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T19:52:38.713Z",
+        "duréeMs": 11,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 1
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T19:52:38.724Z",
+        "duréeMs": 146060,
+        "tours": 3,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "Section manquante : « Recommandation ».",
+              "Section manquante : « Passage de relais »."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 471704,
+        "sortie": 8805,
+        "nanoAiu": 43366730000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 144280,
+        "effetsMs": 144611,
+        "codeMs": 331,
+        "moteurMs": 239
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T19:52:57.396Z",
+        "duréeMs": 67,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 8,
+        "codeMs": 8,
+        "moteurMs": 31
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T19:55:04.794Z",
+        "duréeMs": 14,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 5
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:55:04.808Z",
+        "duréeMs": 297674,
+        "tours": 5,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 21,
+        "entrée": 979963,
+        "sortie": 25211,
+        "nanoAiu": 76361840000,
+        "modèles": [
+          "claude-sonnet-5.5",
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 295930,
+        "effetsMs": 296358,
+        "codeMs": 428,
+        "moteurMs": 209
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T20:00:02.539Z",
+        "duréeMs": 178316,
+        "tours": 11,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 28,
+        "entrée": 853135,
+        "sortie": 8574,
+        "nanoAiu": 114421150000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 173434,
+        "effetsMs": 174367,
+        "codeMs": 933,
+        "moteurMs": 659
+      },
+      {
+        "phase": "RATIFICATION",
+        "début": "2026-10-10T20:01:06.106Z",
+        "duréeMs": 426,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 73,
+        "codeMs": 73,
+        "moteurMs": 23
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T20:01:06.532Z",
+        "duréeMs": 182310,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 331102,
+        "sortie": 11922,
+        "nanoAiu": 28175500000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 179175,
+        "effetsMs": 181783,
+        "codeMs": 2608,
+        "moteurMs": 169
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T20:05:05.890Z",
+        "duréeMs": 258337,
+        "tours": 8,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 40,
+        "entrée": 1368252,
+        "sortie": 7015,
+        "nanoAiu": 72849280000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 192026,
+        "effetsMs": 248603,
+        "codeMs": 56577,
+        "moteurMs": 4121
+      },
+      {
+        "phase": "DONE",
+        "début": "2026-10-10T20:10:21.928Z",
+        "duréeMs": 58,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 75
+      }
+    ],
+    "total": {
+      "duréeMs": 1072570,
+      "tours": 29,
+      "appels": 111,
+      "entrée": 4019194,
+      "sortie": 61582,
+      "nanoAiu": 335365217500,
+      "agentsMs": 988906,
+      "effetsMs": 1054171,
+      "codeMs": 65265,
+      "moteurMs": 5547,
+      "rejets": 1
+    }
+  },
+  "comparable": {
+    "etapes": [
+      {
+        "etape": "PRÉPARATION",
+        "sousEtapes": [],
+        "duréeMs": 4484,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 4484,
+        "agentsMs": 0,
+        "codeMs": 3710,
+        "moteurMs": 13,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DIFFICULTÉ",
+        "sousEtapes": [
+          "classifieur",
+          "confirmation"
+        ],
+        "duréeMs": 4824,
+        "attenteHumaineMs": 4,
+        "horsAttenteMs": 4820,
+        "agentsMs": 4061,
+        "codeMs": 594,
+        "moteurMs": 3,
+        "tours": 1,
+        "appels": 1,
+        "nanoAiu": 190717500,
+        "entrée": 15038,
+        "sortie": 55,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "RESEARCH",
+        "sousEtapes": [
+          "blocage"
+        ],
+        "duréeMs": 146070,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 146067,
+        "agentsMs": 144280,
+        "codeMs": 333,
+        "moteurMs": 242,
+        "tours": 3,
+        "appels": 13,
+        "nanoAiu": 43366730000,
+        "entrée": 471704,
+        "sortie": 8805,
+        "essaisMax": 0,
+        "rejets": 1,
+        "interventions": 1
+      },
+      {
+        "etape": "QUESTIONS",
+        "sousEtapes": [],
+        "duréeMs": 14,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 11,
+        "agentsMs": 0,
+        "codeMs": 1,
+        "moteurMs": 5,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "DESIGN",
+        "sousEtapes": [
+          "blocage",
+          "revue",
+          "ratification"
+        ],
+        "duréeMs": 361724,
+        "attenteHumaineMs": 14,
+        "horsAttenteMs": 361710,
+        "agentsMs": 358497,
+        "codeMs": 744,
+        "moteurMs": 327,
+        "tours": 8,
+        "appels": 32,
+        "nanoAiu": 103730470000,
+        "entrée": 1249123,
+        "sortie": 28318,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 3
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 239358,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 239358,
+        "agentsMs": 234611,
+        "codeMs": 2930,
+        "moteurMs": 302,
+        "tours": 5,
+        "appels": 16,
+        "nanoAiu": 85556640000,
+        "entrée": 565168,
+        "sortie": 14816,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 316038,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 316038,
+        "agentsMs": 247457,
+        "codeMs": 56951,
+        "moteurMs": 4580,
+        "tours": 12,
+        "appels": 49,
+        "nanoAiu": 102520660000,
+        "entrée": 1718161,
+        "sortie": 9588,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "BILAN",
+        "sousEtapes": [],
+        "duréeMs": 58,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 58,
+        "agentsMs": 0,
+        "codeMs": 2,
+        "moteurMs": 75,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      }
+    ],
+    "rejeux": [
+      {
+        "etape": "RESEARCH",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "citations",
+        "motifs": [
+          "Section manquante : « Recommandation ».",
+          "Section manquante : « Passage de relais »."
+        ]
+      }
+    ],
+    "total": {
+      "duréeMs": 1072570,
+      "attenteHumaineMs": 24,
+      "horsAttenteMs": 1072546,
+      "agentsMs": 988906,
+      "codeMs": 65265,
+      "moteurMs": 5547,
+      "tours": 29,
+      "appels": 111,
+      "nanoAiu": 335365217500,
+      "entrée": 4019194,
+      "sortie": 61582,
+      "rejets": 1,
+      "interventions": 6
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-10T19:52:29.342Z",
+      "etape": "départ",
+      "restantes": 39712
+    },
+    {
+      "at": "2026-10-10T19:52:29.419Z",
+      "etape": "INIT",
+      "restantes": 39712
+    },
+    {
+      "at": "2026-10-10T19:52:33.900Z",
+      "etape": "CLASSIFY",
+      "restantes": 39712
+    },
+    {
+      "at": "2026-10-10T19:52:38.713Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 39712
+    },
+    {
+      "at": "2026-10-10T19:52:38.724Z",
+      "etape": "RESEARCH",
+      "restantes": 39712
+    },
+    {
+      "at": "2026-10-10T19:52:57.396Z",
+      "etape": "BLOCKED",
+      "restantes": 39691
+    },
+    {
+      "at": "2026-10-10T19:52:57.406Z",
+      "etape": "RESEARCH",
+      "restantes": 39691
+    },
+    {
+      "at": "2026-10-10T19:55:04.794Z",
+      "etape": "ROUTE",
+      "restantes": 39691
+    },
+    {
+      "at": "2026-10-10T19:55:04.808Z",
+      "etape": "DESIGN",
+      "restantes": 39691
+    },
+    {
+      "at": "2026-10-10T19:56:54.236Z",
+      "etape": "BLOCKED",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T19:56:54.256Z",
+      "etape": "DESIGN",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T19:57:00.725Z",
+      "etape": "BLOCKED",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T19:57:00.744Z",
+      "etape": "DESIGN",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T19:57:04.953Z",
+      "etape": "BLOCKED",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T19:57:04.971Z",
+      "etape": "DESIGN",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T20:00:02.539Z",
+      "etape": "REVIEW",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T20:01:06.106Z",
+      "etape": "RATIFICATION",
+      "restantes": 39630
+    },
+    {
+      "at": "2026-10-10T20:01:06.532Z",
+      "etape": "DISTILL",
+      "restantes": 39541
+    },
+    {
+      "at": "2026-10-10T20:04:08.842Z",
+      "etape": "REVIEW",
+      "restantes": 39541
+    },
+    {
+      "at": "2026-10-10T20:05:05.890Z",
+      "etape": "DELIVER",
+      "restantes": 39541
+    },
+    {
+      "at": "2026-10-10T20:09:24.227Z",
+      "etape": "REVIEW",
+      "restantes": 39433
+    },
+    {
+      "at": "2026-10-10T20:10:21.928Z",
+      "etape": "DONE",
+      "restantes": 39433
+    },
+    {
+      "at": "2026-10-10T20:10:25.421Z",
+      "etape": "fin",
+      "restantes": 39433
+    }
+  ],
+  "brancheRun": "tests/us-2/workflow-2",
+  "etatFinal": {
+    "fin": {
+      "statut": "fini",
+      "valeur": {
+        "ref": "sha256:6f22afd5873352641c2f37474dd91e9988a92a78b01f2327d1078de315182575"
+      }
+    },
+    "phase": "DONE"
+  }
+}

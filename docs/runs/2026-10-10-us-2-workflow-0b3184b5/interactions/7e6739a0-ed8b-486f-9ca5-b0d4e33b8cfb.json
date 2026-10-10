@@ -1,0 +1,42 @@
+{
+  "id": "7e6739a0-ed8b-486f-9ca5-b0d4e33b8cfb",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "Le barème sera fourni par l'appelant à chaque chiffrage. Il reste deux règles à préciser avant de finaliser les contrats : (1) La remise doit-elle être déduite de Facture.ATPayer dès US-2, ou cette modification est-elle reportée à US-4 ? ATPayer ignore actuellement la remise (src/Tarification.Application/CalculDuPanier.cs:10-12), et US-2 ne précise que les montants de remise (stories/US-2.md:7-11). (2) Quelles configurations sont valides, et comment rejeter les invalides : seuil ≤ 0, taux hors [0,100] %, seuils dupliqués ? Les critères ne fixent pas ces règles (stories/US-2.md:7-11). Merci de répondre aux deux points.",
+  "options": [
+    {
+      "id": "100:ATPayer : déduire la remise dès US-2.",
+      "label": "ATPayer : déduire la remise dès US-2."
+    },
+    {
+      "id": "100:ATPayer : conserver le comportement actuel dans US-2 ; déduction reportée à US-4.",
+      "label": "ATPayer : conserver le comportement actuel dans US-2 ; déduction reportée à US-4."
+    },
+    {
+      "id": "100:Validation : rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %.",
+      "label": "Validation : rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %."
+    },
+    {
+      "id": "100:Validation : rejeter explicitement seuils ≤ 0 et taux hors [0,100] %, autoriser les seuils dupliqués et retenir la meilleure remise.",
+      "label": "Validation : rejeter explicitement seuils ≤ 0 et taux hors [0,100] %, autoriser les seuils dupliqués et retenir la meilleure remise."
+    },
+    {
+      "id": "100:Validation : autre politique, à préciser.",
+      "label": "Validation : autre politique, à préciser."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:57:00.729Z",
+  "status": "answered",
+  "answer": {
+    "option": "100:ATPayer : déduire la remise dès US-2.",
+    "answeredAt": "2026-10-10T19:57:00.734Z"
+  }
+}

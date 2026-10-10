@@ -5,16 +5,475 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Publication des corrections et de la campagne comparative
+
+À la demande utilisateur, publication sur `feat/workflow-rejouable` des corrections
+d'environnement et d'authentification, du regel DISTILL, du précontrôle et de la
+couverture du diff, puis du banc et des rapports archivés. Aucun changement de main.
+Avant publication : typage et contrôle des diffs verts ; 1 279 tests verts et neuf
+sautés sur les neuf projets concernés. Deux échecs sous exécution concurrente
+(délai du clonage Workspace et observation running/waiting de DESIGN) :
+rejeu des deux fichiers avec un seul worker, 12/12 verts. Pas de modification
+de tests pour masquer ces échecs ; leur sensibilité à la concurrence reste à surveiller.
+Branches des essais réussis déjà vérifiées sur GitHub : workflow-1 b7b6928,
+workflow-2 69a9c8a et extension-2 59f2454 dans exemple-dotnet-tdd.
+
+---
+
+## 10/10 — Productions finales à modèles fixés comparées
+
+Analyse du workflow 0b3184b5 contre extension c4433175, code/tests et documents :
+§6 de `docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md`.
+Même calcul sur les cinq exemples ; workflow : 19 exemples acceptance, somme
+de deux remises positives couverte et invalides dès DISTILL ; extension :
+test d'immuabilité et gardes nulles plus explicites. Workflow copie correctement
+son barème mais ne teste pas la mutation source exigée par sa matrice DESIGN.
+Extension additionne correctement mais ne teste toujours pas deux remises positives.
+Taux zéro reste autorisé seulement côté workflow, par choix automatique du banc.
+Les revues finales approuvent sans signaler ces trous respectifs. Aucun changement
+de code ni de livrable d'essai ; pas de nouveau run.
+
+---
+
+## 10/10 — Workflow à modèles verrouillés terminé DONE
+
+À la demande utilisateur, mêmes modèles par rôle que l'extension c4433175 :
+classifieur gpt-6-luna, modélisation claude-sonnet-5.5, autres gpt-6.1-sol.
+Exception explicitement choisie : cold-reader fixé à gpt-6.1-sol, alors que le
+run extension avait aussi utilisé mai-code-1.1-flash. Le banc accepte désormais
+`--modeles-roles`, refuse les rôles non configurés et annule au modèle effectif
+différent signalé par usage. Association conservée dans le résumé.
+35 tests banc verts et typage vert ; test livraison ajusté pour exactOptionalPropertyTypes.
+
+Run `0b3184b5-d4af-4a9a-8c97-101af6d61ecf`, copie mesure-skraft-pzsXn3 :
+**fini / DONE**, 17m58, 29 tours, 111 appels, 335,4 requêtes équivalentes SDK,
+un rejet RESEARCH (sections manquantes), aucun silence. Plafond 600 non atteint.
+Tous les événements usage ont été comparés aux modèles demandés : aucun écart.
+Branche workflow-2 à `69a9c8a9b0cc40c1d1464a8251b6dcb0078354ea`, arbre propre,
+main inchangé a7cf6db. Vérification indépendante : 24/24 tests verts, zéro ignoré.
+Rapport, trace, preuves et interactions archivés sous
+`docs/runs/2026-10-10-us-2-workflow-0b3184b5/`.
+Comparaison distincte `docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md`.
+
+Cette fois le workflow a demandé en DESIGN provenance du barème, déduction dans
+ATPayer et validation des configurations. Le répondeur a encore choisi la première
+option non configurée : taux [0,100] avec zéro autorisé, contre ]0,100] dans
+l'extension. Les modèles verrouillés n'ont donc pas rendu les contrats identiques.
+Ne pas attribuer causalement la différence de questions au modèle seul.
+Aucun run actif ni nouveau lancement automatique.
+
+---
+
+## 10/10 — Documents US-2 comparés aux deux livraisons
+
+Lecture complète RESEARCH/DESIGN/DISTILL et revues des runs livrés c4433175 et
+cffee616, puis tests concernés. Analyse conservée en §6 de
+`docs/runs/2026-10-10-comparaison-us-2-extension-600.md`. Aucun artefact de run modifié.
+Les cinq critères sont présents dans les deux ; contrats différents hors exemples :
+extension valide taux ]0,100] et doublons, workflow les exclut faute de décision.
+Les clarifications dites « utilisateur » extension sont des choix du répondeur
+automatique (blocages sans règle = premier choix), pas une intervention humaine.
+
+Faiblessse concrète : aucun test extension de deux remises positives à additionner,
+alors que le workflow en ajoute un après sa revue. Code extension additionne bien,
+mais ses exemples ne protègent pas contre la conservation de la dernière remise.
+Le meilleur palier inversé est aussi manqué par sa revue DISTILL puis récupéré
+en DELIVER. Invariants et immuabilité du plan extension réalisés seulement après
+refus de revue finale. Docs DESIGN parfois laissés en état intermédiaire après
+fermeture des contrats. Aucun correctif de code demandé ni réalisé dans cette analyse.
+
+---
+
+## 10/10 — Extension à plafond 600 terminée DONE
+
+Run `c4433175` livré en **17m35**, 35 tours, 128 appels, 232,2 requêtes
+équivalentes SDK, 4 rejets ; plafond 600 non atteint, consommation même inférieure
+à 350. Réserve 40032 → 39856 (écart 176, relevé retardé). Branche extension-2
+à `59f2454eb5388619da67fd1a8d4e4813e6bba8fc`, arbre propre ; main inchangé a7cf6db.
+Vérification indépendante `dotnet test` : **21/21**, zéro ignoré ; ac-1 à ac-5 présents.
+Rapport, résumé, trace, preuves et interactions archivés sous
+`docs/runs/2026-10-10-us-2-extension-c4433175/`.
+
+Comparaison distincte `docs/runs/2026-10-10-comparaison-us-2-extension-600.md`,
+sans écraser le couple précédent. Workflow : 55m21 / 264,3 ; extension : 17m35 /
+232,2. Ne pas conclure que relever le budget a provoqué cette amélioration :
+nouveau run, modèles effectifs et choix métier différents ; plafond différent,
+mais aucun des deux runs livrés n'a consommé 350. Aucun silence dans ce run
+extension, contrairement aux deux interruptions du workflow. Revue finale :
+tests et code complétés pour invariants de configuration, copie défensive et
+sélection du meilleur palier. Aucun run actif ; campagne de quatre runs non terminée.
+
+---
+
+## 10/10 — Extension rejouée depuis main, plafond porté à 600
+
+Demande utilisateur : nouveau run complet extension, plafond 600 requêtes
+équivalentes SDK. Réinitialisation de `tests/us-2/extension-2` explicitement
+autorisée, effectuée avec lease sur `8333982` vers `a7cf6db` ; main inchangé.
+L'ancien rapport 521f0098 et sa copie mesure-skraft-LDRZZe sont conservés.
+
+Run **en cours** `c4433175-1600-46f9-98b3-fd407ad00410`, processus
+`us2-extension-600`, copie
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-dSODxp`.
+Commande banc : `--base=main --hote-copilot=byb.ghe.com --plafond-requetes=600`,
+`--pousser --branche-run=tests/us-2/extension-2`. Même répondeur, modèles non
+imposés. Précontrôle franchi avec avertissement non bloquant, CLASSIFY terminé,
+RESEARCH démarré. Réserve initiale 40032/45000.
+Ce run n'a plus le même plafond que le workflow : consigner cet écart dans la
+comparaison, sans remplacer le résultat précédent au plafond 350.
+
+---
+
+## 10/10 — Extension arrêtée au plafond, premier couple mesuré
+
+Run `521f0098-3032-4c26-9846-0f2c530be45b` terminé **ABORTED / DISTILL** :
+plafond de 350 atteint, 352,5 requêtes équivalentes comptabilisées après l'appel
+ayant franchi la limite. Arrêt pendant la revue DISTILL, aucun DELIVER lancé.
+16m48, 22 tours, 99 appels, 3 rejets ; réserve 40421 → 40064, écart 357.
+DESIGN et ses revues ont consommé 297 requêtes équivalentes, dont une correction
+sur l'exception absente du modèle et une demande de marqueur/nom de matrice par
+la lentille. Ce dernier grief paraît lié au format amont : à examiner, pas corrigé
+pendant la mesure.
+
+Branche `tests/us-2/extension-2` à `8333982a9a9f175a2dd5f900da343dd9e1ef4f64` ;
+main vérifié inchangé à `a7cf6db`. Rapport, résumé, trace, preuves et interactions
+archivés dans `docs/runs/2026-10-10-us-2-extension-521f0098/`.
+Premier tableau produit dans `docs/runs/2026-10-10-comparaison-us-2.md`.
+Workflow livré (264,3), extension non livrée au plafond (352,5) : constat de ce
+couple, pas conclusion générale. Les modèles n'étaient pas imposés et leurs
+associations effectives diffèrent ; le répondeur commun choisit par défaut le
+premier choix aux blocages non configurés, donc les précisions métier peuvent
+aussi diverger. Ne pas attribuer tout l'écart au moteur sans ces réserves.
+Aucun run encore actif ni relance automatique.
+
+---
+
+## 10/10 — Indicateur de livraison du banc corrigé avant le run extension
+
+Run extension **en cours** : tâche `521f0098-3032-4c26-9846-0f2c530be45b`,
+processus `us2-extension-2`, copie isolée
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-LDRZZe`.
+Précontrôle franchi avec avertissement non bloquant de couverture, classification
+confirmée « assez difficile », RESEARCH démarré. Réserve initiale 40421/45000 ;
+plafond 350 requêtes équivalentes SDK. Même répondeur que cffee616, modèles laissés
+au runtime comme pour le workflow. Base et branche distante vérifiées à `a7cf6db`.
+Commande : banc sans `--workflow`, `--base=main --hote-copilot=byb.ghe.com`,
+`--plafond-requetes=350 --pousser --branche-run=tests/us-2/extension-2`.
+À la fin : archiver le rapport et vérifier le livrable avant comparaison.
+
+Accord utilisateur pour le run extension suivant sur la branche libre
+`tests/us-2/extension-2`, depuis main `a7cf6db`, sans réinitialiser extension-1.
+Préparation : `workflowLivre` réutilise `relire` du moteur pour lire résultats en
+clair ou référencés ; contenu absent = erreur explicite. TDD, 32 tests banc verts,
+dont 4 nouveaux ; résultat réel cffee616 relu et confirmé livré. `resume.json`
+corrigé à `livre: true` avec annotation de l'ancienne valeur et de la méthode,
+rapport mis à jour, trace et preuves inchangées. Le défaut de mesure est résolu.
+
+---
+
+## 10/10 — Mesure workflow terminée : DONE, livrable vert
+
+Run `cffee616-6ba6-4a79-b64a-df8e13c264ed` terminé **fini / DONE** en 55m21 :
+35 tours, 185 appels, 264,3 requêtes équivalentes SDK, 5 rejets. Écart de réserve
+annoncé : 301 (40773 → 40472), non convertible en crédits à taux fixe.
+Branche `tests/us-2/workflow-1` poussée à
+`b7b6928e85d362968462ddd6f9131c4ff30f5367`, arbre propre ; `main` vérifié inchangé
+à `a7cf6db`. Vérification indépendante : `dotnet test Tarification.sln --no-restore`
+vert, 13 tests, zéro ignoré ; les cinq critères ont leurs acceptances.
+Rapport, résumé, trace, preuves et interactions archivés dans
+`docs/runs/2026-10-10-us-2-workflow-cffee616/`.
+
+Rejets : citations hors plages, revue DISTILL sur le meilleur palier, deux silences
+de 300 s en DELIVER (pas test puis dev ac-2), revue finale avec corrections ciblées.
+La correction de DISTILL a franchi le gel puis DELIVER ; la dette historique de
+couverture n'a pas bloqué. Ne pas confondre livraison et absence de défaut métier :
+la revue finale a notamment demandé un test de somme des remises sur deux références.
+
+**Défaut du banc à traiter avant le tableau comparatif** : `resume.json` indique
+`livre: false` malgré DONE. Le résultat workflow persisté est une référence
+`fin.valeur.ref`, tandis que le banc cherche directement `fin.valeur.clair.phases`.
+Le rapport brut est conservé, sans falsifier l'indicateur. La campagne complète reste
+non validée ; aucun nouveau run extension lancé automatiquement après cette fin.
+
+---
+
+## 10/10 — Nouvelle mesure lancée, workflow en premier
+
+À la demande de l'utilisateur, lancement complet du workflow skraft depuis `main`
+`a7cf6db058fc74fb6b3a72d469ccda5acf06177b`, après les correctifs ADR 0059 et 0060.
+Tâche `cffee616-6ba6-4a79-b64a-df8e13c264ed`, processus de session
+`us2-workflow-1`, copie isolée
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-8aTs4u`.
+Commande : banc `scripts/mesure-skraft.ts`, `--workflow --base=main`,
+`--hote-copilot=byb.ghe.com --plafond-requetes=350 --pousser`,
+`--branche-run=tests/us-2/workflow-1`. .NET 10.0.400, répondeur commun inchangé,
+aucune association de modèles imposée. Réserve annoncée par le banc : 40773/45000.
+
+Précontrôle franchi : avertissement non bloquant sur la couverture existante,
+classifieur terminé puis RESEARCH démarré. Première poussée `7d1272b` sur la branche
+workflow dédiée ; `main` et les résultats extension précédents sont conservés.
+**Run en cours, aucun résultat de livraison encore acquis.** Le workflow est désormais
+le premier run de cette nouvelle séquence ; ne pas lancer l'extension en parallèle.
+À la fin, lire le rapport automatiquement produit et consigner l'issue réelle avant
+de poursuivre la comparaison.
+
+---
+
+## 10/10 — Couverture du code modifié, dette existante notifiée
+
+Décision utilisateur implémentée dans les deux versions (ADR 0060). Avant le premier
+agent, les tests existants sont exécutés par le code (`INIT_BASELINE`) : rouge,
+ignoré, délai ou sortie en erreur bloquent. Couverture historique insuffisante :
+notification non bloquante dans le chat, avec les seuils par couche inchangés.
+
+Le Workspace ajoute les numéros des lignes modifiées au diff, y compris pour les
+fichiers non suivis ; le lecteur Cobertura garde les lignes exécutables et leur état.
+Les portes croisent ces deux ensembles. Les propriétés historiques ATPayer et Lignes
+ne bloquent plus un ajout couvert si elles restent inchangées. Si une ligne modifiée
+est non couverte, le rejet donne son numéro. Rapport/détail absent : « non mesurée »,
+pas de substitution par le taux global ni de conformité fictive.
+
+Checkpoint qualité initial persisté avant les agents ; contrôle de scénario local,
+puis contrôle final de toute la tâche (sources DESIGN/DISTILL incluses). Les anciens
+états sans cette référence gardent un contrôle depuis DELIVER avec note de limitation.
+Une nouvelle tâche sur les tests d'acceptance déjà rouges du run abandonné sera
+bloquée : `--depuis` n'est pas une reprise de l'état persisté. Ne pas relancer ce
+dépôt en prétendant reprendre automatiquement la tâche précédente.
+
+Vérifié : suites ext-skraft + workflow-skraft, 659 tests verts, 4 Swift sautés ;
+workspace/stack-adapters/extension-api/workflow : 370 verts au premier passage,
+5 Swift sautés et un échec de configuration Git préexistant, puis les 11 tests sync
+verts isolément. Typage vert. Précontrôles et couverture du diff testés via les
+deux hôtes isolés, livraison avec dette inchangée et refus sur ligne modifiée non couverte.
+Aucun appel LLM réel ; pas de nouvelle campagne ni modification des rapports archivés.
+
+Pièges : S4 n'avait aucun test à l'initialisation, Vitest rendait code 1 « aucun test » ;
+les fixtures jumeaux incluent désormais un test du comportement existant.
+`safe.bareRepository=explicit` empêche le test sync de lire son faux distant :
+autorisation limitée au processus de validation par `GIT_CONFIG_COUNT=1`,
+`GIT_CONFIG_KEY_0=safe.bareRepository`, `GIT_CONFIG_VALUE_0=all`, aucune modification
+de la configuration utilisateur. Sous la charge des E2E parallèles, délai de 5 s
+dépassé sur sync ; rejoué seul avec `--testTimeout=30000`, vert.
+
+Prochaine étape : choisir une base verte pour une nouvelle mesure réelle, ou traiter
+explicitement la reprise de la tâche abandonnée ; ne pas abaisser les seuils.
+
+---
+
+## 10/10 — Essai de reprise terminé : gel franchi, couverture insuffisante
+
+À la demande de l'utilisateur, nouveau run extension lancé depuis l'état conservé `a845e0f`
+du premier run, avec `--base=skraft/us-2 --depuis=DISTILL`, plafond 350 et hôte `byb.ghe.com`.
+Tâche `eda055a6-f20d-4a10-a316-a3bc08688565`, copie
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-zTVyQi`.
+Run terminé **ABORTED / DELIVER**, rapport dans
+`docs/runs/2026-10-10-us-2-extension-eda055a6/`. DISTILL et sa revue sont approuvés,
+DELIVER démarre réellement : aucune erreur d'empreinte. Le correctif du gel est donc
+franchi sur l'exemple réel, sans démontrer une correction de revue dans ce nouveau run.
+
+Blocage suivant, porte de fin du scénario ac-2 : couverture de `CalculDuPanier.cs`
+à 75 % (3/4 lignes) et de `Panier.cs` à 87,5 % (7/8), minimum exigé 90 %.
+Deux reprises automatiques retrouvent les mêmes motifs, puis le répondeur abandonne.
+Mesures de la trace : 11m43, 32 tours, 113 appels, 113,6 requêtes équivalentes SDK,
+9 rejets. Aucun dépassement du plafond, aucune poussée GitHub.
+
+C'est une reprise par phase du banc, dans une nouvelle tâche, pas la réouverture de la tâche
+ABORTED ni un test de reprise après crash. RESEARCH et DESIGN ne sont pas rejoués ; leurs
+livrables restent présents sur disque mais ne sont pas renseignés dans `phasesCompleted`.
+DISTILL doit revalider l'ensemble actuel avant DELIVER. Aucun fichier initial modifié,
+aucune poussée GitHub demandée ; la copie et les rapports conserveront les résultats.
+Cet essai part d'une base avancée : ne pas le compter comme run complet comparable.
+Prochaine étape : examiner pourquoi les corrections de scénario ne comblent pas la couverture
+requise ; ne pas abaisser silencieusement la barre de qualité ni relancer à l'identique.
+
+---
+
+## 10/10 — Gel de DISTILL corrigé dans l'extension et le workflow
+
+Cause du run `63e98c3d` identifiée : le premier passage des portes enregistrait l'empreinte,
+puis un refus de revue autorisait une correction sans invalider cette référence. Le test ajouté
+par `skraft-acceptance` était approuvé mais absent de l'empreinte reprise par DELIVER.
+
+ADR 0059 : refus ou interruption de DISTILL = empreinte et non-régressions invalidées avant
+correction ; portes rejouées sur l'ensemble corrigé, nouvelle empreinte conservée après
+approbation. Même correctif dans le réducteur et le workflow indépendant, avec invalidation
+après rembobinage. Un refus en DELIVER ne lève pas le gel.
+
+Vérifié : 230 tests ciblés verts (réducteur, S4 jumeaux, portes DISTILL et DELIVER), typage
+du monorepo et `git diff --check`. Les deux scénarios S4 atteignent le premier agent DELIVER
+après ajout d'un fichier demandé en revue. Les tests purs couvrent délai, panne, rejet définitif
+et budget épuisé. Aucun appel Copilot.
+
+Pièges de validation : les défauts simulés doivent renseigner `target: "test"` ; sinon la revue
+échoue sur son schéma, pas sur le gel. Sur macOS, lancer ces tests avec un `TMPDIR` canonique
+(`TMPDIR="$(cd "$TMPDIR" && pwd -P)"`) : le compilateur workflow voit `/private/var/…`,
+et rejette les imports si le dossier déclaré reste son alias `/var/…`. Défaut de chemins
+préexistant, non corrigé ici.
+
+Prochaine étape : reprendre la campagne après décision sur la branche extension-1 déjà
+modifiée. Le run échoué reste archivé, aucun nouveau run réel lancé et aucune branche
+réinitialisée. Les résultats de campagne restent incomplets.
+
+---
+
+## 10/10 — Run 1 extension terminé : abandon à l'entrée de DELIVER
+
+Run `63e98c3d-fdc4-4059-9e65-3dc3b9d40d75`, rapport archivé dans
+`docs/runs/2026-10-10-us-2-extension-63e98c3d/`. RESEARCH, DESIGN et DISTILL ont été
+validés après corrections ; aucun agent DELIVER n'a démarré. À son entrée, la vérification
+du gel échoue : « Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés ».
+Le répondeur a relancé deux fois, puis abandonné devant la même escalade. Le processus sort
+avec succès car il a produit le rapport, mais la tâche est **ABORTED / DELIVER**, non livrée.
+
+Mesures de la trace : 13m59, 26 tours, 96 appels, 196,8 requêtes équivalentes SDK sur
+350, 4 rejets, 3 660 717 tokens d'entrée. Le résumé console initial ne compte que certains
+tours : utiliser le rapport issu de la trace. La réserve est mise à jour avec retard.
+Branche `tests/us-2/extension-1` poussée à `a845e0f` ; `main` reste à `a7cf6db`
+(refs distantes vérifiées après le run).
+
+Écart d'empreinte diagnostiqué et corrigé depuis (ADR 0059, entrée ci-dessus).
+Conserver ce run comme preuve d'échec.
+Ne pas redémarrer un run complet sur extension-1 : sa branche n'est plus au SHA initial et
+le banc le refusera. Aucun run workflow n'a encore été lancé.
+
+---
+
+## 10/10 — Connexion confirmée et première réponse Copilot GHE
+
+L'utilisateur confirme que la connexion depuis l'interface fonctionne après le correctif du
+code gh. À sa demande, vérification réelle avec le jeton actuel lu par
+`gh auth token --hostname byb.ghe.com` et le client corrigé : 23 modèles accessibles, puis
+un seul prompt minimal sans outils ni lecture de fichiers. Réponse exacte : `COPILOT_OK`.
+Session fermée et supprimée ; aucun jeton affiché ou enregistré. Ce contrôle a envoyé une
+inférence réelle, contrairement aux précontrôles précédents. La campagne US-2 reste à lancer.
+
+---
+
+## 10/10 — Connexion dans l'interface : code gh non reconnu et mauvaise page
+
+Le précontrôle SDK précédent utilisait une connexion gh déjà enregistrée ; il ne vérifiait
+pas le parcours de connexion depuis l'interface. L'utilisateur a signalé l'absence de code
+et de navigateur, puis le délai expiré.
+
+Cause observée sur gh 2.101 sans terminal : `One-time code (…) copied to clipboard`,
+pas l'ancien `one-time code: …`. Le lecteur reconnaît maintenant les deux formats et
+n'envoie Entrée que si l'invite le demande. L'interface ouvre explicitement la page à
+réception du code et affiche aussi son adresse pour une ouverture manuelle. Le canal de
+réouverture ne vise plus systématiquement github.com : il conserve l'adresse de la connexion
+Enterprise en cours, avant même sa réussite (ADR 0058).
+
+Vérifié : 103 tests ciblés, typage, build et 2 essais Electron réussis. Les tests d'interface
+couvrent aussi l'échec du navigateur : code conservé, adresse visible, erreur explicite.
+Aucun prompt Copilot. Reste à confirmer la connexion OAuth réelle dans le navigateur par
+l'utilisateur après arrêt et relance de l'application dev ; le code de la tentative expirée
+ne doit pas être réutilisé.
+
+---
+
+## 10/10 — Authentification Copilot Enterprise Cloud résolue
+
+Le blocage décrit plus bas était un défaut de câblage, pas un défaut d'activation côté
+administrateur. `byb.ghe.com` utilise Enterprise Cloud avec résidence des données ; le mode
+GHES offline ajouté au premier essai était inadapté. Le SDK accepte le jeton OAuth existant de
+`gh` lorsqu'on lui transmet également `env.GH_HOST=byb.ghe.com` (ADR 0057).
+
+Le client associe désormais jeton et hôte, sans variables GHES offline. Le banc, l'essai
+Copilot et l'application utilisent ce chemin. Le contrôleur transmet l'hôte courant, pas
+seulement celui lu au lancement : une connexion Enterprise faite dans l'interface est prise
+en compte au prochain démarrage du runtime.
+
+Vérifié avec le client corrigé et le SDK 1.0.14 : **23 modèles accessibles, création de session
+réussie, puis fermeture et suppression**, aucun prompt envoyé. Les 62 tests ciblés, le typage,
+le build et les 2 essais Electron passent. Aucun jeton écrit ni affiché.
+
+Prochaine étape : relancer l'application dev pour prendre le correctif, sélectionner
+`byb.ghe.com` comme hôte de connexion si nécessaire. La campagne US-2 n'a pas été relancée
+pendant cette réparation ; ses quatre runs restent à faire sur les seules branches dédiées.
+
+---
+
+## 10/10 — Build Electron réparé après l'ajout des workflows
+
+Le lancement `pnpm run dev` échouait avec `Unterminated string literal` dans Acorn :
+electron-vite 5 détectait un faux import dans une chaîne du parseur et y insérait son shim
+CommonJS. Acorn est maintenant une dépendance directe d'exécution de `apps/desktop`, donc
+externalisée par la configuration existante. esbuild passe également des dépendances de
+développement à celles d'exécution : le moteur de workflows en a besoin à l'exécution et son
+binaire doit être résolu depuis son paquet, pas depuis le bundle (ADR 0056).
+
+Vérifié : `pnpm build`, `pnpm e2e` (2 essais : démarrage et ouverture d'un projet) et
+`pnpm typecheck` passent, sans requête Copilot. Aucun changement de version des dépendances.
+Le cache pnpm ne contenait pas les métadonnées nécessaires à l'installation hors ligne ;
+l'installation normale a actualisé le verrou sans télécharger de nouveau paquet.
+
+Pour lancer sans pnpm global, depuis ce dépôt :
+`npm exec --yes --package=pnpm@10.34.5 -- pnpm run dev`.
+Le blocage d'authentification GHE de la campagne reste distinct et non résolu.
+
+---
+
+## 10/10 — Premier run US-2 bloqué avant Copilot, hôte conservé
+
+Deux tentatives pour le run 1 (`extension-1`), plafond 350, sans limite murale :
+1. Sans hôte explicite : arrêt avant tâche, aucune session GitHub.com dans `gh`.
+2. Avec `--hote-copilot=byb.ghe.com` : le jeton OAuth est lu et la réserve répond
+   (`41 507 / 45 000`, `token_based_billing: true`), mais le SDK refuse le jeton à la création de
+   session : `No GitHub OAuth token or Copilot HMAC key provided`. Trois reprises d'escalade
+   immédiate, **zéro appel modèle / zéro requête facturée**.
+
+`main` et `tests/us-2/extension-1` sont toujours à `a7cf6db` ; le push final n'a changé aucun
+commit. Le report invalide est archivé sous `docs/runs/2026-10-10-us-2-extension-8fd59623/`.
+Le banc accepte désormais `--hote-copilot=byb.ghe.com` pour auth et réserve, et passe les variables
+`COPILOT_PROVIDER_GHES_HOST`, `COPILOT_PROVIDER_GHES_TOKEN` et `COPILOT_OFFLINE` documentées pour
+Copilot CLI sur GHES. Vérification sans prompt : démarrage du SDK réussi, mais `models.list` répond
+`Not authenticated`. Aucun appel d'inférence envoyé. Ne pas relancer le pipeline : il faut que
+l'administrateur confirme l'activation/configuration Copilot et du fournisseur de modèle sur cet
+hôte, ou que le SDK fournisse une authentification supportée.
+
+---
+
+## 10/10 — Campagne bornée à 350 requêtes, sans limite murale
+
+À la demande du responsable : suppression de la limite de durée du banc, plafond par défaut porté à
+350 requêtes équivalentes SDK (`nanoAiu / 10⁹`), arrêt au plafond. L'ancien argument positionnel
+des minutes est refusé pour éviter de laisser croire qu'il est encore actif. Mis à jour :
+`docs/10-plan-comparaison-skraft-workflow.md`, `features.json`.
+
+Une requête équivalente n'est pas un crédit Copilot : GitHub facture désormais en crédits IA selon
+le modèle et les tokens ; 1 crédit IA = 0,01 USD. Les 350 requêtes ne se convertissent donc pas en
+3 500 crédits. Source officielle : https://docs.github.com/en/billing/concepts/product-billing/github-copilot-billing
+et https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing.
+
+---
+
+## 10/10 — Branches isolées pour les runs de comparaison
+
+Le responsable a demandé que les runs ne puissent pas pousser sur `main`. Le banc exige maintenant
+`--branche-run` avec `--pousser`, et n'accepte que les quatre noms prévus pour US-2. Avant tout
+run, il vérifie que la branche distante existe au même commit de départ ; chaque push utilise un
+lease explicite, qui autorise les rembobinages du pipeline mais refuse une mise à jour concurrente.
+Les quatre branches dédiées ont été créées sur `freecompub/exemple-dotnet-tdd` depuis `a7cf6db` :
+`tests/us-2/extension-1`, `tests/us-2/workflow-1`, `tests/us-2/extension-2`,
+`tests/us-2/workflow-2`. Vérifications : 28 tests du banc et `pnpm typecheck` passent ; deux essais
+CLI confirment que `--pousser` sans branche et `--branche-run=main` sont refusés. Aucun run Copilot
+n'a été lancé.
+
+---
+
 ## 10/10 — Campagne US-2 prête, pas lancée
 
 **État.** Tout le banc est écrit (P1 à P6 de `docs/10`) ; aucun run n'a tourné.
 
-**Vérifié avant de lancer.**
-- .NET 10.0.401 est dans `~/.dotnet`, **pas dans le PATH** du shell : sans
-  `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`, `dotnet test` n'existe pas et la suite de
-  référence échouerait comme une panne d'environnement.
-- Projet d'essai `exemple-dotnet-tdd` propre, commit `a7cf6db`, suite verte (5 tests) ;
-  `gh` connecté (compte `freecompub`), distant `github.com/freecompub/exemple-dotnet-tdd`.
+**Vérifié le 10/10 dans cet environnement.**
+- Dépôt fourni par le responsable : `https://github.com/freecompub/exemple-dotnet-tdd`. `git
+  ls-remote` fonctionne ; `gh repo view` ne résout pas ce dépôt, mais ce n'est pas nécessaire au
+  clonage.
+- Clone local : `/tmp/agentstudio-exemple-dotnet-tdd`, branche `main`, commit `a7cf6db` (même
+  référence que le plan), arbre propre avant les tests.
+- Avec `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`, `dotnet test Tarification.sln`
+  passe : 5 réussis, 0 échec.
+- Le chemin d'essai Linux du plan (`/home/diabeo/Projets/...`) n'existe pas sur cette machine ;
+  employer le clone local ci-dessus pour les prochains lancements.
 
 **Piège.** Le lancement par l'agent est refusé par le mode automatique de Claude Code (requêtes
 Copilot payantes et poussée GitHub). L'utilisateur lance lui-même, ou ajoute une règle de
@@ -24,12 +483,14 @@ permission Bash pour `pnpm tsx scripts/mesure-skraft.ts`.
 simulé. Le premier run réel sert aussi de vérification du banc ; si le rapport final plante, la
 trace JSONL reste et le résumé peut être recalculé.
 
-**Prochaine étape** — quatre runs en alternance, au plus 250 requêtes chacun :
+**Prochaine étape** — quatre runs en alternance, au plus 350 requêtes équivalentes SDK chacun,
+sans limite de durée :
 
 ```
 PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet pnpm tsx scripts/mesure-skraft.ts \
-  /home/diabeo/Projets/exemple-dotnet-tdd stories/US-2.md 45 --pousser            # runs 1 et 3
-# … même commande avec --workflow                                                 # runs 2 et 4
+  /tmp/agentstudio-exemple-dotnet-tdd stories/US-2.md --pousser \
+  --branche-run=tests/us-2/extension-1                                           # run 1
+# même commande avec --workflow et la branche dédiée                             # runs 2 et 4
 tsx scripts/banc/comparer.ts docs/runs/<run1> docs/runs/<run2> …                   # rapport
 ```
 
@@ -78,7 +539,7 @@ complète : 1 711 tests.
   Incompatible avec `--depuis`.
 - Répondeur commun pour **les deux modes** (`scripts/banc/repondeur.ts`, `--reponses=`, défaut
   `docs/runs/reponses-us-2.json`) : les questions ouvertes reçoivent enfin leur texte.
-- `--plafond-requetes=N` (250 par défaut), compté sur la trace par le SDK ; l'arrêt est dit dans
+- `--plafond-requetes=N` (350 par défaut), compté sur la trace par le SDK ; l'arrêt est dit dans
   le rapport. Rapport et `resume.json` : mode, arrêt, état final propre à chaque mode ; dossier
   `docs/runs/<date>-<story>-<extension|workflow>-<id>/`.
 - Le workflow n'a pas d'événement `COMMITTED` : le banc pousse (`--pousser`) dès que HEAD bouge.

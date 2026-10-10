@@ -1,0 +1,30 @@
+{
+  "id": "9056124f-0445-4856-af36-11498ab8d607",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question de l'agent (RESEARCH)",
+  "detail": "La story laisse explicitement ouverte la portée des paliers (stories/US-2.md:13-14). Sont-ils communs à toutes les références ou configurés par référence ? Cette règle est nécessaire pour évaluer les approches de configuration et de calcul sans inventer une décision métier.",
+  "options": [
+    {
+      "id": "27:Les mêmes paliers s'appliquent à toutes les références.",
+      "label": "Les mêmes paliers s'appliquent à toutes les références."
+    },
+    {
+      "id": "27:Chaque référence possède ses propres paliers ; une référence sans palier configuré ne reçoit aucune remise.",
+      "label": "Chaque référence possède ses propres paliers ; une référence sans palier configuré ne reçoit aucune remise."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:52:57.399Z",
+  "status": "answered",
+  "answer": {
+    "option": "27:Les mêmes paliers s'appliquent à toutes les références.",
+    "answeredAt": "2026-10-10T19:52:57.402Z"
+  }
+}

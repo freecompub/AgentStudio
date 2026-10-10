@@ -1,0 +1,30 @@
+{
+  "id": "d2e7d29c-503f-4f5d-9370-c07753c3aada",
+  "taskId": "cffee616-6ba6-4a79-b64a-df8e13c264ed",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question de l'agent (RESEARCH)",
+  "detail": "Quelle est la portée métier des paliers de quantité : sont-ils communs à toutes les références, ou configurés par référence ?",
+  "options": [
+    {
+      "id": "27:Paliers communs à toutes les références",
+      "label": "Paliers communs à toutes les références"
+    },
+    {
+      "id": "27:Paliers configurés par référence",
+      "label": "Paliers configurés par référence"
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T15:05:47.176Z",
+  "status": "answered",
+  "answer": {
+    "option": "27:Paliers communs à toutes les références",
+    "answeredAt": "2026-10-10T15:05:47.180Z"
+  }
+}

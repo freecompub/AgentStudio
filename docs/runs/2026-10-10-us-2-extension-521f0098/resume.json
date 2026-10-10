@@ -1,0 +1,904 @@
+{
+  "mode": "extension skraft",
+  "livre": false,
+  "arret": "plafond de 350 requêtes premium atteint (352.5 comptabilisées)",
+  "resume": {
+    "etapes": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T18:45:49.205Z",
+        "duréeMs": 2,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4717,
+        "codeMs": 4717,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T18:45:49.207Z",
+        "duréeMs": 12319,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 3,
+        "entrée": 45553,
+        "sortie": 358,
+        "nanoAiu": 216570600,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 11813,
+        "effetsMs": 12314,
+        "codeMs": 501,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T18:46:01.526Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T18:46:01.539Z",
+        "duréeMs": 28267,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 74477,
+        "sortie": 1453,
+        "nanoAiu": 6944157000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 27972,
+        "effetsMs": 28130,
+        "codeMs": 158,
+        "moteurMs": 1
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T18:46:29.806Z",
+        "duréeMs": 9,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T18:46:29.815Z",
+        "duréeMs": 136213,
+        "tours": 2,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-55` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:1-55` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-55` : plage hors du fichier, qui compte 50 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 311248,
+        "sortie": 8305,
+        "nanoAiu": 18530253000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 135589,
+        "effetsMs": 135837,
+        "codeMs": 248,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T18:48:46.028Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T18:48:46.035Z",
+        "duréeMs": 32844,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 102272,
+        "sortie": 1716,
+        "nanoAiu": 9352764000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 32606,
+        "effetsMs": 32728,
+        "codeMs": 122,
+        "moteurMs": 0
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T18:49:18.879Z",
+        "duréeMs": 8,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T18:49:18.887Z",
+        "duréeMs": 522208,
+        "tours": 4,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "cohérence",
+            "motifs": [
+              "`ArgumentOutOfRangeException` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 34,
+        "entrée": 2365263,
+        "sortie": 46864,
+        "nanoAiu": 194780862000,
+        "modèles": [
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 520989,
+        "effetsMs": 521594,
+        "codeMs": 605,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T18:58:01.095Z",
+        "duréeMs": 40101,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 357070,
+        "sortie": 6918,
+        "nanoAiu": 23483669400,
+        "modèles": [
+          "gpt-6.1-sol",
+          "mai-code-1.1-flash"
+        ],
+        "agentsMs": 100417,
+        "effetsMs": 39977,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T18:58:41.196Z",
+        "duréeMs": 80152,
+        "tours": 2,
+        "essaisMax": 2,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, blocker, deliverable] La matrice de cohérence ne respecte pas le gate G10 de la revue d’architecture : elle n’expose pas la ligne de validation attendue `consistency-gate: PASS` et son nom ne suit pas le format attendu `consistency-matrix-{story}.md`. Sans cette preuve explicite, le design n’a pas de trace de cohérence formelle pour US-2, ce qui invalide la phase DESIGN. (.skraft/us-2/design/consistency-matrix.md)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 1290068,
+        "sortie": 5893,
+        "nanoAiu": 50647950000,
+        "modèles": [
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 79572,
+        "effetsMs": 79866,
+        "codeMs": 294,
+        "moteurMs": 1
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T19:00:01.348Z",
+        "duréeMs": 15023,
+        "tours": 3,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 6,
+        "entrée": 247055,
+        "sortie": 1426,
+        "nanoAiu": 18719397000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 31038,
+        "effetsMs": 14906,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T19:00:16.371Z",
+        "duréeMs": 242,
+        "tours": 0,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 79,
+        "codeMs": 79,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T19:00:16.613Z",
+        "duréeMs": 122174,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 276353,
+        "sortie": 7242,
+        "nanoAiu": 20109888000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 119293,
+        "effetsMs": 122057,
+        "codeMs": 2764,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T19:02:18.787Z",
+        "duréeMs": 10356,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          },
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          },
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          }
+        ],
+        "appels": 6,
+        "entrée": 255369,
+        "sortie": 1925,
+        "nanoAiu": 9699363000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 39481,
+        "effetsMs": 10236,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T19:02:29.143Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T18:45:49.205Z",
+        "duréeMs": 2,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4717,
+        "codeMs": 4717,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T18:45:49.207Z",
+        "duréeMs": 12319,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 3,
+        "entrée": 45553,
+        "sortie": 358,
+        "nanoAiu": 216570600,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 11813,
+        "effetsMs": 12314,
+        "codeMs": 501,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T18:46:01.526Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T18:46:01.539Z",
+        "duréeMs": 164480,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-55` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:1-55` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-55` : plage hors du fichier, qui compte 50 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 385725,
+        "sortie": 9758,
+        "nanoAiu": 25474410000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 163561,
+        "effetsMs": 163967,
+        "codeMs": 406,
+        "moteurMs": 1
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T18:46:29.806Z",
+        "duréeMs": 17,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 5,
+        "codeMs": 5,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T18:48:46.028Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T18:48:46.035Z",
+        "duréeMs": 635446,
+        "tours": 7,
+        "essaisMax": 2,
+        "rejets": [
+          {
+            "porte": "cohérence",
+            "motifs": [
+              "`ArgumentOutOfRangeException` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+            ]
+          },
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, blocker, deliverable] La matrice de cohérence ne respecte pas le gate G10 de la revue d’architecture : elle n’expose pas la ligne de validation attendue `consistency-gate: PASS` et son nom ne suit pas le format attendu `consistency-matrix-{story}.md`. Sans cette preuve explicite, le design n’a pas de trace de cohérence formelle pour US-2, ce qui invalide la phase DESIGN. (.skraft/us-2/design/consistency-matrix.md)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 51,
+        "entrée": 3757603,
+        "sortie": 54473,
+        "nanoAiu": 254781576000,
+        "modèles": [
+          "gpt-6.1-sol",
+          "claude-opus-5.5"
+        ],
+        "agentsMs": 633167,
+        "effetsMs": 634267,
+        "codeMs": 1100,
+        "moteurMs": 1
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T18:58:01.095Z",
+        "duréeMs": 65480,
+        "tours": 10,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          },
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          },
+          {
+            "fin": "annulé",
+            "raison": "Annulé"
+          }
+        ],
+        "appels": 25,
+        "entrée": 859494,
+        "sortie": 10269,
+        "nanoAiu": 51902429400,
+        "modèles": [
+          "gpt-6.1-sol",
+          "mai-code-1.1-flash"
+        ],
+        "agentsMs": 170936,
+        "effetsMs": 65119,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T19:00:16.613Z",
+        "duréeMs": 122174,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 276353,
+        "sortie": 7242,
+        "nanoAiu": 20109888000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 119293,
+        "effetsMs": 122057,
+        "codeMs": 2764,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T19:02:29.143Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "total": {
+      "duréeMs": 999938,
+      "tours": 22,
+      "appels": 99,
+      "entrée": 5324728,
+      "sortie": 82100,
+      "nanoAiu": 352484874000,
+      "agentsMs": 1098770,
+      "effetsMs": 1002450,
+      "codeMs": 9497,
+      "moteurMs": 3,
+      "rejets": 3
+    }
+  },
+  "comparable": {
+    "etapes": [
+      {
+        "etape": "PRÉPARATION",
+        "sousEtapes": [],
+        "duréeMs": 2,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 2,
+        "agentsMs": 0,
+        "codeMs": 4717,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DIFFICULTÉ",
+        "sousEtapes": [
+          "classifieur",
+          "confirmation"
+        ],
+        "duréeMs": 12332,
+        "attenteHumaineMs": 4,
+        "horsAttenteMs": 12328,
+        "agentsMs": 11813,
+        "codeMs": 504,
+        "moteurMs": 1,
+        "tours": 1,
+        "appels": 3,
+        "nanoAiu": 216570600,
+        "entrée": 45553,
+        "sortie": 358,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "RESEARCH",
+        "sousEtapes": [
+          "blocage"
+        ],
+        "duréeMs": 164489,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 164486,
+        "agentsMs": 163561,
+        "codeMs": 409,
+        "moteurMs": 1,
+        "tours": 3,
+        "appels": 13,
+        "nanoAiu": 25474410000,
+        "entrée": 385725,
+        "sortie": 9758,
+        "essaisMax": 1,
+        "rejets": 1,
+        "interventions": 1
+      },
+      {
+        "etape": "QUESTIONS",
+        "sousEtapes": [],
+        "duréeMs": 7,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 4,
+        "agentsMs": 0,
+        "codeMs": 1,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "DESIGN",
+        "sousEtapes": [
+          "blocage",
+          "revue"
+        ],
+        "duréeMs": 690578,
+        "attenteHumaineMs": 4,
+        "horsAttenteMs": 690574,
+        "agentsMs": 764622,
+        "codeMs": 1102,
+        "moteurMs": 1,
+        "tours": 13,
+        "appels": 70,
+        "nanoAiu": 296984642400,
+        "entrée": 4361728,
+        "sortie": 62817,
+        "essaisMax": 2,
+        "rejets": 2,
+        "interventions": 1
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 132530,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 132530,
+        "agentsMs": 158774,
+        "codeMs": 2764,
+        "moteurMs": 0,
+        "tours": 5,
+        "appels": 13,
+        "nanoAiu": 29809251000,
+        "entrée": 531722,
+        "sortie": 9167,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "BILAN",
+        "sousEtapes": [
+          "abandon"
+        ],
+        "duréeMs": 0,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 0,
+        "agentsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      }
+    ],
+    "rejeux": [
+      {
+        "etape": "RESEARCH",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "citations",
+        "motifs": [
+          "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-55` : plage hors du fichier, qui compte 50 lignes.",
+          "`tests/Tarification.Tests/CalculDuPanierTests.cs:1-55` : plage hors du fichier, qui compte 50 lignes.",
+          "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-55` : plage hors du fichier, qui compte 50 lignes."
+        ]
+      },
+      {
+        "etape": "DESIGN",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "cohérence",
+        "motifs": [
+          "`ArgumentOutOfRangeException` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+        ]
+      },
+      {
+        "etape": "DESIGN",
+        "essai": 2,
+        "nature": "revue",
+        "porte": "revue",
+        "motifs": [
+          "[cold-reader#1.1, blocker, deliverable] La matrice de cohérence ne respecte pas le gate G10 de la revue d’architecture : elle n’expose pas la ligne de validation attendue `consistency-gate: PASS` et son nom ne suit pas le format attendu `consistency-matrix-{story}.md`. Sans cette preuve explicite, le design n’a pas de trace de cohérence formelle pour US-2, ce qui invalide la phase DESIGN. (.skraft/us-2/design/consistency-matrix.md)",
+          "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+        ]
+      }
+    ],
+    "total": {
+      "duréeMs": 999938,
+      "attenteHumaineMs": 14,
+      "horsAttenteMs": 999924,
+      "agentsMs": 1098770,
+      "codeMs": 9497,
+      "moteurMs": 3,
+      "tours": 22,
+      "appels": 99,
+      "nanoAiu": 352484874000,
+      "entrée": 5324728,
+      "sortie": 82100,
+      "rejets": 3,
+      "interventions": 4
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-10T18:45:44.350Z",
+      "etape": "départ",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:45:49.207Z",
+      "etape": "CLASSIFY",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:46:01.526Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:46:01.539Z",
+      "etape": "RESEARCH",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:46:29.806Z",
+      "etape": "BLOCKED",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:46:29.815Z",
+      "etape": "RESEARCH",
+      "restantes": 40421
+    },
+    {
+      "at": "2026-10-10T18:48:46.028Z",
+      "etape": "ROUTE",
+      "restantes": 40388
+    },
+    {
+      "at": "2026-10-10T18:48:46.035Z",
+      "etape": "DESIGN",
+      "restantes": 40388
+    },
+    {
+      "at": "2026-10-10T18:49:18.879Z",
+      "etape": "BLOCKED",
+      "restantes": 40388
+    },
+    {
+      "at": "2026-10-10T18:49:18.887Z",
+      "etape": "DESIGN",
+      "restantes": 40388
+    },
+    {
+      "at": "2026-10-10T18:58:01.095Z",
+      "etape": "REVIEW",
+      "restantes": 40245
+    },
+    {
+      "at": "2026-10-10T18:58:41.196Z",
+      "etape": "DESIGN",
+      "restantes": 40245
+    },
+    {
+      "at": "2026-10-10T19:00:01.348Z",
+      "etape": "REVIEW",
+      "restantes": 40245
+    },
+    {
+      "at": "2026-10-10T19:00:16.371Z",
+      "etape": "DESIGN",
+      "restantes": 40245
+    },
+    {
+      "at": "2026-10-10T19:00:16.613Z",
+      "etape": "DISTILL",
+      "restantes": 40245
+    },
+    {
+      "at": "2026-10-10T19:02:18.787Z",
+      "etape": "REVIEW",
+      "restantes": 40064
+    },
+    {
+      "at": "2026-10-10T19:02:29.143Z",
+      "etape": "ABORTED",
+      "restantes": 40064
+    },
+    {
+      "at": "2026-10-10T19:02:30.360Z",
+      "etape": "fin",
+      "restantes": 40064
+    }
+  ],
+  "brancheRun": "tests/us-2/extension-2",
+  "etatFinal": {
+    "stage": "ABORTED",
+    "phase": "DISTILL"
+  }
+}

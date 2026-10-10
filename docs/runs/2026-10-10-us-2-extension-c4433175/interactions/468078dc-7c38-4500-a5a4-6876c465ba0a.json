@@ -1,0 +1,28 @@
+{
+  "id": "468078dc-7c38-4500-a5a4-6876c465ba0a",
+  "taskId": "c4433175-1600-46f9-98b3-fd407ad00410",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Difficulté de US-2 : Assez difficile ?",
+  "detail": "La remise par palier de quantité implique une règle métier de tarification avec une question métier encore ouverte, ce qui justifie le niveau proposé.",
+  "options": [
+    {
+      "id": "medium-hard",
+      "label": "Confirmer : Assez difficile"
+    },
+    {
+      "id": "challenging",
+      "label": "Difficile"
+    },
+    {
+      "id": "medium",
+      "label": "Moyenne"
+    }
+  ],
+  "createdAt": "2026-10-10T19:12:31.490Z",
+  "status": "answered",
+  "answer": {
+    "option": "medium-hard",
+    "answeredAt": "2026-10-10T19:12:31.494Z"
+  }
+}
