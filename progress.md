@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Répondeur commun du banc (point 3 avant la comparaison US-2)
+
+Critère `mesure-repondeur-commun` passé à `true` (7 tests, projet Vitest `banc`).
+
+**Fait.** `scripts/banc/repondeur.ts` : fonction pure `repondre(demande, reponses, memoire)` ;
+nature de la demande d'après son titre (difficulté, question ouverte, ratification, arbitrage,
+blocage, escalade — les titres des deux implémentations) ; option reconnue par son **action**
+(identifiant tel quel, `action:…` ou `…:action`) ; profil : le PO si la demande l'accepte, sinon
+le premier requis. Fichier `docs/runs/reponses-us-2.json` (réponses du 03/10).
+
+**Corrigé au passage** : l'ancien répondeur passait le texte des réponses comme **option** (qui ne
+correspondait à aucune), donc les questions ouvertes recevaient une réponse vide, dans les deux.
+
+**Suite** : point 1, le banc qui lance l'extension ou le workflow, avec ce répondeur.
+
+---
+
 ## 10/10 — Rejets du workflow tracés (point 2 avant la comparaison US-2)
 
 Critère `mesure-workflow-rejets-traces` passé à `true` après son `verify` ; suite : 1 704 tests.

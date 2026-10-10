@@ -663,10 +663,10 @@
     },
     {
       "id": "mesure-repondeur-commun",
-      "title": "Un répondeur scripté par fichier donne les mêmes réponses humaines aux deux extensions, reconnues par libellé (prérequis P4 de docs/10)",
-      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
-      "passes": false,
-      "notes": "À FAIRE. Planifié le 2026-10-08."
+      "title": "Un répondeur scripté par fichier donne les mêmes réponses humaines à l'extension skraft et au workflow skraft (prérequis P4 de docs/10)",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : scripts/banc/repondeur.ts (pur), options reconnues par leur action (id, « action:… » ou « …:action ») et non par leur libellé ; questions ouvertes répondues avec du texte (fini les réponses vides) ; escalade relancée deux fois par motif puis abandonnée. Fichier de réponses : docs/runs/reponses-us-2.json. Pas encore branché dans le banc : point 1."
     },
     {
       "id": "comparaison-us-2",
