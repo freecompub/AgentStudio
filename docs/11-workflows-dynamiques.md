@@ -257,7 +257,7 @@ proposé avant un arrêt est reconnu après la reprise (sa ligne `Story`). Test�
 | Accord par empreinte, gel du dossier pendant une tâche | **nouveau** |
 | Commandes `/<commande>`, `/workflow ajouter`, `/workflow liste` ; outil `proposer_workflow` de l'agent principal | **nouveau** |
 | Composition des prompts d'agents (contenu + skills + contrat d'exécution) | **réutilisée** depuis `extension-host` (`agent-prompts.ts`) |
-| `extensions/skraft-workflow` | **converti** en `workflows/skraft/` (JavaScript), puis retiré |
+| `extensions/skraft-workflow` | **converti** en `workflows/skraft/` (JavaScript), puis retiré — fait le 2026-10-10 |
 | `extensions/skraft` | **inchangé** (comparaison, ADR 0054) |
 | `contributes.workflows` (prévu par `docs/09` §3) | **abandonné** |
 

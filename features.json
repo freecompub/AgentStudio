@@ -678,28 +678,28 @@
     {
       "id": "skraft-deliver-en-workflow",
       "title": "skraft-workflow mène DELIVER et tout le pipeline : jumeaux de e2e-s5 et e2e-s6 (vraie chaîne Swift, correction de revue, usage sur trois stories) et reprise après un crash au milieu de DELIVER",
-      "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s5-workflow.test.ts test/e2e-s6-workflow.test.ts test/e2e-reprise-workflow.test.ts test/deliver-gates.test.ts",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s5-workflow.test.ts test/e2e-s6-workflow.test.ts test/e2e-reprise-workflow.test.ts test/deliver-gates.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/livraison.ts : 595 lignes de code, portes comprises (skraft : deliver-machine 299 + deliver-effects 340). Pipeline complet : 1 015 lignes contre 1 624 dans skraft (dont 269 de types d’état, d’événements et d’effets). Divergences assumées : rembobiner fait oublier les agents (ADR 0053, décidé ; le réducteur ne le faisait pas en DELIVER) ; usage par phase (pas d’états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non comptés ; relancer après escalade pendant une correction de revue reprend la correction (le réducteur repartait du pas « test »). Les tests Swift tournent si la chaîne est installée (~/.cache/agent-studio/swift). Coexistence avec skraft décidée (ADR 0054) ; l’extension s’empaquette et s’installe comme skraft (test/install.test.ts)."
     },
     {
       "id": "skraft-distill-en-workflow",
       "title": "skraft-workflow mène DISTILL : portes gherkin et valeurs, RED d'acceptance exécuté par le code, gel des tests d'acceptance, revue (jumeau de e2e-s4, vrai Vitest)",
-      "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s4-workflow.test.ts test/distill-gates.test.ts test/gherkin.test.ts",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s4-workflow.test.ts test/distill-gates.test.ts test/gherkin.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/distillation.ts : 64 lignes de code ; la revue est commune à DESIGN et DISTILL (src/revue.ts, 98 lignes). Preuve enregistrée sous DISTILL_RED (w.lancerTests({ etiquette })). Le dernier comptage des tests vient du TestRun rendu au script plutôt que du magasin de preuves (même source, D20)."
     },
     {
       "id": "skraft-design-en-workflow",
       "title": "skraft-workflow mène DESIGN : porte cohérence, revue à lentilles avec dialogue et arbitrage humain, ratification et amendement (jumeau de e2e-s3, en processus isolé aussi)",
-      "verify": "pnpm vitest run --project ext-skraft-workflow test/e2e-s3-workflow.test.ts test/e2e-revue-workflow.test.ts test/design-gate.test.ts test/review-thread.test.ts",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s3-workflow.test.ts test/e2e-revue-workflow.test.ts test/design-gate.test.ts test/review-thread.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), docs/09 §14 étape 5 pour DESIGN. src/conception.ts : 172 lignes de code. Écarts du §13 non tranchés : comportement du réducteur reproduit (budget partagé, amendement sans budget ni modélisation, lentilles sans quality-gates, défaut maintenu par l’humain corrigé malgré le budget). Différences assumées : plusieurs amendements traités ensemble ; isTestFile approché par les emplacements de la stack (w.disposition) ; aucune preuve de tests dans les faits de revue (DESIGN n’en produit pas)."
     },
     {
       "id": "skraft-research-en-workflow",
       "title": "L'extension indépendante skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
-      "verify": "pnpm vitest run --project ext-skraft-workflow && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte ; puis, à sa demande, dans une extension totalement indépendante (extensions/skraft-workflow, aucune importation de skraft, vérifiée par test/independance.test.ts ; code pur, agents et tests copiés avec leur provenance). Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
     }

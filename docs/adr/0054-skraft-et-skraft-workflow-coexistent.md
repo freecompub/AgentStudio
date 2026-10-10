@@ -2,7 +2,11 @@
 
 - Statut : **décidé**, 2026-10-08 (décision du responsable du projet)
 - S'appuie sur : ADR 0052 (orchestration par script rejouable), ADR 0053 (cycle de vie des sessions)
-- Détail : `docs/09-workflows-rejouables.md` §14, `extensions/skraft-workflow/README.md`
+- Détail : `docs/09-workflows-rejouables.md` §14, `workflows/skraft/README.md`
+- **Mis à jour le 2026-10-10** : depuis l'ADR 0055, l'implémentation comparée au réducteur est le
+  **workflow** `workflows/skraft/` ; l'extension `extensions/skraft-workflow` a été convertie en ce
+  workflow puis retirée. Ce qui suit vaut pour lui : indépendance, copies avec provenance, pas
+  d'écart tranché avant la comparaison.
 
 ## Contexte
 

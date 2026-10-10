@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Extension skraft-workflow retirée (convertie en `workflows/skraft/`)
+
+Point 11 de l'ADR 0055 : l'extension `extensions/skraft-workflow` est retirée ; son contenu vit dans
+`workflows/skraft/` (lisible dans l'historique Git avant ce commit). Suite complète : 1 702 tests
+(232 tests de l'extension retirés ; leur équivalent tourne sur le workflow, projet `workflow-skraft`).
+
+Mis à jour : critères `skraft-*-en-workflow` de `features.json` (même tests, projet
+`workflow-skraft`), ADR 0054 (la comparaison porte sur le workflow), `docs/10` P3, `docs/11` §10,
+`CLAUDE.md`, README du workflow.
+
+**Suite** : P1 à P6 de `docs/10` (mesure comparée), puis la campagne US-2 avec Copilot.
+
+---
+
 ## 10/10 — skraft converti en workflow JavaScript (étape 6 de `docs/11` §11)
 
 Branche `feat/workflow-rejouable`. Critère `workflow-skraft-javascript` passé à `true` après son

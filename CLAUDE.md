@@ -27,10 +27,11 @@ Un jalon = une branche partie du précédent, avec des commits séparés par bri
 Orchestration : passage décidé à des **workflows rejouables** (script ordinaire, appels journalisés,
 reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`). Le moteur existe
 (`packages/workflow` : `createWorkflowTask`, `essayer`, `agir`). skraft et tdd tournent toujours
-sur leur réducteur ; l'essai est `extensions/skraft-workflow` (`/skraft-workflow`, pipeline
-complet), extension **indépendante de skraft** : elle n'en importe rien, ses copies divergent.
-Les deux coexistent le temps de les comparer avec Copilot (ADR 0054) : une correction dans l'une
-ne se reporte pas seule dans l'autre.
+sur leur réducteur ; l'essai est le **workflow** `workflows/skraft/` (`/skraft-workflow`, pipeline
+complet), **indépendant de l'extension skraft** : il n'en importe rien, ses copies divergent.
+Les deux coexistent le temps de les comparer avec Copilot (ADR 0054) : une correction dans l'un
+ne se reporte pas seule dans l'autre. (L'extension `extensions/skraft-workflow`, première version,
+a été convertie en ce workflow puis retirée le 10/10.)
 **Décidé le 08/10 (ADR 0055, `docs/11`)** : un workflow n'est plus une extension mais un **dossier**
 (`workflow.mjs` en JavaScript, `meta` littéral en tête, agents, skills, contrôles), sur la machine
 (`~/.agent-studio/workflows/`) ou dans le projet (`.agent-studio/workflows/`). Implémenté : chargeur,
@@ -43,7 +44,7 @@ pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
 pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
-                                #            extension-packaging, ext-tdd, ext-skraft, ext-skraft-workflow, workflow-skraft, desktop
+                                #            extension-packaging, ext-tdd, ext-skraft, workflow-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)

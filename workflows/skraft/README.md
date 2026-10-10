@@ -31,7 +31,8 @@ Les tests de ce workflow sont dans `tests/workflow-skraft/` (ils ne sont pas cop
 ## Provenance et licence
 
 GPL-3.0-or-later (voir `LICENSE`). Converti en JavaScript le 2026-10-10 depuis
-`extensions/skraft-workflow/src/` (chaque fichier le dit en tête), lui-même repris de
+`extensions/skraft-workflow/src/` (chaque fichier le dit en tête ; extension retirée le même jour,
+lisible dans l'historique Git), lui-même repris de
 `extensions/skraft` ; agents et skills repris de skraft-plugin (`docs/licences/autorisation-skraft.md`).
 
 Différences avec l'extension skraft-workflow : plus d'outil `render_adr` — l'architecte écrit les
