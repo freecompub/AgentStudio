@@ -184,6 +184,7 @@ async function scenario(w, d, L, i, motifs, max) {
 }
 /** Escalade d'un scénario : relancer reprend CE scénario, sauter saute la phase (comme le réducteur). */
 async function escaladeScenario(w, motif) {
+  await w.etape("ESCALATED");
   const d = await w.humain("escalade", "Pipeline skraft bloqué (DELIVER)", [
     { id: "relancer", label: "Relancer la phase" },
     { id: "sauter", label: "Sauter la phase" },
@@ -290,6 +291,7 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
   const testeur = etape === "test" || etape === "fix-test";
   let retour = rejet;
   for (;;) {
+    await w.etape("DELIVER");
     const consigne = [
       buildBrief(d, "DELIVER", retour),
       `Scénario en cours : ${sc.id}${critere ? ` (critère ${critere.n} : ${critere.text})` : ""}`,
@@ -302,6 +304,7 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
     if (r.sortie)
       return r.sortie;
     const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
+    await w.etape("BLOCKED");
     const rep = await w.humain("blocage", "Question de l'agent (DELIVER)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
     d.reponses = [...d.reponses, { question: r.blocage.question, answer: rep.commentaire ? `${rep.decision} (${rep.commentaire})` : rep.decision }];
     retour = etape === "fix" || etape === "fix-test" ? routes : [];

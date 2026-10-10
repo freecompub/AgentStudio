@@ -88,6 +88,8 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
     },
 
     checkpointBefore: (effet) => AVEC_CHECKPOINT.has(effet.kind),
+    // Le workflow rend ses erreurs comme événements : la trace des effets doit les voir (docs/10 P2).
+    estUnEchec: (e) => e.type === "ERREUR",
     isTerminal: (etat) => etat.fin !== undefined,
     phaseOf: (etat) => phaseDe(etat),
   };
@@ -98,13 +100,14 @@ function avecRejets(etat: EtatWorkflow): EtatWorkflow {
   const rejets = etat.journal.filter((e) => e.appel === "rejet");
   const dernier = rejets.at(-1);
   const args = dernier ? (relire(dernier.args, etat.contenus) as { porte: string; motifs: string[] }) : null;
-  return { ...etat, rejections: rejets.length, lastRejection: args ? { gate: args.porte, reasons: args.motifs } : null };
+  return { ...etat, rejections: rejets.length, lastRejection: args ? { gate: args.porte, reasons: args.motifs } : null, stage: phaseDe(etat) };
 }
 
+/** La dernière phase ou étape annoncée (`w.phase`, `w.etape`), sinon « DÉBUT ». */
 function phaseDe(etat: EtatWorkflow): string {
   for (let i = etat.journal.length - 1; i >= 0; i--) {
     const e = etat.journal[i]!;
-    if (e.appel === "phase") return (relire(e.args, etat.contenus) as { nom: string }).nom;
+    if (e.appel === "phase" || e.appel === "etape") return (relire(e.args, etat.contenus) as { nom: string }).nom;
   }
   return "DÉBUT";
 }

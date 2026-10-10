@@ -2,7 +2,7 @@
 /**
  * Jumeau de `extensions/skraft/test/e2e-s6.test.ts` pour `/skraft-workflow`. Ce que le réducteur
  * seul compte (réessais par phase, `rejections`, états CLASSIFY et REVIEW de l'usage) n'existe pas
- * dans le workflow : ces vérifications sont retirées, l'usage se lit par phase.
+ * dans le workflow : ces vérifications sont retirées. L'usage se lit par étape, avec les noms de l'extension.
  *
  * Critères de sortie de S6 (SPEC-skraft §14) :
  *  - bout en bout 13.3 vert sur le projet Swift de démonstration (vraie chaîne SwiftPM + XCTest ;
@@ -205,10 +205,10 @@ describe.skipIf(!toolchain)("skraft en workflow — bout en bout 13.3 (Swift)", 
       expect(replay.markdown.trim()).toBe(git(root, "show", `HEAD:.skraft/us-12/reviews/deliver-review-${i + 1}.md`)); // git() rogne la fin de ligne
     }
 
-    // Bilan ; usage par phase (D37). La revue est comptée dans la phase qu'elle juge.
+    // Bilan ; usage par étape (D37), avec les mêmes étapes que l'extension (docs/10 §3).
     expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");
     const usage = await app.usage.report(id);
-    for (const phase of ["DÉBUT", "RESEARCH", "DESIGN", "DISTILL", "DELIVER"]) expect(usage.find((r) => r.phase === phase)?.requests, phase).toBeGreaterThan(0);
+    for (const phase of ["CLASSIFY", "RESEARCH", "DESIGN", "DISTILL", "DELIVER", "REVIEW"]) expect(usage.find((r) => r.phase === phase)?.requests, phase).toBeGreaterThan(0);
     const log = git(root, "log", "--format=%s", "main..HEAD").split("\n");
     expect(log).toEqual([
       "feat(us-12): livraison de la story",
@@ -265,7 +265,7 @@ describe("skraft en workflow — mesures d'usage sur trois stories (§12)", () =
     expect(measures["us-15"]).toMatchObject({ level: "challenging", granularity: "session-per-step" });
     // Sessions séparées : plus de requêtes en DELIVER que le tour unique, pour un scénario moteur chacun.
     expect(measures["us-15"]!.phases.DELIVER!).toBeGreaterThan(measures["us-12"]!.phases.DELIVER!);
-    expect(Object.keys(measures["us-12"]!.phases)).toEqual(expect.arrayContaining(["DÉBUT", "RESEARCH", "DESIGN", "DISTILL", "DELIVER"]));
+    expect(Object.keys(measures["us-12"]!.phases)).toEqual(expect.arrayContaining(["CLASSIFY", "RESEARCH", "DESIGN", "DISTILL", "DELIVER", "REVIEW"]));
   }, 180_000);
 });
 

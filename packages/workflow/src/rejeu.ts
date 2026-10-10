@@ -83,6 +83,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     informer: (texte) => appeler("informer", { texte }),
     maintenant: () => appeler("maintenant", {}),
     rejet: (porte, motifs) => appeler("rejet", { porte, motifs: [...motifs] }, true),
+    etape: (nom) => appeler("etape", { nom }, true),
     echec: (motif) => {
       throw new EchecWorkflow(motif);
     },
@@ -109,6 +110,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
         // L'escalade annule toujours (ADR 0040) ; les agents de la phase oublient (ADR 0053).
         await w.rembobiner(cp);
         await opts.apresRembobinage?.();
+        await w.etape("ESCALATED");
         const d = await w.humain("escalade", `Phase ${nom} : ${motif}`, ESCALADE);
         if (d.decision === "sauter") return undefined;
         if (d.decision === "abandonner") w.echec(`Phase ${nom} abandonnée : ${motif}`);

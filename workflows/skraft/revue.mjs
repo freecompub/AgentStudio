@@ -18,6 +18,7 @@ export const nouveauSuivi = () => ({ revues: [], fils: [], livrables: [] });
 export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
   let retour = motifs;
   for (;;) {
+    await w.etape(phase);
     const r = await w.agent(nom, buildBrief(d, phase, retour) + suffixe, { lectureSeule: GELÉS });
     if (r.sortie) {
       if (r.sortie.responses?.length)
@@ -25,6 +26,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
       return;
     }
     const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
+    await w.etape("BLOCKED");
     const rep = await w.humain("blocage", `Question de l'agent (${phase})`, choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
     d.reponses = [...d.reponses, { question: r.blocage.question, answer: rep.commentaire ? `${rep.decision} (${rep.commentaire})` : rep.decision }];
     retour = [];
@@ -32,6 +34,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
 }
 /** Revue à lentilles ; rend `undefined` si elle approuve, le rejet sinon. */
 export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
+  await w.etape("REVIEW");
   const tour = s.revues.length + 1;
   const disp = await w.disposition();
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
@@ -52,6 +55,7 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
   let lenses = r.lenses;
   let parHumain = false;
   if (r.persistent.length) {
+    await w.etape("ARBITRATION");
     const decisions = await Promise.all(r.persistent.map((t) => arbitrer(w, t)));
     for (const [i, t] of r.persistent.entries())
       s.fils = applyArbitration(s.fils, `${decisions[i]}:${t.id}`);

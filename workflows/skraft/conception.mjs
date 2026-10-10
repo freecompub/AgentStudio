@@ -135,6 +135,7 @@ async function controlerAdrs(w, d, avant) {
 }
 /** Ratification de tous les ADR proposés, à la fois ; rend les amendements demandés. */
 async function ratifier(w, d) {
+  await w.etape("RATIFICATION");
   const proposes = d.adrs.filter((a) => a.status === "Proposed");
   const decisions = await Promise.all(proposes.map((a) => w.humain("ratifier-adr", `Ratifier ${a.id}`, [
     { id: "accept", label: "Accepter" },

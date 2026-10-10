@@ -74,7 +74,8 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
     expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
-    expect((await app.engine.status(id))!.phase).toBe("RESEARCH");
+    // Comme l'extension (stade ROUTE) : les questions ouvertes sont une étape à part (docs/10 §3).
+    expect((await app.engine.status(id))!.phase).toBe("ROUTE");
     // RESEARCH est commitée avant les questions, avec le message du réducteur.
     expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): research de us-12");
 

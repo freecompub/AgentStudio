@@ -282,6 +282,28 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect(etat.journal.filter((e) => e.appel === "rejet")).toHaveLength(2);
   });
 
+  it("w.etape : la phase de la tâche suit la dernière étape annoncée, et w.phase la remplace", async () => {
+    const def = createWorkflowTask(
+      decl(async (w) => {
+        await w.etape("CLASSIFY");
+        await w.lireFichier("a");
+        await w.phase("DESIGN", async () => {
+          await w.lireFichier("b");
+          await w.etape("REVIEW");
+          await w.lireFichier("c");
+          return true;
+        });
+      }),
+    );
+    const s0 = await def.initialState(null);
+    expect(await def.phaseOf!(s0)).toBe("CLASSIFY");
+    const s1 = (await def.transition(s0, { type: "RESULTAT", n: 2, resultat: "" })).state;
+    const s2 = (await def.transition(s1, { type: "RESULTAT", n: 4, resultat: "cp" })).state;
+    expect(await def.phaseOf!(s2)).toBe("DESIGN");
+    const s3 = (await def.transition(s2, { type: "RESULTAT", n: 5, resultat: "" })).state;
+    expect(await def.phaseOf!(s3)).toBe("REVIEW");
+  });
+
   it("w.echec termine la tâche en échec avec son motif", async () => {
     const f = fauxContexte();
     const t = await lancer(decl(async (w) => w.echec("Story invalide : critère 2 vide")), f.ctx);

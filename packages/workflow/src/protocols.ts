@@ -47,6 +47,7 @@ export type NomAppel =
   | "architecture"
   | "maintenant"
   | "rejet"
+  | "etape"
   | "brancher"
   | "checkpoint"
   | "rembobiner"
@@ -73,6 +74,8 @@ export interface EtatWorkflow {
    * une entrée `rejet` dans la trace (même convention que les états des réducteurs, ADR 0032).
    */
   rejections?: number;
+  /** Étape ou phase en cours, pour la trace (`stade`). */
+  stage?: string;
   lastRejection?: { gate: string; reasons: string[] } | null;
 }
 
@@ -153,6 +156,12 @@ export interface W {
    * `essayer` l'appelle de lui-même. Sert à savoir, après un run, pourquoi chaque travail a été refait.
    */
   rejet(porte: string, motifs: readonly string[]): Promise<void>;
+  /**
+   * Annonce la sous-étape en cours (évaluation, revue, ratification…) : la phase de la tâche — carte,
+   * usage, trace — la suit jusqu'à la prochaine étape ou phase. Journalisé sans effet. Sert à
+   * comparer deux implémentations étape par étape (docs/10 §3).
+   */
+  etape(nom: string): Promise<void>;
   /** Heure courante (ISO 8601), journalisée : identique au rejeu. `Date` n'est pas disponible. */
   maintenant(): Promise<string>;
   /** Termine la tâche en échec, avec ce motif. */

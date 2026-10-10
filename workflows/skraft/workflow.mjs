@@ -14,6 +14,16 @@ export const meta = {
   },
   phases: {
     "DÉBUT": "Préparation et difficulté",
+    INIT: "Lecture de la story",
+    CLASSIFY: "Évaluation de la difficulté",
+    CONFIRM_DIFFICULTY: "Difficulté à confirmer",
+    ROUTE: "Questions ouvertes",
+    REVIEW: "Revue",
+    ARBITRATION: "Arbitrage à rendre",
+    RATIFICATION: "ADR à ratifier",
+    BLOCKED: "Question d'un agent",
+    ESCALATED: "Escalade",
+    DONE: "Terminé",
     RESEARCH: "Enquête sur le code existant",
     DESIGN: "Conception",
     DISTILL: "Scénarios d'acceptance",
@@ -176,6 +186,8 @@ export default async function skraft(w, entree) {
       vue.phasesFaites = [{ phase: "RESEARCH", fichiers: [`.skraft/${slug}/research/research.md`] }];
   }
   // Les questions ouvertes (story, recherche) sont tranchées avant DESIGN, toutes à la fois.
+  // Étapes annoncées avec le vocabulaire de l'extension skraft : les deux se comparent (docs/10 §3).
+  await w.etape("ROUTE");
   const reponses = await Promise.all(vue.questions.map((q) => w.humain("question-ouverte", `Question ouverte (${story.id})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true })));
   vue.questions = vue.questions.map((q, i) => {
     const d = reponses[i];
@@ -193,6 +205,7 @@ export default async function skraft(w, entree) {
     vue.phasesFaites = [...vue.phasesFaites, { phase: "DELIVER", fichiers: [] }];
   else
     vue.phasesSautees = [...vue.phasesSautees, "DELIVER"];
+  await w.etape("DONE");
   await w.informer(bilan(vue, !entree.auto));
   return {
     slug,
@@ -215,6 +228,7 @@ function bilan(d, confirmee) {
 }
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */
 async function preparer(w, chemin) {
+  await w.etape("INIT");
   for (;;) {
     let motifs;
     try {
@@ -236,6 +250,7 @@ async function preparer(w, chemin) {
 }
 /** Classifieur, budget compté par le code (D24), puis confirmation humaine si demandée. */
 async function evaluerDifficulte(w, story, indicateurs, confirmer) {
+  await w.etape("CLASSIFY");
   const grille = gradeDifficulty(indicateurs, DEFAULT_THRESHOLDS);
   const consigne = [`Story : ${story.id} — ${story.title}`, `Indicateurs : ${JSON.stringify(indicateurs)}`, `Niveau proposé par la grille : ${grille}`].join("\n");
   let propose;
@@ -261,6 +276,7 @@ async function evaluerDifficulte(w, story, indicateurs, confirmer) {
   if (!confirmer)
     return propose.level;
   const niveaux = [...new Set([propose.level, shift(propose.level, 1), shift(propose.level, -1)])];
+  await w.etape("CONFIRM_DIFFICULTY");
   const d = await w.humain("confirmer-difficulte", `Difficulté de ${story.id} : ${LEVEL_LABELS[propose.level]} ?`, niveaux.map((l) => ({ id: l, label: l === propose.level ? `Confirmer : ${LEVEL_LABELS[l]}` : LEVEL_LABELS[l] })), { detail: propose.justification });
   return isDifficulty(d.decision) ? d.decision : propose.level;
 }
@@ -269,6 +285,7 @@ function rechercher(w, vue, max) {
   return essayer(w, { max }, async (motifs) => {
     let retour = motifs;
     for (;;) {
+      await w.etape("RESEARCH");
       const fichiers = await w.listerFichiers();
       const utiles = preselectFiles(vue.story, fichiers);
       const consigne = buildBrief(vue, "RESEARCH", retour) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
@@ -277,6 +294,7 @@ function rechercher(w, vue, max) {
         break;
       // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier.
       const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
+      await w.etape("BLOCKED");
       const d = await w.humain("blocage", "Question de l'agent (RESEARCH)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
       vue.reponses = [...vue.reponses, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
       retour = [];
@@ -309,6 +327,7 @@ async function porteCitations(w, vue) {
   return [];
 }
 async function relancerOuAbandonner(w, motif) {
+  await w.etape("ESCALATED");
   const d = await w.humain("escalade", "Pipeline skraft bloqué", RELANCER_OU_ABANDONNER, { detail: motif });
   if (d.decision !== "relancer")
     w.echec(`Abandon : ${motif}`);
