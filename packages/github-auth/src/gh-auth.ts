@@ -15,7 +15,7 @@ export function tokenKindOf(token: string): TokenKind {
   return "unknown";
 }
 
-const DEVICE_CODE = /one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/;
+const DEVICE_CODE = /one-time code(?:\s*:\s*|\s*\()([A-Z0-9]{4}-[A-Z0-9]{4})/i;
 
 /**
  * Nom d'hôte acceptable : un domaine, rien d'autre. Ce texte vient de l'utilisateur et part en
@@ -117,6 +117,7 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
       const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"]);
       let buffer = "";
       let sent = false;
+      let inviteValidee = false;
       const vu = new Promise<void>((resolve) => {
         proc.onOutput((chunk) => {
           buffer += chunk;
@@ -124,8 +125,11 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
           if (m?.[1] && !sent) {
             sent = true;
             onCode({ code: m[1], verificationUrl: `https://${cible}/login/device` });
-            proc.write("\n"); // valide « Press Enter to open … in your browser »
             resolve();
+          }
+          if (sent && !inviteValidee && /Press Enter/i.test(buffer)) {
+            inviteValidee = true;
+            proc.write("\n");
           }
         });
       });

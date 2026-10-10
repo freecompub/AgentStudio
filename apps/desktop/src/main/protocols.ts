@@ -9,7 +9,7 @@ export interface WorkspaceProvider {
 }
 
 /** Construit le runtime d'agent une fois le jeton obtenu. */
-export type RuntimeFactory = (gitHubToken: string) => AgentRuntime;
+export type RuntimeFactory = (gitHubToken: string, hostname: string) => AgentRuntime;
 
 /** Émission d'événements vers la fenêtre. */
 export interface EventSink {

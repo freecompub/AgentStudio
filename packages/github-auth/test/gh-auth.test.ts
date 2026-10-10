@@ -76,7 +76,10 @@ describe("GhAuth", () => {
     await expect(auth.token()).rejects.toThrow(/connecté/);
   });
 
-  it("connexion : transmet le code d'appareil, valide l'invite, puis renvoie le statut", async () => {
+  it.each([
+    ["ancien format", "! First copy your one-time code: AB12-CD34\nPress Enter to open github.com in your browser...", ["\n"]],
+    ["format sans terminal de gh 2.101", "! One-time code (AB12-CD34) copied to clipboard\nOpen this URL to continue in your web browser: https://github.com/login/device", []],
+  ])("connexion (%s) : transmet le code d'appareil puis renvoie le statut", async (_nom, sortie, entree) => {
     const written: string[] = [];
     let emit: (s: string) => void = () => {};
     let exit: (c: number) => void = () => {};
@@ -96,14 +99,14 @@ describe("GhAuth", () => {
     const codes: unknown[] = [];
     const done = auth.login((c) => codes.push(c));
 
-    emit("! First copy your one-time code: ");
-    emit("AB12-CD34\nPress Enter to open github.com in your browser...");
+    emit(sortie.slice(0, 24));
+    emit(sortie.slice(24));
     exit(0);
 
     expect(await done).toMatchObject({ loggedIn: true, user: "octo" });
     expect(spawned[0]).toBe("gh auth login --hostname github.com --git-protocol https --web");
     expect(codes).toEqual([{ code: "AB12-CD34", verificationUrl: "https://github.com/login/device" }]);
-    expect(written).toEqual(["\n"]);
+    expect(written).toEqual(entree);
   });
 
   it("le statut indique l'hôte auquel on est connecté", async () => {

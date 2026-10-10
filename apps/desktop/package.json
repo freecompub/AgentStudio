@@ -27,6 +27,8 @@
     "@agent-studio/workflow": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "@github/copilot-sdk": "1.0.14",
+    "acorn": "^8.18.0",
+    "esbuild": "^0.28.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"
@@ -40,7 +42,6 @@
     "@vitejs/plugin-react": "~5.1.4",
     "electron": "^44.4.5",
     "electron-vite": "^5.0.0",
-    "esbuild": "^0.28.2",
     "jsdom": "^30.1.1",
     "vite": "^7.3.6"
   }

@@ -51,11 +51,11 @@ describe("fabriquesDEssai", () => {
 
   it("le runtime est le MÊME d'un appel à l'autre : l'essai script ses comportements avant de discuter", async () => {
     const f = fabriquesDEssai();
-    expect(f.runtimeFactory("x")).toBe(f.runtimeFactory("y"));
+    expect(f.runtimeFactory("x", "github.invalid")).toBe(f.runtimeFactory("y", "github.invalid"));
   });
 
   it("le runtime rendu est un double, jamais l'adaptateur Copilot", () => {
-    expect(fabriquesDEssai().runtimeFactory("x").id).toBe("fake");
+    expect(fabriquesDEssai().runtimeFactory("x", "github.invalid").id).toBe("fake");
   });
 
   it("le sélecteur de dossier ne montre aucune boîte : il rend ce que l'essai a posé", async () => {

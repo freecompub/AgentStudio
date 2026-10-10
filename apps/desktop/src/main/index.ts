@@ -205,9 +205,9 @@ async function createController(): Promise<AppController> {
     }),
     runtimeFactory:
       essai?.runtimeFactory ??
-      ((token) =>
+      ((token, hostname) =>
         createCopilotRuntime({
-          client: createCopilotClient({ gitHubToken: token, baseDirectory: join(userData, "copilot") }),
+          client: createCopilotClient({ gitHubToken: token, hostname, baseDirectory: join(userData, "copilot") }),
           logger: logger.child({ component: "runtime" }),
         })),
     conversations: createJsonConversationStore(join(userData, "conversations")),

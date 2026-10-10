@@ -31,7 +31,7 @@ const logger = createJsonLogger({ write: (l) => process.stderr.write(`${l}\n`), 
 const auth = createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner() });
 console.log("auth :", await auth.status());
 
-const runtime = createCopilotRuntime({ client: createCopilotClient({ gitHubToken: await auth.token() }), logger });
+const runtime = createCopilotRuntime({ client: createCopilotClient({ gitHubToken: await auth.token(), hostname: auth.hostname() }), logger });
 await runtime.start();
 const ws = await openWorkspace(dir);
 const deps: MainSessionDeps = {
