@@ -10,7 +10,7 @@ import type { OptionsAgent, W } from "./protocols.js";
  * donne un essai de plus malgré un budget épuisé : un arbitrage humain a maintenu un défaut, il a
  * droit à sa correction (`docs/09` §13, écart 9).
  */
-export type Rejet = readonly string[] | { motifs: readonly string[]; revue: true; garanti?: boolean };
+export type Rejet = readonly string[] | { motifs: readonly string[]; revue?: true; garanti?: boolean; /** Nom de la porte, pour la trace. */ porte?: string };
 
 /**
  * Motifs rendus après un tour interrompu (ADR 0029, 0040). La seconde phrase compte autant que la
@@ -30,20 +30,26 @@ export const motifsInterruption = (raison: string): string[] => [
  * - un tour interrompu compte comme un rejet, avec la consigne de reprendre ;
  * - une panne d'environnement n'est pas comptée et remonte aussitôt (D25).
  */
-export async function essayer(_w: W, opts: { max: number; premiereRevueGarantie?: boolean }, fn: (motifs: readonly string[], essai: number) => Promise<Rejet>): Promise<void> {
+export async function essayer(w: W, opts: { max: number; premiereRevueGarantie?: boolean }, fn: (motifs: readonly string[], essai: number) => Promise<Rejet>): Promise<void> {
   let motifs: readonly string[] = [];
   let revues = 0;
   for (let essai = 1; ; essai++) {
     let rejet: Rejet;
+    let interrompu = false;
     try {
       rejet = await fn(motifs, essai);
     } catch (e) {
       if (!(e instanceof TourInterrompu)) throw e;
       rejet = motifsInterruption(e.message);
+      interrompu = true;
     }
-    const revue = !Array.isArray(rejet) && "revue" in rejet;
-    const m = Array.isArray(rejet) ? (rejet as readonly string[]) : (rejet as { motifs: readonly string[] }).motifs;
+    const objet = Array.isArray(rejet) ? null : (rejet as { motifs: readonly string[]; revue?: true; porte?: string });
+    const revue = objet?.revue === true;
+    const m = objet ? objet.motifs : (rejet as readonly string[]);
     if (!m.length) return;
+    // Chaque essai refusé est tracé, avec sa cause : c'est ce qui dira, après un run, pourquoi
+    // un travail a été refait (docs/10 §4.3).
+    await w.rejet(objet?.porte ?? (interrompu ? "délai" : revue ? "revue" : "porte"), m);
     if (revue) revues++;
     const demande = Array.isArray(rejet) ? undefined : (rejet as { garanti?: boolean }).garanti;
     const garanti = demande ?? (opts.premiereRevueGarantie === true && revue && revues === 1);

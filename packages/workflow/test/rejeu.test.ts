@@ -266,6 +266,22 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect(f.consignes[0]!.opts).toMatchObject({ evidence: { taskId: "t1", stepId: "ac-1" } });
   });
 
+  it("w.rejet : journalisé ; l'état expose rejections et lastRejection, que le moteur trace", async () => {
+    const f = fauxContexte({}, { a: "" });
+    const t = await lancer(
+      decl(async (w) => {
+        await w.rejet("citations", ["`a.ts:40-72` : plage hors du fichier."]);
+        await w.lireFichier("a");
+        await w.rejet("revue", ["[D-1] défaut"]);
+      }),
+      f.ctx,
+    );
+    const etat = (await t.record()).state;
+    expect(etat.rejections).toBe(2);
+    expect(etat.lastRejection).toEqual({ gate: "revue", reasons: ["[D-1] défaut"] });
+    expect(etat.journal.filter((e) => e.appel === "rejet")).toHaveLength(2);
+  });
+
   it("w.echec termine la tâche en échec avec son motif", async () => {
     const f = fauxContexte();
     const t = await lancer(decl(async (w) => w.echec("Story invalide : critère 2 vide")), f.ctx);

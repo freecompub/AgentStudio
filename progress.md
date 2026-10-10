@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Rejets du workflow tracés (point 2 avant la comparaison US-2)
+
+Critère `mesure-workflow-rejets-traces` passé à `true` après son `verify` ; suite : 1 704 tests.
+
+**Fait.**
+- `w.rejet(porte, motifs)` : appel journalisé sans effet (comme `w.phase`). L'état du workflow
+  expose `rejections` et `lastRejection`, déduits du journal à chaque transition : le moteur, qui
+  lit déjà ces champs pour les réducteurs, écrit l'entrée `rejet` de la trace sans changer.
+- `essayer` trace chaque essai refusé ; `Rejet` accepte `porte` ; défauts : « revue », « délai »
+  (tour interrompu), « porte ».
+- Workflow skraft : portes nommées comme dans l'extension (`classifieur`, `citations`, `adr`,
+  `cohérence`, `gherkin`, `valeurs`, `RED d'acceptance`) ; DELIVER trace les pas refusés
+  (`pas test (ac-1)`…), les scénarios repris, les pannes, les corrections, les corrections
+  ciblées (mutation, revue) et les réessais de phase.
+- Le harnais de `tests/workflow-skraft` donne une trace au moteur ; deux jumeaux vérifient porte
+  et motif exacts.
+
+**Suite** : point 3 (répondeur commun aux deux), puis point 1 (banc qui lance le workflow).
+
+---
+
 ## 10/10 — Extension skraft-workflow retirée (convertie en `workflows/skraft/`)
 
 Point 11 de l'ADR 0055 : l'extension `extensions/skraft-workflow` est retirée ; son contenu vit dans

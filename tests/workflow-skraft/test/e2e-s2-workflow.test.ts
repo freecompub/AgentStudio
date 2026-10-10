@@ -68,6 +68,9 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(researchPrompts).toHaveLength(2);
     expect(researchPrompts[1]).toContain("Rejet précédent :");
     expect(researchPrompts[1]).toContain("`Sources/Domain/BolusCalculator.swift:40-72` : plage hors du fichier, qui compte 55 lignes.");
+    // Le rejeu est tracé avec sa porte et son motif exact (docs/10 §4.3).
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toEqual([expect.objectContaining({ porte: "citations", motifs: ["`Sources/Domain/BolusCalculator.swift:40-72` : plage hors du fichier, qui compte 55 lignes."] })]);
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
     expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });

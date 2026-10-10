@@ -16,6 +16,7 @@ import {
   createJsonInteractionStore,
   createRegistry,
   createTaskAgentRunner,
+  createJsonlTraceStore,
   createUsageRecorder,
 } from "@agent-studio/core";
 import { sequentialIds, type ScriptedBehavior, type ScriptedRuntime } from "@agent-studio/core/testing";
@@ -282,7 +283,10 @@ export function fakeSwiftStack(): StackAdapter {
 export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; stack?: StackAdapter } = {}) {
   const workspace = withHang(await openWorkspace(root), opts.hang);
   const usage = createUsageRecorder(join(tasksDir, "usage"));
+  // Trace d'exécution (ADR 0032) : c'est là qu'un run dit pourquoi chaque travail a été refait.
+  const trace = createJsonlTraceStore(join(tasksDir, "traces"));
   const engine = createTaskEngine({
+    trace,
     usage,
     store: createJsonTaskStore(tasksDir),
     checkpoints: workspace.checkpoints,
@@ -322,7 +326,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
   });
   if (!r.ok) throw new Error(`Workflow non activé : ${r.motifs.join(" ; ")}`);
   handles.push(r.handle);
-  return { engine, interactions, registry, posted, workspace, usage };
+  return { engine, interactions, registry, posted, workspace, usage, trace };
 }
 
 export async function until(check: () => Promise<boolean>, timeoutMs = 30_000): Promise<void> {

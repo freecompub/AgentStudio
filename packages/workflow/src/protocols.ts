@@ -46,6 +46,7 @@ export type NomAppel =
   | "preuves"
   | "architecture"
   | "maintenant"
+  | "rejet"
   | "brancher"
   | "checkpoint"
   | "rembobiner"
@@ -67,6 +68,12 @@ export interface EtatWorkflow {
   /** Magasin de contenus, indexé par empreinte : un même contenu n'est stocké qu'une fois. */
   contenus: Record<string, string>;
   fin?: Fin;
+  /**
+   * Rejets tracés (`w.rejet`), déduits du journal à chaque transition : le moteur les lit pour écrire
+   * une entrée `rejet` dans la trace (même convention que les états des réducteurs, ADR 0032).
+   */
+  rejections?: number;
+  lastRejection?: { gate: string; reasons: string[] } | null;
 }
 
 /** Effet émis vers le moteur : seulement le numéro d'appel, les arguments sont dans le journal. */
@@ -141,6 +148,11 @@ export interface W {
    * `apresRembobinage` reprépare ce que le rembobinage efface (dossiers vides que Git ne suit pas).
    */
   phase<T>(nom: string, fn: (checkpoint: string) => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
+  /**
+   * Trace un essai refusé : la porte (ou la cause) et les motifs exacts. Journalisé sans effet ;
+   * `essayer` l'appelle de lui-même. Sert à savoir, après un run, pourquoi chaque travail a été refait.
+   */
+  rejet(porte: string, motifs: readonly string[]): Promise<void>;
   /** Heure courante (ISO 8601), journalisée : identique au rejeu. `Date` n'est pas disponible. */
   maintenant(): Promise<string>;
   /** Termine la tâche en échec, avec ce motif. */

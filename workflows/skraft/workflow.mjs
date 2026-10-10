@@ -244,9 +244,9 @@ async function evaluerDifficulte(w, story, indicateurs, confirmer) {
       await essayer(w, { max: 3 }, async () => {
         const r = await w.agent("skraft-classifier", consigne);
         if (!r.sortie)
-          return [`Blocage inattendu : ${r.blocage.question}`];
+          return { motifs: [`Blocage inattendu : ${r.blocage.question}`], porte: "classifieur" };
         if (!isDifficulty(r.sortie.level))
-          return [`Niveau de difficulté inconnu : ${r.sortie.level}`];
+          return { motifs: [`Niveau de difficulté inconnu : ${r.sortie.level}`], porte: "classifieur" };
         propose = { level: r.sortie.level, justification: r.sortie.justification };
         return [];
       });
@@ -281,7 +281,7 @@ function rechercher(w, vue, max) {
       vue.reponses = [...vue.reponses, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
       retour = [];
     }
-    return porteCitations(w, vue);
+    return { motifs: await porteCitations(w, vue), porte: "citations" };
   });
 }
 async function porteCitations(w, vue) {

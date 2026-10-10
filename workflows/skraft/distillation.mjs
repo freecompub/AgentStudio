@@ -25,7 +25,7 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
   // Seul l'emplacement est dynamique : il vient de la stack ; la norme vit dans l'agent (ADR 0024, 0043).
   await specialiste(w, d, s, "DISTILL", "skraft-acceptance", motifs, `\nTests d'acceptance à écrire dans : ${disp.acceptanceTests.join(", ")}`);
   const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai);
-  if (porte.length)
+  if (porte.motifs.length)
     return porte;
   const faits = [
     ...reviewFacts(s.livrables, "DISTILL"),
@@ -46,10 +46,10 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   const features = await lire(fichiers.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
   const gherkin = checkGherkin(features);
   if (gherkin.length)
-    return gherkin;
+    return { motifs: gherkin, porte: "gherkin" };
   const valeurs = checkValues({ criteria: d.story.criteria, features, acceptanceTests: await lire(fichiers.filter((f) => matchesAny(globsAcceptance, f))) });
   if (valeurs.length)
-    return valeurs;
+    return { motifs: valeurs, porte: "valeurs" };
   let testPlan;
   try {
     testPlan = await w.lireFichier(`${dir}/test-plan.md`);
@@ -57,14 +57,14 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   catch (e) {
     if (e instanceof PanneEnvironnement)
       throw e;
-    return [`Plan de test absent : ${dir}/test-plan.md`];
+    return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "valeurs" };
   }
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)
-    return ["Les tests ont dépassé le délai."];
+    return { motifs: ["Les tests ont dépassé le délai."], porte: "RED d'acceptance" };
   const red = checkAcceptanceRed({ criteria: d.story.criteria, testPlan, results: run.results });
   if (red.reasons.length)
-    return red.reasons;
+    return { motifs: red.reasons, porte: "RED d'acceptance" };
   const compte = (st) => run.results.filter((r) => r.status === st).length;
   d.derniereExecution = `Dernière exécution des tests par le code (DISTILL_RED) : ${compte("passed")} réussi(s), ${compte("failed")} en échec, ${compte("skipped")} ignoré(s).`;
   await enregistrerLivrables(w, s, (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted").map((f) => f.path), essai, sha256);
@@ -73,5 +73,5 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
     d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
     d.regressions = red.regressions;
   }
-  return [];
+  return { motifs: [], porte: "" };
 }

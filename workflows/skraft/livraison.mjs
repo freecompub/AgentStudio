@@ -71,8 +71,10 @@ async function phase(w, d, s, cpPhase, lentilles, max) {
     catch (e) {
       if (!(e instanceof TourInterrompu))
         throw e;
-      rejet = { motifs: [`Le tour précédent a été interrompu (${e.message}) : aucune porte n'a jugé ton travail.`], garanti: false };
+      rejet = { motifs: [`Le tour précédent a été interrompu (${e.message}) : aucune porte n'a jugé ton travail.`], garanti: false, porte: "délai" };
     }
+    // Réessai de toute la phase : tracé avec sa cause (docs/10 §4.3).
+    await w.rejet(`DELIVER : ${rejet.porte ?? "phase"}`, rejet.motifs);
     tentatives++;
     if (tentatives >= max && !rejet.garanti)
       throw new Escalade(rejet.motifs);
@@ -162,6 +164,8 @@ async function scenario(w, d, L, i, motifs, max) {
       if (!(e instanceof PanneEnvironnement) && !(e instanceof ScenarioEchoue))
         throw e;
       const panne = e instanceof PanneEnvironnement;
+      // Scénario repris à son début : tracé avec sa cause (docs/10 §4.3).
+      await w.rejet(panne ? `panne (${sc.id})` : `scénario ${sc.id}`, e instanceof ScenarioEchoue ? e.motifs : [e.message]);
       echecs++;
       await w.rembobiner(cpScenario);
       await creerDossiers(w, d.slug);
@@ -248,6 +252,8 @@ async function pas(w, d, L, i, etape, depuis, motifs, max, unitTests, nouveau, c
       const motif = e instanceof PasRefuse || e instanceof TourInterrompu ? e.message : null;
       if (motif === null)
         throw e;
+      // Pas refusé par sa porte, ou tour interrompu : tracé, puis rembobiné et relancé.
+      await w.rejet(`pas ${etape} (${L.scenarios[i].id})`, [motif]);
       await w.rembobiner(depuis);
       await creerDossiers(w, d.slug);
       if (essais >= max)
@@ -553,16 +559,17 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
     const essai = tentatives() + 1;
     const changes = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted");
     if (changes.length === 0)
-      return { motifs: ["Aucun livrable produit pendant la phase DELIVER."], garanti: false };
+      return { motifs: ["Aucun livrable produit pendant la phase DELIVER."], garanti: false, porte: "livrables" };
     const m = await mutationDeFin(w, L, cpPhase);
     if (m.motifs.length) {
       if (L.dernierVert && tentatives() + 1 < max) {
+        await w.rejet("mutation (correction ciblée)", m.motifs);
         consommer();
         s.fils = [...s.fils, ...filsDeMutation(m.motifs, tentatives())];
         await corriger(w, d, L, s, max);
         continue;
       }
-      return { motifs: m.motifs, garanti: false };
+      return { motifs: m.motifs, garanti: false, porte: "mutation" };
     }
     await enregistrerLivrables(w, s, changes.map((c) => c.path), essai, sha256);
     L.faits = uniq([...L.faits, ...m.faits]);
@@ -579,11 +586,12 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
     const garanti = !Array.isArray(revue) && revue.garanti === true;
     const parHumain = s.fils.some((t) => t.status === "humanMaintained");
     if (s.fils.some(isActive) && L.dernierVert && (tentatives() + 1 < max || parHumain)) {
+      await w.rejet("revue (correction ciblée)", motifs);
       consommer();
       await corriger(w, d, L, s, max);
       continue;
     }
-    return { motifs, garanti };
+    return { motifs, garanti, porte: "revue" };
   }
 }
 /** Noms du contrat ratifié présents dans le code au moment de la revue (ADR 0047). */
@@ -632,6 +640,7 @@ async function corriger(w, d, L, s, max) {
     catch (e) {
       if (!(e instanceof ScenarioEchoue))
         throw e;
+      await w.rejet(`correction (${L.scenarios[i].id})`, e.motifs);
       await w.rembobiner(depart);
       await creerDossiers(w, d.slug);
       s.fils = filsAuDepart;

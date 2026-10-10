@@ -5,8 +5,9 @@ import { Escalade, PanneEnvironnement, SauterPhase, TourInterrompu } from "../sr
 import type { DeclarationWorkflow, W } from "../src/protocols.js";
 import { fauxContexte, lancer, sortie } from "./faux-contexte.js";
 
-/** `essayer` n'appelle `w` que par `fn` : un `w` vide suffit à le tester en code pur. */
-const w = {} as W;
+/** `essayer` n'appelle de `w` que `rejet` (trace) : un `w` qui note ses rejets suffit. */
+const rejets: { porte: string; motifs: readonly string[] }[] = [];
+const w = { rejet: async (porte: string, motifs: readonly string[]) => void rejets.push({ porte, motifs }) } as unknown as W;
 
 describe("essayer : budget d'essais appliqué par le code (D24)", () => {
   it("réussite au premier essai : fn appelée une fois, sans motif", async () => {
@@ -19,6 +20,22 @@ describe("essayer : budget d'essais appliqué par le code (D24)", () => {
     const vus: (readonly string[])[] = [];
     await essayer(w, { max: 3 }, async (motifs, essai) => (vus.push(motifs), essai === 1 ? ["ADR sans conséquences"] : []));
     expect(vus).toEqual([[], ["ADR sans conséquences"]]);
+  });
+
+  it("chaque essai refusé est tracé : porte nommée, motifs exacts ; revue et tour interrompu nommés d'office", async () => {
+    rejets.length = 0;
+    const issues = [{ motifs: ["citation hors limites"], porte: "citations" }, { motifs: ["D-1"], revue: true as const }, ["sans nom"]];
+    let i = 0;
+    await essayer(w, { max: 5 }, async (_m, essai) => {
+      if (essai === 4) throw new TourInterrompu("silence");
+      return essai === 5 ? [] : issues[i++]!;
+    });
+    expect(rejets.map((r) => [r.porte, r.motifs[0]])).toEqual([
+      ["citations", "citation hors limites"],
+      ["revue", "D-1"],
+      ["porte", "sans nom"],
+      ["délai", expect.stringMatching(/interrompu \(silence\)/)],
+    ]);
   });
 
   it("budget épuisé : Escalade avec les derniers motifs, après exactement max essais", async () => {

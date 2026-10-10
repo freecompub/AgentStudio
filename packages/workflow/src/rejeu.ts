@@ -82,6 +82,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     oublier: (agents) => appeler("oublier", { agents: [...agents] }),
     informer: (texte) => appeler("informer", { texte }),
     maintenant: () => appeler("maintenant", {}),
+    rejet: (porte, motifs) => appeler("rejet", { porte, motifs: [...motifs] }, true),
     echec: (motif) => {
       throw new EchecWorkflow(motif);
     },

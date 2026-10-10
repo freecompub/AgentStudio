@@ -37,10 +37,10 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
     await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour);
     const horsStory = await controlerAdrs(w, d, avant);
     if (horsStory.length)
-      return horsStory;
+      return { motifs: horsStory, porte: "adr" };
     const porte = await porteCoherence(w, d, s, cp, essai);
     if (porte.length)
-      return porte;
+      return { motifs: porte, porte: "cohérence" };
     const revue = await reviser(w, d, s, cp, "DESIGN", lentilles, essai, reviewFacts(s.livrables, "DESIGN"));
     if (revue)
       return revue;

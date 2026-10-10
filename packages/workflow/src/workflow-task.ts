@@ -47,7 +47,7 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
 
     async initialState(input) {
       const etat: EtatWorkflow = { script: { nom: o.nom, empreinte }, entree: (input ?? null) as Json, journal: [], contenus: {} };
-      return (await o.rejoueur.rejouer(etat)).etat;
+      return avecRejets((await o.rejoueur.rejouer(etat)).etat);
     },
 
     initialEffects: (etat) => (etat.fin ? [] : effetsDe(etat.journal)),
@@ -68,7 +68,7 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
       }
       appliquer(etat, event);
       const r = await o.rejoueur.rejouer(etat);
-      return { state: r.etat, effects: r.etat.fin ? [] : effetsDe(r.nouveaux) };
+      return { state: avecRejets(r.etat), effects: r.etat.fin ? [] : effetsDe(r.nouveaux) };
     },
 
     async runEffect(effet, ctx, { taskId, state, signal }) {
@@ -91,6 +91,14 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
     isTerminal: (etat) => etat.fin !== undefined,
     phaseOf: (etat) => phaseDe(etat),
   };
+}
+
+/** `rejections` et `lastRejection` déduits des appels `w.rejet` du journal (convention du moteur). */
+function avecRejets(etat: EtatWorkflow): EtatWorkflow {
+  const rejets = etat.journal.filter((e) => e.appel === "rejet");
+  const dernier = rejets.at(-1);
+  const args = dernier ? (relire(dernier.args, etat.contenus) as { porte: string; motifs: string[] }) : null;
+  return { ...etat, rejections: rejets.length, lastRejection: args ? { gate: args.porte, reasons: args.motifs } : null };
 }
 
 function phaseDe(etat: EtatWorkflow): string {

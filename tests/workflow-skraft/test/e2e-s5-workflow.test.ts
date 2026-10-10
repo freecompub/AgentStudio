@@ -158,6 +158,9 @@ describe("skraft en workflow — porte de fin de scénario (pile simulée)", () 
 
     expect(testPrompts).toHaveLength(2);
     expect(testPrompts[1]).toContain("Mutation : Sources/Domain/BolusCap.swift à 50 % (minimum 100 %) ; mutants survivants : ligne 1 (RemoveSideEffects).");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets.map((r) => (r as { porte: string }).porte)).toEqual(["scénario ac-1"]);
+    expect((rejets[0] as { motifs: string[] }).motifs).toContain("Mutation : Sources/Domain/BolusCap.swift à 50 % (minimum 100 %) ; mutants survivants : ligne 1 (RemoveSideEffects).");
     expect(s.livraison?.granularity).toBe("session-per-step");
     expect(s.livraison?.notes).toEqual([
       "Scénario ac-1 : repris en sessions séparées après un échec.",

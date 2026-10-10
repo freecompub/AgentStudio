@@ -643,9 +643,9 @@
     {
       "id": "mesure-workflow-rejets-traces",
       "title": "Chaque rejeu du workflow est tracé avec son étape, sa porte et ses motifs exacts (prérequis P1 de docs/10)",
-      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
-      "passes": false,
-      "notes": "À FAIRE. Planifié le 2026-10-08."
+      "verify": "pnpm vitest run --project workflow test/aides.test.ts test/rejeu.test.ts && pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/e2e-s5-workflow.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : w.rejet(porte, motifs) journalisé ; essayer l’appelle à chaque essai refusé (porte nommée, « revue », « délai ») ; DELIVER trace pas refusés, scénarios repris, corrections et réessais de phase ; l’état du workflow expose rejections et lastRejection, que le moteur trace déjà. Reste de P1 : le découpage commun en étapes (CLASSIFY, REVIEW…), point 4 de la liste."
     },
     {
       "id": "mesure-durees-effets",
