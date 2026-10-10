@@ -147,6 +147,16 @@ aussi, venu d'ailleurs. Même règle pour les deux :
 2. **Dossier gelé pendant une tâche** : aucun agent ne peut écrire sous `.agent-studio/workflows/**`
    (garde du cœur), et l'empreinte enregistrée avec la tâche est revérifiée à chaque reprise : un
    dossier modifié refuse de reprendre la tâche (`docs/09` §6.5).
+**Réalisation (2026-10-10)** : `packages/workflow/src/accord/accords.ts` — résumé montré avant
+l'accord (dossier, écritures, tests, Git, agents et leurs droits, questions et profils) ;
+« une fois » autorise cette exécution, « toujours » retient l'accord pour **cette empreinte**,
+« refuser » n'en démarre rien. Gel : la garde du cœur refuse toute écriture d'agent sous
+`.agent-studio/workflows/` (sans la casse, comme `.git`), et le script ne peut pas y écrire non
+plus ; un dossier modifié entre deux reprises fait refuser la reprise, avec la consigne de relancer.
+Le dossier de la machine est hors du projet : les agents ne peuvent déjà pas y écrire. **Limite** :
+l'empreinte est calculée au chargement ; une modification à la main pendant qu'une tâche tourne
+n'est vue qu'à la reprise suivante (le code déjà chargé continue).
+
 3. Les invariants du cœur restent garantis quoi que fasse le script : preuves produites par
    `run_tests` (D20), tests gelés (D21), périmètres d'écriture, gardes en refus par défaut (D28),
    aucun Git ni shell pour les agents.

@@ -5,6 +5,33 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Accord par empreinte et gel du dossier (étape 4 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-accord` passé à `true` après son
+`verify` ; suite complète : 1 699 tests.
+
+**Précisé avec le responsable** : le gel porte sur le **dossier du workflow** (script, contrôles,
+agents, skills), pas sur le code du projet.
+
+**Fait.**
+- `packages/workflow/src/accord/accords.ts` : magasin JSON des accords (nom + empreinte, écriture
+  atomique), `resumeAccord` (ce que l'utilisateur voit), `verifierAccord` (une fois, toujours,
+  refuser — même vocabulaire que les permissions, `ConfirmAnswer`).
+- Garde du cœur (`task-agent-guard.ts`) : écriture refusée sous `.agent-studio/workflows/` pour
+  tout agent, même à périmètre `**`, sans la casse ; `estDossierDeWorkflow` exporté. Vérifiée en la
+  neutralisant : son test échoue.
+- Script : `w.ecrireFichier` et `w.creerDossier` refusés au même endroit.
+- Reprise après modification du dossier : refusée, avec « relance-la avec la nouvelle version ».
+
+**Limite notée** : l'empreinte est prise au chargement ; une modification à la main pendant une
+tâche en cours n'est vue qu'à la reprise suivante.
+
+**Suite** : étape 5, lancement — commande, `proposer_workflow` de l'agent principal avec
+confirmation, accord demandé à ce moment, bornes `meta.permissions` sur les appels `w.*`, et
+branchement dans l'application (chargeur, rejoueur isolé, lanceur Electron).
+
+---
+
 ## 10/10 — Exécution isolée des workflows (étape 3 de `docs/11` §11)
 
 Branche `feat/workflow-rejouable`. Critère `workflow-dossier-isole` passé à `true` après son

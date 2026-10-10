@@ -56,7 +56,7 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
       if (etat.script.empreinte !== empreinte) {
         etat.fin = {
           statut: "echec",
-          motif: `Le script du workflow a été modifié depuis le début de la tâche (${etat.script.empreinte} → ${empreinte}) : elle ne peut pas reprendre avec lui.`,
+          motif: `Le workflow a été modifié depuis le début de la tâche (${etat.script.empreinte} → ${empreinte}) : elle ne peut pas reprendre avec lui. Relance-la avec la nouvelle version.`,
         };
         return { state: etat, effects: [] };
       }
@@ -165,6 +165,12 @@ interface Args {
   regles: { module: string; forbidden: string[] }[];
 }
 
+/** Le dossier d'un workflow est gelé, pour le script comme pour les agents (ADR 0055). */
+function gele(chemin: string): void {
+  const s = chemin.replace(/\\/g, "/").replace(/^\.\//, "").split("/").map((x) => x.toLowerCase());
+  if (s[0] === ".agent-studio" && s[1] === "workflows") throw new Error(`Écriture refusée : ${chemin} est dans le dossier d'un workflow, gelé pendant la tâche.`);
+}
+
 interface Execution {
   ctx: ExtensionContext;
   taskId: string;
@@ -217,8 +223,10 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
     case "fichiersModifies":
       return ctx.workspace.changedFiles(a.depuis);
     case "ecrireFichier":
+      gele(a.chemin);
       return ctx.workspace.writeFile(a.chemin, a.contenu);
     case "creerDossier":
+      gele(a.chemin);
       return ctx.workspace.ensureDir(a.chemin);
     case "lancerTests":
       return ctx.stack.runTests({ signal, evidence: { ...evidence, ...(a.etiquette ? { phase: a.etiquette } : {}), ...(a.etape ? { stepId: a.etape } : {}) } });

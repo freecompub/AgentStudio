@@ -622,9 +622,9 @@
     {
       "id": "workflow-dossier-accord",
       "title": "Accord de l'utilisateur par empreinte du dossier à la première exécution et à chaque modification ; dossier gelé pendant une tâche (docs/11 §11, étape 4)",
-      "verify": "À DÉFINIR à l’implémentation (docs/11)",
-      "passes": false,
-      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+      "verify": "pnpm vitest run --project workflow test/accord.test.ts && pnpm vitest run --project core test/task-agent-guard.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : accords par empreinte (une fois / toujours / refuser), résumé des droits, garde du cœur sur .agent-studio/workflows/ (sans la casse), écriture du script refusée au même endroit, reprise refusée si le dossier a changé. L’accord n’est pas encore demandé par l’application : il le sera au lancement (étape 5)."
     },
     {
       "id": "workflow-dossier-lancement",

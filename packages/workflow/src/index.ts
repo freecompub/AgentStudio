@@ -10,3 +10,4 @@ export { compilerWorkflow, type Compilation } from "./hote/compiler.js";
 export { evaluerScript } from "./hote/bac-a-sable.js";
 export { bibliotheque, type Bibliotheque } from "./hote/bibliotheque.js";
 export { lancerEnfantWorkflow } from "./hote/enfant.js";
+export { createJsonAccordStore, resumeAccord, verifierAccord, type AccordStore } from "./accord/accords.js";

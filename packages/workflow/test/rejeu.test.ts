@@ -108,7 +108,7 @@ describe("Workflow rejouable (ADR 0052)", () => {
     await m2.engine.idle(id);
     const r = (await m2.store.load(id))!;
     expect(r.status).toBe("finished");
-    expect((r.state as EtatWorkflow).fin).toMatchObject({ statut: "echec", motif: expect.stringMatching(/script.*modifié/i) });
+    expect((r.state as EtatWorkflow).fin).toMatchObject({ statut: "echec", motif: expect.stringMatching(/workflow a été modifié/i) });
     expect(f.appels).not.toContain("lire:a");
   });
 
