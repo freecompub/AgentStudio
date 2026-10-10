@@ -45,6 +45,7 @@ export type NomAppel =
   | "disposition"
   | "preuves"
   | "architecture"
+  | "maintenant"
   | "brancher"
   | "checkpoint"
   | "rembobiner"
@@ -140,6 +141,8 @@ export interface W {
    * `apresRembobinage` reprépare ce que le rembobinage efface (dossiers vides que Git ne suit pas).
    */
   phase<T>(nom: string, fn: (checkpoint: string) => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
+  /** Heure courante (ISO 8601), journalisée : identique au rejeu. `Date` n'est pas disponible. */
+  maintenant(): Promise<string>;
   /** Termine la tâche en échec, avec ce motif. */
   echec(motif: string): never;
 }
@@ -157,4 +160,6 @@ export interface DeclarationWorkflow<E = Json> {
   empreinte?: string;
   /** Qui peut répondre à quelle question (D6). Une question non déclarée est refusée. */
   humains?: Record<string, readonly Profil[]>;
+  /** Agents déclarés (meta du workflow) : un agent absent est refusé à l'appel. Absent : pas de contrôle. */
+  agents?: readonly string[];
 }

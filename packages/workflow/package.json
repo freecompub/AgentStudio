@@ -11,7 +11,11 @@
     "@agent-studio/extension-api": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
     "acorn": "^8.18.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@agent-studio/extension-host": "workspace:*",
+    "esbuild": "^0.28.2",
+    "yaml": "^2.9.1",
+    "@agent-studio/stack-adapters": "workspace:*"
   },
   "devDependencies": {
     "@agent-studio/core": "workspace:*"

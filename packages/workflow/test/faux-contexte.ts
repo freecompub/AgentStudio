@@ -130,6 +130,18 @@ export function moteur(decl: DeclarationWorkflow<never>, ctx: ExtensionContext, 
   return { engine, store };
 }
 
+/** Moteur réel pour une définition déjà construite (rejoueur isolé, par exemple). */
+export function moteurDepuis(def: ReturnType<typeof createWorkflowTask>, ctx: ExtensionContext, store = new MemoryTaskStore()) {
+  const engine: TaskEngine = createTaskEngine({
+    store,
+    checkpoints: { create: async () => ({ id: `e-${Math.random().toString(36).slice(2, 8)}` }), rollback: async () => {} },
+    clock: fixedClock(),
+    ids: sequentialIds("t"),
+  });
+  engine.register(def, ctx);
+  return { engine, store };
+}
+
 export async function lancer(decl: DeclarationWorkflow<never>, ctx: ExtensionContext, entree: Json = null) {
   const m = moteur(decl, ctx);
   const id = await m.engine.start(decl.nom, entree);

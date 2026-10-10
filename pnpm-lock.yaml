@@ -340,12 +340,24 @@ importers:
       '@agent-studio/extension-api':
         specifier: workspace:*
         version: link:../extension-api
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../extension-host
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../stack-adapters
       '@agent-studio/task-engine':
         specifier: workspace:*
         version: link:../task-engine
       acorn:
         specifier: ^8.18.0
         version: 8.18.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
       zod:
         specifier: ^4.6.5
         version: 4.6.5

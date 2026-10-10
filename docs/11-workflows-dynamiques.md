@@ -175,6 +175,28 @@ aussi, venu d'ailleurs. Même règle pour les deux :
   interdit. (Le hasard pourrait suivre le même chemin, `w.aleatoire()`, si un workflow en a besoin.)
 - Le script ne voit que `w` et `@agent-studio/workflow`. Les appels `w.*` sont exécutés par le
   processus principal, bornés par `meta.permissions` et `meta.agents`.
+
+**Réalisation (2026-10-10, `packages/workflow/src/hote/`)** — trois barrières, chacune testée :
+
+1. **Compilation** (`compiler.ts`, esbuild) : un seul code à partir de `workflow.mjs` ; tout import
+   autre qu'un fichier du dossier ou `@agent-studio/workflow` est refusé avant exécution, y compris
+   `import("node:…")`.
+2. **Bac à sable** (`bac-a-sable.ts`, `node:vm`) : `Date` et `Math.random` lèvent une erreur qui
+   dit quoi faire (`w.maintenant()`) ; pas de minuteries, de `process`, de `fetch` ; génération de
+   code interdite (`eval`, `Function`). Le `require` du code compilé ne connaît que
+   `@agent-studio/workflow`. **Ce n'est pas une frontière de sécurité** : un objet venu du
+   processus (`w.lireFichier.constructor.constructor`) donne accès à `process`.
+3. **Processus enfant sous `--permission`** (`rejoueur.ts`, lanceur des extensions) : lecture de
+   son seul runtime, aucune écriture, aucun sous-processus. C'est **la** frontière : le test
+   d'évasion par `w.lireFichier.constructor.constructor` échoue sur `ERR_ACCESS_DENIED`, et réussit
+   si l'on retire `--permission` (vérifié). Boucle infinie : délai, processus tué, tâche en échec ;
+   crash : un nouveau processus rejoue le journal.
+
+**Risque résiduel : le réseau.** Le modèle de permissions de Node 22 ne couvre pas le réseau (vérifié
+le 2026-10-10 : une connexion part). Un script hostile qui s'évade du bac à sable peut donc ouvrir
+une connexion, sans pouvoir lire hors de son runtime ni écrire. C'est la même limite que pour les
+extensions aujourd'hui (D9). À lever avec une version de Node qui restreint le réseau, ou un
+confinement du processus par le système.
 - Moteur, journal, rejeu, reprise après crash, sessions : **inchangés** (`docs/09`, ADR 0052, 0053).
   `createWorkflowTask` reçoit le script et le `meta` au lieu d'une déclaration en TypeScript.
 

@@ -5,6 +5,47 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Exécution isolée des workflows (étape 3 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-isole` passé à `true` après son
+`verify` (17 tests ; paquet `workflow` : 79 ; suite complète : 1 692).
+
+**Fait** (`packages/workflow/src/hote/`) :
+- `compiler.ts` : esbuild, sortie CJS en mémoire ; imports limités au dossier et à
+  `@agent-studio/workflow`, motif avec fichier et ligne.
+- `bac-a-sable.ts` : `node:vm`, `codeGeneration` interdite ; `Date` et `Math.random` lèvent une
+  erreur explicite ; `require` limité à la bibliothèque.
+- `bibliotheque.ts` : ce que le script importe — `essayer`, `agir`, erreurs, et les calculs purs
+  (`empreinte`, `correspond`, `lireYaml`, barre de qualité, couches).
+- `enfant.ts`, `enfant-entree.ts`, `rejoueur.ts` : processus enfant lancé par le lanceur des
+  extensions (`--permission`, lecture de son runtime seul) ; le principal lui envoie le code, puis
+  l'état à rejouer ; il rend l'état et les entrées nouvelles. Boucle → délai, processus tué, tâche
+  en échec ; script invalide → échec motivé ; crash → nouveau processus, rejeu du journal.
+- `createWorkflowTaskDepuis({ nom, empreinte, humains, rejoueur })` : la définition de tâche ne
+  sait plus où tourne le script ; `createWorkflowTask` garde sa forme (rejoueur local).
+- `w.maintenant()` (journalisé) ; agent non déclaré dans le meta refusé à l'appel.
+- Dépendances de `packages/workflow` : `@agent-studio/extension-host` (lanceur, RPC),
+  `@agent-studio/stack-adapters` (motifs, barre de qualité), `esbuild`, `yaml`.
+
+**Vérifié contre les faux positifs** : en retirant `--permission` du lanceur, le test d'évasion
+échoue (le fichier est écrit). **Le bac à sable seul ne protège pas** : `w.lireFichier.constructor
+.constructor("return process")()` en sort ; la frontière est le processus.
+
+**Risque résiduel, mesuré** : Node 22 ne restreint pas le réseau (une connexion part sous
+`--permission`). Même limite que les extensions ; documenté dans `docs/11` §8.
+
+**Piège** : le code compilé appelle `require("@agent-studio/workflow")` ; un test qui exigeait
+`typeof require === "undefined"` était faux — le `require` existe, mais ne connaît que la
+bibliothèque.
+
+**Reste pour l'étape 5** : borner les appels `w.*` d'écriture et de Git par `meta.permissions`
+(aujourd'hui seuls les agents et les questions déclarés sont contrôlés), et le lanceur Electron
+(`utilityProcess`) pour les workflows.
+
+**Suite** : étape 4, accord par empreinte et gel du dossier pendant une tâche.
+
+---
+
 ## 09/10 — Chargeur de workflows (étape 2 de `docs/11` §11)
 
 Branche `feat/workflow-rejouable`. Critère `workflow-dossier-chargeur` passé à `true` après son

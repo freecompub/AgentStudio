@@ -49,14 +49,16 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
   };
 
   const w: W = {
-    agent: (nom, consigne, opts = {}) =>
-      appeler("agent", {
+    agent: async (nom, consigne, opts = {}) => {
+      if (decl.agents && !decl.agents.includes(nom)) throw new Error(`Agent « ${nom} » non déclaré dans le meta du workflow ${decl.nom}`);
+      return appeler("agent", {
         nom,
         consigne: opts.motifs?.length ? `${consigne}\n\nRejet précédent :\n${opts.motifs.map((m) => `  - ${m}`).join("\n")}` : consigne,
         ...(opts.lectureSeule?.length ? { lectureSeule: [...opts.lectureSeule] } : {}),
         ...(opts.gelApresRouge ? { gelApresRouge: true } : {}),
         ...(opts.preuve ? { preuve: { ...opts.preuve } } : {}),
-      }),
+      });
+    },
     humain: async (id, question, options, opts = {}) => {
       if (decl.humains && !(id in decl.humains)) throw new Error(`Question humaine « ${id} » non déclarée dans le workflow ${decl.nom}`);
       return appeler("humain", { id, question, options: options.map((o) => ({ id: o.id, label: o.label })), ...opts });
@@ -79,6 +81,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     commiter: (message, chemins) => appeler("commiter", { message, ...(chemins ? { chemins: [...chemins] } : {}) }),
     oublier: (agents) => appeler("oublier", { agents: [...agents] }),
     informer: (texte) => appeler("informer", { texte }),
+    maintenant: () => appeler("maintenant", {}),
     echec: (motif) => {
       throw new EchecWorkflow(motif);
     },

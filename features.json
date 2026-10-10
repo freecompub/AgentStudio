@@ -615,9 +615,9 @@
     {
       "id": "workflow-dossier-isole",
       "title": "Le script d'un workflow tourne dans un processus isolé dédié, sans heure, hasard, minuteries, réseau ni modules Node, ses appels w.* bornés par le meta (docs/11 §11, étape 3)",
-      "verify": "À DÉFINIR à l’implémentation (docs/11)",
-      "passes": false,
-      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+      "verify": "pnpm vitest run --project workflow test/hote.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : compilation à imports contrôlés, bac à sable node:vm (Date, Math.random, minuteries, eval absents ; w.maintenant() journalisé), processus enfant sous --permission (évasion vers le disque refusée, vérifié en retirant --permission). RÉSERVE : le réseau n’est pas bloqué par Node 22 (même limite que les extensions). Les appels w.* sont déjà bornés par les agents et questions déclarés ; les bornes d’écriture et de Git du meta seront branchées avec le lancement (étape 5)."
     },
     {
       "id": "workflow-dossier-accord",
