@@ -41,6 +41,7 @@ export function manifesteDuWorkflow(w: WorkflowTrouve): ExtensionManifest {
         name,
         title: name,
         prompt: a.prompt,
+        ...(a.consignes ? { role: a.consignes } : {}),
         output: a.sortie,
         ...(a.ecriture ? { write: [...a.ecriture] } : {}),
         ...(a.outils ? { tools: [...a.outils] } : {}),
@@ -49,7 +50,8 @@ export function manifesteDuWorkflow(w: WorkflowTrouve): ExtensionManifest {
         ...(a.memoire ? { memoire: a.memoire } : {}),
       })),
       skills: skills.map((name) => ({ name, path: `skills/${name}` })),
-      tasks: [{ name: m.name, title: m.description, states: { ...m.phases } }],
+      // Le titre de la carte est court (80 caractères) : le nom, pas la description.
+      tasks: [{ name: m.name, title: m.name, states: { ...m.phases } }],
     },
   };
 }

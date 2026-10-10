@@ -17,7 +17,9 @@ Math.random = function () { throw new Error("Le hasard n'est pas disponible dans
 `;
 
 export function evaluerScript(code: string, bib: Bibliotheque = bibliothequeParDefaut): { meta: unknown; script: ScriptWorkflow<never> } {
-  const ctx = vm.createContext({}, { name: "workflow", codeGeneration: { strings: false, wasm: false } });
+  // `URL` et `URLSearchParams` ne sont pas du langage mais des API de Node et du web : purs et
+  // déterministes, ils sont fournis (la porte des citations de skraft vérifie les URL avec).
+  const ctx = vm.createContext({ URL, URLSearchParams }, { name: "workflow", codeGeneration: { strings: false, wasm: false } });
   vm.runInContext(PREAMBULE, ctx);
   const module = { exports: {} as Record<string, unknown> };
   const exiger = (nom: string) => {

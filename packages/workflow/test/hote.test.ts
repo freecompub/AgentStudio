@@ -109,6 +109,10 @@ describe("bac à sable : ce qui rend le rejeu faux est absent", () => {
     await expect(essayer(`return require("node:fs");`)).rejects.toThrow(/import interdit dans un workflow : node:fs/);
   });
 
+  it("URL et URLSearchParams, purs, sont disponibles", async () => {
+    await expect(essayer(`return new URL("https://exemple.fr/a?b=1").searchParams.get("b");`)).resolves.toBe("1");
+  });
+
   it("pas de génération de code (eval, Function)", async () => {
     await expect(essayer(`return eval("1 + 1");`)).rejects.toThrow(/Code generation from strings disallowed/);
     await expect(essayer(`return new Function("return 1")();`)).rejects.toThrow(/Code generation from strings disallowed/);

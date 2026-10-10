@@ -636,9 +636,9 @@
     {
       "id": "workflow-skraft-javascript",
       "title": "Le workflow skraft en JavaScript, chargé depuis un dossier de projet, passe les jumeaux e2e-s2 à e2e-s6 et le test de reprise ; ADR rattachés à leur US par le slug (docs/11 §11, étape 6)",
-      "verify": "À DÉFINIR à l’implémentation (docs/11)",
-      "passes": false,
-      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+      "verify": "pnpm vitest run --project workflow-skraft",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : workflows/skraft/ (JavaScript, meta littéral, 11 agents, 12 skills) ; tests dans tests/workflow-skraft/ (219, dont jumeaux e2e-s2 à e2e-s6 en vraie chaîne Swift, dialogue de revue, reprise après crash, ADR par story). Le workflow est copié dans .agent-studio/workflows/ du projet d’essai, commité, activé et exécuté isolé."
     },
     {
       "id": "mesure-workflow-rejets-traces",

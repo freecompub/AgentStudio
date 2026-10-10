@@ -16,6 +16,8 @@ const texte = (max: number) => z.string().trim().min(1).max(max);
 const agent = z
   .object({
     prompt: texte(200),
+    /** Consignes propres à agent-studio, ajoutées au contenu du fichier d'agent (ADR 0024). */
+    consignes: texte(20_000).optional(),
     classe: z.enum(["strong", "standard", "light"]).optional(),
     ecriture: z.array(texte(200)).optional(),
     outils: z.array(texte(40)).optional(),

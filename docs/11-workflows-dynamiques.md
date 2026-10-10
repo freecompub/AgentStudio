@@ -240,6 +240,13 @@ confinement du processus par le système.
   d'un autre slug modifié, un ADR décidé modifié, une ligne `Story` changée : rejet, et le tour est
   rembobiné. Le gabarit est vérifié par la porte cohérence (sections, statut).
 
+**Réalisation (2026-10-10)** : `workflows/skraft/conception.mjs`, `instantaneAdrs` et
+`controlerAdrs`. Un amendement par réécriture complète fait disparaître la ligne `Story` : le code
+la remet au lieu de rejeter le tour. Une ligne `Story` d'une autre story, ou un ADR d'une autre
+story ou décidé modifié ou supprimé : restauré, et le tour rejeté avec le motif. Un ADR de l'US
+proposé avant un arrêt est reconnu après la reprise (sa ligne `Story`). Testé par
+`tests/workflow-skraft/test/e2e-adr-story.test.ts` (vérifié en retirant la restauration).
+
 ## 10. Ce que ça change dans le code
 
 | Part | Devenir |

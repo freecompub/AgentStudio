@@ -5,6 +5,48 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — skraft converti en workflow JavaScript (étape 6 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-skraft-javascript` passé à `true` après son
+`verify` (219 tests) ; suite complète : 1 934 tests.
+
+**Fait.**
+- `workflows/skraft/` : conversion de `extensions/skraft-workflow/src` par le compilateur
+  TypeScript (commentaires gardés), puis ré-indentation en deux espaces par un script qui ne touche
+  pas l'intérieur des littéraux sur plusieurs lignes ; provenance en tête de chaque fichier ;
+  `meta` littéral en tête de `workflow.mjs` (agents et consignes repris de `roles.ts`, mot pour
+  mot sauf l'architecte des décisions) ; imports remplacés par la bibliothèque (`correspond`,
+  `empreinte`, `lireBarreDeQualite`, `couchesManquantes`, `coucheDe`) ; `zod` remplacé par une
+  relecture écrite à la main dans `review.mjs`.
+- `meta.agents.<nom>.consignes` (nouveau champ, traduit en `role`) : les consignes d'orchestration
+  restent hors du fichier d'agent partageable (ADR 0024).
+- Point 7 réalisé : plus de `render_adr` ; ligne `Story : <slug>` écrite par le code ; ADR d'une
+  autre story ou décidé restauré et tour rejeté.
+- `tests/workflow-skraft/` (nouveau projet Vitest, `tests/*` ajouté à pnpm et à Vitest,
+  `allowJs` dans `tsconfig.json`) : harnais qui copie le workflow dans `.agent-studio/workflows/`
+  du projet d'essai, le commite, l'active et l'exécute isolé ; jumeaux repris ;
+  `e2e-adr-story.test.ts` ajouté.
+
+**Défauts trouvés par ces tests, corrigés.**
+- Titre de carte de tâche pris dans la description du `meta` (jusqu'à 500 caractères) alors que le
+  manifeste interne le limite à 80 : la carte prend le nom.
+- `URL` absent du bac à sable (ce n'est pas du langage) : la porte des citations jugeait toute URL
+  « mal formée ». `URL` et `URLSearchParams`, purs, sont fournis ; test ajouté.
+- Amendement d'ADR par réécriture complète : la ligne `Story` disparaissait et le tour était
+  rejeté ; le code la remet.
+
+**Pièges.**
+- Les modules du workflow importent `@agent-studio/workflow`, introuvable depuis `workflows/` :
+  dans les tests, un greffon Vite le résout vers `pour-les-scripts.ts` **pour ces seuls fichiers**
+  (un alias global cassait le harnais, qui a besoin de la vraie API).
+- Un workflow de projet **doit être commité** : non suivi, un rembobinage (`git clean`) l'efface.
+- Les tests unitaires repris importent du JavaScript sans types : `// @ts-nocheck` avec la raison.
+
+**Suite** : retirer `extensions/skraft-workflow` (converti) ; adapter `docs/10` et l'ADR 0054
+(la comparaison porte sur le workflow) ; P1 à P6 de `docs/10` pour la campagne US-2.
+
+---
+
 ## 10/10 — Lancement des workflows (étape 5 de `docs/11` §11)
 
 Branche `feat/workflow-rejouable`. Critère `workflow-dossier-lancement` passé à `true` après son

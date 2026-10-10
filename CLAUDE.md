@@ -33,7 +33,9 @@ Les deux coexistent le temps de les comparer avec Copilot (ADR 0054) : une corre
 ne se reporte pas seule dans l'autre.
 **Décidé le 08/10 (ADR 0055, `docs/11`)** : un workflow n'est plus une extension mais un **dossier**
 (`workflow.mjs` en JavaScript, `meta` littéral en tête, agents, skills, contrôles), sur la machine
-(`~/.agent-studio/workflows/`) ou dans le projet (`.agent-studio/workflows/`) ; pas encore implémenté. L'approche YAML de `docs/08` est
+(`~/.agent-studio/workflows/`) ou dans le projet (`.agent-studio/workflows/`). Implémenté : chargeur,
+exécution isolée, accord, lancement (`packages/workflow`) ; le modèle skraft est `workflows/skraft/`, testé par
+`tests/workflow-skraft/` (projet Vitest `workflow-skraft`). L'approche YAML de `docs/08` est
 abandonnée.
 
 ```bash
@@ -41,7 +43,7 @@ pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
 pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
-                                #            extension-packaging, ext-tdd, ext-skraft, ext-skraft-workflow, desktop
+                                #            extension-packaging, ext-tdd, ext-skraft, ext-skraft-workflow, workflow-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)
