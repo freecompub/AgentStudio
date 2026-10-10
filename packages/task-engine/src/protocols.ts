@@ -39,6 +39,11 @@ export interface TaskDefinition<S, E extends { type: string }, F, D> {
   isTerminal(state: S): MaybePromise<boolean>;
   /** Nom de l'état courant, pour l'usage par état (D37). Défaut : `state.phase`. */
   phaseOf?(state: S): MaybePromise<string>;
+  /**
+   * L'événement rendu par `runEffect` signale-t-il un échec (pour la trace des effets) ? Une tâche
+   * qui rend ses erreurs comme événements, au lieu de les lever, le dit ici. Défaut : non.
+   */
+  estUnEchec?(event: TaskEvent<E>): boolean;
 }
 
 export type TaskStatus = "running" | "waiting" | "finished";

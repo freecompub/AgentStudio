@@ -18,6 +18,14 @@ export interface ResumeEtape {
   nanoAiu: number;
   /** Modèles réellement utilisés par les appels de l'étape (ADR 0048). */
   modèles: string[];
+  /** Temps des tours d'agent commencés dans l'étape (du début à la fin de chaque tour). */
+  agentsMs: number;
+  /** Temps des effets exécutés dans l'étape (agents compris). */
+  effetsMs: number;
+  /** Temps du code : effets moins tours d'agent (tests, mutation, Git, lectures). */
+  codeMs: number;
+  /** Temps de calcul des transitions : coût du moteur, rejeu du script compris. */
+  moteurMs: number;
 }
 
 export interface ResumeRun {
@@ -43,6 +51,10 @@ const vide = (phase: string, début: string): ResumeEtape => ({
   sortie: 0,
   nanoAiu: 0,
   modèles: [],
+  agentsMs: 0,
+  effetsMs: 0,
+  codeMs: 0,
+  moteurMs: 0,
 });
 
 /**
@@ -56,6 +68,7 @@ const vide = (phase: string, début: string): ResumeEtape => ({
 export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
   const etapes: ResumeEtape[] = [];
   const etapeDeSession = new Map<string, ResumeEtape>();
+  const debutDeSession = new Map<string, number>();
   let courante: ResumeEtape | undefined;
   let dernier = "";
 
@@ -71,13 +84,25 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
     if (e.kind === "transition") {
       const et = entrer(e.phase ?? courante?.phase ?? "?", e.at);
       if (typeof e.essais === "number") et.essaisMax = Math.max(et.essaisMax, e.essais);
+      if (typeof e.duréeMs === "number") et.moteurMs += e.duréeMs;
     } else if (e.kind === "tour-début") {
       const et = entrer(e.phase ?? courante?.phase ?? "?", e.at);
       et.tours++;
-      if (e.sessionId) etapeDeSession.set(e.sessionId, et);
+      if (e.sessionId) {
+        etapeDeSession.set(e.sessionId, et);
+        debutDeSession.set(e.sessionId, Date.parse(e.at));
+      }
     } else if (e.kind === "rejet") {
       entrer(courante?.phase ?? "?", e.at).rejets.push({ porte: e.porte, motifs: e.motifs });
+    } else if (e.kind === "effet") {
+      entrer(e.phase ?? courante?.phase ?? "?", e.at).effetsMs += e.duréeMs;
     } else if (e.kind === "tour-fin") {
+      const debut = e.sessionId ? debutDeSession.get(e.sessionId) : undefined;
+      if (e.sessionId && debut !== undefined) {
+        const et = etapeDeSession.get(e.sessionId) ?? entrer(courante?.phase ?? "?", e.at);
+        et.agentsMs += Math.max(0, Date.parse(e.at) - debut);
+        debutDeSession.delete(e.sessionId);
+      }
       if (!NORMALES.includes(e.fin)) {
         const et = (e.sessionId && etapeDeSession.get(e.sessionId)) || entrer(courante?.phase ?? "?", e.at);
         et.finsAnormales.push({ fin: e.fin, ...(e.raison ? { raison: e.raison } : {}) });
@@ -95,6 +120,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
   etapes.forEach((et, i) => {
     const fin = etapes[i + 1]?.début ?? dernier;
     et.duréeMs = Math.max(0, Date.parse(fin) - Date.parse(et.début));
+    et.codeMs = Math.max(0, et.effetsMs - et.agentsMs);
   });
 
   const parPhase: ResumeEtape[] = [];
@@ -113,10 +139,14 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
     p.entrée += et.entrée;
     p.sortie += et.sortie;
     p.nanoAiu += et.nanoAiu;
+    p.agentsMs += et.agentsMs;
+    p.effetsMs += et.effetsMs;
+    p.codeMs += et.codeMs;
+    p.moteurMs += et.moteurMs;
     for (const m of et.modèles) if (!p.modèles.includes(m)) p.modèles.push(m);
   }
 
-  const somme = (k: "duréeMs" | "tours" | "appels" | "entrée" | "sortie" | "nanoAiu") => etapes.reduce((n, et) => n + et[k], 0);
+  const somme = (k: "duréeMs" | "tours" | "appels" | "entrée" | "sortie" | "nanoAiu" | "agentsMs" | "effetsMs" | "codeMs" | "moteurMs") => etapes.reduce((n, et) => n + et[k], 0);
   return {
     etapes,
     parPhase,
@@ -127,6 +157,10 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
       entrée: somme("entrée"),
       sortie: somme("sortie"),
       nanoAiu: somme("nanoAiu"),
+      agentsMs: somme("agentsMs"),
+      effetsMs: somme("effetsMs"),
+      codeMs: somme("codeMs"),
+      moteurMs: somme("moteurMs"),
       rejets: etapes.reduce((n, et) => n + et.rejets.length, 0),
     },
   };

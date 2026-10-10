@@ -32,7 +32,12 @@ export type TraceEntry = {
   | { kind: "usage"; modèle?: string; entrée?: number; sortie?: number; nanoAiu?: number }
   | { kind: "contexte"; occupés: number; limite: number; système?: number; conversation?: number; outils?: number; messages?: number }
   /** Transition de la machine à états : l'événement reçu, l'état obtenu, les effets déclenchés. */
-  | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[] }
+  | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[]; /** Calcul de la transition : coût du moteur (rejeu compris). */ duréeMs?: number }
+  /**
+   * Effet exécuté (docs/10 P2) : sa durée, et comment il s'est terminé — `attente` quand il a posé
+   * une question à l'humain et rend la main. Sépare le temps des agents de celui du code.
+   */
+  | { kind: "effet"; effet: string; phase?: string; duréeMs: number; issue: "ok" | "erreur" | "attente" }
   /** Rejet par une porte ou une revue, avec ses motifs entiers. */
   | { kind: "rejet"; porte: string; motifs: string[] }
   /**

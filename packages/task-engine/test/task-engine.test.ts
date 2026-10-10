@@ -421,6 +421,44 @@ describe("Moteur de tâches — trace", () => {
     ]);
   });
 
+  it("trace chaque effet avec sa durée et son issue, et la durée de chaque transition (docs/10 P2)", async () => {
+    const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["x"] }, { type: "PASS" }]);
+    const effets = entries.filter((e) => e.kind === "effet");
+    expect(effets).toEqual([
+      expect.objectContaining({ effet: "work", phase: "DESIGN", issue: "ok", duréeMs: expect.any(Number) }),
+      expect.objectContaining({ effet: "work", phase: "DESIGN", issue: "ok", duréeMs: expect.any(Number) }),
+    ]);
+    for (const t of entries.filter((e) => e.kind === "transition")) expect(t).toMatchObject({ duréeMs: expect.any(Number) });
+  });
+
+  it("un effet qui attend une réponse humaine, ou qui échoue, le dit dans son issue", async () => {
+    const entries: TraceEntry[] = [];
+    const trace = { append: async (e: TraceEntry) => void entries.push(e), list: async () => entries, archive: async () => undefined };
+    const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t"), trace });
+    let n = 0;
+    engine.register(
+      {
+        name: "issues",
+        initialState: () => ({ phase: "X" }),
+        initialEffects: () => [{ kind: "casse" }, { kind: "attend" }],
+        transition: (s) => ({ state: s, effects: [] }),
+        runEffect: async (f: { kind: string }) => {
+          n++;
+          if (f.kind === "casse") throw new Error("boum");
+        },
+        isTerminal: () => false,
+      },
+      {},
+    );
+    const id = await engine.start("issues", {});
+    await engine.idle(id);
+    expect(n).toBe(2);
+    expect(entries.filter((e) => e.kind === "effet").map((e) => [(e as { effet: string }).effet, (e as { issue: string }).issue])).toEqual([
+      ["casse", "erreur"],
+      ["attend", "attente"],
+    ]);
+  });
+
   it("un motif conservé d'un rejet précédent ne compte pas comme un nouveau rejet", async () => {
     // `lastRejection` reste posé pendant tout le réessai : seul le compteur dit qu'un rejet a eu lieu.
     const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["x"] }, { type: "PASS" }]);
