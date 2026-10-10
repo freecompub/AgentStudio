@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -108,6 +109,8 @@ function createWindow(): BrowserWindow {
 /** Extensions internes construites par `scripts/build-extensions.mjs`, et runtime de leurs hôtes. */
 const EXTENSIONS_DIR = join(import.meta.dirname, "../extensions");
 const EXTENSION_RUNTIME = join(import.meta.dirname, "../extension-host/extension-child.mjs");
+/** Runtime des processus enfants des workflows en dossier (ADR 0055). */
+const WORKFLOW_RUNTIME = join(import.meta.dirname, "../workflow-host/workflow-child.mjs");
 
 /** Liste de révocation signée désignée par l'administrateur (fichier ou URL), ou `null`. */
 async function fetchRevocationList(rev: { file?: string; url?: string } | null): Promise<unknown> {
@@ -183,6 +186,12 @@ async function createController(): Promise<AppController> {
       isolation: {
         launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'une extension", { output: c.slice(0, 2_000) }) }),
         runtimeEntry: EXTENSION_RUNTIME,
+      },
+      // Workflows en dossier (ADR 0055) : ceux de la machine, puis ceux du projet ouvert.
+      workflows: {
+        machine: join(homedir(), ".agent-studio", "workflows"),
+        launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'un workflow", { output: c.slice(0, 2_000) }) }),
+        runtimeEntry: WORKFLOW_RUNTIME,
       },
       // Swift (SwiftPM) puis TypeScript (Vitest) ; chaîne Swift du système ou installée hors système.
       // Un projet qui déclare son propre profil (`.agent-studio/stack.yaml`) l'emporte sur eux.

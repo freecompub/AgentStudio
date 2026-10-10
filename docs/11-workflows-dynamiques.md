@@ -136,6 +136,23 @@ du projet : le workflow est écarté, et la raison est dite (champ et valeur fau
   affiche la proposition (workflow, entrées, phases) et **rien ne démarre sans confirmation**.
   L'agent ne peut pas lancer seul.
 
+**Réalisation (2026-10-10)** :
+- `packages/workflow/src/hote/activer.ts` : la commande lit ses arguments d'après `meta.entrees`
+  (positionnels dans l'ordre, booléens en `--nom`, usage affiché sinon), demande l'accord, puis
+  lance la tâche. En interne, le `meta` est traduit en une déclaration que la machinerie des
+  extensions sait exécuter — composition des prompts, gardes, preuves, et **vérification de chaque
+  appel du script contre les permissions** (écriture par motif, `git:*`, tests) ; un refus se dit
+  en termes du `meta` (« `git:branch` : action non déclarée dans meta.permissions »). Le script n'en
+  reçoit rien : il tourne isolé et ne voit que `w.*`.
+- Application (`apps/desktop`) : workflows cherchés à l'ouverture du projet
+  (`~/.agent-studio/workflows/`, puis `.agent-studio/workflows/`), écartés ou remplacés avec un
+  message, runtime enfant construit avec celui des extensions, même lanceur `utilityProcess`.
+- Agent principal : outil `proposer_workflow(nom, arguments)`, présent seulement si un workflow
+  est actif ; sa description liste les workflows et leur syntaxe ; **la proposition est confirmée
+  par l'utilisateur**, puis l'accord sur le workflow est demandé comme pour une commande.
+- **Pas encore éprouvé dans Electron réel** : les tests passent par le lanceur Node ; le lanceur
+  `utilityProcess` est celui des extensions, déjà éprouvé pour elles.
+
 ## 7. La confiance
 
 Un workflow du projet est du code du dépôt qui s'exécute sur la machine ; un workflow de la machine

@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, UserConfirmer } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -57,6 +57,8 @@ export interface WorkspaceServices {
   commands(): CommandListing[];
   /** Hooks `onPreToolUse` des extensions actives, pour l'arbitre de la session principale. */
   hookGuards(): ToolCallGuard[];
+  /** Outils donnés à l'agent principal (`proposer_workflow` si un workflow est actif, ADR 0055). */
+  outilsAgent(): ToolSpec[];
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;

@@ -32,6 +32,8 @@ export interface OptionsTache {
   humains?: Record<string, readonly Profil[]>;
   /** Qui rejoue le script : dans ce processus, ou dans un processus isolé (`docs/11` §8). */
   rejoueur: Rejoueur;
+  /** Workflow en dossier : un refus de permission se dit en termes du `meta` (ADR 0055). */
+  refusEnTermesDuMeta?: boolean;
 }
 
 /** Définition de tâche à partir d'un rejoueur : le script peut tourner hors de ce processus. */
@@ -79,7 +81,9 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
         return { type: "RESULTAT", n: effet.n, resultat: (r ?? null) as Json };
       } catch (err) {
         const nature: NatureErreur = err instanceof WorkDefectError ? "tour-interrompu" : err instanceof EnvFailureError ? "panne" : "erreur";
-        return { type: "ERREUR", n: effet.n, nature, message: err instanceof Error ? err.message : String(err) };
+        const permission = o.refusEnTermesDuMeta && err instanceof Error && err.name === "PermissionDeniedError" ? (err as { permission?: string }).permission : undefined;
+        const message = permission ? `${permission} : action non déclarée dans meta.permissions du workflow` : err instanceof Error ? err.message : String(err);
+        return { type: "ERREUR", n: effet.n, nature, message };
       }
     },
 

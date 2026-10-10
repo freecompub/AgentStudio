@@ -5,6 +5,42 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Lancement des workflows (étape 5 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-lancement` passé à `true` après son
+`verify` ; suite complète : 1 714 tests.
+
+**Précisé avec le responsable** : les limites du `meta` (écriture, Git, tests) s'appliquent aux
+appels du **script** ; celles des agents sont déjà tenues par la garde du cœur.
+
+**Fait.**
+- `packages/workflow/src/hote/activer.ts` : `manifesteDuWorkflow` (le `meta` traduit en
+  déclaration interne : `fs:write:<motif>`, `shell:test`, `git:*`, agents, skills, commande,
+  tâche), `lireEntrees` et `syntaxeCommande`, `activerWorkflow` (compilation, rejoueur isolé,
+  tâche, commande avec accord). Les refus de permission se disent en termes du `meta`.
+- Choix d'implémentation : **réutiliser la machinerie des extensions pour exécuter les effets**
+  (prompts, gardes, preuves, vérification des permissions à chaque appel) plutôt que de la
+  réécrire. Le script n'en voit rien : il est isolé et n'a que `w.*`. L'ADR 0055 est respecté
+  côté auteur (un dossier, pas d'extension à écrire) ; c'est un détail interne de la plateforme.
+- `apps/desktop` : workflows cherchés à l'ouverture du projet (machine puis projet), écartés ou
+  remplacés avec un message, désactivés s'il n'y a pas de confirmateur ; runtime enfant construit
+  par `build-extensions.mjs` (`out/workflow-host/workflow-child.mjs`), lanceur `utilityProcess`.
+- Agent principal : `proposer_workflow(nom, arguments)` ; confirmation de la proposition, puis
+  accord sur le workflow ; refus rendu à l'agent (« ne relance pas sans qu'il le demande »).
+
+**Pièges.**
+- Recoller le nom de la commande dans le message d'usage après coup l'a cassé (`/<story>`) : la
+  commande est maintenant un paramètre de `lireEntrees`.
+- `w.phase` rembobine en cas d'escalade : un workflow qui utilise des phases doit déclarer
+  `git: ["revert"]`, sinon l'escalade échoue sur la permission. À rappeler dans le modèle skraft.
+
+**Non éprouvé** : Electron réel (les tests utilisent le lanceur Node).
+
+**Suite** : étape 6, skraft converti en workflow JavaScript, chargé depuis un dossier de projet ;
+les jumeaux `e2e-s2` à `e2e-s6` et le test de reprise doivent passer dessus.
+
+---
+
 ## 10/10 — Accord par empreinte et gel du dossier (étape 4 de `docs/11` §11)
 
 Branche `feat/workflow-rejouable`. Critère `workflow-dossier-accord` passé à `true` après son

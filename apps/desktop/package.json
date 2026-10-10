@@ -24,6 +24,7 @@
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
     "@github/copilot-sdk": "1.0.14",
     "react": "^19.3.0",

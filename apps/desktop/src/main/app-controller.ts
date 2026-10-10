@@ -365,6 +365,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
         workspaceRoot: ws.root,
         systemPrompt: deps.systemPrompt,
         ...(modele ? { model: modele } : {}),
+        // `proposer_workflow` si un workflow est actif dans ce projet (ADR 0055).
+        tools: services?.outilsAgent() ?? [],
         // Arbitre unique : politique du cœur → hooks des extensions → règles → question (D27).
         guard: createPermissionArbiter({
           root: ws.root,

@@ -629,9 +629,9 @@
     {
       "id": "workflow-dossier-lancement",
       "title": "Un workflow se lance par sa commande, ou sur proposition de l'agent principal confirmée par l'utilisateur (docs/11 §11, étape 5)",
-      "verify": "À DÉFINIR à l’implémentation (docs/11)",
-      "passes": false,
-      "notes": "À FAIRE. Décidé le 2026-10-08 (ADR 0055)."
+      "verify": "pnpm vitest run --project workflow test/activer.test.ts && pnpm vitest run --project desktop apps/desktop/test/workflows.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : commande et arguments d’après le meta, accord, permissions du meta appliquées à chaque appel (écriture, git, tests), workflows trouvés à l’ouverture du projet, outil proposer_workflow de l’agent principal avec confirmation. Non éprouvé dans Electron réel (tests sur le lanceur Node)."
     },
     {
       "id": "workflow-skraft-javascript",
