@@ -5,6 +5,36 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/10 — Campagne US-2 prête, pas lancée
+
+**État.** Tout le banc est écrit (P1 à P6 de `docs/10`) ; aucun run n'a tourné.
+
+**Vérifié avant de lancer.**
+- .NET 10.0.401 est dans `~/.dotnet`, **pas dans le PATH** du shell : sans
+  `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`, `dotnet test` n'existe pas et la suite de
+  référence échouerait comme une panne d'environnement.
+- Projet d'essai `exemple-dotnet-tdd` propre, commit `a7cf6db`, suite verte (5 tests) ;
+  `gh` connecté (compte `freecompub`), distant `github.com/freecompub/exemple-dotnet-tdd`.
+
+**Piège.** Le lancement par l'agent est refusé par le mode automatique de Claude Code (requêtes
+Copilot payantes et poussée GitHub). L'utilisateur lance lui-même, ou ajoute une règle de
+permission Bash pour `pnpm tsx scripts/mesure-skraft.ts`.
+
+**Écart au protocole.** Le run à blanc (§6 point 1) n'est pas fait : le banc n'a pas de mode
+simulé. Le premier run réel sert aussi de vérification du banc ; si le rapport final plante, la
+trace JSONL reste et le résumé peut être recalculé.
+
+**Prochaine étape** — quatre runs en alternance, au plus 250 requêtes chacun :
+
+```
+PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet pnpm tsx scripts/mesure-skraft.ts \
+  /home/diabeo/Projets/exemple-dotnet-tdd stories/US-2.md 45 --pousser            # runs 1 et 3
+# … même commande avec --workflow                                                 # runs 2 et 4
+tsx scripts/banc/comparer.ts docs/runs/<run1> docs/runs/<run2> …                   # rapport
+```
+
+---
+
 ## 10/10 — Étapes communes, durée des effets, rapport de comparaison (points 4, 5, 7)
 
 Suite complète : 1 728 tests ; typage propre. Le banc n'a toujours **jamais tourné**.

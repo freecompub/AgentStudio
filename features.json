@@ -659,7 +659,7 @@
       "title": "Le banc de mesure lance l'extension skraft ou le workflow skraft et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
       "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md 45 --workflow (consomme des requêtes Copilot)",
       "passes": false,
-      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable)."
+      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (250 par défaut) ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable). Run à blanc impossible sans mode simulé (non développé) : le premier run réel de la campagne servira de vérification."
     },
     {
       "id": "mesure-repondeur-commun",
@@ -680,7 +680,7 @@
       "title": "Campagne de quatre runs réels sur US-2 en alternance, rapport de comparaison avec la raison de chaque rejeu, durée et coût par étape (docs/10)",
       "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
       "passes": false,
-      "notes": "À FAIRE. Planifié le 2026-10-08."
+      "notes": "Prête à lancer le 2026-10-10, pas lancée. Environnement vérifié : .NET 10.0.401 dans ~/.dotnet (absent du PATH par défaut : exporter PATH=$HOME/.dotnet:$PATH et DOTNET_ROOT), suite du projet d'essai verte (5 tests), gh connecté, projet propre au commit a7cf6db. Le lancement par l'agent a été refusé par le mode automatique (requêtes Copilot payantes, poussée GitHub) : c'est l'utilisateur qui lance, ou qui autorise `pnpm tsx scripts/mesure-skraft.ts`. Run à blanc (§6 point 1) non fait : le banc n'a pas de mode simulé, le premier run réel le vérifiera. Commande du run 1 (extension) : PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet pnpm tsx scripts/mesure-skraft.ts /home/diabeo/Projets/exemple-dotnet-tdd stories/US-2.md 45 --pousser ; runs 2 et 4 avec --workflow. Puis tsx scripts/banc/comparer.ts <dossiers docs/runs/…>. Au plus 250 requêtes par run, 1 000 pour la campagne."
     },
     {
       "id": "skraft-deliver-en-workflow",
