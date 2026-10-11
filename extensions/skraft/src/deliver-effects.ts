@@ -94,7 +94,7 @@ const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | n
   "fix-test": ({ unit }) =>
     `Pas en cours : correction de revue, côté tests. Pour chaque défaut listé dans « Rejet précédent », ajoute le test demandé (dans ${unit}), ou conteste le défaut avec ta raison. ` +
     "Un test ajouté peut passer d'emblée s'il décrit un comportement que le code a déjà, ou échouer sur une assertion s'il révèle un défaut du code : le développeur le fera passer ensuite. " +
-    "Ne modifie pas les tests existants, n'écris aucun code de production. Vérifie avec run_tests.",
+    "Ne modifie un test existant que pour renforcer celui qu'un défaut cite ; sinon, ajoute un test. N'écris aucun code de production. Vérifie avec run_tests.",
   fix: ({ sources }) =>
     `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test. ` +
     "Si un défaut ne doit pas être corrigé selon toi, conteste-le avec ta raison ; s'il est juste mais que sa correction n'est pas de ton ressort (un test à écrire, par exemple), déclare-le `outOfScope`. " +
@@ -135,6 +135,14 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
 }
 
 /** Porte RED d'un pas (SPEC.md §8.3) : un seul nouveau test unitaire, rouge pour une bonne raison, aucun test gelé touché. */
+/**
+ * Fichiers de tests existants dont une ligne a été retirée ou remplacée, hors `allowed` : un test
+ * affaibli passe toujours, seule la forme du diff le trahit (D10 de docs/12).
+ */
+function testsRetouches(changed: { path: string; status: string; removed?: number }[], allowed: string[]): string[] {
+  return changed.filter((f) => f.status !== "added" && (f.removed ?? 0) > 0 && !allowed.includes(f.path)).map((f) => f.path);
+}
+
 export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
   const k = kinds(ctx);
@@ -146,6 +154,11 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
     );
   const outside = changed.filter((f) => !k.unit(f.path));
   if (outside.length) return fail(`Seuls des tests unitaires peuvent être modifiés à ce pas. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
+  const retouches = testsRetouches(changed, []);
+  if (retouches.length)
+    return fail(
+      `À ce pas, un test unitaire existant ne peut recevoir que des ajouts : ${retouches.join(", ")}. Pour renforcer un test, ajoutes-en un plus strict ; ne modifie ni ne retire les tests existants.`,
+    );
 
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
@@ -230,6 +243,10 @@ export async function verifyFixTests(e: Fx<"verifyFixTests">, { ctx, state, task
   const changed = await ctx.workspace.changedFiles(e.since);
   const outside = changed.filter((f) => !k.unit(f.path));
   if (outside.length) return fail(`À ce pas, seuls des tests unitaires peuvent être ajoutés. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
+  // Renforcer un test existant est permis, s'il est cité par un défaut adressé au testeur (D10 de docs/12).
+  const retouches = testsRetouches(changed, e.editable ?? []);
+  if (retouches.length)
+    return fail(`Un test unitaire existant ne peut recevoir que des ajouts, sauf s'il est cité par un défaut ci-dessus : ${retouches.join(", ")}. Ajoute plutôt un test plus strict.`);
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_FIX_TEST", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : un test ajouté boucle-t-il ?");
   const ids = new Set(run.results.map((r) => r.id));

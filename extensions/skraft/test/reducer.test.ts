@@ -1010,7 +1010,8 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
 
     it("correction côté tests : vérifiée par le code, puis le développeur fait passer les tests rouges et traite ses défauts", () => {
       const verify = play([...delivered, review, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev]);
-      expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object) }]);
+      // Le défaut cite un fichier de test : le testeur peut le renforcer (D10 de docs/12).
+      expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object), editable: ["Tests/GrilleTests.swift"] }]);
       // La réponse attend la validation du pas : un pas refusé est annulé, ses « corrigé » avec lui.
       expect(verify.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("open");
 

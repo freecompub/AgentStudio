@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D10 : un test unitaire existant ne s'affaiblit plus en silence
+
+- Cœur : `FileChange.removed`, le nombre de lignes de l'ancien arbre retirées ou remplacées, lu
+  dans les hunks `--unified=0` déjà calculés pour `lines`. Zéro veut dire « ajouts seulement ».
+- Pas `test` : ajouts seulement aux tests existants. Pas `fix-test` : modification permise pour
+  les fichiers cités par un défaut actif adressé au testeur. Une lentille peut demander de
+  renforcer un test faible (décision du responsable du projet, option B).
+- Preuves des essais effacés (second point) : vérifié sans effet, rien codé. La porte de scénario
+  lance ses tests avant de lire les preuves, donc le vert est toujours le sien.
+- Piège de test : avec le faux runner, tout passe dès que `src/domain/bolus-cap.ts` existe, et un
+  seul scénario n'a pas de cycle. Le test du pas `test` utilise une pile « par marques » (un test
+  passe si le code contient `// <nom>`).
+
+Prochaine étape : D12 à D16 (W), D17 à D23 (E).
+
+---
+
 ## 11/10 — D9 : après une question bloquante, le motif reste
 
 - L'agent repart avec la réponse **et** son retour : rejet de porte, amendement, question de revue

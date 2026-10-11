@@ -123,6 +123,7 @@ export function createGitCheckpointStore(git: GitRunner, gitDir: string): Checkp
       for (const file of files) {
         const detail = await git.run(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=0", "--inter-hunk-context=0", cp.sha, current, "--", `:(literal)${file.path}`]);
         file.lines = addedLines(detail);
+        file.removed = removedLines(detail);
       }
       const patch = files.length ? await git.run(["diff", "--no-renames", cp.sha, current]) : "";
       return { files, patch };
@@ -156,4 +157,11 @@ function toStatus(code: string): FileChangeStatus {
 
 function idToDate(id: string): string {
   return new Date(Number(id.split("-")[0])).toISOString();
+}
+
+/** Lignes de l'ancien arbre retirées ou remplacées : zéro pour un fichier qui n'a reçu que des ajouts. */
+function removedLines(patch: string): number {
+  let n = 0;
+  for (const hunk of patch.matchAll(/^@@ -\d+(?:,(\d+))? \+\d+(?:,\d+)? @@/gm)) n += hunk[1] === undefined ? 1 : Number(hunk[1]);
+  return n;
 }

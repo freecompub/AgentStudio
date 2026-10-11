@@ -61,9 +61,9 @@ describe("Workspace — checkpoints, diff, rollback", () => {
     const diff = await ws.checkpoints.diff(cp.id);
 
     expect(diff.files).toEqual([
-      { path: "README.md", status: "deleted", lines: [] },
-      { path: "src/a.ts", status: "modified", lines: [1] },
-      { path: "src/b.ts", status: "added", lines: [1] },
+      { path: "README.md", status: "deleted", lines: [], removed: 1 },
+      { path: "src/a.ts", status: "modified", lines: [1], removed: 1 },
+      { path: "src/b.ts", status: "added", lines: [1], removed: 0 },
     ]);
     expect(diff.patch).toContain("-a1");
     expect(diff.patch).toContain("+a2");
@@ -81,9 +81,20 @@ describe("Workspace — checkpoints, diff, rollback", () => {
     await put(root, "src/neuf.ts", "un\ndeux\n");
     const diff = await ws.checkpoints.diff(cp.id);
     expect(diff.files).toEqual([
-      { path: "src/avec espace.ts", status: "modified", lines: [1, 3, 4] },
-      { path: "src/neuf.ts", status: "added", lines: [1, 2] },
+      { path: "src/avec espace.ts", status: "modified", lines: [1, 3, 4], removed: 2 },
+      { path: "src/neuf.ts", status: "added", lines: [1, 2], removed: 0 },
     ]);
+  });
+
+  it("lignes retirées ou remplacées de l'ancien arbre : zéro pour un fichier qui n'a reçu que des ajouts", async () => {
+    await put(root, "src/ajout.ts", "un\ndeux\n");
+    await put(root, "src/change.ts", "ancien\nstable\nsupprimer\n");
+    const cp = await ws.checkpoints.create("départ");
+    await put(root, "src/ajout.ts", "zéro\nun\ndeux\ntrois\n");
+    await put(root, "src/change.ts", "nouveau\nstable\najout\nfin\n");
+    await put(root, "src/neuf.ts", "un\n");
+    const removed = Object.fromEntries((await ws.checkpoints.diff(cp.id)).files.map((f) => [f.path, f.removed]));
+    expect(removed).toEqual({ "src/ajout.ts": 0, "src/change.ts": 2, "src/neuf.ts": 0 });
   });
 
   it("rollback restaure exactement l'arbre de travail du checkpoint", async () => {

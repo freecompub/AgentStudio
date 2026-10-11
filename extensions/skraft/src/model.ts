@@ -277,7 +277,7 @@ export type SkraftEffect =
   | { kind: "planDeliver" }
   | { kind: "startScenario"; scenarioId: string }
   | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix-test" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
-  | { kind: "verifyFixTests"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] } }
+  | { kind: "verifyFixTests"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; /** Tests existants qu'un défaut demande de renforcer (D10 de docs/12). */ editable?: string[] }
   | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[]; coveredBy?: string }
   | {
       kind: "verifyUnitGreen";

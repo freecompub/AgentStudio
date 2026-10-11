@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "tests-unitaires-existants-ajouts-seulement",
+      "title": "Un test unitaire existant ne s'affaiblit pas en silence : ajouts seulement au pas test, modification au pas fix-test seulement s'il est cité par un défaut",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workspace -t \"D10|ne peut recevoir|retirées ou remplacées|correction côté tests\"",
+      "passes": true,
+      "notes": "D10 de docs/12, 2026-10-11. Cœur : FileChange.removed (git-checkpoint-store.ts), exposé par changedFiles et fichiersModifies. Workflow : testsRetouches dans porteRouge et porteCorrectionTests (livraison.mjs). Extension : testsRetouches dans verifyUnitRed et verifyFixTests (deliver-effects.ts), editable posé par deliver-machine.ts. Consigne fix-test modifiée dans les deux. Tests bout en bout dans les deux (pas test affaibli, fix-test cité ou non), vérifiés en échec sans la correction. Second point de D10 (preuves des essais effacés) vérifié sans effet : la porte de scénario lance ses tests avant de lire les preuves."
+    },
+    {
       "id": "motif-garde-apres-question",
       "title": "Après une question bloquante, l'agent repart avec la réponse et le motif qu'il corrigeait",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D9\"",

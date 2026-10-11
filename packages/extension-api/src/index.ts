@@ -174,7 +174,7 @@ export interface WorkspaceApi {
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;
   /** Fichiers modifiés depuis un checkpoint. */
-  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted"; lines?: number[] }[]>;
+  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted"; lines?: number[]; removed?: number }[]>;
   /** Empreinte des fichiers de test du projet, au sens de l'adaptateur de stack (gel des tests, D21). */
   fingerprintTests(): Promise<string>;
   /** Empreinte des fichiers correspondant aux motifs (`@stack:*` résolus), ex. tests d'acceptance gelés. */

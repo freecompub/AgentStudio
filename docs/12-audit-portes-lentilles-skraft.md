@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D11.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -309,6 +309,19 @@ Priorités proposées :
   - Vérifier l'empreinte des tests unitaires existants aussi aux pas de test, en n'autorisant que
     des ajouts.
   - Ne compter que les preuves postérieures au point de reprise.
+- **Corrigé le 2026-10-11** (premier point), dans l'extension et dans le workflow, en tenant
+  compte d'un cas légitime : une lentille peut demander de **renforcer** un test faible.
+  - Le cœur donne, par fichier modifié, le nombre de lignes retirées ou remplacées (`removed`,
+    lu dans les hunks de `git diff`). Zéro veut dire que le fichier n'a reçu que des ajouts.
+  - Au pas `test`, un test unitaire existant ne reçoit que des ajouts.
+  - Au pas `fix-test`, il peut être modifié s'il est cité par un défaut actif adressé au testeur.
+    La revue suivante voit la modification, puis la mutation de fin de DELIVER la mesure. La
+    consigne du pas l'autorise désormais.
+- **Second point vérifié sans effet.** La porte de fin de scénario lance les tests **avant** de
+  lire les preuves. Le vert vient donc toujours de sa propre exécution, et un test rouge à ce
+  moment est déjà refusé (« suite rouge »). Le rouge de l'essai en cours est exigé par la porte du
+  pas rouge. Une preuve d'un essai effacé ne peut pas faire accepter ce que l'essai en cours
+  refuserait. Aucun test ne peut échouer sans le filtrage, donc rien n'est modifié.
 
 ---
 

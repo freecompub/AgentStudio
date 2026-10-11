@@ -72,7 +72,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       // Correction de revue : les réponses de l'agent (ADR 0046) attendent que sa porte valide le pas.
       if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...d, pendingResponses: e.responses ?? [] } };
       if (d.step === "fix-test")
-        return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline }] };
+        return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline, ...editable(s) }] };
       if (d.step === "test")
         return {
           state: s,
@@ -192,6 +192,12 @@ function closeTurn(s: SkraftState, d: DeliverState, concerns: (t: DefectThread) 
 /** Tests d'acceptance encore autorisés à échouer : scénarios moteurs non terminés (dont le courant, ou non). */
 function pending(d: DeliverState, includeCurrent: boolean): string[] {
   return d.scenarios.filter((x, i) => x.role === "driver" && x.status !== "done" && (includeCurrent || i !== d.current)).map((x) => x.acceptanceTestId);
+}
+
+/** Fichiers de tests cités par un défaut actif adressé au testeur : il peut les renforcer (D10 de docs/12). */
+function editable(s: SkraftState): { editable?: string[] } {
+  const files = [...new Set((s.reviewThreads ?? []).filter((t) => isActive(t) && forTests(t) && t.file).map((t) => t.file!))];
+  return files.length ? { editable: files } : {};
 }
 
 function agent(s: SkraftState, d: DeliverState, feedback: string[]): Out {

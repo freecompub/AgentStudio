@@ -277,7 +277,7 @@ const TEXTE = {
   refactor: () => "Pas en cours : nettoie le code de production sans changer son comportement ; la suite doit rester verte. Ne modifie aucun test.",
   "fix-test": ({ unit }) => `Pas en cours : correction de revue, côté tests. Pour chaque défaut listé dans « Rejet précédent », ajoute le test demandé (dans ${unit}), ou conteste le défaut avec ta raison. ` +
     "Un test ajouté peut passer d'emblée s'il décrit un comportement que le code a déjà, ou échouer sur une assertion s'il révèle un défaut du code : le développeur le fera passer ensuite. " +
-    "Ne modifie pas les tests existants, n'écris aucun code de production. Vérifie avec run_tests.",
+    "Ne modifie un test existant que pour renforcer celui qu'un défaut cite ; sinon, ajoute un test. N'écris aucun code de production. Vérifie avec run_tests.",
   fix: ({ sources }) => `Pas en cours : corrige les défauts de revue listés dans « Rejet précédent », dans le code de production uniquement (${sources}) ; la suite doit rester verte. Ne modifie aucun test. ` +
     "Si un défaut ne doit pas être corrigé selon toi, conteste-le avec ta raison ; s'il est juste mais que sa correction n'est pas de ton ressort (un test à écrire, par exemple), déclare-le `outOfScope`. " +
     "Ne supprime jamais un comportement exigé par le contrat de conception pour faire taire une revue : le code le vérifie, et refuse ce tour.",
@@ -336,6 +336,9 @@ async function porteRouge(w, d, L, i, depuis, couvertPar) {
   const hors = changes.filter((f) => !k.unit(f.path));
   if (hors.length)
     throw new PasRefuse(`Seuls des tests unitaires peuvent être modifiés à ce pas. Fichiers hors tests unitaires : ${hors.map((f) => f.path).join(", ")}.`);
+  const retouches = testsRetouches(changes, []);
+  if (retouches.length)
+    throw new PasRefuse(`À ce pas, un test unitaire existant ne peut recevoir que des ajouts : ${retouches.join(", ")}. Pour renforcer un test, ajoutes-en un plus strict ; ne modifie ni ne retire les tests existants.`);
   const run = await w.lancerTests({ etiquette: "DELIVER_RED", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
@@ -386,6 +389,13 @@ async function couvertParAcceptance(w, d, L, i, nbChanges, couvertPar) {
   const cp = await w.checkpoint(`skraft ${d.slug} : couvert par l'acceptance ${sc.id}`);
   L.dernierVert = cp;
   return { cp, nouveau: sc.acceptanceTestId, viaAcceptance: true, acceptanceVerte: false };
+}
+/**
+* Fichiers de tests existants dont une ligne a été retirée ou remplacée, hors `permis` : un test
+* affaibli passe toujours, seule la forme du diff le trahit (D10 de docs/12).
+*/
+function testsRetouches(changes, permis) {
+  return changes.filter((f) => f.status !== "added" && (f.removed ?? 0) > 0 && !permis.includes(f.path)).map((f) => f.path);
 }
 /** Fichiers de production du projet, concaténés : de quoi chercher un nom du contrat. */
 async function texteDesSources(w, disp) {
@@ -779,6 +789,11 @@ async function porteCorrectionTests(w, d, L, i, depuis, sortie, c) {
   const hors = changes.filter((f) => !k.unit(f.path));
   if (hors.length)
     throw new PasRefuse(`À ce pas, seuls des tests unitaires peuvent être ajoutés. Fichiers hors tests unitaires : ${hors.map((f) => f.path).join(", ")}.`);
+  // Renforcer un test existant est permis, s'il est cité par un défaut qui t'est adressé (D10 de docs/12).
+  const cites = c.fils.filter((t) => isActive(t) && pourTests(t) && t.file).map((t) => t.file);
+  const retouches = testsRetouches(changes, cites);
+  if (retouches.length)
+    throw new PasRefuse(`Un test unitaire existant ne peut recevoir que des ajouts, sauf s'il est cité par un défaut ci-dessus : ${retouches.join(", ")}. Ajoute plutôt un test plus strict.`);
   const run = await w.lancerTests({ etiquette: "DELIVER_FIX_TEST", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai : un test ajouté boucle-t-il ?");
