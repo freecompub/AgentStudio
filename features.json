@@ -36,7 +36,7 @@
       "title": "Le runtime reçoit le jeton gh avec son hôte GitHub Enterprise Cloud",
       "verify": "pnpm vitest run --project runtime-copilot --project desktop packages/runtime-copilot/test/copilot-client.test.ts apps/desktop/test/app-controller.test.ts apps/desktop/test/mode-essai.test.ts",
       "passes": true,
-      "notes": "ADR 0057 : GH_HOST et gitHubToken associés, sans mode GHES offline. L'application transmet l'hôte courant ou restauré au runtime ; même client dans le banc. Vérifié le 10/10 : 62 tests ciblés ; précontrôle réel sur byb.ghe.com avec le SDK 1.0.14, 23 modèles et création de session réussie. Après confirmation utilisateur de la connexion UI, un prompt minimal réel avec le jeton gh actuel a reçu exactement COPILOT_OK, sans outils ni lecture de fichiers ; session fermée et supprimée. La campagne comparative reste à lancer."
+      "notes": "ADR 0057 : GH_HOST et gitHubToken associés, sans mode GHES offline. L'application transmet l'hôte courant ou restauré au runtime ; même client dans le banc. Vérifié le 10/10 : 62 tests ciblés ; précontrôle réel sur byb.ghe.com avec le SDK 1.0.14, 23 modèles et création de session réussie. Après confirmation utilisateur de la connexion UI, un prompt minimal réel avec le jeton gh actuel a reçu exactement COPILOT_OK, sans outils ni lecture de fichiers ; session fermée et supprimée. La campagne comparative reste à lancer. — 2026-10-11 : `env` du SDK REMPLACE l'environnement du CLI (`options.env ?? process.env`, SDK 1.0.14) : `{ GH_HOST }` seul privait le CLI de PATH, HOME et du proxy. Corrigé en `{ ...process.env, GH_HOST }`, testé (PATH conservé, GH_HOST hérité écrasé)."
     },
     {
       "id": "j5-profil-schema",

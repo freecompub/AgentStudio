@@ -9,7 +9,11 @@ export type CopilotClientOptions = {
   logLevel?: "none" | "error" | "warning" | "info" | "debug";
 };
 
-export function sdkCopilotClientOptions(opts: CopilotClientOptions): SdkCopilotClientOptions {
+/**
+ * `env` remplace l'environnement du CLI au lieu de s'y ajouter (SDK 1.0.14, `options.env ?? process.env`) :
+ * on part donc de celui du processus et on n'y fixe que l'hôte du jeton.
+ */
+export function sdkCopilotClientOptions(opts: CopilotClientOptions, ambiant: NodeJS.ProcessEnv = process.env): SdkCopilotClientOptions {
   const shared = {
     logLevel: opts.logLevel ?? "error",
     ...(opts.baseDirectory ? { baseDirectory: opts.baseDirectory } : {}),
@@ -18,7 +22,7 @@ export function sdkCopilotClientOptions(opts: CopilotClientOptions): SdkCopilotC
     ...shared,
     gitHubToken: opts.gitHubToken,
     useLoggedInUser: false,
-    env: { GH_HOST: opts.hostname ?? "github.com" },
+    env: { ...ambiant, GH_HOST: opts.hostname ?? "github.com" },
   };
 }
 
