@@ -307,6 +307,19 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     ]);
   });
 
+  it("D17 (docs/12) : panne en ROUTE, escalade relancer / abandonner ; relancer repose les seules questions non posées", () => {
+    const route = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
+    const panne = play([...route, { type: "QUESTION_ASKED", id: "q1" } as Ev, { type: "ENV_FAILURE", reason: "disque plein" } as Ev]);
+    expect(panne.state.escalation).toEqual({ from: "ROUTE", reason: "disque plein" });
+    expect(panne.effects).toEqual([{ kind: "askEscalation", reason: "disque plein", options: ["retry", "abort"] }]);
+    // q1 a reçu sa réponse pendant l'escalade : elle n'est pas perdue.
+    const repondue = transition(panne.state, DECIDE("answer:q1", "par prise"));
+    expect(repondue.state.openQuestions[0]).toMatchObject({ id: "q1", answer: "par prise" });
+    const relance = transition(repondue.state, DECIDE("retry"));
+    expect(relance.state.stage).toBe("ROUTE");
+    expect(relance.effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
+  });
+
   it("réponse libre ou report ; la phase suivante démarre quand tout est tranché", () => {
     const base = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
     const one = play([...base, DECIDE("answer:q1", "par prise")]);

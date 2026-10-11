@@ -219,7 +219,7 @@ export default async function skraft(w, entree) {
   // Comme l'extension, ROUTE n'existe que s'il reste des questions (D11 de docs/12).
   if (vue.questions.length)
     await w.etape("ROUTE");
-  const reponses = await Promise.all(vue.questions.map((q) => w.humain("question-ouverte", `Question ouverte (${story.id})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true })));
+  const reponses = await poserLesQuestions(w, vue.questions, story.id);
   vue.questions = vue.questions.map((q, i) => {
     const d = reponses[i];
     return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
@@ -259,6 +259,38 @@ function bilan(d, confirmee) {
       ? [`Dérogations de mutation : ${d.derogations.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`, ...d.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`)]
       : []),
   ].join("\n");
+}
+/**
+* Questions ouvertes, posées toutes à la fois, hors de toute phase. Une panne à la création d'une
+* demande (D17 de docs/12) escalade : « Relancer » repose les seules questions en échec ; il n'y a
+* pas de phase à sauter.
+*/
+async function poserLesQuestions(w, questions, storyId) {
+  const reponses = new Array(questions.length);
+  let restantes = questions.map((_, i) => i);
+  for (;;) {
+    const issues = await Promise.allSettled(restantes.map((i) => w.humain("question-ouverte", `Question ouverte (${storyId})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: questions[i].text, texteLibre: true })));
+    const pannes = [];
+    issues.forEach((r, j) => {
+      if (r.status === "fulfilled")
+        reponses[restantes[j]] = r.value;
+      else if (r.reason instanceof PanneEnvironnement)
+        pannes.push({ i: restantes[j], motif: r.reason.message });
+      else
+        throw r.reason;
+    });
+    if (!pannes.length)
+      return reponses;
+    await w.etape("ESCALATED");
+    const d = await w.humain("escalade", "Pipeline skraft bloqué (ROUTE)", [
+      { id: "relancer", label: "Relancer : reposer les questions" },
+      { id: "abandonner", label: "Abandonner" },
+    ], { detail: `Panne pendant les questions ouvertes : ${pannes.map((p) => p.motif).join(" ; ")}` });
+    if (d.decision === "abandonner")
+      w.echec(`Abandon pendant les questions ouvertes : ${pannes[0].motif}`);
+    await w.etape("ROUTE");
+    restantes = pannes.map((p) => p.i);
+  }
 }
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */
 async function preparer(w, chemin) {

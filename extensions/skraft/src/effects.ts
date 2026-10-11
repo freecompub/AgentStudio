@@ -277,14 +277,18 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         freeText: true,
         requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
       });
-      return;
+      // Demande créée : une panne sur une question suivante ne la fera pas reposer (D17 de docs/12).
+      return { type: "QUESTION_ASKED", id: effect.id };
 
     case "askEscalation":
       await ctx.interactions.request({
         taskId,
-        title: `Pipeline skraft bloqué (${state.phase ?? state.stage})`,
+        title: `Pipeline skraft bloqué (${state.escalation?.from === "ROUTE" ? "ROUTE" : (state.phase ?? state.stage)})`,
         detail: effect.reason,
-        options: effect.options.map((id) => ({ id, label: { retry: "Relancer la phase", skip: "Sauter la phase", abort: "Abandonner" }[id] })),
+        options: effect.options.map((id) => ({
+          id,
+          label: { retry: state.escalation?.from === "ROUTE" ? "Relancer : reposer les questions" : "Relancer la phase", skip: "Sauter la phase", abort: "Abandonner" }[id],
+        })),
         requiredRoles: ["developpeur", "architecte", "administrateur"],
       });
       return;

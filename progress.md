@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D17 : panne pendant les questions ouvertes (ROUTE)
+
+- Extension : l'escalade proposait « relancer » et « sauter », qui ne faisaient rien hors phase.
+  Elle a maintenant ses propres options, « relancer » et « abandonner ». Workflow : les questions
+  sont posées hors de `w.phase`, donc une panne terminait la tâche en échec.
+- « Relancer » repose les seules questions dont la demande n'a pas été créée :
+  - extension : `askQuestion` rend `QUESTION_ASKED`, noté à tout stade (une autre question a pu
+    faire escalader entre-temps) ;
+  - workflow : `Promise.allSettled`.
+- Piège trouvé en testant : une question déjà posée pouvait recevoir sa réponse **pendant**
+  l'escalade, et l'extension l'ignorait (la réponse était perdue, et la question n'avait plus de
+  demande en attente). Les réponses aux questions sont maintenant acceptées en ESCALATED depuis
+  ROUTE.
+- Le workflow ne reconnaît que la panne (`PanneEnvironnement`) : une erreur imprévue d'effet
+  (nature « erreur ») y reste fatale, par conception de la bibliothèque. Le script s'en sert pour
+  les fichiers absents.
+
+Prochaine étape : D18 à D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D16 : un nettoyage ne change pas le comportement
 
 - Décision du responsable du projet (option B, dans les deux) : un nettoyage qui fait passer

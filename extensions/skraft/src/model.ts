@@ -202,11 +202,13 @@ export interface SkraftState {
   /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */
   reviewQuestions?: number;
   /** Origine d'une escalade, pour savoir quoi relancer. */
-  escalation: { from: "INIT" | "CLASSIFY" | "PHASE"; reason: string } | null;
+  escalation: { from: "INIT" | "CLASSIFY" | "ROUTE" | "PHASE"; reason: string } | null;
   /** Réponses de l'utilisateur à transmettre au prochain dossier de passation. */
   answers: { question: string; answer: string }[];
   /** Questions ouvertes déjà soumises à l'utilisateur (pas de double demande). */
   questionsAsked: string[];
+  /** Questions dont la demande a réellement été créée : « relancer » après une panne en ROUTE repose les autres (D17 de docs/12). */
+  questionsConfirmees?: string[];
   /** Empreinte des tests d'acceptance, gelés à la sortie de DISTILL (§7.3). */
   acceptanceHash: string | null;
   /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
@@ -255,6 +257,7 @@ export type SkraftEvent =
       notes?: string[];
     }
   | { type: "GATE_FAIL"; gate: string; reasons: string[]; /** Porte de mutation : les survivants, un défaut chacun (ADR 0065). */ mutants?: MutantSurvivant[] }
+  | { type: "QUESTION_ASKED"; id: string }
   | { type: "MUTANTS_JUDGED"; rulings: { defect: string; decision: "accepted" | "maintained"; reason?: string }[] }
   | {
       type: "LENSES_DONE";

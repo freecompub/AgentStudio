@@ -73,6 +73,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
   if (e.type === "ABORT") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (e.type === "RESUMED") return same;
   if (e.type === "ENV_FAILURE") return escalate(s, e.reason);
+  // Demande de question créée : notée quel que soit le stade, une panne sur une autre question a pu
+  // faire escalader entre-temps (D17 de docs/12).
+  if (e.type === "QUESTION_ASKED") return { state: { ...s, questionsConfirmees: uniq([...(s.questionsConfirmees ?? []), e.id]) }, effects: [] };
 
   switch (s.stage) {
     case "INIT":
@@ -243,11 +246,8 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "ROUTE":
       // Attente des réponses aux questions ouvertes (§7.1, §11) : réponse libre ou report explicite.
       if (e.type === "HUMAN_DECISION") {
-        const [action, id] = e.decision.split(":");
-        const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
-        if (!q || (action !== "answer" && action !== "defer")) break;
-        const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (e.comment ?? "").trim() || "(réponse vide)";
-        return route({ ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) });
+        const ns = repondre(s, e.decision, e.comment);
+        if (ns) return route(ns);
       }
       break;
 
@@ -258,7 +258,12 @@ export function transition(s0: SkraftState, e: Ev): Out {
       break;
 
     case "ESCALATED":
-      if (e.type === "HUMAN_DECISION" && s.escalation) return decide(s, e.decision);
+      if (e.type === "HUMAN_DECISION" && s.escalation) {
+        // Escalade en ROUTE : une question déjà posée peut recevoir sa réponse entre-temps (D17 de docs/12).
+        const ns = s.escalation.from === "ROUTE" ? repondre(s, e.decision, e.comment) : null;
+        if (ns) return { state: ns, effects: [] };
+        return decide(s, e.decision);
+      }
       break;
 
     case "ARBITRATION": {
@@ -443,6 +448,15 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
 }
 
 /** Invariant 2 : prochaine phase de `phaseOrder` hors phases faites et sautées ; invariant 7 : pas de DISTILL avec un ADR proposé. */
+/** Réponse (ou report) à une question ouverte ; `null` si la décision ne la concerne pas. */
+function repondre(s: SkraftState, decision: string, comment: string | undefined): SkraftState | null {
+  const [action, id] = decision.split(":");
+  const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
+  if (!q || (action !== "answer" && action !== "defer")) return null;
+  const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (comment ?? "").trim() || "(réponse vide)";
+  return { ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) };
+}
+
 function route(s: SkraftState): Out {
   const pendingAdrs = s.adrs.filter((a) => a.status === "Proposed");
   if (pendingAdrs.length) return { state: { ...s, stage: "RATIFICATION" }, effects: pendingAdrs.map((adr) => ({ kind: "askRatification", adr })) };
@@ -559,6 +573,8 @@ function escalate(etat: SkraftState, reason: string): Out {
   const s = leverGelDistill(etat);
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
+  // Hors de toute phase : rien à sauter ; « relancer » repose les questions (D17 de docs/12).
+  if (s.stage === "ROUTE") return escalateFrom(s, "ROUTE", reason, ["retry", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   return {
     state: { ...oublierLaPhase(s), stage: "ESCALATED", escalation: { from: "PHASE", reason } },
@@ -566,7 +582,7 @@ function escalate(etat: SkraftState, reason: string): Out {
   };
 }
 
-function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY", reason: string, options: ("retry" | "skip" | "abort")[]): Out {
+function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY" | "ROUTE", reason: string, options: ("retry" | "skip" | "abort")[]): Out {
   return { state: { ...s, stage: "ESCALATED", escalation: { from, reason } }, effects: [{ kind: "askEscalation", reason, options }] };
 }
 
@@ -575,6 +591,8 @@ function decide(s: SkraftState, decision: string): Out {
   if (decision === "abort") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (decision === "retry") {
     if (from === "INIT") return { state: { ...s, stage: "INIT", escalation: null }, effects: [{ kind: "init", storyPath: s.storyPath }] };
+    // Panne en ROUTE : les questions sans réponse dont la demande n'a pas été créée sont reposées.
+    if (from === "ROUTE") return route({ ...s, escalation: null, questionsAsked: s.questionsAsked.filter((id) => (s.questionsConfirmees ?? []).includes(id)) });
     if (from === "CLASSIFY" && s.indicators)
       // Budget rendu : sans cela, le tour suivant escaladerait aussitôt.
       return { state: { ...s, stage: "CLASSIFY", escalation: null, attempts: 0 }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };

@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D14, D15, D16, D22 (ADR 0065), D23.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D14, D15, D16, D17, D22 (ADR 0065), D23.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -449,7 +449,7 @@ Priorités proposées :
 
 | # | Défaut | Où | Vérifié | Proposition |
 |---|---|---|---|---|
-| D17 | Une panne en ROUTE bloque la tâche : `phase` vaut `null`, et « relancer » ou « sauter » ne font rien. Seul « abandonner » fonctionne | `reducer.ts:426`, `:444`, `:450` | test | En ROUTE, « relancer » reprend les questions et « sauter » passe à DESIGN ; refuser une escalade dont aucune option n'agit |
+| D17 | Une panne en ROUTE bloque la tâche : `phase` vaut `null`, et « relancer » ou « sauter » ne font rien. Seul « abandonner » fonctionne. **Corrigé le 2026-10-11, dans les deux** : le workflow, lui, terminait la tâche en échec (questions posées hors phase). Escalade « relancer / abandonner » ; relancer repose les seules questions dont la demande n'a pas été créée ; une réponse donnée pendant l'escalade est gardée | `reducer.ts:426`, `:444`, `:450` | test | En ROUTE, « relancer » reprend les questions et « sauter » passe à DESIGN ; refuser une escalade dont aucune option n'agit |
 | D18 | Une phase sautée transmet ses défauts de revue et son motif à la phase suivante | `reducer.ts:450-453`, `:448`, `deliver-machine.ts:52` | test | « Sauter » vide `reviewThreads` et `lastRejection`, comme le commit (`:231`) |
 | D19 | Une panne au commit rembobine une phase déjà approuvée, et « relancer » la refait entière, revue comprise | `reducer.ts:422-428` | test | Une panne au commit ne rembobine pas : on réessaie le commit seul |
 | D20 | Deux escalades de DELIVER rembobinent sans faire oublier les sessions (ADR 0050) | `deliver-machine.ts:306-311`, `:318-325` | test | Utiliser la fonction unique `rollback` + `forgetSessions` |
