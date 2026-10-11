@@ -659,6 +659,14 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
       expect(r.effects.at(-1)).toEqual({ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION, "Mutation : 90 %"] });
     });
 
+    it("D14 (docs/12) : panne pendant la correction, « relancer » la reprend, sans replanifier DELIVER", () => {
+      const panne = play([...delivered, major, { type: "ENV_FAILURE", reason: "Copilot injoignable" } as Ev]);
+      expect(panne.state.stage).toBe("ESCALATED");
+      const relance = transition(panne.state, DECIDE("retry"));
+      expect(kinds(relance.effects)).not.toContain("planDeliver");
+      expect(relance.effects).toEqual([expect.objectContaining({ kind: "runDeliverAgent", step: "fix", feedback: expect.arrayContaining([defect]) })]);
+    });
+
     it("blocage pendant la correction : la réponse relance la correction avec ses défauts", () => {
       const blocked = play([...delivered, major, { type: "BLOCKER_REPORTED", question: "Valeur minimale ?", choices: [] }]);
       expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);

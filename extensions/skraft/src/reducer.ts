@@ -5,7 +5,7 @@ import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftSt
 import type { MutantSurvivant } from "./deliver.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
-import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
+import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
 type Out = { state: SkraftState; effects: SkraftEffect[] };
@@ -579,6 +579,8 @@ function decide(s: SkraftState, decision: string): Out {
       // Budget rendu : sans cela, le tour suivant escaladerait aussitôt.
       return { state: { ...s, stage: "CLASSIFY", escalation: null, attempts: 0 }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
     if (!s.phase) return { state: s, effects: [] };
+    // Pendant une correction, « relancer » la reprend, au lieu de replanifier DELIVER (D14 de docs/12).
+    if (s.phase === "DELIVER" && s.deliver?.fixing && !s.phasesCompleted.includes("DELIVER")) return retryFix(s);
     if (s.phase === "DELIVER" && s.deliver && !s.phasesCompleted.includes("DELIVER") && s.deliver.scenarios.some((x) => x.status !== "done")) return retryDeliver(s);
     const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts: 0, escalation: null, designStep: "model" };
     if (!ns.checkpoints[ns.phase!]) return { state: ns, effects: [{ kind: "checkpointPhase", phase: ns.phase! }] };

@@ -763,6 +763,18 @@ async function corriger(w, d, L, s, max) {
       return;
     }
     catch (e) {
+      // Panne d'environnement (D14 de docs/12) : retour à l'entrée de la correction, puis l'humain.
+      // « Relancer » reprend la correction, sans essai consommé (D25) ; rien de livré n'est rejoué.
+      if (e instanceof PanneEnvironnement) {
+        await w.rejet(`panne (correction ${L.scenarios[i].id})`, [e.message]);
+        await w.rembobiner(depart);
+        await creerDossiers(w, d.slug);
+        s.fils = filsAuDepart;
+        Object.assign(L, memoire);
+        await escaladeScenario(w, e.message);
+        echecs--;
+        continue;
+      }
       if (!(e instanceof ScenarioEchoue))
         throw e;
       await w.rejet(`correction (${L.scenarios[i].id})`, e.motifs);

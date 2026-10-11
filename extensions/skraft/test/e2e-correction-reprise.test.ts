@@ -6,9 +6,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EnvFailureError } from "@agent-studio/core";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, put, shutdownHosts, simulatedAgents, stateOf, unitTestWriter, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, fakeStack, put, shutdownHosts, simulatedAgents, stateOf, unitTestWriter, until } from "./support/harness.js";
 import { CODE, developpeur, pileParMarques } from "./support/marques.js";
 
 const DEFAUT = "cold-reader#1.1";
@@ -66,5 +67,54 @@ describe("skraft — reprise d'une correction ciblée (D12)", () => {
     // La reprise connaît la cause de l'échec (déjà le cas dans l'extension).
     const reprise = devPrompts.find((p, i) => i > 0 && !p.includes(ROUGES));
     expect(reprise).toContain("Tests en échec");
+  }, 90_000);
+
+  // D14 (docs/12) : « relancer » après une panne pendant une correction reprend la correction.
+  it("panne pendant une correction : « relancer » reprend la correction, sans rejouer les scénarios ni la revue", async () => {
+    let enCorrection = false;
+    let panne = false;
+    const stack = fakeStack();
+    const run = stack.runTests;
+    stack.runTests = async (opts) => {
+      // Premier lancement des tests après la revue : celui du pas du développeur en correction.
+      if (enCorrection && !panne) {
+        panne = true;
+        throw new EnvFailureError("Copilot injoignable");
+      }
+      return run(opts);
+    };
+    let revues = 0;
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      // En correction, le développeur modifie le code : un pas de correction doit le faire.
+      "skraft-dev": async (t) => {
+        await put(root, CODE, t.prompt.includes(`[${DEFAUT}`) ? "export class BolusCap { max = 10; } // dose négative refusée\n" : "export class BolusCap { max = 10; }\n");
+        await t.callTool("report_phase", { summary: "code", files: [CODE] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        const premiere = t.prompt.includes("phase DELIVER") && revues++ === 0;
+        if (premiere) enCorrection = true;
+        await t.callTool("submit_lens_verdict", premiere
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "dose négative non gérée", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    answerQuestions(app);
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    await app.interactions.respond((await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!.id, "medium-hard");
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED", 60_000);
+    expect(stateOf(await app.engine.status(id))!.escalation?.reason).toContain("Copilot injoignable");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Pipeline skraft bloqué")));
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Pipeline skraft bloqué"))!;
+    const avant = runtime.history.length;
+    await app.interactions.respond(q.id, "retry", undefined, { role: "architecte" });
+    await until(async () => runtime.history.length > avant && ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const apres = runtime.history.slice(avant).map((h) => runtime.configs.get(h.id)!.role.split("/")[1]!);
+    // La correction reprend : d'abord le développeur ; ni testeur des scénarios, ni lentille avant lui.
+    expect(apres[0]).toBe("skraft-dev");
+    expect(revues).toBe(2);
   }, 90_000);
 });

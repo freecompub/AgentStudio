@@ -6,9 +6,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EnvFailureError } from "@agent-studio/core";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, put, shutdownHosts, simulatedAgents, unitTestWriter } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, fakeStack, put, shutdownHosts, simulatedAgents, unitTestWriter, until } from "./support/harness.js";
 import { fin, lancerWorkflow } from "./support/fin.js";
 import { CODE, developpeur, pileParMarques } from "./support/marques.js";
 
@@ -65,5 +66,49 @@ describe("skraft en workflow — reprise d'une correction ciblée (D12, D15)", (
     const cause = rejets.find((r) => r.porte.startsWith("correction ("))!.motifs[0]!;
     const reprise = devPrompts.find((p, i) => i > 0 && !p.includes(ROUGES));
     expect(reprise).toContain(cause);
+  }, 90_000);
+
+  // D14 (docs/12) : une panne pendant une correction ne rembobine pas toute la phase DELIVER.
+  it("panne pendant une correction : « relancer » reprend la correction, sans rejouer les scénarios ni la revue", async () => {
+    let enCorrection = false;
+    let panne = false;
+    const stack = fakeStack();
+    const run = stack.runTests;
+    stack.runTests = async (opts) => {
+      // Premier lancement des tests après la revue : celui du pas du développeur en correction.
+      if (enCorrection && !panne) {
+        panne = true;
+        throw new EnvFailureError("Copilot injoignable");
+      }
+      return run(opts);
+    };
+    let revues = 0;
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      // En correction, le développeur modifie le code : un pas de correction doit le faire.
+      "skraft-dev": async (t) => {
+        await put(root, CODE, t.prompt.includes(`[${DEFAUT}`) ? "export class BolusCap { max = 10; } // dose négative refusée\n" : "export class BolusCap { max = 10; }\n");
+        await t.callTool("report_phase", { summary: "code", files: [CODE] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        const premiere = t.prompt.includes("phase DELIVER") && revues++ === 0;
+        if (premiere) enCorrection = true;
+        await t.callTool("submit_lens_verdict", premiere
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "dose négative non gérée", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await until(async () => (await app.interactions.pending()).some((p) => /bloqué|^Phase /.test(p.title)), 60_000);
+    const q = (await app.interactions.pending()).find((p) => /bloqué|^Phase /.test(p.title))!;
+    expect(q.detail ?? q.title).toContain("Copilot injoignable");
+    const avant = runtime.history.length;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await fin(app, id, 60_000);
+    const apres = runtime.history.slice(avant).map((h) => runtime.configs.get(h.id)!.role.split("/")[1]!);
+    // La correction reprend : d'abord le développeur ; ni testeur des scénarios, ni lentille avant lui.
+    expect(apres[0]).toBe("skraft-dev");
+    expect(revues).toBe(2);
   }, 90_000);
 });

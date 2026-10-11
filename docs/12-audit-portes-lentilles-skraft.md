@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D15, D22 (ADR 0065), D23.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D14, D15, D22 (ADR 0065), D23.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -401,6 +401,14 @@ Priorités proposées :
   - Escalader avec une question propre à la correction.
   - Sur « relancer », revenir au point de reprise de la correction et pas à celui de la phase,
     comme `escalateDeliver` dans E.
+- **Corrigé le 2026-10-11, dans les deux.** Contrairement à ce que disait ce constat, l'extension
+  ne reprenait pas la correction non plus. Elle rembobinait bien à l'entrée de la correction, mais
+  « relancer » replanifiait DELIVER (les scénarios étaient tous terminés), d'où une nouvelle revue
+  et une correction perdue. Le copier dans le workflow aurait rouvert D13.
+  - Workflow : `corriger` attrape la panne, rembobine à son entrée, restaure la mémoire et escalade.
+    « Relancer » reprend la correction, sans essai consommé.
+  - Extension : au « relancer » pendant une correction, `retryFix` la reprend depuis son entrée,
+    avec ses défauts d'entrée.
 
 ### D15 — Motifs perdus à la reprise d'une correction et au « relancer » de phase
 

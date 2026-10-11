@@ -344,6 +344,34 @@ export function escalateDeliver(s: SkraftState, reason: string): Out {
 }
 
 /** « Relancer » après une escalade dans DELIVER : le scénario reprend à son début, budget remis à zéro. */
+/**
+ * « Relancer » après une escalade pendant une correction (panne, D14 de docs/12, ou échecs
+ * répétés) : la correction reprend depuis son entrée, avec ses défauts d'entrée. Le rollback de
+ * l'escalade a déjà ramené le code à ce point ; rien de livré n'est rejoué, aucune revue refaite.
+ */
+export function retryFix(s: SkraftState): Out {
+  const d = s.deliver!;
+  const threads = d.threadsAtFixStart ?? s.reviewThreads ?? [];
+  const step = threads.some((t) => isActive(t) && forTests(t)) ? "fix-test" : "fix";
+  const reviewFeedback = { test: agentFeedback(threads, forTests), code: agentFeedback(threads, forDev) };
+  const { mutationArbitration: _, ...reste } = d;
+  const nd: DeliverState = {
+    ...reste,
+    step,
+    attempts: 0,
+    unitTests: [],
+    newTest: null,
+    fixTargets: [],
+    pendingResponses: [],
+    reviewFeedback,
+    reviewDefects: step === "fix-test" ? reviewFeedback.test : reviewFeedback.code,
+    baseline: d.scenarioBaseline,
+    ...repriseDeLEmpreinte(d),
+    stepCheckpoint: d.scenarioCheckpoint,
+  };
+  return agent({ ...s, stage: "SPECIALIST", escalation: null, reviewThreads: threads }, nd, s.lastRejection?.reasons ?? []);
+}
+
 export function retryDeliver(s: SkraftState): Out {
   const d = s.deliver!;
   if (!d.scenarioCheckpoint) return { state: { ...s, stage: "SPECIALIST", escalation: null }, effects: [{ kind: "startScenario", scenarioId: d.scenarios[d.current]!.id }] };

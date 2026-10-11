@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D14 : une panne pendant une correction ne rembobine plus toute la phase
+
+- Workflow : `corriger` attrape aussi `PanneEnvironnement`. Il rembobine à l'entrée de la
+  correction, restaure `L` et les fils, puis escalade (`escaladeScenario`). « Relancer » reprend la
+  boucle de correction, sans essai consommé.
+- **L'audit se trompait sur l'extension**. Elle rembobinait au bon point, mais « relancer »
+  replanifiait DELIVER, parce que `retryDeliver` n'est appelé que s'il reste un scénario non
+  terminé. Il y avait donc une nouvelle revue et la correction était perdue. `retryFix` reprend
+  maintenant la correction.
+- Ne pas aligner le workflow sur l'ancien comportement de l'extension : replanifier avec des
+  scénarios déjà verts, c'est le chemin de D13 (`dernierVert` reste `null`).
+- Piège de test : la pile ne reçoit pas l'étiquette de l'exécution (`opts.evidence` est absent).
+  La panne est donc déclenchée au premier lancement de tests après la revue.
+
+Prochaine étape : D16 (W), D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D22 : arbitrage des mutants équivalents (ADR 0065)
 
 - **Décision du responsable du projet.** Un mutant contesté comme équivalent est jugé par un
