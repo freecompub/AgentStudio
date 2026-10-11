@@ -305,21 +305,19 @@ async function evaluerDifficulte(w, story, indicateurs, confirmer) {
 /** Un essai de RESEARCH : le chercheur, ses questions bloquantes, puis la porte citations (§7.1). */
 function rechercher(w, vue, max) {
   return essayer(w, { max }, async (motifs) => {
-    let retour = motifs;
     for (;;) {
       await w.etape("RESEARCH");
       const fichiers = await w.listerFichiers();
       const utiles = preselectFiles(vue.story, fichiers);
-      const consigne = buildBrief(vue, "RESEARCH", retour) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
+      const consigne = buildBrief(vue, "RESEARCH", motifs) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
       const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
       if (r.sortie)
         break;
-      // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier.
+      // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier, et le même motif (D9 de docs/12).
       const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
       await w.etape("BLOCKED");
       const d = await w.humain("blocage", "Question de l'agent (RESEARCH)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
       vue.reponses = [...vue.reponses, { question: r.blocage.question, answer: d.commentaire ? `${d.decision} (${d.commentaire})` : d.decision }];
-      retour = [];
     }
     return { motifs: await porteCitations(w, vue), porte: "citations" };
   });

@@ -422,6 +422,25 @@ const FAIL = (reason = "motif"): Ev => ({ type: "STEP_FAIL", reason });
 const DISTILL_FROZEN: Ev[] = [CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc" } as Ev, LENSES(lens("APPROVED")), COMMITTED];
 const toDeliver = (level = "medium-hard") => [...toFirstPhase(level), ...researchPhase, ...designPhase, ...DISTILL_FROZEN, CP("DELIVER")];
 
+describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le retour qu'il avait", () => {
+  const Q: Ev = { type: "BLOCKER_REPORTED", question: "Par prise ?", choices: [] };
+
+  it("relancé après un rejet de porte : le motif reste", () => {
+    const r = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] }]);
+  });
+
+  it("relancé pour un amendement : la demande reste", () => {
+    const r = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Proposed" }] } as Ev, LENSES(lens("APPROVED")), DECIDE("amend:ADR-008", "préciser le plafond journalier"), Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 1, feedback: ["Amendement demandé sur ADR-008 : préciser le plafond journalier"] }]);
+  });
+
+  it("DELIVER, pas refusé : le motif reste", () => {
+    const r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, FAIL("tests unitaires modifiés"), Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "dev", scenarioId: "ac-1", attempt: 2, feedback: ["tests unitaires modifiés"] }]);
+  });
+});
+
 describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
   const toReview = () => [
     ...toFirstPhase(), ...researchPhase, ...designPhase,

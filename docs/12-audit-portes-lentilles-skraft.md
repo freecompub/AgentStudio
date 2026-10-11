@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D11.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D11.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -272,6 +272,12 @@ Priorités proposées :
   - Après une relance, les rapports du run effacé sont réécrits avant le commit.
 - **Proposition** : un compteur de revues propre à la phase, qui ne revient jamais en arrière, et
   une remise à zéro de `suivi.revues` au rembobinage.
+- **Corrigé le 2026-10-11**, dans le workflow **et dans l'extension**, qui avait les deux défauts
+  (vérifié par test). Un rapport est nommé par son **rang** dans la phase (`suivi.revues`,
+  `state.reviews[phase]`), qui ne recule jamais, et non plus par le numéro d'essai. `suivi.revues`
+  n'est pas vidé, parce que son rang numérote aussi les fils de défauts. Un marqueur de début de
+  run (`suivi.debutDuRun` posé par `oublierLeRun`, `debutDesRevues` posé par `oublierLaPhase`)
+  limite la réécriture avant le commit aux revues du run en cours.
 
 ### D9 — Après une question bloquante, la relance perd le motif du rejet
 
@@ -282,6 +288,15 @@ Priorités proposées :
 - **Proposition** :
   - Garder le dernier motif jusqu'à la fin de l'essai, question comprise.
   - Rattacher chaque réponse humaine à sa phase, et l'oublier si la phase est rembobinée.
+- **Corrigé le 2026-10-11** (premier point), dans l'extension et dans le workflow :
+  - L'agent repart avec la réponse **et** le motif qu'il corrigeait (rejet de porte, amendement,
+    question de revue, pas refusé).
+  - Extension : `lancer` garde le retour dans `state.retour` ; en DELIVER, `deliver.feedback` est
+    tenu par `agent`.
+  - Workflow : les boucles de `specialiste`, `agentDuPas` et RESEARCH ne vident plus leur retour.
+- **Second point écarté** sur décision du responsable du projet. Les réponses aux questions sont
+  gardées et réutilisées dans tout le processus, même après un rembobinage. Une réponse métier
+  reste vraie ; l'oublier ferait reposer la question à l'humain.
 
 ### D10 — Contrôles faibles des tests unitaires
 

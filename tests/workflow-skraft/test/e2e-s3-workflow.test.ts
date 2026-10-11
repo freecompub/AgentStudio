@@ -22,6 +22,14 @@ const ADR_ARGS = {
   alternatives: "Plafonner dans l'interface : rejeté.",
 };
 
+/** Rapports de revue commités avec DESIGN (D8 de docs/12). */
+async function rapportsDuDesign(root: string): Promise<string[]> {
+  const ligne = async () => git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us-12"));
+  await until(async () => (await ligne()) !== undefined, 60_000);
+  const sha = (await ligne())!.split(" ")[0]!;
+  return git(root, "ls-tree", "-r", "--name-only", sha, ".skraft/us-12/reviews/").split("\n").filter(Boolean).map((p) => p.split("/").at(-1)!);
+}
+
 describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () => {
   let root: string;
   let tasksDir: string;
@@ -153,6 +161,34 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(await readFile(join(root, ADR2), "utf8")).toContain("Alerte par prise.");
   }, 120_000);
 
+  // D8 (docs/12) : un amendement ne consomme pas d'essai ; sa revue ne doit pas écraser la précédente.
+  it("amendement : la revue d'avant et celle d'après ont chacune leur rapport (D8)", async () => {
+    const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
+    const decide: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+      const amende = t.prompt.includes("Amendement demandé sur ADR-001");
+      await put(root, ADR1, renderAdr(1, amende ? { ...ADR_ARGS, consequences: "Alerte par prise." } : ADR_ARGS, "2026-10-10"));
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    for (const action of ["amend", "accept"]) {
+      await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
+      const q = (await app.interactions.pending()).find((x) => x.title === "Ratifier ADR-001")!;
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, action === "amend" ? "alerte par prise" : undefined, { role: "architecte" });
+    }
+    expect(await rapportsDuDesign(root)).toEqual(["design-review-1.json", "design-review-1.md", "design-review-2.json", "design-review-2.md"]);
+  }, 120_000);
+
   // D2 (docs/12) : la liste des ADR suit le disque, que le rembobinage remet au début de la phase.
   describe("ADR proposés puis effacés par un rembobinage (D2)", () => {
     const DOMAINE = "docs/adr/adr-001-plafond-dans-le-domaine.md";
@@ -215,7 +251,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
   });
 
   // D6 (docs/12) : les lentilles ne reçoivent ni faits d'un run effacé, ni rapports de revue en livrables.
-  it("après un rembobinage, les faits de la revue portent sur le run en cours ; les rapports de revue ne sont pas des livrables", async () => {
+  it("après un rembobinage, les faits de la revue portent sur le run en cours ; les rapports de revue ne sont pas des livrables ni ressuscités (D8)", async () => {
     let revues = 0;
     let relance = false;
     const prompts: string[] = [];
@@ -265,5 +301,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     // Revue du run 2 : seul l'essai en cours, pas l'essai 2 du run effacé.
     expect(prompts[2]).toContain("validée à l'essai 1");
     expect(prompts[2]).not.toContain("à l'essai 2");
+    // D8 : les rapports du run effacé ne ressuscitent pas ; le numéro de revue ne recule pas.
+    expect(await rapportsDuDesign(root)).toEqual(["design-review-3.json", "design-review-3.md"]);
   }, 120_000);
 });

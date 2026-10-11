@@ -112,7 +112,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
       }
       if (e.type === "PHASE_CHECKPOINTED" && e.phase === p) {
         const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId } };
-        return { state: ns, effects: [specialist(ns, [])] };
+        return lancer(ns, []);
       }
       if (e.type === "AGENT_REPORTED") {
         // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
@@ -120,7 +120,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (p === "DESIGN" && s1.designStep === "model") {
           // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
           const ns: SkraftState = { ...s1, designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, s1.lastRejection?.reasons ?? [])] };
+          return lancer(ns, s1.lastRejection?.reasons ?? []);
         }
         return { state: { ...s1, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s1.attempts + 1 }] };
       }
@@ -135,8 +135,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const answer = e.comment ? `${e.decision} (${e.comment})` : e.decision;
         if (s.blocker.lens) return afterReviewQuestion(s, s.blocker.lens, s.blocker.question, answer);
         const ns: SkraftState = { ...s, stage: "SPECIALIST", blocker: null, answers: [...s.answers, { question: s.blocker.question, answer }] };
-        if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, []);
-        return { state: ns, effects: [specialist(ns, [])] };
+        // L'agent repart avec le retour qu'il avait avant sa question (D9 de docs/12).
+        if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, ns.deliver.feedback);
+        return lancer(ns, s.retour ?? []);
       }
       break;
 
@@ -216,7 +217,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (!adr || !["accept", "reject", "amend"].includes(action ?? "")) break;
         if (action === "amend") {
           const ns: SkraftState = { ...s, stage: "SPECIALIST", designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, [`Amendement demandé sur ${adr.id} : ${e.comment ?? "(sans précision)"}`])] };
+          return lancer(ns, [`Amendement demandé sur ${adr.id} : ${e.comment ?? "(sans précision)"}`]);
         }
         const status = action === "accept" ? "Accepted" : "Rejected";
         const adrs = s.adrs.map((a): AdrRecord => (a.id === adr.id ? { ...a, status, decisionBy: "user" } : a));
@@ -289,7 +290,7 @@ function afterReviewQuestion(s: SkraftState, lens: LensName, question: string, a
   };
   if (p === "DELIVER") return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
   const replay: SkraftState = { ...ns, stage: "SPECIALIST", designStep: "model" };
-  return { state: replay, effects: [specialist(replay, [motif])] };
+  return lancer(replay, [motif]);
 }
 
 /**
@@ -387,6 +388,14 @@ const tourInterrompu = (raison: string): string[] => [
   `Le tour précédent a été interrompu (${raison}) : aucune porte n'a jugé ton travail.`,
   "Ce que tu avais écrit est resté sur le disque, possiblement incomplet. Reprends-le et termine-le ; ne recommence pas de zéro, et ne considère aucun fichier comme fini sans l'avoir relu.",
 ];
+
+/**
+ * Lance le spécialiste de la phase. Son retour (motif de rejet, amendement, question de revue) est
+ * gardé dans l'état : une question bloquante ne le lui fait pas perdre (D9 de docs/12).
+ */
+function lancer(ns: SkraftState, feedback: string[], avant: SkraftEffect[] = []): Out {
+  return { state: { ...ns, retour: feedback }, effects: [...avant, specialist(ns, feedback)] };
+}
 
 function specialist(s: SkraftState, feedback: string[]): SkraftEffect {
   const p = s.phase!;
@@ -487,7 +496,10 @@ function oublierLaPhase(s: SkraftState): SkraftState {
   // Livrables du run effacé : leurs essais ne seront pas renumérotés, ils fausseraient les faits
   // donnés aux lentilles (D6 de docs/12).
   // Ajout seul (invariant 4, §5.3) : on n'efface pas, on marque où commence le run suivant.
-  const sansLivrables = s.phase ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length } } : s;
+  // Rapports de revue du run effacé : pas réécrits au commit de la phase (D8 de docs/12).
+  const sansLivrables = s.phase
+    ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
+    : s;
   return s.adrsAvantPhase ? { ...sansLivrables, adrs: s.adrsAvantPhase } : sansLivrables;
 }
 
@@ -511,7 +523,7 @@ function failure(etat: SkraftState, gate: string, reasons: string[], essaiGarant
     };
   }
   const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model" };
-  return { state: ns, effects: [...rollback, specialist(ns, reasons)] };
+  return lancer(ns, reasons, rollback);
 }
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */
@@ -542,7 +554,7 @@ function decide(s: SkraftState, decision: string): Out {
     if (s.phase === "DELIVER" && s.deliver && !s.phasesCompleted.includes("DELIVER") && s.deliver.scenarios.some((x) => x.status !== "done")) return retryDeliver(s);
     const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts: 0, escalation: null, designStep: "model" };
     if (!ns.checkpoints[ns.phase!]) return { state: ns, effects: [{ kind: "checkpointPhase", phase: ns.phase! }] };
-    return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };
+    return lancer(ns, s.lastRejection?.reasons ?? []);
   }
   if (decision === "skip" && from === "PHASE" && s.phase) {
     const efface = rembobiner(s);

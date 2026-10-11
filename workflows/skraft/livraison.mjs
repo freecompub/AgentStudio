@@ -13,7 +13,7 @@ import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
-import { ecrireRapport, enregistrerLivrables, nouveauSuivi, reviser } from "./revue.mjs";
+import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
 const QUALITY = ".agent-studio/quality.yaml";
@@ -43,14 +43,13 @@ export async function livrer(w, d, lentilles, max) {
   const faite = await w.phase("DELIVER", async (cp) => {
     const L = await phase(w, d, suivi, cp, lentilles, max);
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
-    for (const r of suivi.revues)
-      await ecrireRapport(w, d.slug, "DELIVER", r.essai, r.lentilles);
+    await ecrireRapports(w, d.slug, "DELIVER", suivi);
     return true;
   }, {
     commit: commitMessage("DELIVER", d.slug),
     apresRembobinage: () => {
-      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
-      suivi.livrables = [];
+      // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
+      oublierLeRun(suivi);
       return creerDossiers(w, d.slug);
     },
   });
@@ -296,11 +295,10 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
   d.livres = L.scenarios.filter((x) => x.status === "done").map((x) => `${x.id}${x.role === "regression" ? " (non-régression)" : ""}`);
   d.constats = L.notes;
   const testeur = etape === "test" || etape === "fix-test";
-  let retour = rejet;
   for (;;) {
     await w.etape("DELIVER");
     const consigne = [
-      buildBrief(d, "DELIVER", retour),
+      buildBrief(d, "DELIVER", rejet),
       `Scénario en cours : ${sc.id}${critere ? ` (critère ${critere.n} : ${critere.text})` : ""}`,
       ...(gherkin ? ["Scénario :", gherkin.trim()] : []),
       `Test d'acceptance à faire passer : ${sc.acceptanceTestId}`,
@@ -314,7 +312,6 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
     await w.etape("BLOCKED");
     const rep = await w.humain("blocage", "Question de l'agent (DELIVER)", choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
     d.reponses = [...d.reponses, { question: r.blocage.question, answer: rep.commentaire ? `${rep.decision} (${rep.commentaire})` : rep.decision }];
-    retour = etape === "fix" || etape === "fix-test" ? routes : [];
   }
 }
 /** La porte du pas : RED, GREEN, REFACTOR, ou correction ; elle commite et pose le point sûr suivant. */

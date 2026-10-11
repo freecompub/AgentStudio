@@ -164,6 +164,10 @@ export interface SkraftState {
    * d'un run effacé par un rembobinage, et ne doivent plus nourrir les faits (D6 de docs/12).
    */
   debutDuRun?: Partial<Record<Phase, number>>;
+  /** Par phase, index dans `reviews` de la première revue du run en cours : les rapports d'avant ne sont pas réécrits (D8 de docs/12). */
+  debutDesRevues?: Partial<Record<Phase, number>>;
+  /** Retour donné au spécialiste en cours, rendu tel quel après une question bloquante (D9 de docs/12). */
+  retour?: string[];
   /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
   adrsAvantPhase?: AdrRecord[];
   /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */

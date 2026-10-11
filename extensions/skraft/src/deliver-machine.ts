@@ -209,7 +209,8 @@ function agent(s: SkraftState, d: DeliverState, feedback: string[]): Out {
         : [];
   const fb = step === "fix" || step === "fix-test" ? [...new Set([...routed, ...feedback])] : feedback;
   return {
-    state: { ...s, stage: "SPECIALIST", deliver: d },
+    // Retour gardé jusqu'à la porte du pas : une question bloquante ne le fait pas perdre (D9 de docs/12).
+    state: { ...s, stage: "SPECIALIST", deliver: { ...d, feedback } },
     effects: [{ kind: "runDeliverAgent", step, scenarioId: d.scenarios[d.current]!.id, attempt: d.attempts + 1, feedback: fb }],
   };
 }

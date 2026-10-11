@@ -10,7 +10,7 @@ import { checkDesign } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
-import { ecrireRapport, enregistrerLivrables, nouveauSuivi, reviser, specialiste } from "./revue.mjs";
+import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
@@ -19,8 +19,7 @@ export async function concevoir(w, d, lentilles, max) {
   const faite = await w.phase("DESIGN", async (cp) => {
     await essayer(w, { max }, (motifs, essai) => unEssai(w, d, suivi, cp, lensesForPhase(lentilles, "DESIGN"), motifs, essai));
     await statuerAdrs(w, d);
-    for (const r of suivi.revues)
-      await ecrireRapport(w, d.slug, "DESIGN", r.essai, r.lentilles);
+    await ecrireRapports(w, d.slug, "DESIGN", suivi);
     return true;
   }, {
     commit: commitMessage("DESIGN", d.slug),
@@ -28,8 +27,8 @@ export async function concevoir(w, d, lentilles, max) {
     apresRembobinage: async () => {
       await creerDossiers(w, d.slug);
       d.adrs = await adrsDuDisque(w, d.slug);
-      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
-      suivi.livrables = [];
+      // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
+      oublierLeRun(suivi);
     },
   });
   return faite === true;

@@ -210,8 +210,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (question && "question" in question) return { type: "LENS_BLOCKED", lens: question.lens, question: question.question, choices: question.choices };
       const raw = runs.map((r) => ("verdict" in r ? r.verdict : null)).filter((v): v is LensVerdict => v !== null);
       // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
-      const verdicts = numberDefects(raw, state.reviews[effect.phase].length + 1, defectTargetOf(ctx));
-      const reportPath = await writeReview(ctx, state.slug, effect.phase, effect.attempt, verdicts);
+      const round = state.reviews[effect.phase].length + 1;
+      const verdicts = numberDefects(raw, round, defectTargetOf(ctx));
+      const reportPath = await writeReview(ctx, state.slug, effect.phase, round, effect.attempt, verdicts);
       // DELIVER : référence de la garde du contrat ratifié, relevée sur le code que la revue a jugé.
       const contractSymbols = effect.phase === "DELIVER" ? await contractSymbolsPresent(ctx, state.slug) : [];
       return { type: "LENSES_DONE", lenses: verdicts, reportPath, ...(contractSymbols.length ? { contractSymbols } : {}) };
@@ -314,8 +315,10 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     }
 
     case "commitPhase":
-      // Rapports de revue réécrits depuis l'état (un rollback de réessai a pu les effacer) : reproductibles.
-      for (const r of state.reviews[effect.phase]) await writeReview(ctx, state.slug, effect.phase, r.attempt, r.lenses);
+      // Rapports de revue du run en cours réécrits depuis l'état (un rollback de réessai a pu les
+      // effacer) ; ceux d'un run effacé par un rembobinage ne ressuscitent pas (D8 de docs/12).
+      for (const [i, r] of state.reviews[effect.phase].entries())
+        if (i >= (state.debutDesRevues?.[effect.phase] ?? 0)) await writeReview(ctx, state.slug, effect.phase, i + 1, r.attempt, r.lenses);
       return { type: "COMMITTED", sha: await ctx.git.commit(effect.message) };
 
     case "finalReport":
@@ -509,8 +512,12 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
 }
 
-async function writeReview(ctx: ExtensionContext, slug: string, phase: Phase, attempt: number, lenses: LensVerdict[]): Promise<string> {
-  const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${attempt}`;
+/**
+ * Rapports d'une revue, nommés par son rang dans la phase (`reviews` ne fait que grandir) : un
+ * amendement, qui ne consomme pas d'essai, n'écrase plus la revue précédente (D8 de docs/12).
+ */
+async function writeReview(ctx: ExtensionContext, slug: string, phase: Phase, round: number, attempt: number, lenses: LensVerdict[]): Promise<string> {
+  const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${round}`;
   await ctx.workspace.writeFile(`${base}.json`, JSON.stringify(lenses, null, 2));
   await ctx.workspace.writeFile(`${base}.md`, reviewReport(phase, attempt, lenses));
   return `${base}.md`;

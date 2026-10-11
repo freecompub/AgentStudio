@@ -7,23 +7,22 @@ import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-st
 import { checkAcceptanceRed, checkValues } from "./distill.mjs";
 import { checkGherkin } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
-import { ecrireRapport, enregistrerLivrables, nouveauSuivi, reviser, specialiste } from "./revue.mjs";
+import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 /** Rend vrai si la phase est faite, faux si l'humain l'a sautée. */
 export async function distiller(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
   const faite = await w.phase("DISTILL", async (cp) => {
     await essayer(w, { max }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
-    for (const r of suivi.revues)
-      await ecrireRapport(w, d.slug, "DISTILL", r.essai, r.lentilles);
+    await ecrireRapports(w, d.slug, "DISTILL", suivi);
     return true;
   }, {
     commit: commitMessage("DISTILL", d.slug),
     apresRembobinage: () => {
       d.acceptanceHash = null;
       d.regressions = [];
-      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
-      suivi.livrables = [];
+      // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
+      oublierLeRun(suivi);
       return creerDossiers(w, d.slug);
     },
   });

@@ -202,6 +202,78 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(rejets.flatMap((r) => r.motifs).some((m) => m.startsWith("Aucun fichier de production modifié"))).toBe(false);
   }, 90_000);
 
+  // D9 (docs/12) : après une question bloquante, l'agent repart avec le motif du rejet qu'il corrigeait.
+  describe("question bloquante après un rejet : le motif reste (D9)", () => {
+    const repondreAuxBlocages = (app: Awaited<ReturnType<typeof assemble>>) => {
+      const faites = new Set<string>();
+      const tick = async () => {
+        for (const p of await app.interactions.pending()) {
+          if (!p.title.startsWith("Question de l'agent") || faites.has(p.id)) continue;
+          faites.add(p.id);
+          await app.interactions.respond(p.id, p.options[0]!.id, undefined, { role: "po" });
+        }
+      };
+      app.interactions.onChange(() => void tick());
+      void tick();
+    };
+
+    it("RESEARCH", async () => {
+      const prompts: string[] = [];
+      const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+        "skraft-researcher": async (t) => {
+          prompts.push(t.prompt);
+          if (prompts.length === 2) return void (await t.callTool("report_blocker", { question: "Par prise ?", choices: ["oui", "non"] }));
+          const lignes = prompts.length === 1 ? "40-72" : "40-55";
+          await put(root, ".skraft/us-12/research/research.md", researchDoc({ Découvertes: `Le calcul vit dans \`src/domain/bolus-calculator.ts:${lignes}\`.` }));
+          await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
+        },
+      });
+      const app = await assemble(root, runtime, tasksDir);
+      answerQuestions(app);
+      repondreAuxBlocages(app);
+      const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+      await fin(app, id, 60_000);
+      expect(prompts[2]).toContain("bolus-calculator.ts:40-72");
+    }, 90_000);
+
+    it("DISTILL", async () => {
+      const prompts: string[] = [];
+      const accept = acceptanceWriter(root);
+      const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+        "skraft-acceptance": async (t) => {
+          prompts.push(t.prompt);
+          if (prompts.length === 2) return void (await t.callTool("report_blocker", { question: "Par prise ?", choices: ["oui", "non"] }));
+          await accept(t);
+          if (prompts.length === 1) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+        },
+      });
+      const app = await assemble(root, runtime, tasksDir);
+      answerQuestions(app);
+      repondreAuxBlocages(app);
+      const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+      await fin(app, id, 60_000);
+      expect(prompts[2]).toContain("Plan de test absent : .skraft/us-12/distill/test-plan.md");
+    }, 90_000);
+
+    it("DELIVER", async () => {
+      const prompts: string[] = [];
+      const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+        "skraft-dev": async (t) => {
+          prompts.push(t.prompt);
+          if (prompts.length === 2) return void (await t.callTool("report_blocker", { question: "Par prise ?", choices: ["oui", "non"] }));
+          if (prompts.length > 1) await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
+          await t.callTool("report_phase", { summary: "code", files: [] });
+        },
+      });
+      const app = await assemble(root, runtime, tasksDir);
+      answerQuestions(app);
+      repondreAuxBlocages(app);
+      const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+      await fin(app, id, 60_000);
+      expect(prompts[2]).toContain("Aucun fichier de production modifié");
+    }, 90_000);
+  });
+
   it("revue de DELIVER « changements demandés » sans aucun défaut : escalade, personne à qui l'adresser", async () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-lens-cold-reader": async (t) => {

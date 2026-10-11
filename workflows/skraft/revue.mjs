@@ -10,18 +10,27 @@ import { lensBrief, latestArtifacts } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
-export const nouveauSuivi = () => ({ revues: [], fils: [], livrables: [] });
+/**
+* `revues` ne fait que grandir : son rang numérote les rapports, qui ne reculent donc jamais, même
+* sur un amendement qui ne consomme pas d'essai. `debutDuRun` marque la première revue du run en
+* cours : celles d'avant ont été effacées du disque par un rembobinage (D8 de docs/12).
+*/
+export const nouveauSuivi = () => ({ revues: [], fils: [], livrables: [], debutDuRun: 0 });
+/** Au rembobinage : livrables et rapports du run effacé oubliés (D6, D8 de docs/12). */
+export function oublierLeRun(s) {
+  s.livrables = [];
+  s.debutDuRun = s.revues.length;
+}
 /**
 * Tour d'un spécialiste ; ses réponses aux défauts mettent les fils à jour. Une question bloquante
-* passe à l'humain, puis il repart sans motif (comme le réducteur).
+* passe à l'humain, puis il repart avec la réponse et le même motif (D9 de docs/12).
 */
 export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
-  let retour = motifs;
   for (;;) {
     await w.etape(phase);
     // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
     const decides = d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
-    const r = await w.agent(nom, buildBrief(d, phase, retour) + suffixe, { lectureSeule: [...GELÉS, ...decides] });
+    const r = await w.agent(nom, buildBrief(d, phase, motifs) + suffixe, { lectureSeule: [...GELÉS, ...decides] });
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);
@@ -30,8 +39,8 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
     const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
     await w.etape("BLOCKED");
     const rep = await w.humain("blocage", `Question de l'agent (${phase})`, choix.map((c) => ({ id: c, label: c })), { detail: r.blocage.question });
+    // Il repart avec la réponse ET le motif qu'il corrigeait (D9 de docs/12).
     d.reponses = [...d.reponses, { question: r.blocage.question, answer: rep.commentaire ? `${rep.decision} (${rep.commentaire})` : rep.decision }];
-    retour = [];
   }
 }
 /** Au-delà, une question de revue escalade : le budget ne borne plus ces rejeux (D4 de docs/12). */
@@ -109,10 +118,10 @@ async function juger(w, d, s, phase, essai, bruts, disp) {
   const tour = s.revues.length + 1;
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
   const verdicts = numberDefects(bruts, tour, classer);
-  await ecrireRapport(w, d.slug, phase, essai, verdicts);
+  await ecrireRapport(w, d.slug, phase, tour, essai, verdicts);
   const r = reviewRound(s.fils, verdicts, tour);
   s.fils = r.threads;
-  s.revues.push({ essai, lentilles: verdicts });
+  s.revues.push({ tour, essai, lentilles: verdicts });
   // Contesté deux fois, maintenu deux fois : l'humain tranche, tous les désaccords à la fois.
   let lenses = r.lenses;
   let parHumain = false;
@@ -165,11 +174,16 @@ async function fichiersDePhase(w, s, cp, disp) {
   const derniers = latestArtifacts(s.livrables).map((a) => a.path).filter((p) => existants.has(p));
   return { artifacts: [...new Set([...derniers, ...changes.filter((p) => !tests.includes(p) && !code.includes(p))])], code, tests };
 }
-/** Rapports d'une revue ; réécrits avant le commit, un rembobinage a pu les effacer. */
-export async function ecrireRapport(w, slug, phase, essai, lentilles) {
-  const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${essai}`;
+/** Rapports d'une revue, nommés par son rang dans la phase. */
+async function ecrireRapport(w, slug, phase, tour, essai, lentilles) {
+  const base = `.skraft/${slug}/reviews/${phase.toLowerCase()}-review-${tour}`;
   await w.ecrireFichier(`${base}.json`, JSON.stringify(lentilles, null, 2));
   await w.ecrireFichier(`${base}.md`, reviewReport(phase, essai, lentilles));
+}
+/** Rapports du run en cours, réécrits avant le commit : un réessai rembobiné a pu les effacer. */
+export async function ecrireRapports(w, slug, phase, s) {
+  for (const r of s.revues.slice(s.debutDuRun))
+    await ecrireRapport(w, slug, phase, r.tour, r.essai, r.lentilles);
 }
 /** Livrables d'un essai validé par la porte, avec leur empreinte. */
 export async function enregistrerLivrables(w, s, chemins, essai, sha256) {

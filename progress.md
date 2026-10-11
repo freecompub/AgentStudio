@@ -5,6 +5,38 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D9 : après une question bloquante, le motif reste
+
+- L'agent repart avec la réponse **et** son retour : rejet de porte, amendement, question de revue
+  ou pas refusé.
+- Extension : `lancer(ns, retour)` (`reducer.ts`) remplace les `{ state, effects: [specialist(…)] }`
+  et garde `state.retour`. `lastRejection` ne suffisait pas : un amendement n'est pas un rejet.
+  En DELIVER, `agent` tient `deliver.feedback`.
+- Workflow : les trois boucles (`specialiste`, `agentDuPas`, RESEARCH) ne vident plus leur retour.
+- **Décision du responsable du projet** : les réponses humaines sont gardées et réutilisées dans
+  tout le processus, même après un rembobinage. Le second point de D9 (les oublier) est écarté.
+
+Prochaine étape : D10, puis D12 à D16 (W) et D17 à D23 (E).
+
+---
+
+## 11/10 — D8 : un rapport par revue, sans écrasement ni résurrection
+
+- Rapport nommé par le **rang** de la revue dans la phase, et non plus par l'essai :
+  - un amendement ne consomme pas d'essai, donc ses deux revues écrivaient le même fichier ;
+  - après une relance, la réécriture d'avant commit remettait les rapports du run effacé.
+- Les listes de revues ne sont pas vidées au rembobinage : leur rang numérote aussi les fils de
+  défauts, qui survivent à la relance. On marque à la place le début du run (`debutDuRun` dans le
+  suivi du workflow, `debutDesRevues` dans l'état de l'extension).
+- L'audit ne citait que le workflow. L'extension avait les deux défauts ; les tests le montrent.
+- Piège : le test D3 du workflow contourne la garde, ce qui provoque un rejet et consomme un essai.
+  Ses deux revues ont donc des essais différents, et il ne reproduit pas l'écrasement. Il a fallu
+  un test d'amendement pur.
+
+Prochaine étape : D9, D10.
+
+---
+
 ## 11/10 — D7 : en correction, contester n'oblige plus à modifier le code
 
 - Règle « aucun fichier de production modifié » levée au pas `fix` quand **chaque** défaut actif
