@@ -612,6 +612,23 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     expect(refused.state.deliver?.notes).toEqual(["Scénario ac-1 : nettoyage annulé (suite rouge)"]);
   });
 
+  describe("D20 (docs/12) : une escalade de DELIVER rembobine ET fait oublier les sessions (ADR 0050)", () => {
+    const oubli = { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] };
+
+    it("panne d'environnement pendant un scénario", () => {
+      const r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, { type: "ENV_FAILURE", reason: "Copilot injoignable" } as Ev]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s" }, oubli, expect.objectContaining({ kind: "askEscalation" })]);
+    });
+
+    it("scénario en échec au-delà du budget", () => {
+      const echec: Ev = { type: "SCENARIO_FAIL", reasons: ["acceptance rouge"] };
+      const r = play([...toDeliver(), PLANNED, STARTED, echec, echec, echec]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s" }, oubli, expect.objectContaining({ kind: "askEscalation" })]);
+    });
+  });
+
   it("pas refusé : rollback au dernier point sûr, relance ciblée ; budget épuisé en mode tour → scénario repris en sessions séparées", () => {
     const dev = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV];
     const once = play([...dev, FAIL("tests unitaires modifiés")]);
@@ -632,8 +649,10 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const again = (st: Ev[]) => [...st, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2), { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] } as Ev];
     const esc = play(again(again([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }])));
     expect(esc.state.stage).toBe("ESCALATED");
+    // Rembobiner et oublier vont ensemble (ADR 0050, D20 de docs/12).
     expect(esc.effects).toEqual([
       { kind: "rollback", to: "cp-s" },
+      { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] },
       { kind: "askEscalation", reason: "Scénario ac-1 : Mutation : 95 %", options: ["retry", "skip", "abort"] },
     ]);
     const retried = transition(esc.state, DECIDE("retry"));
@@ -742,7 +761,11 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   it("panne d'environnement pendant un scénario : retour au début du scénario et escalade, sans perdre les scénarios livrés", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: [] } as Ev, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev];
     const r = play([...base, REP_TEST, { type: "ENV_FAILURE", reason: "swift introuvable" }]);
-    expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "askEscalation", reason: "swift introuvable", options: ["retry", "skip", "abort"] }]);
+    expect(r.effects).toEqual([
+      { kind: "rollback", to: "cp-s2" },
+      { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] },
+      { kind: "askEscalation", reason: "swift introuvable", options: ["retry", "skip", "abort"] },
+    ]);
     expect(r.state.deliver!.scenarios.map((x) => x.status)).toEqual(["done", "in_progress", "done"]);
     expect(transition(r.state, DECIDE("retry")).effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-2", attempt: 1, feedback: [] }]);
   });

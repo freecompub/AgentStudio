@@ -1,3 +1,4 @@
+import { phaseRoles } from "./config.js";
 import { levelEffects } from "./difficulty.js";
 import type { ArbitrageRecord, DeliverState, Derogation, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
@@ -326,11 +327,21 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     const reason = `Scénario ${sc.id} : ${reasons.join(" ; ")}`;
     return {
       state: { ...s, stage: "ESCALATED", deliver: restart, lastRejection, escalation: { from: "PHASE", reason } },
-      effects: [...rollback, { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+      effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
     };
   }
   const r = agent({ ...s, lastRejection }, restart, reasons);
   return { state: r.state, effects: [...rollback, ...r.effects] };
+}
+
+/**
+ * Escalade de DELIVER : retour au point de reprise du scénario (ou de la correction) ET oubli des
+ * sessions du testeur et du développeur, qui se souviendraient d'un code effacé (ADR 0050, D20 de
+ * docs/12). Les reprises sans escalade, elles, gardent leur session : leur motif dit que le tour est annulé.
+ */
+function rembobinerScenario(d: DeliverState): SkraftEffect[] {
+  if (!d.scenarioCheckpoint) return [];
+  return [{ kind: "rollback", to: d.scenarioCheckpoint }, { kind: "forgetSessions", roles: phaseRoles("DELIVER") }];
 }
 
 /** Panne d'environnement pendant un scénario : retour au début du scénario, escalade immédiate (D25). */
@@ -339,7 +350,7 @@ export function escalateDeliver(s: SkraftState, reason: string): Out {
   const restart: DeliverState = { ...d, step: "test", unitTests: [], newTest: null, acceptanceGreen: false, attempts: 0, baseline: d.scenarioBaseline, ...repriseDeLEmpreinte(d), stepCheckpoint: d.scenarioCheckpoint };
   return {
     state: { ...s, stage: "ESCALATED", deliver: restart, escalation: { from: "PHASE", reason } },
-    effects: [...(d.scenarioCheckpoint ? [{ kind: "rollback", to: d.scenarioCheckpoint } as SkraftEffect] : []), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+    effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
   };
 }
 

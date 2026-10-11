@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "escalade-de-deliver-oublie-les-sessions",
+      "title": "Une escalade de DELIVER rembobine le scénario ET fait oublier les sessions du testeur et du développeur",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D20\"",
+      "passes": true,
+      "notes": "D20 de docs/12, ADR 0050, 2026-10-11. Extension : rembobinerScenario (deliver-machine.ts) dans l'escalade de scénario et escalateDeliver ; deux anciens tests réécrits pour exiger la paire. Workflow : pas de défaut, test de contrôle (vérifié en échec quand l'oubli de w.rembobiner est désactivé). Tests du réducteur vérifiés en échec sans la correction."
+    },
+    {
       "id": "commit-de-phase-en-echec",
       "title": "Un commit de phase en échec ne rembobine pas une phase approuvée : relancer le commit seul, continuer sans commiter (tracé) ou abandonner",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D19\"",

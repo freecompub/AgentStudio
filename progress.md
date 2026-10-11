@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D20 : une escalade de DELIVER fait aussi oublier les sessions (extension)
+
+- Les deux escalades de la sous-machine DELIVER (budget d'échecs du scénario et panne) émettaient
+  un `rollback` seul. Au « relancer », le testeur et le développeur se souvenaient d'un code effacé
+  (ADR 0050). `rembobinerScenario` émet maintenant la paire avec `forgetSessions`.
+- Les reprises **sans** escalade (pas refusé, scénario repris automatiquement) gardent leur
+  session, qui reçoit le motif « tour annulé ». Ce cas n'est pas visé par l'audit.
+- Le workflow n'a pas ce défaut : `w.rembobiner` oublie toujours (ADR 0053). Le test de contrôle a
+  été vérifié en désactivant cet oubli : il échoue alors.
+- Instabilité vue une fois sous charge (`e2e-arbitrage-mutation`, cas « équivalent ») : passe seul
+  et à la suite complète suivante. À surveiller.
+
+Prochaine étape : D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D19 : commit de phase en échec
 
 - Avant, une panne au commit rembobinait une phase **approuvée**, et « relancer » la refaisait
