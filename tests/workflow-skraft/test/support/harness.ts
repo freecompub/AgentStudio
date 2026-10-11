@@ -203,6 +203,21 @@ export function simulatedAgents(
 /** Panne simulée : l'opération désignée ne rend jamais la main (plantage du processus). */
 export type HangPoint = "readStory" | "changedFiles" | "commit";
 
+/** Commit en échec (verrou Git, disque plein) tant que le prédicat le dit, sur le message du commit. */
+function withCommitFailure(ws: Workspace, echoue: ((message: string) => boolean) | undefined): Workspace {
+  if (!echoue) return ws;
+  return {
+    ...ws,
+    repo: {
+      ...ws.repo,
+      commit: async (m, o) => {
+        if (echoue(m)) throw new Error("Unable to create '.git/index.lock': File exists.");
+        return ws.repo.commit(m, o);
+      },
+    },
+  };
+}
+
 function withHang(ws: Workspace, hang: HangPoint | undefined): Workspace {
   if (!hang) return ws;
   const never = () => new Promise<never>(() => {});
@@ -289,8 +304,8 @@ export function fakeStack(): StackAdapter {
   };
 }
 
-export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; stack?: StackAdapter } = {}) {
-  const workspace = withHang(await openWorkspace(root), opts.hang);
+export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; commitEchoue?: (message: string) => boolean; stack?: StackAdapter } = {}) {
+  const workspace = withCommitFailure(withHang(await openWorkspace(root), opts.hang), opts.commitEchoue);
   const usage = createUsageRecorder(join(tasksDir, "usage"));
   // Trace d'exécution (ADR 0032) : c'est là qu'un run dit pourquoi chaque travail a été refait.
   const trace = createJsonlTraceStore(join(tasksDir, "traces"));

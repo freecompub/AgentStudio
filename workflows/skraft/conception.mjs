@@ -24,6 +24,8 @@ export async function concevoir(w, d, lentilles, max) {
     return true;
   }, {
     commit: commitMessage("DESIGN", d.slug),
+    // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
+    commitManque: () => void d.nonCommitees.push("DESIGN"),
     // Le rembobinage efface les ADR de la phase : la liste les oublie aussi (D2 de docs/12).
     apresRembobinage: async () => {
       await creerDossiers(w, d.slug);

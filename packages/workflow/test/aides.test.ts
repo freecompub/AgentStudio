@@ -214,6 +214,44 @@ describe("w.phase : checkpoint, commit, escalade (docs/09 §5.2)", () => {
     expect((await t.record()).state.fin).toMatchObject({ statut: "fini" });
   });
 
+  describe("commit de la phase en échec (D19 de docs/12)", () => {
+    const phaseQuiReussit = (w: W, manque: string[]) =>
+      w.phase("DESIGN", async () => (await w.agent("archi", ""), true), { commit: "docs: DESIGN", commitManque: (m) => void manque.push(m) });
+
+    it("aucun rembobinage ; relancer refait le seul commit", async () => {
+      const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
+      f.echecsDeCommit.n = 1;
+      const t = await lancer(decl((w) => phaseQuiReussit(w, [])), f.ctx);
+      expect(f.rembobinages).toEqual([]);
+      expect(f.demandes[0]!.title).toMatch(/^Phase DESIGN : commit impossible \(.*index\.lock/);
+      expect(f.demandes[0]!.options.map((o) => o.label)).toEqual(["Relancer le commit", "Continuer sans commiter", "Abandonner la tâche"]);
+      await t.engine.dispatch(t.id, { type: "HUMAN_DECISION", decision: f.demandes[0]!.options[0]!.id });
+      await t.engine.idle(t.id);
+      expect(f.appels.filter((a) => a === "agent:archi")).toHaveLength(1);
+      expect(f.appels.filter((a) => a === "commit:docs: DESIGN")).toHaveLength(2);
+      expect((await t.record()).state.fin).toMatchObject({ statut: "fini" });
+    });
+
+    it("continuer sans commiter : la phase rend sa valeur, le choix est tracé comme rejet « commit » et signalé au script", async () => {
+      const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
+      f.echecsDeCommit.n = 1;
+      // Le script est rejoué : ce qu'il note vit dans le script, et se lit dans sa valeur de fin.
+      const t = await lancer(
+        decl(async (w) => {
+          const manque: string[] = [];
+          return { faite: await phaseQuiReussit(w, manque), manque };
+        }),
+        f.ctx,
+      );
+      await t.engine.dispatch(t.id, { type: "HUMAN_DECISION", decision: f.demandes[0]!.options[1]!.id });
+      await t.engine.idle(t.id);
+      const etat = (await t.record()).state;
+      expect(etat.lastRejection).toEqual({ gate: "commit", reasons: [expect.stringMatching(/DESIGN.*index\.lock.*sans commit/)] });
+      expect(etat.fin).toMatchObject({ statut: "fini", valeur: { clair: { faite: true, manque: [expect.stringMatching(/index\.lock/)] } } });
+      expect(f.rembobinages).toEqual([]);
+    });
+  });
+
   it("SauterPhase levée par le script : la phase est rembobinée et sautée, sans nouvelle question", async () => {
     const f = fauxContexte();
     const t = await lancer(

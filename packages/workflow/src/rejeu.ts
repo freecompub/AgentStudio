@@ -48,6 +48,33 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     return marqueur ? Promise.resolve(null as T) : jamais();
   };
 
+  /**
+   * Commit d'une phase approuvée (D19 de docs/12). Son échec (verrou Git, disque plein) ne
+   * rembobine pas un travail approuvé : l'humain relance le commit seul, continue sans commiter
+   * (tracé ; les fichiers partent dans le commit suivant), ou abandonne.
+   */
+  async function commiterLaPhase(nom: string, message: string, commitManque?: (motif: string) => void): Promise<void> {
+    for (;;) {
+      let erreur: string;
+      try {
+        await w.commiter(message);
+        return;
+      } catch (e) {
+        erreur = e instanceof Error ? e.message : String(e);
+      }
+      await w.etape("ESCALATED");
+      const d = await w.humain("escalade", `Phase ${nom} : commit impossible (${erreur})`, ESCALADE_COMMIT);
+      if (d.decision === "abandonner") w.echec(`Phase ${nom} abandonnée : commit impossible (${erreur})`);
+      if (d.decision === "continuer") {
+        const motif = `Phase ${nom} approuvée mais commit impossible (${erreur}) : continuée sans commit, ses fichiers partent dans le commit suivant.`;
+        await w.rejet("commit", [motif]);
+        commitManque?.(motif);
+        return;
+      }
+      await w.etape(nom);
+    }
+  }
+
   const w: W = {
     agent: async (nom, consigne, opts = {}) => {
       if (decl.agents && !decl.agents.includes(nom)) throw new Error(`Agent « ${nom} » non déclaré dans le meta du workflow ${decl.nom}`);
@@ -98,7 +125,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
         let motif: string;
         try {
           const v = await fn(cp, relance);
-          if (opts.commit) await w.commiter(opts.commit);
+          if (opts.commit) await commiterLaPhase(nom, opts.commit, opts.commitManque);
           return v;
         } catch (e) {
           if (e instanceof SauterPhase) {
@@ -149,6 +176,12 @@ function finDe(issue: { ok: unknown } | { err: unknown }, contenus: Record<strin
   if (err instanceof EchecWorkflow) return { statut: "echec", motif: err.motif };
   return { statut: "echec", motif: `Erreur du script : ${err instanceof Error ? err.message : String(err)}` };
 }
+
+const ESCALADE_COMMIT: readonly OptionHumaine[] = [
+  { id: "relancer", label: "Relancer le commit" },
+  { id: "continuer", label: "Continuer sans commiter" },
+  { id: "abandonner", label: "Abandonner la tâche" },
+];
 
 const ESCALADE: readonly OptionHumaine[] = [
   { id: "relancer", label: "Relancer la phase" },

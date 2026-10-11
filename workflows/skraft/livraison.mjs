@@ -50,6 +50,8 @@ export async function livrer(w, d, lentilles, max) {
     return true;
   }, {
     commit: commitMessage("DELIVER", d.slug),
+    // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
+    commitManque: () => void d.nonCommitees.push("DELIVER"),
     apresRembobinage: () => {
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
       oublierLeRun(suivi);

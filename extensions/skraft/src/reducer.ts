@@ -115,7 +115,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (r) return r;
       }
       if (e.type === "PHASE_CHECKPOINTED" && e.phase === p) {
-        const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId } };
+        // Le rejet « commit » d'une phase précédente, continuée sans commit, a été tracé : il ne
+        // concerne pas cette phase (D19 de docs/12).
+        const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId }, ...(s.lastRejection?.gate === "commit" ? { lastRejection: null } : {}) };
         return lancer(ns, []);
       }
       if (e.type === "AGENT_REPORTED") {
@@ -575,6 +577,8 @@ function escalate(etat: SkraftState, reason: string): Out {
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
   // Hors de toute phase : rien à sauter ; « relancer » repose les questions (D17 de docs/12).
   if (s.stage === "ROUTE") return escalateFrom(s, "ROUTE", reason, ["retry", "abort"]);
+  // Commit d'une phase approuvée : rien à rembobiner, le travail est bon (D19 de docs/12).
+  if (s.stage === "COMMIT") return escalateFrom(s, "COMMIT", `Commit impossible : ${reason}`, ["retry", "continue", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   return {
     state: { ...oublierLaPhase(s), stage: "ESCALATED", escalation: { from: "PHASE", reason } },
@@ -582,13 +586,32 @@ function escalate(etat: SkraftState, reason: string): Out {
   };
 }
 
-function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY" | "ROUTE", reason: string, options: ("retry" | "skip" | "abort")[]): Out {
+function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY" | "ROUTE" | "COMMIT", reason: string, options: ("retry" | "skip" | "continue" | "abort")[]): Out {
   return { state: { ...s, stage: "ESCALATED", escalation: { from, reason } }, effects: [{ kind: "askEscalation", reason, options }] };
 }
 
 function decide(s: SkraftState, decision: string): Out {
   const from = s.escalation!.from;
   if (decision === "abort") return { state: { ...s, stage: "ABORTED" }, effects: [] };
+  if (from === "COMMIT" && s.phase) {
+    // Le commit seul est refait ; ou la phase continue sans commit, choix tracé (rejet « commit »).
+    if (decision === "retry") return commit({ ...s, escalation: null });
+    if (decision === "continue") {
+      const motif = `Phase ${s.phase} approuvée mais ${s.escalation!.reason.charAt(0).toLowerCase()}${s.escalation!.reason.slice(1)} : continuée sans commit, ses fichiers partent dans le commit suivant.`;
+      return route({
+        ...s,
+        escalation: null,
+        phasesCompleted: [...s.phasesCompleted, s.phase],
+        attempts: 0,
+        designStep: "model",
+        reviewThreads: [],
+        rejections: (s.rejections ?? 0) + 1,
+        lastRejection: { gate: "commit", reasons: [motif] },
+        nonCommitees: [...(s.nonCommitees ?? []), s.phase],
+      });
+    }
+    return { state: s, effects: [] };
+  }
   if (decision === "retry") {
     if (from === "INIT") return { state: { ...s, stage: "INIT", escalation: null }, effects: [{ kind: "init", storyPath: s.storyPath }] };
     // Panne en ROUTE : les questions sans réponse dont la demande n'a pas été créée sont reposées.

@@ -201,11 +201,15 @@ export default async function skraft(w, entree) {
     qualityCheckpoint,
     // Mutants reconnus équivalents par arbitrage, exemptés de la porte de mutation (ADR 0065).
     derogations: [],
+    // Phases approuvées dont le commit a échoué, continuées sans commit (D19 de docs/12).
+    nonCommitees: [],
   };
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
     const faite = await w.phase("RESEARCH", async (_cp, relance) => (await rechercher(w, vue, effets.maxAttempts, relance), true), {
       commit: commitMessage("RESEARCH", slug),
+      // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
+      commitManque: () => void vue.nonCommitees.push("RESEARCH"),
       // Git ne suit pas les dossiers vides : le rembobinage les emporte (ADR 0037).
       apresRembobinage: () => creerDossiers(w, slug),
     });
@@ -255,6 +259,7 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...(d.nonCommitees?.length ? [`Phases non commitées : ${d.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(d.derogations?.length
       ? [`Dérogations de mutation : ${d.derogations.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`, ...d.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`)]
       : []),

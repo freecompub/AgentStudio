@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D19 : commit de phase en échec
+
+- Avant, une panne au commit rembobinait une phase **approuvée**, et « relancer » la refaisait
+  entièrement (revue, ratification). Le workflow avait le même défaut, et il terminait la tâche
+  sur une erreur imprévue (la nature « erreur » n'est pas attrapée par `w.phase`).
+- Maintenant, dans les deux, il n'y a aucun rembobinage. L'humain choisit :
+  - « Relancer le commit » : le commit seul. Cela marche aussi si l'utilisateur a commité
+    lui-même entre-temps ;
+  - « Continuer sans commiter » : tracé en rejet `commit` et signalé au bilan. Les fichiers
+    partent dans le commit suivant (`git add -A`) ;
+  - « Abandonner ».
+- **Décision du responsable du projet** : l'utilisateur doit pouvoir continuer sans commiter.
+- Rien ne dépend du sha d'un commit de phase ; les checkpoints photographient l'arbre de travail.
+- Un hook de pré-commit ne peut pas être la cause : le dépôt commite avec `--no-verify`. Causes
+  réalistes : verrou `.git/index.lock`, disque plein, droits.
+- Extension : le rejet `commit` est tracé à la transition, puis effacé au checkpoint de la phase
+  suivante, pour ne pas devenir le « Rejet précédent » d'une autre phase.
+
+Prochaine étape : D20, D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D18 : une phase sautée ne transmet plus son motif ni ses défauts (extension)
 
 - « Sauter » vide `lastRejection` et `reviewThreads`, comme le commit d'une phase. Pas dans

@@ -202,13 +202,15 @@ export interface SkraftState {
   /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */
   reviewQuestions?: number;
   /** Origine d'une escalade, pour savoir quoi relancer. */
-  escalation: { from: "INIT" | "CLASSIFY" | "ROUTE" | "PHASE"; reason: string } | null;
+  escalation: { from: "INIT" | "CLASSIFY" | "ROUTE" | "COMMIT" | "PHASE"; reason: string } | null;
   /** Réponses de l'utilisateur à transmettre au prochain dossier de passation. */
   answers: { question: string; answer: string }[];
   /** Questions ouvertes déjà soumises à l'utilisateur (pas de double demande). */
   questionsAsked: string[];
   /** Questions dont la demande a réellement été créée : « relancer » après une panne en ROUTE repose les autres (D17 de docs/12). */
   questionsConfirmees?: string[];
+  /** Phases approuvées dont le commit a échoué, continuées sans commit par l'humain (D19 de docs/12). */
+  nonCommitees?: Phase[];
   /** Empreinte des tests d'acceptance, gelés à la sortie de DISTILL (§7.3). */
   acceptanceHash: string | null;
   /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
@@ -299,7 +301,7 @@ export type SkraftEffect =
   /** `lens` : question d'une lentille de revue (D4 de docs/12). */
   | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
   | { kind: "askQuestion"; id: string; text: string }
-  | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
+  | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "arbitrateMutants"; threads: DefectThread[] }
   | { kind: "askMutationArbitration"; thread: DefectThread; avis: string }

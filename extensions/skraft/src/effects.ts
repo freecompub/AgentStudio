@@ -287,7 +287,12 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         detail: effect.reason,
         options: effect.options.map((id) => ({
           id,
-          label: { retry: state.escalation?.from === "ROUTE" ? "Relancer : reposer les questions" : "Relancer la phase", skip: "Sauter la phase", abort: "Abandonner" }[id],
+          label: {
+            retry: state.escalation?.from === "ROUTE" ? "Relancer : reposer les questions" : state.escalation?.from === "COMMIT" ? "Relancer le commit" : "Relancer la phase",
+            skip: "Sauter la phase",
+            continue: "Continuer sans commiter",
+            abort: "Abandonner",
+          }[id],
         })),
         requiredRoles: ["developpeur", "architecte", "administrateur"],
       });
@@ -616,6 +621,7 @@ function finalReport(s: SkraftState): string {
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
+    ...(s.nonCommitees?.length ? [`Phases non commitées : ${s.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(s.derogations?.length
       ? [
           `Dérogations de mutation : ${s.derogations.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`,

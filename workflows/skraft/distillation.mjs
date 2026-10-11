@@ -19,6 +19,8 @@ export async function distiller(w, d, lentilles, max) {
     return true;
   }, {
     commit: commitMessage("DISTILL", d.slug),
+    // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
+    commitManque: () => void d.nonCommitees.push("DISTILL"),
     apresRembobinage: () => {
       d.acceptanceHash = null;
       d.regressions = [];

@@ -256,6 +256,18 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(answered.effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 1, feedback: [] }]);
   });
 
+  it("D19 (docs/12) : commit en échec, aucun rembobinage ; relancer refait le commit, continuer passe à la suite et trace", () => {
+    const approuve = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))];
+    const panne = play([...approuve, { type: "ENV_FAILURE", reason: "index.lock" } as Ev]);
+    expect(panne.state).toMatchObject({ stage: "ESCALATED", escalation: { from: "COMMIT" } });
+    expect(kinds(panne.effects)).toEqual(["askEscalation"]);
+    expect(kinds(transition(panne.state, DECIDE("retry")).effects)).toEqual(["commitPhase"]);
+    const suite = transition(panne.state, DECIDE("continue"));
+    expect(suite.state).toMatchObject({ phasesCompleted: expect.arrayContaining(["DESIGN"]), nonCommitees: ["DESIGN"], lastRejection: { gate: "commit" } });
+    expect(suite.state.rejections).toBe((panne.state.rejections ?? 0) + 1);
+    expect(transition(suite.state, CP("DISTILL")).state.lastRejection).toBeNull();
+  });
+
   it("REVIEW : APPROVED → COMMIT ; rapport consigné", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))]);
     expect(state.stage).toBe("COMMIT");

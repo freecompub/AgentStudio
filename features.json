@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "commit-de-phase-en-echec",
+      "title": "Un commit de phase en échec ne rembobine pas une phase approuvée : relancer le commit seul, continuer sans commiter (tracé) ou abandonner",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D19\"",
+      "passes": true,
+      "notes": "D19 de docs/12, 2026-10-11. Bibliothèque : commiterLaPhase dans w.phase (rejeu.ts), option commitManque. Workflow : les quatre phases notent vue.nonCommitees, le bilan le dit. Extension : escalade from COMMIT sans rembobinage, retry → commitPhase, continue → phase suivante, rejet « commit » tracé puis effacé au checkpoint suivant, nonCommitees au rapport final. Harness : option commitEchoue. Bouts en bout (relancer, continuer) dans les deux, bibliothèque et réducteur, vérifiés en échec sans la correction."
+    },
+    {
       "id": "phase-sautee-sans-heritage",
       "title": "Une phase sautée ne transmet ni son motif de rejet ni ses défauts de revue à la phase suivante",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D18\"",

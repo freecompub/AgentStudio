@@ -18,6 +18,8 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
   /** Fichiers « modifiés depuis le checkpoint », pour l'archivage avant rembobinage. */
   const modifies: Record<string, string> = {};
   let cp = 0;
+  /** Nombre de commits qui échoueront encore (verrou Git). */
+  const echecsDeCommit = { n: 0 };
   const ctx = {
     extensionId: "test.ext",
     agents: {
@@ -71,6 +73,10 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
     git: {
       async commit(message: string) {
         appels.push(`commit:${message}`);
+        if (echecsDeCommit.n > 0) {
+          echecsDeCommit.n--;
+          throw new Error("Unable to create '.git/index.lock': File exists.");
+        }
         return "sha-1";
       },
       async branch(nom: string) {
@@ -115,7 +121,7 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
       },
     },
   } as unknown as ExtensionContext;
-  return { ctx, appels, consignes, oublis, rembobinages, demandes, messages, fichiers, archives, modifies };
+  return { ctx, appels, consignes, oublis, rembobinages, demandes, messages, fichiers, archives, modifies, echecsDeCommit };
 }
 
 /** Moteur réel, magasin en mémoire partageable entre deux « démarrages ». */
