@@ -16,8 +16,9 @@ const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
 export async function concevoir(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
-  const faite = await w.phase("DESIGN", async (cp) => {
-    await essayer(w, { max }, (motifs, essai) => unEssai(w, d, suivi, cp, lensesForPhase(lentilles, "DESIGN"), motifs, essai));
+  const faite = await w.phase("DESIGN", async (cp, relance) => {
+    // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
+    await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lensesForPhase(lentilles, "DESIGN"), motifs, essai));
     await statuerAdrs(w, d);
     await ecrireRapports(w, d.slug, "DESIGN", suivi);
     return true;

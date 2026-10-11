@@ -45,8 +45,12 @@ export const motifsInterruption = (raison: string): string[] => [
  * - un rejet `nonCompte` rejoue l'essai avec ses motifs, sans le compter ;
  * - une panne d'environnement n'est pas comptée et remonte aussitôt (D25).
  */
-export async function essayer(w: W, opts: { max: number; premiereRevueGarantie?: boolean }, fn: (motifs: readonly string[], essai: number) => Promise<Rejet>): Promise<void> {
-  let motifs: readonly string[] = [];
+export async function essayer(
+  w: W,
+  opts: { max: number; premiereRevueGarantie?: boolean; /** Motifs du premier essai : ceux d'une phase relancée (D15 de docs/12). */ motifs?: readonly string[] },
+  fn: (motifs: readonly string[], essai: number) => Promise<Rejet>,
+): Promise<void> {
+  let motifs: readonly string[] = opts.motifs ?? [];
   let revues = 0;
   for (let essai = 1; ; essai++) {
     let rejet: Rejet;

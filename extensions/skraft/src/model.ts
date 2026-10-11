@@ -75,9 +75,11 @@ export interface DeliverState {
   step: DeliverStep;
   /** Dernier point sûr (début du scénario ou dernier pas validé) : cible des rollbacks. */
   stepCheckpoint: string | null;
-  /** Tests connus et tests verts au dernier point sûr, et au début du scénario. */
+  /** Tests connus et tests verts au dernier point sûr, et au point de reprise (début du scénario ou de la correction). */
   baseline: { all: string[]; passed: string[] };
   scenarioBaseline: { all: string[]; passed: string[] };
+  /** Empreinte des tests unitaires au même point que `scenarioBaseline` : rendue à chaque reprise (D12 de docs/12). */
+  scenarioUnitTestsHash?: string | null;
   /** Tests unitaires ajoutés pendant le scénario, et celui qui attend son vert. */
   unitTests: string[];
   newTest: string | null;

@@ -1052,6 +1052,16 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(muet.effects[0]).not.toHaveProperty("nothingToChange");
     });
 
+    it("D12, D23 (docs/12) : une correction en échec reprend avec l'empreinte et la référence de son entrée, pas celles de l'essai effacé", () => {
+      const entree = play([...delivered, review]).state.deliver!;
+      const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [...passedAll, "U > t9"], passed: passedAll, unitTestsHash: "h9", fixTargets: ["U > t9"] };
+      const echec = play([...delivered, review, REP_TEST, fixTestOk, REP_DEV, FAIL("a"), REP_DEV, FAIL("b"), REP_DEV, FAIL("c")]);
+      const d = echec.state.deliver!;
+      expect(d.step).toBe("fix-test");
+      expect(d.unitTestsHash).toBe(entree.unitTestsHash);
+      expect(d.baseline).toEqual(entree.baseline);
+    });
+
     it("la référence du contrat relevée à la revue accompagne la correction du développeur", () => {
       const review = { ...(LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "taux négatif", target: "code" }] }) as object), contractSymbols: ["Soustrait", "ATPayer"] } as Ev;
       const fix = play([...delivered, review]);

@@ -291,6 +291,34 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await until(async () => (await app.interactions.pending()).some((p) => p.title.includes("Revue sans défaut à corriger")), 60_000);
   }, 90_000);
 
+  // D15 (docs/12) : après « relancer », le premier agent de la phase reçoit le motif de l'escalade.
+  it("relancer DELIVER : le premier pas reçoit le motif de l'escalade (D15)", async () => {
+    let relance = false;
+    const testPrompts: string[] = [];
+    const ecrire = unitTestWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-test": async (t) => {
+        testPrompts.push(t.prompt);
+        await ecrire(t);
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        await t.callTool("submit_lens_verdict", t.prompt.includes("phase DELIVER") && !relance
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.includes("Revue sans défaut à corriger")), 60_000);
+    relance = true;
+    const avant = testPrompts.length;
+    const q = (await app.interactions.pending()).find((p) => p.title.includes("Revue sans défaut à corriger"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await fin(app, id, 60_000);
+    expect(testPrompts[avant]).toContain("Revue « changements demandés » sans défaut bloquant ni majeur à corriger");
+  }, 90_000);
+
   // D11 (docs/12) : la trace doit se découper comme celle de l'extension pour que le banc compare.
   it("sans question ouverte, aucune étape ROUTE : comme l'extension, on passe directement à DESIGN", async () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);

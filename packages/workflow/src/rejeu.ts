@@ -91,10 +91,12 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
       await appeler("phase", { nom }, true);
       // Une phase s'ouvre une fois : un réessai ne repose pas son checkpoint (docs/09 §5.2).
       const cp = await w.checkpoint(nom);
+      // « Relancer » : la phase repart avec les motifs de l'escalade (D15 de docs/12).
+      let relance: readonly string[] = [];
       for (;;) {
         let motif: string;
         try {
-          const v = await fn(cp);
+          const v = await fn(cp, relance);
           if (opts.commit) await w.commiter(opts.commit);
           return v;
         } catch (e) {
@@ -106,6 +108,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
           if (e instanceof Escalade) motif = e.message;
           else if (e instanceof PanneEnvironnement) motif = `panne d'environnement : ${e.message}`;
           else throw e;
+          relance = e instanceof Escalade && e.motifs.length ? e.motifs : [motif];
         }
         // L'escalade annule toujours (ADR 0040) ; les agents de la phase oublient (ADR 0053).
         await w.rembobiner(cp);

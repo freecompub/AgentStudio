@@ -250,6 +250,40 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     }, 120_000);
   });
 
+  // D15 (docs/12) : après « relancer », la phase repart avec le motif de l'escalade.
+  it("relancer DESIGN après un verdict REJECTED : le modélisateur reçoit le motif (D15)", async () => {
+    let relance = false;
+    const modelPrompts: string[] = [];
+    const model: ScriptedBehavior = async (t) => {
+      modelPrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const lentille = (lens: string): ScriptedBehavior => async (t) => {
+      const rejette = t.prompt.includes("phase DESIGN") && !relance;
+      await t.callTool("submit_lens_verdict", { lens, verdict: rejette ? "REJECTED" : "APPROVED", defects: rejette ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-architect-model": model,
+      "skraft-lens-cold-reader": lentille("cold-reader"),
+      "skraft-lens-architecture": lentille("architecture"),
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
+    relance = true;
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+    expect(modelPrompts.at(-1)).toContain("Revue : verdict REJECTED (cold-reader : REJECTED — conception hors sujet");
+  }, 120_000);
+
   // D6 (docs/12) : les lentilles ne reçoivent ni faits d'un run effacé, ni rapports de revue en livrables.
   it("après un rembobinage, les faits de la revue portent sur le run en cours ; les rapports de revue ne sont pas des livrables ni ressuscités (D8)", async () => {
     let revues = 0;

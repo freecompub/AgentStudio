@@ -264,6 +264,7 @@ function nextScenario(s: SkraftState, d: DeliverState): Out {
     attempts: 0,
     scenarioFailures: 0,
     scenarioBaseline: d.baseline,
+    scenarioUnitTestsHash: d.unitTestsHash,
   };
   return { state: { ...s, stage: "SPECIALIST", deliver: nd }, effects: [{ kind: "startScenario", scenarioId: scenarios[i]!.id }] };
 }
@@ -274,6 +275,15 @@ function stepFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
   if (attempts >= s.budget.maxAttemptsPerPhase) return scenarioFailure(s, d, reasons);
   const r = agent({ ...s, lastRejection: { gate: "DELIVER", reasons } }, { ...d, attempts }, reasons);
   return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
+}
+
+/**
+ * Empreinte des tests unitaires au point de reprise : celle de l'essai effacé ferait refuser chaque
+ * pas de code de la reprise pour des tests « modifiés » (D12 de docs/12). Absente d'un état
+ * enregistré avant ce champ : inchangée.
+ */
+function repriseDeLEmpreinte(d: DeliverState): { unitTestsHash?: string | null } {
+  return d.scenarioUnitTestsHash !== undefined ? { unitTestsHash: d.scenarioUnitTestsHash } : {};
 }
 
 /** Scénario repris depuis son début : en sessions séparées après un premier échec, puis selon le budget. */
@@ -291,6 +301,7 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     scenarioFailures: failures,
     cycles: 0,
     baseline: d.scenarioBaseline,
+    ...repriseDeLEmpreinte(d),
     stepCheckpoint: d.scenarioCheckpoint,
     feedback: reasons,
   };
@@ -326,7 +337,7 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
 /** Panne d'environnement pendant un scénario : retour au début du scénario, escalade immédiate (D25). */
 export function escalateDeliver(s: SkraftState, reason: string): Out {
   const d = s.deliver!;
-  const restart: DeliverState = { ...d, step: "test", unitTests: [], newTest: null, acceptanceGreen: false, attempts: 0, baseline: d.scenarioBaseline, stepCheckpoint: d.scenarioCheckpoint };
+  const restart: DeliverState = { ...d, step: "test", unitTests: [], newTest: null, acceptanceGreen: false, attempts: 0, baseline: d.scenarioBaseline, ...repriseDeLEmpreinte(d), stepCheckpoint: d.scenarioCheckpoint };
   return {
     state: { ...s, stage: "ESCALATED", deliver: restart, escalation: { from: "PHASE", reason } },
     effects: [...(d.scenarioCheckpoint ? [{ kind: "rollback", to: d.scenarioCheckpoint } as SkraftEffect] : []), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
@@ -366,6 +377,9 @@ export function startReviewFix(s0: SkraftState, threads: DefectThread[]): Out {
     attempts: 0,
     scenarioFailures: 0,
     scenarioCheckpoint: cp,
+    // Point de reprise de la correction : la référence et l'empreinte y sont prises aussi (D12, D23 de docs/12).
+    scenarioBaseline: d.baseline,
+    scenarioUnitTestsHash: d.unitTestsHash,
     unitTests: [],
     newTest: null,
     feedback: own,

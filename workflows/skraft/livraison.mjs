@@ -40,8 +40,8 @@ const pourDev = (t) => t.target !== "test";
 const autreAgent = (t) => (t.target === "test" ? "code" : "test");
 export async function livrer(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
-  const faite = await w.phase("DELIVER", async (cp) => {
-    const L = await phase(w, d, suivi, cp, lentilles, max);
+  const faite = await w.phase("DELIVER", async (cp, relance) => {
+    const L = await phase(w, d, suivi, cp, lentilles, max, relance);
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
     await ecrireRapports(w, d.slug, "DELIVER", suivi);
     return true;
@@ -59,9 +59,10 @@ export async function livrer(w, d, lentilles, max) {
 * Budget de la phase : partagé entre les réessais de phase et les corrections de revue, comme
 * `attempts` dans le réducteur (une correction en consomme un).
 */
-async function phase(w, d, s, cpPhase, lentilles, max) {
+async function phase(w, d, s, cpPhase, lentilles, max, relance) {
   let tentatives = 0;
-  let motifs = [];
+  // Relancée après une escalade : le premier pas reçoit son motif (D15 de docs/12).
+  let motifs = relance;
   for (;;) {
     let rejet;
     try {
@@ -724,13 +725,17 @@ function faitsDeLivraison(d, s, L, execution) {
 async function corriger(w, d, L, s, max) {
   const depart = L.dernierVert;
   const filsAuDepart = s.fils;
+  // La mémoire revient au même point que le disque (D12 de docs/12) : sinon l'empreinte et la
+  // référence des tests gardent ceux d'un essai effacé, et chaque pas de la reprise est refusé.
+  const memoire = { unitTestsHash: L.unitTestsHash, baseline: L.baseline, dernierVert: L.dernierVert };
   // Le scénario courant du réducteur : le dernier scénario moteur.
   const i = L.scenarios.map((x) => x.role).lastIndexOf("driver");
   await w.rembobiner(depart);
   await creerDossiers(w, d.slug);
+  let motifs = [];
   for (let echecs = 1;; echecs++) {
     try {
-      await deroulerCorrection(w, d, L, s, i, depart, max);
+      await deroulerCorrection(w, d, L, s, i, depart, max, motifs);
       return;
     }
     catch (e) {
@@ -740,6 +745,9 @@ async function corriger(w, d, L, s, max) {
       await w.rembobiner(depart);
       await creerDossiers(w, d.slug);
       s.fils = filsAuDepart;
+      Object.assign(L, memoire);
+      // La reprise connaît la cause de l'échec (D15 de docs/12).
+      motifs = e.motifs;
       if (echecs >= max) {
         await escaladeScenario(w, `Scénario ${L.scenarios[i].id} : ${e.motifs.join(" ; ")}`);
         echecs = 0;
@@ -747,14 +755,15 @@ async function corriger(w, d, L, s, max) {
     }
   }
 }
-async function deroulerCorrection(w, d, L, s, i, depart, max) {
+async function deroulerCorrection(w, d, L, s, i, depart, max, motifs) {
   const c = { retourTests: agentFeedback(s.fils, pourTests), retourDev: agentFeedback(s.fils, pourDev), cibles: [], reponses: [] };
   let point = depart;
   let unitTests = [];
   let etape = s.fils.some((t) => isActive(t) && pourTests(t)) ? "fix-test" : "fix";
   for (;;) {
     c.fils = s.fils;
-    const r = await pas(w, d, L, i, etape, point, [], max, [], null, c);
+    const r = await pas(w, d, L, i, etape, point, motifs, max, [], null, c);
+    motifs = [];
     point = r.cp;
     const concerne = etape === "fix-test" ? pourTests : pourDev;
     s.fils = endTurn(applyResponses(s.fils, c.reponses, concerne, autreAgent), concerne);

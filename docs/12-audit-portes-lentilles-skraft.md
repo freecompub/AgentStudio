@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D15, D23.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -373,6 +373,13 @@ Priorités proposées :
     rembobinage.
   - Plus généralement, offrir dans la bibliothèque une aide qui associe un objet à un point de
     reprise, pour que tout rembobinage restaure aussi la mémoire.
+- **Corrigé le 2026-10-11** par le correctif ciblé.
+  - Workflow : `corriger` photographie `L.unitTestsHash`, `L.baseline` et `L.dernierVert` à son
+    entrée, et les restaure à chaque rembobinage, comme `s.fils`.
+  - Extension : elle avait l'empreinte périmée, que le test confirme. `startReviewFix` prend
+    `scenarioBaseline` et `scenarioUnitTestsHash` au point d'entrée de la correction, et chaque
+    reprise les rend. Cela corrige aussi D23.
+  - L'aide générale de la bibliothèque n'est pas faite ; elle reste à décider.
 
 ### D13 — Après un réessai de toute la phase DELIVER, plus aucune correction ciblée
 
@@ -406,6 +413,11 @@ Priorités proposées :
   - Faire passer les motifs dans `deroulerCorrection`.
   - Faire rendre à `w.phase` les motifs de l'escalade au « relancer ».
   - Garder l'écart assumé : les sessions sont oubliées, mais pas les motifs.
+- **Corrigé le 2026-10-11.**
+  - `corriger` passe la cause de l'échec au premier pas de la reprise.
+  - Dans la bibliothèque, `w.phase` appelle `fn(cp, relance)` : `relance` vaut les motifs de
+    l'escalade après « relancer », et rien au premier passage. `essayer` accepte des `motifs`
+    initiaux. Les quatre phases de skraft les transmettent.
 
 ### D16 — Le vert du nettoyage est ignoré
 
@@ -428,7 +440,7 @@ Priorités proposées :
 | D20 | Deux escalades de DELIVER rembobinent sans faire oublier les sessions (ADR 0050) | `deliver-machine.ts:306-311`, `:318-325` | test | Utiliser la fonction unique `rollback` + `forgetSessions` |
 | D21 | Rejets ni comptés ni tracés : REJECTED (« relancer » repart alors avec un retour vide), plafond de 20 cycles, nettoyage refusé, relance du classifieur | `reducer.ts:284`, `:362` ; `deliver-machine.ts:165`, `:236` | test | Tout rejet passe par une seule fonction qui incrémente `rejections` et pose `lastRejection` ; corriger le commentaire de `deliver-machine.ts:16` |
 | D22 | Un défaut de mutation contesté n'a pas d'arbitre et la revue rend APPROVED | `reducer.ts:257-268`, `review-thread.ts:111`, `:140` | test | Faire arbitrer les défauts `mutation` par l'humain, ou par la lentille *quality-gates* |
-| D23 | Une correction en échec revient à une référence de tests trop ancienne (le début du dernier scénario) | `deliver-machine.ts:284` | test | Prendre la référence au point d'entrée de la correction |
+| D23 | Une correction en échec revient à une référence de tests trop ancienne (le début du dernier scénario). **Corrigé le 2026-10-11 avec D12** | `deliver-machine.ts:284` | test | Prendre la référence au point d'entrée de la correction |
 
 ---
 

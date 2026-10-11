@@ -150,8 +150,9 @@ export interface W {
    * Rend la valeur de `fn`, ou `undefined` si l'humain saute la phase : pour distinguer les deux,
    * `fn` doit rendre une valeur.
    * `apresRembobinage` reprépare ce que le rembobinage efface (dossiers vides que Git ne suit pas).
+   * `relance` : vide au premier passage ; après « relancer », les motifs de l'escalade (D15 de docs/12).
    */
-  phase<T>(nom: string, fn: (checkpoint: string) => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
+  phase<T>(nom: string, fn: (checkpoint: string, relance: readonly string[]) => Promise<T>, opts?: { commit?: string; apresRembobinage?: () => Promise<unknown> }): Promise<T | undefined>;
   /**
    * Trace un essai refusé : la porte (ou la cause) et les motifs exacts. Journalisé sans effet ;
    * `essayer` l'appelle de lui-même. Sert à savoir, après un run, pourquoi chaque travail a été refait.

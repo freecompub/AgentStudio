@@ -195,7 +195,7 @@ export default async function skraft(w, entree) {
   };
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
-    const faite = await w.phase("RESEARCH", async () => (await rechercher(w, vue, effets.maxAttempts), true), {
+    const faite = await w.phase("RESEARCH", async (_cp, relance) => (await rechercher(w, vue, effets.maxAttempts, relance), true), {
       commit: commitMessage("RESEARCH", slug),
       // Git ne suit pas les dossiers vides : le rembobinage les emporte (ADR 0037).
       apresRembobinage: () => creerDossiers(w, slug),
@@ -303,8 +303,9 @@ async function evaluerDifficulte(w, story, indicateurs, confirmer) {
   return isDifficulty(d.decision) ? d.decision : propose.level;
 }
 /** Un essai de RESEARCH : le chercheur, ses questions bloquantes, puis la porte citations (§7.1). */
-function rechercher(w, vue, max) {
-  return essayer(w, { max }, async (motifs) => {
+function rechercher(w, vue, max, relance) {
+  // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
+  return essayer(w, { max, motifs: relance }, async (motifs) => {
     for (;;) {
       await w.etape("RESEARCH");
       const fichiers = await w.listerFichiers();

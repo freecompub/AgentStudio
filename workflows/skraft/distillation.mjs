@@ -12,8 +12,9 @@ import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 /** Rend vrai si la phase est faite, faux si l'humain l'a sautée. */
 export async function distiller(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
-  const faite = await w.phase("DISTILL", async (cp) => {
-    await essayer(w, { max }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
+  const faite = await w.phase("DISTILL", async (cp, relance) => {
+    // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
+    await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
     await ecrireRapports(w, d.slug, "DISTILL", suivi);
     return true;
   }, {

@@ -22,6 +22,12 @@ describe("essayer : budget d'essais appliqué par le code (D24)", () => {
     expect(vus).toEqual([[], ["ADR sans conséquences"]]);
   });
 
+  it("motifs initiaux (reprise d'une phase relancée, D15 de docs/12) : le premier essai les reçoit", async () => {
+    const vus: (readonly string[])[] = [];
+    await essayer(w, { max: 3, motifs: ["Revue : verdict REJECTED"] }, async (motifs, essai) => (vus.push(motifs), essai === 1 ? ["porte"] : []));
+    expect(vus).toEqual([["Revue : verdict REJECTED"], ["porte"]]);
+  });
+
   it("chaque essai refusé est tracé : porte nommée, motifs exacts ; revue et tour interrompu nommés d'office", async () => {
     rejets.length = 0;
     const issues = [{ motifs: ["citation hors limites"], porte: "citations" }, { motifs: ["D-1"], revue: true as const }, ["sans nom"]];
@@ -183,6 +189,29 @@ describe("w.phase : checkpoint, commit, escalade (docs/09 §5.2)", () => {
     await t.engine.idle(t.id);
     expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: "après" } });
     expect(f.appels).not.toContain("commit:docs: DESIGN");
+  });
+
+  it("relancer : la phase repart avec les motifs de l'escalade (D15 de docs/12)", async () => {
+    const f = fauxContexte({ archi: () => sortie({ summary: "" }) });
+    const vus: (readonly string[])[] = [];
+    const t = await lancer(
+      decl((w) =>
+        w.phase("DESIGN", (_cp, relance) =>
+          essayer(w, { max: 1, motifs: relance }, async (motifs) => {
+            vus.push(motifs);
+            await w.agent("archi", "");
+            // Le script est rejoué à chaque pas du moteur : la décision ne dépend que de ce qu'il reçoit.
+            return relance.length ? [] : ["porte cohérence : ADR-002 sans conséquences"];
+          }),
+        ),
+      ),
+      f.ctx,
+    );
+    await t.engine.dispatch(t.id, { type: "HUMAN_DECISION", decision: f.demandes[0]!.options[0]!.id });
+    await t.engine.idle(t.id);
+    expect(vus[0]).toEqual([]);
+    expect(vus.at(-1)).toEqual(["porte cohérence : ADR-002 sans conséquences"]);
+    expect((await t.record()).state.fin).toMatchObject({ statut: "fini" });
   });
 
   it("SauterPhase levée par le script : la phase est rembobinée et sautée, sans nouvelle question", async () => {

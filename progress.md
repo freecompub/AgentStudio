@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D12, D15, D23 : reprise d'une correction et phase relancée
+
+- D12 : la correction rembobinait le disque mais pas `L` (empreinte, référence, dernier vert). La
+  reprise était refusée sans fin (« tests unitaires modifiés »). Correctif ciblé : `L` est
+  photographié à l'entrée de `corriger` et restauré. L'aide générale de la bibliothèque n'est pas
+  faite et reste à décider.
+- L'extension avait la même empreinte périmée, et sa référence de reprise remontait au début du
+  scénario (D23). Les deux sont maintenant prises à l'entrée de la correction.
+- D15 : la reprise reçoit la cause de l'échec. **API de la bibliothèque** : `w.phase` passe
+  `relance` (les motifs de l'escalade) à `fn` au « relancer », et `essayer` accepte `motifs`. Le
+  changement est rétrocompatible.
+- On ne remet pas l'empreinte à `null` : `null` désactive le contrôle. La mémoire revient au même
+  point que le disque.
+- Piège : dans un test de la bibliothèque, le script est **rejoué** à chaque pas du moteur. Un
+  compteur extérieur au script fausse sa logique ; la décision doit dépendre de ce que le script
+  reçoit.
+
+Prochaine étape : D13, D14, D16 (W), puis D17 à D22 (E).
+
+---
+
 ## 11/10 — D10 : un test unitaire existant ne s'affaiblit plus en silence
 
 - Cœur : `FileChange.removed`, le nombre de lignes de l'ancien arbre retirées ou remplacées, lu
