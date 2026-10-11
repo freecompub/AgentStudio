@@ -4,6 +4,7 @@ import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, T
 import { buildBrief } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
+import type { DefectThread } from "./review-thread.js";
 import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
@@ -319,7 +320,41 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // effacer) ; ceux d'un run effacé par un rembobinage ne ressuscitent pas (D8 de docs/12).
       for (const [i, r] of state.reviews[effect.phase].entries())
         if (i >= (state.debutDesRevues?.[effect.phase] ?? 0)) await writeReview(ctx, state.slug, effect.phase, i + 1, r.attempt, r.lenses);
+      // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
+      if (effect.phase === "DELIVER" && state.derogations?.length)
+        await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/derogations.md`, rapportDeDerogations(state));
       return { type: "COMMITTED", sha: await ctx.git.commit(effect.message) };
+
+    case "arbitrateMutants": {
+      // L'arbitre de mutation juge chaque mutant contesté (ADR 0065) ; un silence le laisse à l'humain.
+      let rulings: { defect: string; decision: "accepted" | "maintained"; reason?: string }[] = [];
+      try {
+        const r = await ctx.agents.run<"submit_lens_verdict">("skraft-mutation-arbiter", await briefArbitre(ctx, state, effect.threads), { signal });
+        rulings = (r.output?.rulings ?? []).map((x) => ({ defect: x.defect, decision: x.decision, ...(x.reason ? { reason: x.reason } : {}) }));
+      } catch (err) {
+        if (!defautDeTravail(err)) throw err;
+      }
+      return { type: "MUTANTS_JUDGED", rulings };
+    }
+
+    case "askMutationArbitration": {
+      const t = effect.thread;
+      const m = t.mutant!;
+      await ctx.interactions.request({
+        taskId,
+        title: `Arbitrer un mutant (${t.id})`,
+        detail:
+          `Mutant survivant : ${m.file}:${m.line} (${m.operator})${m.replacement ? ` — code du mutant : ${m.replacement}` : ""}\n` +
+          `Contestation du testeur : « ${t.contestation ?? "?"} »\n${effect.avis}\nJustifie ta décision en commentaire : elle est tracée et commitée.`,
+        options: [
+          { id: `derogation:${t.id}`, label: "Mutant équivalent : accorder la dérogation" },
+          { id: `corriger:${t.id}`, label: "Non équivalent : le testeur doit le tuer" },
+        ],
+        freeText: true,
+        requiredRoles: ["developpeur", "architecte", "administrateur"],
+      });
+      return;
+    }
 
     case "finalReport":
       ctx.chat.post(finalReport(state));
@@ -377,7 +412,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   // Mutation de fin de DELIVER (ADR 0049) : un mutant survivant est un test trop faible ; le
   // réducteur en fait des défauts adressés au testeur, sans relancer la phase.
   const m = await phaseEndMutation(ctx, state, signal);
-  if (m.reasons.length) return { type: "GATE_FAIL", gate: "mutation", reasons: m.reasons };
+  if (m.reasons.length) return { type: "GATE_FAIL", gate: "mutation", reasons: m.reasons, mutants: m.mutants };
   return { type: "GATE_OK", artifacts, facts: [...coverageFacts, ...m.facts], notes: [...coverageNotes, ...m.notes] };
 }
 
@@ -536,6 +571,36 @@ async function phaseFiles(ctx: ExtensionContext, state: SkraftState, phase: Phas
   return { artifacts, code, tests };
 }
 
+/** Dossier de l'arbitre : chaque mutant contesté, la contestation, et le code des fichiers mutés. */
+async function briefArbitre(ctx: ExtensionContext, state: SkraftState, threads: DefectThread[]): Promise<string> {
+  const codes: string[] = [];
+  for (const f of [...new Set(threads.map((t) => t.mutant!.file))]) codes.push(`Fichier ${f} :`, "```", await ctx.workspace.readFile(f), "```");
+  return [
+    `Story : ${state.story?.id ?? state.slug} — ${state.story?.title ?? ""}`,
+    "Mutants survivants contestés par le testeur :",
+    ...threads.map((t) => {
+      const m = t.mutant!;
+      return `  - [${t.id}] ${m.file}:${m.line} (${m.operator})${m.replacement ? ` — code du mutant : ${m.replacement}` : ""} ; contestation : « ${t.contestation ?? "?"} »`;
+    }),
+    ...codes,
+  ].join("\n");
+}
+
+/** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
+function rapportDeDerogations(s: SkraftState): string {
+  const cellule = (x: string) => x.replace(/\|/g, "\\|");
+  return [
+    `# Dérogations de mutation — ${s.story?.id ?? s.slug}`,
+    "",
+    "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
+    "",
+    "| Mutant | Décidé par | Raison | Contestation du testeur |",
+    "| --- | --- | --- | --- |",
+    ...(s.derogations ?? []).map((x) => `| ${x.file}:${x.line} (${x.operator}) | ${x.par} | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+    "",
+  ].join("\n");
+}
+
 function finalReport(s: SkraftState): string {
   const executed = s.phasesCompleted.join(", ") || "aucune";
   const skipped = s.skipPhases.join(", ") || "aucune";
@@ -547,6 +612,12 @@ function finalReport(s: SkraftState): string {
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
+    ...(s.derogations?.length
+      ? [
+          `Dérogations de mutation : ${s.derogations.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`,
+          ...s.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`),
+        ]
+      : []),
     `Identifiant de suivi : ${randomUUID().slice(0, 8)}.`,
   ].join("\n");
 }

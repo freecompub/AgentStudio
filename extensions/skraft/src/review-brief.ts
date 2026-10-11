@@ -32,6 +32,9 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
   if ((phase === "DISTILL" || phase === "DELIVER") && state.acceptanceHash)
     facts.push(`Tests d'acceptance gelés, empreinte ${short(state.acceptanceHash)}${phase === "DELIVER" ? ", vérifiée inchangée à chaque pas de DELIVER" : ""}.`);
   for (const r of state.regressions) facts.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);
+  if (phase === "DELIVER")
+    for (const x of state.derogations ?? [])
+      facts.push(`Dérogation de mutation (${x.par}) : ${x.file}:${x.line} (${x.operator}) — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
   const last = evidence.filter((e) => e.source === "gate" && e.phase?.startsWith(phase)).at(-1);
   if (last)
     facts.push(

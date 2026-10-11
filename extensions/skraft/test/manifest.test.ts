@@ -20,6 +20,8 @@ describe("Manifeste et commande skraft", () => {
       "skraft-lens-cold-reader",
       "skraft-lens-quality-gates",
       "skraft-lens-test-integrity",
+      // Arbitre des mutants contestés comme équivalents (ADR 0065).
+      "skraft-mutation-arbiter",
       "skraft-researcher",
       "skraft-test",
     ]);

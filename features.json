@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "arbitrage-des-mutants-equivalents",
+      "title": "Un mutant survivant contesté comme équivalent est jugé par l'arbitre de mutation, puis par l'humain ; chaque décision est tracée et les dérogations sont commitées",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow --project task-engine --project stack-adapters -t \"ADR 0065|D22|dérogation|arbitrage|tués et jugés\"",
+      "passes": true,
+      "notes": "ADR 0065, D22 de docs/12, 2026-10-11. Cœur : entrée de trace arbitrage (trace.ts), lue par le moteur dans state.arbitrages (task-engine.ts) ; MutationReport.killed/total/replacement (stryker-report.ts) ; w.arbitrage (packages/workflow). Agent skraft-mutation-arbiter dans les deux. Workflow : filsDeMutation, arbitrerMutants, derogations.md (livraison.mjs). Extension : mutationThreads (reducer.ts), arbitrerMutants et arbitrageEnCours (deliver-machine.ts), effets arbitrateMutants et askMutationArbitration (effects.ts) ; les fils de fin de DELIVER sont désormais dans reviewThreads. Bouts en bout (4 cas) dans les deux, vérifiés en échec avant l'implémentation."
+    },
+    {
       "id": "reprise-de-correction-coherente",
       "title": "Une correction ciblée en échec reprend avec la mémoire de son entrée (empreinte, référence des tests) et la cause de l'échec ; une phase relancée reçoit le motif de son escalade",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D12|D15|correction ciblée\"",

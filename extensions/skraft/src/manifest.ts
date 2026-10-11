@@ -122,6 +122,8 @@ export const manifest: ExtensionManifest = {
         tools: ["report_blocker"],
         skills: skillsOf(ROLE_SKILLS.lens),
       })),
+      // Juge les mutants survivants que le testeur conteste comme équivalents (ADR 0065).
+      { name: "skraft-mutation-arbiter", title: "Arbitre de mutation", prompt: agentFile("skraft-mutation-arbiter"), role: ROLES.mutationArbiter, output: "submit_lens_verdict", modelClass: ROLE_MODEL_CLASS.mutationArbiter },
     ],
     skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
     tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],

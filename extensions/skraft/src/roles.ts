@@ -63,6 +63,9 @@ un test et le code. Si le dossier liste tes défauts précédents contestés par
 accepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.
 Si juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec
 report_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.`,
+
+  mutationArbiter: `Rends ta décision avec l'outil submit_lens_verdict : lens « mutation-arbiter », verdict APPROVED, aucun défaut, et pour
+chaque défaut de mutation listé un arbitrage (rulings) : accepted si le mutant est équivalent, maintained sinon, avec ta raison.`,
 };
 
 /**
@@ -92,6 +95,7 @@ export const ROLE_MODEL_CLASS = {
   acceptance: "standard",
   test: "standard",
   dev: "standard",
+  mutationArbiter: "standard",
 } as const;
 
 /** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */

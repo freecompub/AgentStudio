@@ -196,7 +196,7 @@ layout:
     const m = await createProfileAdapter(r.profile, { runner: run }).mutation!({ root: racine });
     const dossier = run.appels[0]!.args[run.appels[0]!.args.indexOf("--output") + 1]!;
     expect(dossier.startsWith(racine)).toBe(false);
-    expect(m).toEqual({ score: 50, files: [{ file: "src/Montant.cs", score: 50, survived: [{ line: 25, operator: "Arithmetic mutation" }] }] });
+    expect(m).toEqual({ score: 50, files: [{ file: "src/Montant.cs", score: 50, killed: 1, total: 2, survived: [{ line: 25, operator: "Arithmetic mutation" }] }] });
   });
 });
 

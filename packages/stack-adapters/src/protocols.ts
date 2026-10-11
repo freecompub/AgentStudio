@@ -45,7 +45,11 @@ export interface RunTestsOptions {
 export interface MutationReport {
   /** Pourcentage de mutants tués, de 0 à 100. */
   score: number;
-  files: { file: string; score: number; survived: { line: number; operator: string }[] }[];
+  /**
+   * `killed` et `total` (mutants jugés) permettent de retirer un mutant du score, quand une
+   * dérogation l'a reconnu équivalent (D22 de docs/12) ; `replacement` : le code du mutant.
+   */
+  files: { file: string; score: number; killed?: number; total?: number; survived: { line: number; operator: string; replacement?: string }[] }[];
 }
 
 /**

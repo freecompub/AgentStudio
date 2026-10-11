@@ -109,13 +109,25 @@ export function checkCoverage(report, sources, bar, diff = false) {
   }
   return reasons;
 }
+/**
+* Mutants d'un fichier, sans ceux qu'une dérogation a reconnus équivalents (ADR 0065) : le score est
+* recalculé sur les mutants restants quand le rapport donne ses comptes ; sinon, le score mesuré reste.
+*/
+function sansDerogations(f, path, derogations) {
+  const accorde = (m) => derogations.some((d) => d.file === path && d.line === m.line && d.operator === m.operator);
+  const survived = f.survived.filter((m) => !accorde(m));
+  const retires = f.survived.length - survived.length;
+  const score = retires && f.total !== undefined && f.killed !== undefined ? (f.total - retires > 0 ? (f.killed / (f.total - retires)) * 100 : 100) : f.score;
+  return { score: retires && !survived.length ? 100 : score, survived };
+}
 /** Seuils de mutation sur les fichiers de production : par couche (domaine, application, reste), ADR 0049. */
-export function checkMutation(report, sources, bar) {
+export function checkMutation(report, sources, bar, derogations = []) {
   const reasons = [];
   for (const path of sources) {
-    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
-    if (!f)
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut)
       continue; // aucun mutant applicable dans ce fichier
+    const f = sansDerogations(brut, path, derogations);
     const threshold = bar.mutation[layerOf(path, bar)];
     if (f.score + 1e-9 < threshold) {
       const survivors = f.survived.map((s) => `ligne ${s.line} (${s.operator})`).join(", ");
@@ -123,6 +135,20 @@ export function checkMutation(report, sources, bar) {
     }
   }
   return reasons;
+}
+/** Mutants survivants, un par un, des fichiers sous leur seuil : chacun devient un défaut (ADR 0065). */
+export function mutantsSousLeSeuil(report, sources, bar, derogations = []) {
+  const mutants = [];
+  for (const path of sources) {
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut)
+      continue;
+    const f = sansDerogations(brut, path, derogations);
+    if (f.score + 1e-9 < bar.mutation[layerOf(path, bar)])
+      for (const m of f.survived)
+        mutants.push({ file: path, line: m.line, operator: m.operator, ...(m.replacement !== undefined ? { replacement: m.replacement } : {}) });
+  }
+  return mutants;
 }
 const round = (n) => Math.round(n * 10) / 10;
 export function checkDependencies(report) {

@@ -5,6 +5,31 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D22 : arbitrage des mutants équivalents (ADR 0065)
+
+- **Décision du responsable du projet.** Un mutant contesté comme équivalent est jugé par un
+  agent dédié, `skraft-mutation-arbiter`, distinct du testeur. S'il est équivalent, c'est une
+  dérogation de l'agent. Sinon, ou au-delà de deux dérogations de l'agent, l'humain tranche.
+  **Toute décision est tracée.**
+- Un défaut par mutant survivant. Une dérogation retire ce seul mutant du score, recalculé avec
+  les mutants tués et jugés que donne maintenant le lecteur Stryker.
+- La traçabilité couvre l'entrée `arbitrage` de la trace (champ `arbitrages` de l'état, ou
+  `w.arbitrage` dans le workflow), `.skraft/<slug>/deliver/derogations.md` commité, les faits
+  donnés aux lentilles et le rapport final.
+- **Défaut trouvé en route (extension)** : les fils des portes de fin de DELIVER (D5) n'étaient
+  pas dans `reviewThreads`, donc les réponses des agents à ces défauts étaient ignorées. Corrigé.
+- Pièges de test :
+  - *cold-reader* ne reçoit aucun fait (voulu) : pour vérifier les faits de la revue, lire le
+    dossier de *test-integrity*.
+  - La revue de D22 a montré que le constat de l'audit (« la revue rend APPROVED ») n'était plus
+    exact depuis D5 : la porte relancée échoue de nouveau.
+- **Reste ouvert** : la contestation d'un défaut de couverture ou de suite finale n'a toujours pas
+  d'arbitre.
+
+Prochaine étape : D14, D16 (W), D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D12, D15, D23 : reprise d'une correction et phase relancée
 
 - D12 : la correction rembobinait le disque mais pas `L` (empreinte, référence, dernier vert). La

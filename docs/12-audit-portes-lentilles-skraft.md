@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D15, D23.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D15, D22 (ADR 0065), D23.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -439,7 +439,7 @@ Priorités proposées :
 | D19 | Une panne au commit rembobine une phase déjà approuvée, et « relancer » la refait entière, revue comprise | `reducer.ts:422-428` | test | Une panne au commit ne rembobine pas : on réessaie le commit seul |
 | D20 | Deux escalades de DELIVER rembobinent sans faire oublier les sessions (ADR 0050) | `deliver-machine.ts:306-311`, `:318-325` | test | Utiliser la fonction unique `rollback` + `forgetSessions` |
 | D21 | Rejets ni comptés ni tracés : REJECTED (« relancer » repart alors avec un retour vide), plafond de 20 cycles, nettoyage refusé, relance du classifieur | `reducer.ts:284`, `:362` ; `deliver-machine.ts:165`, `:236` | test | Tout rejet passe par une seule fonction qui incrémente `rejections` et pose `lastRejection` ; corriger le commentaire de `deliver-machine.ts:16` |
-| D22 | Un défaut de mutation contesté n'a pas d'arbitre et la revue rend APPROVED | `reducer.ts:257-268`, `review-thread.ts:111`, `:140` | test | Faire arbitrer les défauts `mutation` par l'humain, ou par la lentille *quality-gates* |
+| D22 | Un défaut de mutation contesté n'a pas d'arbitre et la revue rend APPROVED. **Revu le 2026-10-11** : depuis D5, la porte relancée échoue de nouveau et le budget s'épuise ; touche aussi le workflow. **Corrigé (ADR 0065)** : arbitre de mutation, humain au-delà, dérogations tracées | `reducer.ts:257-268`, `review-thread.ts:111`, `:140` | test | Faire arbitrer les défauts `mutation` par l'humain, ou par la lentille *quality-gates* |
 | D23 | Une correction en échec revient à une référence de tests trop ancienne (le début du dernier scénario). **Corrigé le 2026-10-11 avec D12** | `deliver-machine.ts:284` | test | Prendre la référence au point d'entrée de la correction |
 
 ---

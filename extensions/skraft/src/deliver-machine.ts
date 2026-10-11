@@ -1,5 +1,5 @@
 import { levelEffects } from "./difficulty.js";
-import type { DeliverState, SkraftEffect, SkraftState } from "./model.js";
+import type { ArbitrageRecord, DeliverState, Derogation, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
 
@@ -58,6 +58,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
   const d = s.deliver;
   if (!d) return null;
   const scenario = d.scenarios[d.current]!;
+
+  if (d.step === "mutation-arbitration") return arbitrageEnCours(s, d, e);
 
   switch (e.type) {
     case "SCENARIO_STARTED": {
@@ -136,11 +138,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       // rouges à faire passer ; sinon, directement la porte de fin de scénario.
       if (d.step === "fix-test") {
         s = closeTurn(s, d, forTests);
-        const nd: DeliverState = { ...base, newTest: null, pendingResponses: [], fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash };
-        const devWork = (s.reviewThreads ?? []).some((t) => isActive(t) && forDev(t));
-        // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
-        if (devWork || nd.fixTargets!.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: d.reviewFeedback?.test ?? [], code: agentFeedback(s.reviewThreads ?? [], forDev) } }, []);
-        return scenarioGate(s, { ...nd, unitTests: [] });
+        // Mutants contestés comme équivalents : arbitrés avant de poursuivre (ADR 0065).
+        return arbitrerMutants(s, { ...base, newTest: null, pendingResponses: [], fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash });
       }
       // Correction de revue validée : la porte de fin de scénario revérifie le code corrigé, et la
       // séquence rouge puis vert des tests rouges ajoutés par la correction côté tests.
@@ -386,4 +385,118 @@ export function startReviewFix(s0: SkraftState, threads: DefectThread[]): Out {
   };
   const r = agent(s, nd, []);
   return { state: r.state, effects: [{ kind: "rollback", to: cp }, ...r.effects] };
+}
+
+// ---------- arbitrage des mutants contestés (ADR 0065) ------------------------------
+
+/** Au-delà, l'arbitre ne peut plus exempter de mutant : l'humain tranche (ADR 0065). */
+export const MAX_DEROGATIONS_PAR_ARBITRE = 2;
+
+const elementDe = (m: { file: string; line: number; operator: string }) => `${m.file}:${m.line} (${m.operator})`;
+const memeMutant = (a: { file: string; line: number; operator: string }, b: { file: string; line: number; operator: string }) =>
+  a.file === b.file && a.line === b.line && a.operator === b.operator;
+const conteste = (t: DefectThread) => t.mutant !== undefined && (t.status === "contested" || t.status === "recontested");
+const avecStatut = (s: SkraftState, id: string, status: DefectThread["status"]): SkraftState => ({
+  ...s,
+  reviewThreads: (s.reviewThreads ?? []).map((t) => (t.id === id ? { ...t, status } : t)),
+});
+const tracer = (s: SkraftState, t: DefectThread, décision: ArbitrageRecord["décision"], par: ArbitrageRecord["par"], raison: string): SkraftState => ({
+  ...s,
+  arbitrages: [...(s.arbitrages ?? []), { porte: "mutation", élément: elementDe(t.mutant!), contestation: t.contestation ?? "", décision, par, raison }],
+});
+
+/** Dérogation : tracée, et le mutant exempté de la porte de mutation (une seule fois). */
+function accorder(s: SkraftState, t: DefectThread, par: Derogation["par"], raison: string): SkraftState {
+  const m = t.mutant!;
+  const derogations = s.derogations ?? [];
+  const ns = tracer(s, t, "dérogation", par, raison);
+  if (derogations.some((x) => memeMutant(x, m))) return ns;
+  return { ...ns, derogations: [...derogations, { file: m.file, line: m.line, operator: m.operator, par, raison, contestation: t.contestation ?? "", defaut: t.id }] };
+}
+
+/**
+ * Après le tour du testeur : les mutants qu'il conteste comme équivalents vont à l'arbitre de
+ * mutation, puis à l'humain s'il refuse ou si le plafond de ses dérogations est atteint.
+ */
+function arbitrerMutants(s0: SkraftState, d: DeliverState): Out {
+  let s = s0;
+  const aJuger: DefectThread[] = [];
+  for (const t of (s.reviewThreads ?? []).filter(conteste))
+    // Déjà exempté (correction reprise après un échec) : rien à rejuger.
+    if ((s.derogations ?? []).some((x) => memeMutant(x, t.mutant!))) s = avecStatut(s, t.id, "accepted");
+    else aJuger.push(t);
+  if (!aJuger.length) return apresCorrectionTests(s, d);
+  const nd: DeliverState = { ...d, step: "mutation-arbitration", mutationArbitration: { human: [] } };
+  if (restantes(s) > 0) return { state: { ...s, stage: "ARBITRATION", deliver: nd }, effects: [{ kind: "arbitrateMutants", threads: aJuger }] };
+  const avis = `L'arbitre n'a pas été consulté : plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre atteint.`;
+  return demanderHumain(s, { ...nd, mutationArbitration: { human: aJuger.map((t) => ({ id: t.id, avis })) } });
+}
+
+const restantes = (s: SkraftState) => MAX_DEROGATIONS_PAR_ARBITRE - (s.derogations ?? []).filter((x) => x.par === "agent").length;
+
+function arbitrageEnCours(s0: SkraftState, d: DeliverState, e: Ev): Out | null {
+  let s = s0;
+  const fil = (id: string) => (s.reviewThreads ?? []).find((t) => t.id === id);
+  if (e.type === "MUTANTS_JUDGED") {
+    const human: { id: string; avis: string }[] = [];
+    let accordes = 0;
+    const plafond = restantes(s);
+    for (const t of (s.reviewThreads ?? []).filter(conteste)) {
+      const j = e.rulings.find((r) => r.defect === t.id);
+      if (j?.decision === "accepted" && accordes < plafond) {
+        accordes++;
+        s = avecStatut(accorder(s, t, "agent", j.reason ?? ""), t.id, "accepted");
+        continue;
+      }
+      if (j?.decision === "maintained") s = tracer(s, t, "à corriger", "agent", j.reason ?? "");
+      const avis = !j
+        ? "L'arbitre n'a rien rendu pour ce mutant."
+        : j.decision === "accepted"
+          ? `L'arbitre le juge équivalent (${j.reason ?? "sans raison"}), mais le plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre est atteint.`
+          : `L'arbitre le juge non équivalent : ${j.reason ?? "sans raison"}.`;
+      human.push({ id: t.id, avis });
+    }
+    return demanderHumain(s, { ...d, mutationArbitration: { human } });
+  }
+  if (e.type === "HUMAN_DECISION") {
+    const attendu = d.mutationArbitration?.human[0];
+    const i = e.decision.indexOf(":");
+    const [choix, id] = [e.decision.slice(0, i), e.decision.slice(i + 1)];
+    const t = attendu && id === attendu.id ? fil(id) : undefined;
+    if (!t || (choix !== "derogation" && choix !== "corriger")) return { state: s, effects: [] };
+    s =
+      choix === "derogation"
+        ? avecStatut(accorder(s, t, "humain", e.comment ?? "(sans justification)"), t.id, "humanAccepted")
+        : avecStatut(tracer(s, t, "à corriger", "humain", e.comment ?? ""), t.id, "humanMaintained");
+    return demanderHumain(s, { ...d, mutationArbitration: { human: d.mutationArbitration!.human.slice(1) } });
+  }
+  return null;
+}
+
+/** Prochain mutant à soumettre à l'humain ; quand il n'y en a plus, la correction reprend. */
+function demanderHumain(s: SkraftState, d: DeliverState): Out {
+  const suivant = d.mutationArbitration?.human[0];
+  if (!suivant) {
+    const { mutationArbitration: _, ...reste } = d;
+    return apresCorrectionTests(s, { ...reste, step: "fix-test" });
+  }
+  const thread = (s.reviewThreads ?? []).find((t) => t.id === suivant.id)!;
+  return { state: { ...s, stage: "ARBITRATION", deliver: d }, effects: [{ kind: "askMutationArbitration", thread, avis: suivant.avis }] };
+}
+
+/**
+ * Correction côté tests validée (ADR 0046) : au testeur de nouveau s'il lui reste un défaut (un
+ * mutant que l'humain exige de tuer), au développeur s'il a des défauts ou des tests rouges à faire
+ * passer ; sinon, directement la porte de fin de scénario.
+ */
+function apresCorrectionTests(s: SkraftState, nd: DeliverState): Out {
+  const threads = s.reviewThreads ?? [];
+  if (threads.some((t) => isActive(t) && forTests(t))) {
+    const test = agentFeedback(threads, forTests);
+    return agent(s, { ...nd, step: "fix-test", reviewFeedback: { test, code: nd.reviewFeedback?.code ?? [] }, reviewDefects: test }, []);
+  }
+  const devWork = threads.some((t) => isActive(t) && forDev(t));
+  // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
+  if (devWork || nd.fixTargets?.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: nd.reviewFeedback?.test ?? [], code: agentFeedback(threads, forDev) } }, []);
+  return scenarioGate(s, { ...nd, unitTests: [] });
 }

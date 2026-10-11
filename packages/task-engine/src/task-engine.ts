@@ -29,6 +29,8 @@ interface TracedState {
   attempts?: unknown;
   rejections?: unknown;
   lastRejection?: { gate?: unknown; reasons?: unknown } | null;
+  /** Arbitrages de défauts de porte, en ajout seul : chaque nouvel élément est tracé (ADR 0065). */
+  arbitrages?: unknown;
 }
 
 const effectKind = (f: unknown): string => {
@@ -139,6 +141,19 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
         kind: "rejet",
         porte: typeof r?.gate === "string" ? r.gate : "?",
         motifs: Array.isArray(r?.reasons) ? r.reasons.map(String) : [],
+      });
+    }
+    const liste = (s: TracedState | null) => (Array.isArray(s?.arbitrages) ? (s.arbitrages as Record<string, unknown>[]) : []);
+    for (const a of liste(after).slice(liste(before).length)) {
+      const texte = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : "?");
+      bodies.push({
+        kind: "arbitrage",
+        porte: texte("porte"),
+        élément: texte("élément"),
+        contestation: texte("contestation"),
+        décision: a.décision === "dérogation" ? "dérogation" : "à corriger",
+        par: a.par === "humain" ? "humain" : "agent",
+        raison: texte("raison"),
       });
     }
     for (const b of bodies) {

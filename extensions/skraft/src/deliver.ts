@@ -124,11 +124,36 @@ export function checkCoverage(report: CoverageReport, sources: string[], bar: Qu
 }
 
 /** Seuils de mutation sur les fichiers de production : par couche (domaine, application, reste), ADR 0049. */
-export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar): string[] {
+/** Mutant reconnu équivalent par un arbitrage : exempté de la porte de mutation (ADR 0065). */
+export interface MutantExempte {
+  file: string;
+  line: number;
+  operator: string;
+}
+
+/** Mutant survivant d'un fichier sous son seuil : chacun devient un défaut (ADR 0065). */
+export interface MutantSurvivant extends MutantExempte {
+  replacement?: string;
+}
+
+/**
+ * Mutants d'un fichier, sans ceux qu'une dérogation a reconnus équivalents (ADR 0065) : le score est
+ * recalculé sur les mutants restants quand le rapport donne ses comptes ; sinon, le score mesuré reste.
+ */
+function sansDerogations(f: MutationReport["files"][number], path: string, derogations: readonly MutantExempte[]) {
+  const accorde = (m: { line: number; operator: string }) => derogations.some((d) => d.file === path && d.line === m.line && d.operator === m.operator);
+  const survived = f.survived.filter((m) => !accorde(m));
+  const retires = f.survived.length - survived.length;
+  const score = retires && f.total !== undefined && f.killed !== undefined ? (f.total - retires > 0 ? (f.killed / (f.total - retires)) * 100 : 100) : f.score;
+  return { score: retires && !survived.length ? 100 : score, survived };
+}
+
+export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar, derogations: readonly MutantExempte[] = []): string[] {
   const reasons: string[] = [];
   for (const path of sources) {
-    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
-    if (!f) continue; // aucun mutant applicable dans ce fichier
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut) continue; // aucun mutant applicable dans ce fichier
+    const f = sansDerogations(brut, path, derogations);
     const threshold = bar.mutation[layerOf(path, bar)];
     if (f.score + 1e-9 < threshold) {
       const survivors = f.survived.map((s) => `ligne ${s.line} (${s.operator})`).join(", ");
@@ -136,6 +161,18 @@ export function checkMutation(report: MutationReport, sources: string[], bar: Qu
     }
   }
   return reasons;
+}
+
+export function mutantsSousLeSeuil(report: MutationReport, sources: string[], bar: QualityBar, derogations: readonly MutantExempte[] = []): MutantSurvivant[] {
+  const mutants: MutantSurvivant[] = [];
+  for (const path of sources) {
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut) continue;
+    const f = sansDerogations(brut, path, derogations);
+    if (f.score + 1e-9 < bar.mutation[layerOf(path, bar)])
+      for (const m of f.survived) mutants.push({ file: path, line: m.line, operator: m.operator, ...(m.replacement !== undefined ? { replacement: m.replacement } : {}) });
+  }
+  return mutants;
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;

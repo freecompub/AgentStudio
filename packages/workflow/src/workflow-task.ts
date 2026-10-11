@@ -1,7 +1,7 @@
 import { EnvFailureError, WorkDefectError, type ExtensionContext, type TaskDefinition, type TaskEvent } from "@agent-studio/extension-api";
 import { empreinteDe, ranger, relire } from "./contenus.js";
 import { createRejoueurLocal, type Rejoueur } from "./hote/rejoueur.js";
-import type { DeclarationWorkflow, EffetWorkflow, EntreeJournal, EtatWorkflow, EvenementWorkflow, Json, NatureErreur, NomAppel, Profil } from "./protocols.js";
+import type { Arbitrage, DeclarationWorkflow, EffetWorkflow, EntreeJournal, EtatWorkflow, EvenementWorkflow, Json, NatureErreur, NomAppel, Profil } from "./protocols.js";
 
 /** Appels qui écrivent ou lancent un agent : checkpoint avant (D23). */
 const AVEC_CHECKPOINT = new Set<NomAppel>(["agent", "ecrireFichier", "creerDossier", "commiter", "brancher"]);
@@ -100,7 +100,8 @@ function avecRejets(etat: EtatWorkflow): EtatWorkflow {
   const rejets = etat.journal.filter((e) => e.appel === "rejet");
   const dernier = rejets.at(-1);
   const args = dernier ? (relire(dernier.args, etat.contenus) as { porte: string; motifs: string[] }) : null;
-  return { ...etat, rejections: rejets.length, lastRejection: args ? { gate: args.porte, reasons: args.motifs } : null, stage: phaseDe(etat) };
+  const arbitrages = etat.journal.filter((e) => e.appel === "arbitrage").map((e) => relire(e.args, etat.contenus) as unknown as Arbitrage);
+  return { ...etat, rejections: rejets.length, lastRejection: args ? { gate: args.porte, reasons: args.motifs } : null, arbitrages, stage: phaseDe(etat) };
 }
 
 /** La dernière phase ou étape annoncée (`w.phase`, `w.etape`), sinon « DÉBUT ». */

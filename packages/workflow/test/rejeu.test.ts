@@ -282,6 +282,19 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect(etat.journal.filter((e) => e.appel === "rejet")).toHaveLength(2);
   });
 
+  it("w.arbitrage : journalisé ; l'état expose arbitrages, que le moteur trace (ADR 0065)", async () => {
+    const f = fauxContexte({}, { a: "" });
+    const a = { porte: "mutation", élément: "src/a.ts:3 (EqualityOperator)", contestation: "équivalent", décision: "dérogation" as const, par: "agent" as const, raison: "même valeur" };
+    const t = await lancer(
+      decl(async (w) => {
+        await w.arbitrage(a);
+        await w.lireFichier("a");
+      }),
+      f.ctx,
+    );
+    expect((await t.record()).state.arbitrages).toEqual([a]);
+  });
+
   it("w.etape : la phase de la tâche suit la dernière étape annoncée, et w.phase la remplace", async () => {
     const def = createWorkflowTask(
       decl(async (w) => {

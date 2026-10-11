@@ -83,6 +83,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
     informer: (texte) => appeler("informer", { texte }),
     maintenant: () => appeler("maintenant", {}),
     rejet: (porte, motifs) => appeler("rejet", { porte, motifs: [...motifs] }, true),
+    arbitrage: (a) => appeler("arbitrage", { ...a }, true),
     etape: (nom) => appeler("etape", { nom }, true),
     echec: (motif) => {
       throw new EchecWorkflow(motif);

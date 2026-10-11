@@ -41,6 +41,11 @@ export type TraceEntry = {
   /** Rejet par une porte ou une revue, avec ses motifs entiers. */
   | { kind: "rejet"; porte: string; motifs: string[] }
   /**
+   * Arbitrage d'un défaut de porte contesté (D22 de docs/12, ADR 0065) : qui a tranché (agent ou
+   * humain), quoi (l'élément exact), et pourquoi. Une dérogation exempte cet élément de la porte.
+   */
+  | { kind: "arbitrage"; porte: string; élément: string; contestation: string; décision: "dérogation" | "à corriger"; par: "agent" | "humain"; raison: string }
+  /**
    * Livrable archivé **avant** qu'un rollback ne l'efface (ADR 0038).
    *
    * Un rejet de porte rembobine le dépôt : le document jugé disparaît en même temps que le verdict

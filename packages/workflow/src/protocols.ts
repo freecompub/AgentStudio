@@ -47,6 +47,7 @@ export type NomAppel =
   | "architecture"
   | "maintenant"
   | "rejet"
+  | "arbitrage"
   | "etape"
   | "brancher"
   | "checkpoint"
@@ -77,6 +78,18 @@ export interface EtatWorkflow {
   /** Étape ou phase en cours, pour la trace (`stade`). */
   stage?: string;
   lastRejection?: { gate: string; reasons: string[] } | null;
+  /** Arbitrages tracés (`w.arbitrage`), déduits du journal : le moteur les écrit dans la trace. */
+  arbitrages?: Arbitrage[];
+}
+
+/** Arbitrage d'un défaut de porte contesté (ADR 0065). */
+export interface Arbitrage {
+  porte: string;
+  élément: string;
+  contestation: string;
+  décision: "dérogation" | "à corriger";
+  par: "agent" | "humain";
+  raison: string;
 }
 
 /** Effet émis vers le moteur : seulement le numéro d'appel, les arguments sont dans le journal. */
@@ -158,6 +171,11 @@ export interface W {
    * `essayer` l'appelle de lui-même. Sert à savoir, après un run, pourquoi chaque travail a été refait.
    */
   rejet(porte: string, motifs: readonly string[]): Promise<void>;
+  /**
+   * Trace l'arbitrage d'un défaut de porte contesté (ADR 0065) : qui a tranché, quoi, pourquoi.
+   * Journalisé sans effet ; le moteur l'écrit dans la trace.
+   */
+  arbitrage(a: Arbitrage): Promise<void>;
   /**
    * Annonce la sous-étape en cours (évaluation, revue, ratification…) : la phase de la tâche — carte,
    * usage, trace — la suit jusqu'à la prochaine étape ou phase. Journalisé sans effet. Sert à

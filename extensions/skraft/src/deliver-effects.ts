@@ -1,7 +1,7 @@
 import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
 import { declaredIdentifiers } from "./text-analysis.js";
@@ -350,13 +350,20 @@ export async function loadQualityBar(ctx: ExtensionContext): Promise<{ bar: Qual
 }
 
 /** Mutation des fichiers de production donnés, jugée contre la barre : motifs de rejet, faits, notes. */
-async function mutate(ctx: ExtensionContext, bar: QualityBar, sources: string[], label: string, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+async function mutate(
+  ctx: ExtensionContext,
+  bar: QualityBar,
+  sources: string[],
+  label: string,
+  signal?: AbortSignal,
+  derogations: readonly MutantExempte[] = [],
+): Promise<{ reasons: string[]; mutants: MutantSurvivant[]; facts: string[]; notes: string[] }> {
   const mutation = await ctx.stack.mutation({ ...(signal ? { signal } : {}) });
-  if (!mutation) return { reasons: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  if (!mutation) return { reasons: [], mutants: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
   const facts = mutation.files
     .filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`)))
     .map((f) => `Mutation (${label}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-  return { reasons: checkMutation(mutation, sources, bar), facts, notes: [] };
+  return { reasons: checkMutation(mutation, sources, bar, derogations), mutants: mutantsSousLeSeuil(mutation, sources, bar, derogations), facts, notes: [] };
 }
 
 /**
@@ -364,19 +371,24 @@ async function mutate(ctx: ExtensionContext, bar: QualityBar, sources: string[],
  * fichiers de production modifiés depuis le début de la phase. Un outil comme Stryker relance la
  * suite pour chaque mutant : par scénario, ce serait une exécution complète à chaque fois.
  */
-export async function phaseEndMutation(ctx: ExtensionContext, state: SkraftState, signal?: AbortSignal): Promise<{ reasons: string[]; facts: string[]; notes: string[] }> {
+export async function phaseEndMutation(
+  ctx: ExtensionContext,
+  state: SkraftState,
+  signal?: AbortSignal,
+): Promise<{ reasons: string[]; mutants: MutantSurvivant[]; facts: string[]; notes: string[] }> {
   const { bar, notes } = await loadQualityBar(ctx);
-  if (!bar.mutation.active) return { reasons: [], facts: [], notes: [...notes, "Mutation désactivée par la barre de qualité du projet."] };
-  if (bar.mutation.moment !== "phase-end") return { reasons: [], facts: [], notes };
+  if (!bar.mutation.active) return { reasons: [], mutants: [], facts: [], notes: [...notes, "Mutation désactivée par la barre de qualité du projet."] };
+  if (bar.mutation.moment !== "phase-end") return { reasons: [], mutants: [], facts: [], notes };
   const cp = state.checkpoints.DELIVER;
-  if (!cp) return { reasons: [], facts: [], notes };
+  if (!cp) return { reasons: [], mutants: [], facts: [], notes };
   const k = kinds(ctx);
   const sources = (await ctx.workspace.changedFiles(cp))
     .filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(ctx.stack.layout.sources, f.path))
     .map((f) => f.path);
-  if (sources.length === 0) return { reasons: [], facts: [], notes };
-  const r = await mutate(ctx, bar, sources, "fin de DELIVER", signal);
-  return { reasons: r.reasons, facts: r.facts, notes: [...notes, ...r.notes] };
+  if (sources.length === 0) return { reasons: [], mutants: [], facts: [], notes };
+  // Les mutants reconnus équivalents par arbitrage sortent du score (ADR 0065).
+  const r = await mutate(ctx, bar, sources, "fin de DELIVER", signal, state.derogations ?? []);
+  return { reasons: r.reasons, mutants: r.mutants, facts: r.facts, notes: [...notes, ...r.notes] };
 }
 
 /** Porte de fin de scénario (§7.4) : acceptance verte, suite verte, séquence des preuves, mutation, dépendances, calisthenics. */
@@ -405,7 +417,7 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     // exécution en fin de DELIVER (`phaseEndMutation`). Désactivée : on le dit aux lentilles.
     if (!bar.mutation.active) notes.push("Mutation désactivée par la barre de qualité du projet.");
     else if (bar.mutation.moment === "scenario") {
-      const m = await mutate(ctx, bar, sources, e.scenarioId, signal);
+      const m = await mutate(ctx, bar, sources, e.scenarioId, signal, state.derogations ?? []);
       reasons.push(...m.reasons);
       facts.push(...m.facts);
       notes.push(...m.notes);

@@ -2,6 +2,7 @@ import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
+import type { MutantSurvivant } from "./deliver.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
@@ -170,8 +171,15 @@ export function transition(s0: SkraftState, e: Ev): Out {
       // Porte de fin de DELIVER avec une cible (ADR 0049, D5 de docs/12) : les scénarios sont verts,
       // rejouer la phase ne ferait travailler personne. Chaque motif devient un défaut adressé à
       // l'agent concerné, par la correction de l'ADR 0046.
-      if (e.type === "GATE_FAIL" && p === "DELIVER" && Object.hasOwn(CORRECTIONS_DE_FIN, e.gate) && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase)
-        return startReviewFix(s, [...(s.reviewThreads ?? []), ...endGateThreads(e.gate, e.reasons, s.attempts + 1)]);
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && Object.hasOwn(CORRECTIONS_DE_FIN, e.gate) && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase) {
+        const threads = [
+          ...(s.reviewThreads ?? []),
+          // Mutation : un défaut par mutant survivant, qui peut être tué ou contesté puis arbitré (ADR 0065).
+          ...(e.gate === "mutation" && e.mutants?.length ? mutationThreads(e.mutants, s.attempts + 1) : endGateThreads(e.gate, e.reasons, s.attempts + 1)),
+        ];
+        // Les fils sont tenus dans l'état, comme ceux d'une revue : les réponses de l'agent s'y appliquent.
+        return startReviewFix({ ...s, reviewThreads: threads }, threads);
+      }
       // Rien produit : personne à qui adresser le motif, l'humain décide sans qu'un essai soit consommé (D5).
       if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "livrables") return escalate(s, `${e.gate} : ${e.reasons.join(" ; ")}`);
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
@@ -255,6 +263,8 @@ export function transition(s0: SkraftState, e: Ev): Out {
 
     case "ARBITRATION": {
       const p = s.phase;
+      // Arbitrage d'un mutant contesté, pendant une correction de DELIVER (ADR 0065).
+      if (p === "DELIVER" && s.deliver?.step === "mutation-arbitration") return deliverTransition(s, e) ?? same;
       if (e.type !== "HUMAN_DECISION" || !p) break;
       const threads = applyArbitration(s.reviewThreads ?? [], e.decision);
       const ns: SkraftState = { ...s, reviewThreads: threads };
@@ -303,7 +313,8 @@ const CORRECTIONS_DE_FIN: Record<string, { id: string; target: "test" | "code"; 
     target: "test",
     consigne:
       "Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. " +
-      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si le mutant est équivalent (aucune entrée ne le distingue du code), conteste-le en le démontrant : un arbitre jugera, et l'humain si besoin.",
   },
   "couverture du diff": {
     id: "couverture",
@@ -328,6 +339,21 @@ function endGateThreads(gate: string, reasons: string[], round: number): DefectT
     severity: "major" as const,
     description: `${description} ${c.consigne}`,
     target: c.target,
+    status: "open" as const,
+    round,
+  }));
+}
+
+/** Mutants survivants → un défaut chacun, adressé au testeur, qui garde le mutant exact (ADR 0065). */
+function mutationThreads(mutants: MutantSurvivant[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN.mutation!;
+  return mutants.map((m, i) => ({
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
+    severity: "major" as const,
+    description: `Mutant survivant : ${m.file}:${m.line} (${m.operator})${m.replacement ? ` — code du mutant : ${m.replacement}` : ""}. ${c.consigne}`,
+    target: c.target,
+    mutant: m,
     status: "open" as const,
     round,
   }));
@@ -500,7 +526,9 @@ function oublierLaPhase(s: SkraftState): SkraftState {
   const sansLivrables = s.phase
     ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
     : s;
-  return s.adrsAvantPhase ? { ...sansLivrables, adrs: s.adrsAvantPhase } : sansLivrables;
+  // Le code effacé emporte les mutants exemptés (ADR 0065) ; les arbitrages, eux, restent tracés.
+  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [] } : sansLivrables;
+  return s.adrsAvantPhase ? { ...sansDerogations, adrs: s.adrsAvantPhase } : sansDerogations;
 }
 
 function leverGelDistill(s: SkraftState): SkraftState {

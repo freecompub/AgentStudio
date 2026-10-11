@@ -36,6 +36,7 @@ export const meta = {
     "question-de-revue": ["po", "developpeur", "architecte", "administrateur"],
     escalade: ["developpeur", "architecte", "administrateur"],
     arbitrer: ["developpeur", "architecte", "administrateur"],
+    "arbitrer-mutation": ["developpeur", "architecte", "administrateur"],
     "ratifier-adr": ["architecte"],
   },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
@@ -103,6 +104,12 @@ export const meta = {
       ecriture: ["@stack:sources"],
       outils: ["list_files", "run_tests", "run_lint", "report_blocker"],
       skills: { obligatoires: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], aLaDemande: ["clean-architecture-testing", "test-refactoring-catalog"] },
+    },
+    "skraft-mutation-arbiter": {
+      prompt: "agents/skraft-mutation-arbiter.agent.md",
+      consignes: "Rends ta décision avec l'outil submit_lens_verdict : lens « mutation-arbiter », verdict APPROVED, aucun défaut, et pour\nchaque défaut de mutation listé un arbitrage (rulings) : accepted si le mutant est équivalent, maintained sinon, avec ta raison.",
+      classe: "standard",
+      sortie: "submit_lens_verdict",
     },
     "skraft-lens-cold-reader": {
       prompt: "agents/skraft-lens-cold-reader.agent.md",
@@ -192,6 +199,8 @@ export default async function skraft(w, entree) {
     regressions: [],
     acceptanceHash: null,
     qualityCheckpoint,
+    // Mutants reconnus équivalents par arbitrage, exemptés de la porte de mutation (ADR 0065).
+    derogations: [],
   };
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
@@ -246,6 +255,9 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...(d.derogations?.length
+      ? [`Dérogations de mutation : ${d.derogations.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`, ...d.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`)]
+      : []),
   ].join("\n");
 }
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */

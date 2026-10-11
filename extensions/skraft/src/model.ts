@@ -3,7 +3,7 @@
  * (défaut C2 rendu impossible). Types purs, sérialisables, persistés par le moteur.
  */
 import { z } from "zod";
-import type { DeliverScenario, Granularity } from "./deliver.js";
+import type { DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
@@ -60,7 +60,7 @@ export interface AdrRecord {
 }
 
 /** Pas de la sous-machine DELIVER : test unitaire, puis code (un tour) ou vert et nettoyage (sessions séparées). */
-export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate";
+export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate" | "mutation-arbitration";
 
 /** Sous-machine DELIVER (§7.4). Les champs après `scenarioCheckpoint` sont internes au réducteur. */
 export interface DeliverState {
@@ -114,6 +114,29 @@ export interface DeliverState {
   pendingResponses?: DefectResponse[];
   /** Fils à l'entrée en correction : restaurés avec le code si la porte de fin de scénario échoue. */
   threadsAtFixStart?: DefectThread[];
+  /**
+   * Mutants contestés en cours d'arbitrage (ADR 0065) : ceux qui attendent l'humain, avec l'avis de
+   * l'arbitre de mutation à lui montrer.
+   */
+  mutationArbitration?: { human: { id: string; avis: string }[] };
+}
+
+/** Mutant reconnu équivalent : exempté de la porte de mutation (ADR 0065). */
+export interface Derogation extends MutantExempte {
+  par: "agent" | "humain";
+  raison: string;
+  contestation: string;
+  defaut: string;
+}
+
+/** Arbitrage d'un défaut de porte contesté, tracé par le moteur (ADR 0065). */
+export interface ArbitrageRecord {
+  porte: string;
+  élément: string;
+  contestation: string;
+  décision: "dérogation" | "à corriger";
+  par: "agent" | "humain";
+  raison: string;
 }
 
 export interface SkraftInput {
@@ -170,6 +193,10 @@ export interface SkraftState {
   debutDesRevues?: Partial<Record<Phase, number>>;
   /** Retour donné au spécialiste en cours, rendu tel quel après une question bloquante (D9 de docs/12). */
   retour?: string[];
+  /** Mutants exemptés de la porte de mutation, pour le run en cours de DELIVER (ADR 0065). */
+  derogations?: Derogation[];
+  /** Toutes les décisions d'arbitrage, en ajout seul : le moteur trace chaque nouvelle (ADR 0065). */
+  arbitrages?: ArbitrageRecord[];
   /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
   adrsAvantPhase?: AdrRecord[];
   /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */
@@ -227,7 +254,8 @@ export type SkraftEvent =
       facts?: string[];
       notes?: string[];
     }
-  | { type: "GATE_FAIL"; gate: string; reasons: string[] }
+  | { type: "GATE_FAIL"; gate: string; reasons: string[]; /** Porte de mutation : les survivants, un défaut chacun (ADR 0065). */ mutants?: MutantSurvivant[] }
+  | { type: "MUTANTS_JUDGED"; rulings: { defect: string; decision: "accepted" | "maintained"; reason?: string }[] }
   | {
       type: "LENSES_DONE";
       lenses: LensVerdict[];
@@ -270,6 +298,8 @@ export type SkraftEffect =
   | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
+  | { kind: "arbitrateMutants"; threads: DefectThread[] }
+  | { kind: "askMutationArbitration"; thread: DefectThread; avis: string }
   | { kind: "rollback"; to: string }
   // Rembobiner le dépôt sans faire oublier les conversations qui le décrivent, c'est garder le
   // souvenir et retirer la chose (ADR 0040, 0050). Les deux vont ensemble.

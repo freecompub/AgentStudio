@@ -8,7 +8,7 @@
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief } from "./brief.mjs";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, planScenarios } from "./deliver.mjs";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, planScenarios } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -44,12 +44,17 @@ export async function livrer(w, d, lentilles, max) {
     const L = await phase(w, d, suivi, cp, lentilles, max, relance);
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
     await ecrireRapports(w, d.slug, "DELIVER", suivi);
+    // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
+    if (d.derogations.length)
+      await w.ecrireFichier(`.skraft/${d.slug}/deliver/derogations.md`, rapportDeDerogations(d));
     return true;
   }, {
     commit: commitMessage("DELIVER", d.slug),
     apresRembobinage: () => {
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
       oublierLeRun(suivi);
+      // Le code effacé emporte les mutants qu'on avait exemptés (ADR 0065) ; la trace les garde.
+      d.derogations = [];
       return creerDossiers(w, d.slug);
     },
   });
@@ -470,12 +475,12 @@ function problemesDeSuite(results, attente, estAcceptance) {
 }
 // ---------- fin de scénario et fin de phase ----------------------------------------------------
 /** Mutation des fichiers de production donnés, jugée contre la barre. */
-async function muter(w, barre, sources, etiquette) {
+async function muter(w, barre, sources, etiquette, derogations = []) {
   const m = await w.mutation();
   if (!m)
-    return { motifs: [], faits: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+    return { motifs: [], mutants: [], faits: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
   const faits = m.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))).map((f) => `Mutation (${etiquette}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-  return { motifs: checkMutation(m, sources, barre), faits, notes: [] };
+  return { motifs: checkMutation(m, sources, barre, derogations), mutants: mutantsSousLeSeuil(m, sources, barre, derogations), faits, notes: [] };
 }
 /** Porte de fin de scénario (§7.4) : acceptance verte, suite verte, séquence des preuves, mutation, dépendances, lint. */
 async function porteScenario(w, d, L, i, depuis, unitTests) {
@@ -548,7 +553,7 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
   L.faits = uniq([...L.faits, ...faits]);
 }
 /** Mutation de fin de DELIVER (ADR 0049, moment par défaut) : une exécution sur tout ce que la phase a modifié. */
-async function mutationDeFin(w, L, cpPhase) {
+async function mutationDeFin(w, L, cpPhase, derogations) {
   const { barre, notes } = await barreDeQualite(w, L.disp);
   if (!barre.mutation.active)
     return { motifs: [], faits: [], notes: [...notes, "Mutation désactivée par la barre de qualité du projet."] };
@@ -558,8 +563,8 @@ async function mutationDeFin(w, L, cpPhase) {
   const sources = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(L.disp.sources, f.path)).map((f) => f.path);
   if (sources.length === 0)
     return { motifs: [], faits: [], notes };
-  const r = await muter(w, barre, sources, "fin de DELIVER");
-  return { motifs: r.motifs, faits: r.faits, notes: [...notes, ...r.notes] };
+  const r = await muter(w, barre, sources, "fin de DELIVER", derogations);
+  return { motifs: r.motifs, mutants: r.mutants, faits: r.faits, notes: [...notes, ...r.notes] };
 }
 /**
 * Portes de fin de DELIVER qui désignent leur correcteur : un test trop faible (mutation, lignes
@@ -570,7 +575,8 @@ const CORRECTIONS_DE_FIN = {
     id: "mutation",
     target: "test",
     consigne: "Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. " +
-      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si le mutant est équivalent (aucune entrée ne le distingue du code), conteste-le en le démontrant : un arbitre jugera, et l'humain si besoin.",
   },
   "couverture du diff": {
     id: "couverture",
@@ -584,6 +590,21 @@ const CORRECTIONS_DE_FIN = {
     consigne: "Corrige le code pour que ce test repasse ; ne modifie pas ce test.",
   },
 };
+const elementDe = (m) => `${m.file}:${m.line} (${m.operator})`;
+/** Mutants survivants → un défaut chacun, adressé au testeur, qui garde le mutant exact (ADR 0065). */
+function filsDeMutation(mutants, tour) {
+  const c = CORRECTIONS_DE_FIN.mutation;
+  return mutants.map((m, j) => ({
+    id: `${c.id}#${tour}.${j + 1}`,
+    lens: c.id,
+    severity: "major",
+    description: `Mutant survivant : ${elementDe(m)}${m.replacement ? ` — code du mutant : ${m.replacement}` : ""}. ${c.consigne}`,
+    target: c.target,
+    mutant: m,
+    status: "open",
+    round: tour,
+  }));
+}
 /** Motifs d'une porte de fin de DELIVER → défauts adressés à son correcteur. */
 function filsDeFin(porte, motifs, tour) {
   const c = CORRECTIONS_DE_FIN[porte];
@@ -602,12 +623,12 @@ function filsDeFin(porte, motifs, tour) {
 * verts, rejouer la phase ne ferait travailler personne. Correction ciblée depuis le dernier vert si
 * le budget le permet ; rend vrai si elle a eu lieu.
 */
-async function correctionDeFin(w, d, L, s, max, tentatives, consommer, porte, motifs) {
+async function correctionDeFin(w, d, L, s, max, tentatives, consommer, porte, motifs, fils = (tour) => filsDeFin(porte, motifs, tour)) {
   if (!L.dernierVert || tentatives() + 1 >= max)
     return false;
   await w.rejet(`${porte} (correction ciblée)`, motifs);
   consommer();
-  s.fils = [...s.fils, ...filsDeFin(porte, motifs, tentatives())];
+  s.fils = [...s.fils, ...fils(tentatives())];
   await corriger(w, d, L, s, max);
   return true;
 }
@@ -647,9 +668,10 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
         L.faits = uniq([...L.faits, ...diff.report.files.map((f) => `Couverture du diff (tâche) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`)]);
       } else L.notes = uniq([...L.notes, "Couverture non mesurée : la commande de test du projet n'en produit pas."]);
     }
-    const m = await mutationDeFin(w, L, cpPhase);
+    const m = await mutationDeFin(w, L, cpPhase, d.derogations);
     if (m.motifs.length) {
-      if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "mutation", m.motifs))
+      // Un défaut par mutant survivant : chacun peut être tué, ou contesté puis arbitré (ADR 0065).
+      if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "mutation", m.motifs, (tour) => filsDeMutation(m.mutants, tour)))
         continue;
       return { motifs: m.motifs, garanti: false, porte: "mutation" };
     }
@@ -708,6 +730,8 @@ function faitsDeLivraison(d, s, L, execution) {
     faits.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);
   if (execution)
     faits.push(execution);
+  for (const x of d.derogations)
+    faits.push(`Dérogation de mutation (${x.par}) : ${elementDe(x)} — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
   for (const sc of L.scenarios.filter((x) => x.status === "done")) {
     if (sc.role === "regression")
       faits.push(`Scénario ${sc.id} : non-régression, vert dès DISTILL (${sc.acceptanceTestId}).`);
@@ -769,6 +793,13 @@ async function deroulerCorrection(w, d, L, s, i, depart, max, motifs) {
     s.fils = endTurn(applyResponses(s.fils, c.reponses, concerne, autreAgent), concerne);
     c.reponses = [];
     if (etape === "fix-test") {
+      // Mutants contestés : l'arbitre, puis l'humain si besoin (ADR 0065). Un mutant maintenu par
+      // l'humain repart au testeur.
+      await arbitrerMutants(w, d, s);
+      if (s.fils.some((t) => isActive(t) && pourTests(t))) {
+        c.retourTests = agentFeedback(s.fils, pourTests);
+        continue;
+      }
       if (s.fils.some((t) => isActive(t) && pourDev(t)) || c.cibles.length) {
         c.retourDev = agentFeedback(s.fils, pourDev);
         etape = "fix";
@@ -829,4 +860,100 @@ async function porteCorrectionTests(w, d, L, i, depuis, sortie, c) {
   c.cibles = neufs.filter((r) => r.status === "failed").map((r) => r.id);
   c.reponses = sortie.responses ?? [];
   return { cp, nouveau: null, viaAcceptance: false, acceptanceVerte: false };
+}
+
+/** Au-delà, l'arbitre ne peut plus exempter de mutant : l'humain tranche (ADR 0065). */
+const MAX_DEROGATIONS_PAR_ARBITRE = 2;
+const memeMutant = (a, b) => a.file === b.file && a.line === b.line && a.operator === b.operator;
+/**
+* Mutants survivants contestés par le testeur (mutant équivalent) : l'arbitre de mutation juge, et
+* l'humain tranche s'il refuse ou si le plafond de ses dérogations est atteint. Chaque décision est
+* tracée ; une dérogation exempte ce seul mutant de la porte (ADR 0065).
+*/
+async function arbitrerMutants(w, d, s) {
+  const contestes = s.fils.filter((t) => t.mutant && (t.status === "contested" || t.status === "recontested"));
+  if (!contestes.length)
+    return;
+  const statut = (t, status) => (s.fils = s.fils.map((x) => (x.id === t.id ? { ...x, status } : x)));
+  // Déjà exempté (correction reprise après un échec) : rien à rejuger.
+  const aJuger = [];
+  for (const t of contestes)
+    if (d.derogations.some((x) => memeMutant(x, t.mutant)))
+      statut(t, "accepted");
+    else
+      aJuger.push(t);
+  if (!aJuger.length)
+    return;
+  await w.etape("ARBITRATION");
+  const restants = MAX_DEROGATIONS_PAR_ARBITRE - d.derogations.filter((x) => x.par === "agent").length;
+  const jugements = new Map();
+  if (restants > 0) {
+    const r = await w.agent("skraft-mutation-arbiter", await briefArbitre(w, d, aJuger));
+    for (const j of r.sortie?.rulings ?? [])
+      jugements.set(j.defect, j);
+  }
+  let accordes = 0;
+  for (const t of aJuger) {
+    const j = jugements.get(t.id);
+    if (j?.decision === "accepted" && accordes < restants) {
+      accordes++;
+      await accorder(w, d, t, "agent", j.reason ?? "");
+      statut(t, "accepted");
+      continue;
+    }
+    if (j?.decision === "maintained")
+      await w.arbitrage({ porte: "mutation", élément: elementDe(t.mutant), contestation: t.contestation ?? "", décision: "à corriger", par: "agent", raison: j.reason ?? "" });
+    const avis = !j
+      ? `L'arbitre n'a pas été consulté ou n'a rien rendu (plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre).`
+      : j.decision === "accepted"
+        ? `L'arbitre le juge équivalent (${j.reason ?? "sans raison"}), mais le plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre est atteint.`
+        : `L'arbitre le juge non équivalent : ${j.reason ?? "sans raison"}.`;
+    const rep = await w.humain("arbitrer-mutation", `Arbitrer un mutant (${t.id})`, [
+      { id: "derogation", label: "Mutant équivalent : accorder la dérogation" },
+      { id: "corriger", label: "Non équivalent : le testeur doit le tuer" },
+    ], {
+      detail: `Mutant survivant : ${elementDe(t.mutant)}${t.mutant.replacement ? ` — code du mutant : ${t.mutant.replacement}` : ""}\n` +
+        `Contestation du testeur : « ${t.contestation ?? "?"} »\n${avis}\nJustifie ta décision en commentaire : elle est tracée et commitée.`,
+      texteLibre: true,
+    });
+    if (rep.decision === "derogation") {
+      await accorder(w, d, t, "humain", rep.commentaire ?? "(sans justification)");
+      statut(t, "humanAccepted");
+    }
+    else {
+      await w.arbitrage({ porte: "mutation", élément: elementDe(t.mutant), contestation: t.contestation ?? "", décision: "à corriger", par: "humain", raison: rep.commentaire ?? "" });
+      statut(t, "humanMaintained");
+    }
+  }
+}
+async function accorder(w, d, t, par, raison) {
+  await w.arbitrage({ porte: "mutation", élément: elementDe(t.mutant), contestation: t.contestation ?? "", décision: "dérogation", par, raison });
+  if (!d.derogations.some((x) => memeMutant(x, t.mutant)))
+    d.derogations = [...d.derogations, { file: t.mutant.file, line: t.mutant.line, operator: t.mutant.operator, par, raison, contestation: t.contestation ?? "", defaut: t.id }];
+}
+/** Dossier de l'arbitre : chaque mutant contesté, la contestation, et le code des fichiers mutés. */
+async function briefArbitre(w, d, fils) {
+  const fichiers = [...new Set(fils.map((t) => t.mutant.file))];
+  const codes = [];
+  for (const f of fichiers)
+    codes.push(`Fichier ${f} :`, "```", await w.lireFichier(f), "```");
+  return [
+    `Story : ${d.story.id} — ${d.story.title ?? ""}`,
+    "Mutants survivants contestés par le testeur :",
+    ...fils.map((t) => `  - [${t.id}] ${elementDe(t.mutant)}${t.mutant.replacement ? ` — code du mutant : ${t.mutant.replacement}` : ""} ; contestation : « ${t.contestation ?? "?"} »`),
+    ...codes,
+  ].join("\n");
+}
+/** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
+function rapportDeDerogations(d) {
+  return [
+    `# Dérogations de mutation — ${d.story.id}`,
+    "",
+    "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
+    "",
+    "| Mutant | Décidé par | Raison | Contestation du testeur |",
+    "| --- | --- | --- | --- |",
+    ...d.derogations.map((x) => `| ${elementDe(x)} | ${x.par} | ${x.raison.replace(/\|/g, "\\|")} | ${x.contestation.replace(/\|/g, "\\|")} |`),
+    "",
+  ].join("\n");
 }

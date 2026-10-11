@@ -374,8 +374,9 @@ describe("Moteur de tâches — trace", () => {
     attempts: number;
     rejections: number;
     lastRejection: { gate: string; reasons: string[] } | null;
+    arbitrages?: unknown[];
   }
-  type RE = { type: "FAIL"; gate: string; reasons: string[] } | { type: "PASS" };
+  type RE = { type: "FAIL"; gate: string; reasons: string[] } | { type: "PASS" } | { type: "ARBITRE"; a: unknown };
   const rejectingTask = (events: RE[]): TaskDefinition<R, RE, { kind: "work" }, unknown> => ({
     name: "rejets",
     initialState: () => ({ phase: "DESIGN", stage: "SPECIALIST", attempts: 0, rejections: 0, lastRejection: null }),
@@ -383,6 +384,7 @@ describe("Moteur de tâches — trace", () => {
     transition(s, e) {
       if (e.type === "FAIL") return { state: { ...s, attempts: s.attempts + 1, rejections: s.rejections + 1, lastRejection: { gate: e.gate, reasons: e.reasons } }, effects: [{ kind: "work" }] };
       if (e.type === "PASS") return { state: { ...s, phase: "DONE", stage: "DONE" }, effects: [] };
+      if (e.type === "ARBITRE") return { state: { ...s, arbitrages: [...(s.arbitrages ?? []), e.a] }, effects: [{ kind: "work" }] };
       return { state: s, effects: [] };
     },
     runEffect: async () => events.shift(),
@@ -457,6 +459,12 @@ describe("Moteur de tâches — trace", () => {
       ["casse", "erreur"],
       ["attend", "attente"],
     ]);
+  });
+
+  it("trace chaque arbitrage ajouté à l'état, une fois (D22 de docs/12)", async () => {
+    const a = { porte: "mutation", élément: "src/a.ts:3 (EqualityOperator)", contestation: "équivalent", décision: "dérogation", par: "agent", raison: "même valeur à dose == max" };
+    const entries = await run([{ type: "ARBITRE", a }, { type: "FAIL", gate: "x", reasons: ["y"] }, { type: "PASS" }]);
+    expect(entries.filter((e) => e.kind === "arbitrage")).toEqual([expect.objectContaining({ kind: "arbitrage", ...a })]);
   });
 
   it("un motif conservé d'un rejet précédent ne compte pas comme un nouveau rejet", async () => {

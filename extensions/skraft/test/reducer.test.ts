@@ -1122,6 +1122,49 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev,
     ];
 
+    describe("ADR 0065 : mutant contesté comme équivalent, arbitré puis tracé", () => {
+      const M = { file: "src/Montant.cs", line: 25, operator: "EqualityOperator", replacement: "a >= b" };
+      const echec = (mutants = [M]): Ev => ({ type: "GATE_FAIL", gate: "mutation", reasons: ["Mutation : src/Montant.cs à 75 %."], mutants });
+      const conteste = (ids: string[]): Ev => ({ ...REP_TEST, responses: ids.map((defect) => ({ defect, status: "contested", reason: "équivalent" })) } as Ev);
+      const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h1", fixTargets: [] };
+      const juge = (decision: "accepted" | "maintained", ids = ["mutation#1.1"]): Ev => ({ type: "MUTANTS_JUDGED", rulings: ids.map((defect) => ({ defect, decision, reason: "r" })) });
+
+      it("un défaut par mutant, qui garde le mutant exact", () => {
+        const r = play([...toutLivre(), echec()]);
+        expect(r.state.reviewThreads).toEqual([expect.objectContaining({ id: "mutation#1.1", mutant: M, target: "test" })]);
+      });
+
+      it("contesté : l'arbitre est appelé ; équivalent : dérogation tracée, la correction reprend", () => {
+        const arb = play([...toutLivre(), echec(), conteste(["mutation#1.1"]), fixTestOk]);
+        expect(arb.state.stage).toBe("ARBITRATION");
+        expect(arb.effects).toEqual([{ kind: "arbitrateMutants", threads: [expect.objectContaining({ id: "mutation#1.1", status: "contested" })] }]);
+        const ok = transition(arb.state, juge("accepted"));
+        expect(ok.state.derogations).toEqual([expect.objectContaining({ file: M.file, line: 25, operator: M.operator, par: "agent" })]);
+        expect(ok.state.arbitrages).toEqual([expect.objectContaining({ décision: "dérogation", par: "agent", élément: "src/Montant.cs:25 (EqualityOperator)" })]);
+        expect(kinds(ok.effects)).toEqual(["scenarioGate"]);
+      });
+
+      it("non équivalent : l'humain tranche ; « corriger » renvoie le testeur, sans recours", () => {
+        const arb = play([...toutLivre(), echec(), conteste(["mutation#1.1"]), fixTestOk, juge("maintained")]);
+        expect(arb.effects).toEqual([{ kind: "askMutationArbitration", thread: expect.objectContaining({ id: "mutation#1.1" }), avis: expect.stringMatching(/non équivalent/) }]);
+        const corr = transition(arb.state, DECIDE("corriger:mutation#1.1", "un test le tue"));
+        expect(corr.state.arbitrages!.map((a) => [a.par, a.décision])).toEqual([["agent", "à corriger"], ["humain", "à corriger"]]);
+        const run = corr.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+        expect(run.step).toBe("fix-test");
+        expect(run.feedback.join("\n")).toMatch(/tranché par l'humain/);
+      });
+
+      it("plafond : au-delà de deux dérogations de l'arbitre, l'humain tranche", () => {
+        const trois = [M, { ...M, line: 26 }, { ...M, line: 27 }];
+        const ids = ["mutation#1.1", "mutation#1.2", "mutation#1.3"];
+        const r = play([...toutLivre(), echec(trois), conteste(ids), fixTestOk, juge("accepted", ids)]);
+        expect(r.state.derogations).toHaveLength(2);
+        expect(r.effects).toEqual([{ kind: "askMutationArbitration", thread: expect.objectContaining({ id: "mutation#1.3" }), avis: expect.stringMatching(/plafond/) }]);
+        const fin = transition(r.state, DECIDE("derogation:mutation#1.3", "équivalent aussi"));
+        expect(fin.state.derogations!.map((x) => x.par)).toEqual(["agent", "agent", "humain"]);
+      });
+    });
+
     it("couverture du diff insuffisante en fin de DELIVER : défaut adressé au testeur, sans relancer la phase (D5)", () => {
       const motif = "Couverture du diff : src/Panier.cs à 62 % (minimum 80 %). Lignes non couvertes : 14.";
       const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "couverture du diff", reasons: [motif] }]);

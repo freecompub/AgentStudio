@@ -3,7 +3,7 @@ import { coverageForChanges } from "@agent-studio/extension-api";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, mutantsSousLeSeuil, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -508,11 +508,36 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
     const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
     const fin = await phaseEndMutation(inactive.ctx, state);
     expect(inactive.mutations()).toBe(0);
-    expect(fin).toEqual({ reasons: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
   });
 
   it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {
     const { ctx } = ctxWith({ ".agent-studio/quality.yaml": "couverture:\n  domaine: 150\n" }, null);
     await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/couverture\.domaine/);
+  });
+});
+
+describe("mutation et dérogations (D22 de docs/12, ADR 0065)", () => {
+  const F = "Sources/Domain/BolusCapPolicy.swift";
+  const report = { score: 75, files: [{ file: F, score: 75, killed: 3, total: 4, survived: [{ line: 4, operator: "EqualityOperator", replacement: "dose >= max" }] }] };
+
+  it("un mutant accordé en dérogation sort du score : la porte passe", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
+  });
+
+  it("une dérogation ne vaut que pour son mutant", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 5, operator: "EqualityOperator" }])).toHaveLength(1);
+  });
+
+  it("score recalculé sans les mutants accordés ; sans total connu, le score mesuré reste", () => {
+    const deux = { score: 50, files: [{ file: F, score: 50, killed: 2, total: 4, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(deux, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 66.7 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+    const sansTotal = { score: 50, files: [{ file: F, score: 50, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(sansTotal, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 50 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+  });
+
+  it("mutantsSousLeSeuil : un par survivant non accordé, dans les fichiers sous le seuil", () => {
+    expect(mutantsSousLeSeuil(report, [F], bar(), [])).toEqual([{ file: F, line: 4, operator: "EqualityOperator", replacement: "dose >= max" }]);
+    expect(mutantsSousLeSeuil(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { coverageForChanges } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, mutantsSousLeSeuil, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -225,5 +225,30 @@ describe("concerns — un test désigné par son fichier (rouge de compilation)"
     const rouge = preuve({ testIds: [fichier], failing: [{ id: fichier, failureKind: "missing_symbol", message: "CS1061" }] });
     const vert = preuve({ phase: "DELIVER_GREEN", exitCode: 0, testIds: [nom] });
     expect(checkRedGreenSequence([rouge, vert], [fichier])).toEqual([]);
+  });
+});
+
+describe("mutation et dérogations (D22 de docs/12, ADR 0065)", () => {
+  const F = "Sources/Domain/BolusCapPolicy.swift";
+  const report = { score: 75, files: [{ file: F, score: 75, killed: 3, total: 4, survived: [{ line: 4, operator: "EqualityOperator", replacement: "dose >= max" }] }] };
+
+  it("un mutant accordé en dérogation sort du score : la porte passe", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
+  });
+
+  it("une dérogation ne vaut que pour son mutant", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 5, operator: "EqualityOperator" }])).toHaveLength(1);
+  });
+
+  it("score recalculé sans les mutants accordés ; sans total connu, le score mesuré reste", () => {
+    const deux = { score: 50, files: [{ file: F, score: 50, killed: 2, total: 4, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(deux, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 66.7 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+    const sansTotal = { score: 50, files: [{ file: F, score: 50, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(sansTotal, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 50 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+  });
+
+  it("mutantsSousLeSeuil : un par survivant non accordé, dans les fichiers sous le seuil", () => {
+    expect(mutantsSousLeSeuil(report, [F], bar(), [])).toEqual([{ file: F, line: 4, operator: "EqualityOperator", replacement: "dose >= max" }]);
+    expect(mutantsSousLeSeuil(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
   });
 });

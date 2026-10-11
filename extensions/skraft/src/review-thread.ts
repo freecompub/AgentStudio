@@ -13,6 +13,7 @@
  * Les demandes déjà corrigées restent dans le fil, en rappel : l'agent ne doit pas défaire une
  * correction en satisfaisant la critique suivante.
  */
+import type { MutantSurvivant } from "./deliver.js";
 import type { DefectTarget, LensDefect, LensVerdict } from "./review.js";
 
 export type ThreadStatus =
@@ -51,6 +52,8 @@ export interface DefectThread {
   round: number;
   /** Déjà renvoyé une fois à l'autre agent (« hors de mon périmètre », ADR 0047). */
   rerouted?: boolean;
+  /** Défaut de la porte de mutation : le mutant exact, que l'arbitrage peut exempter (ADR 0065). */
+  mutant?: MutantSurvivant;
 }
 
 export interface DefectResponse {
