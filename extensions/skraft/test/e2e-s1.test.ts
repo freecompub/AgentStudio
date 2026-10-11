@@ -180,6 +180,38 @@ describe("skraft — critères de sortie de S1", () => {
     expect(devPrompts.some((p) => p.includes("[cold-reader#1.mineur1, minor, code] nom vague : BolusCap"))).toBe(true);
   }, 90_000);
 
+  // D7 (docs/12) : contester n'oblige pas à modifier le code ; la lentille arbitre.
+  it("correction de DELIVER où le développeur conteste tout : pas refusé pour « aucun fichier modifié », la lentille arbitre", async () => {
+    const lensPrompts: string[] = [];
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        if (t.prompt.includes("[cold-reader#1.1")) {
+          await t.callTool("report_phase", { summary: "contesté", files: [], responses: [{ defect: "cold-reader#1.1", status: "contested", reason: "Le contrat ratifié impose ce nom." }] });
+          return;
+        }
+        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: ["src/domain/bolus-cap.ts"] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        if (!t.prompt.includes("phase DELIVER")) return void (await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "APPROVED", defects: [] }));
+        lensPrompts.push(t.prompt);
+        await t.callTool("submit_lens_verdict", lensPrompts.length === 1
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague : BolusCap", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [], rulings: [{ defect: "cold-reader#1.1", decision: "accepted", reason: "Le contrat fait foi." }] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.escalation?.reason).toBeUndefined();
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    expect(lensPrompts[1]).toContain("Le contrat ratifié impose ce nom.");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet") as { motifs: string[] }[];
+    expect(rejets.flatMap((r) => r.motifs).some((m) => m.startsWith("Aucun fichier de production modifié"))).toBe(false);
+  }, 90_000);
+
   it("revue de DELIVER « changements demandés » sans aucun défaut : escalade, personne à qui l'adresser", async () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-lens-cold-reader": async (t) => {

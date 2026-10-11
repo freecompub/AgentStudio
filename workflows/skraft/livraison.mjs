@@ -12,7 +12,7 @@ import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGre
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
-import { agentFeedback, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
+import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
 import { ecrireRapport, enregistrerLivrables, nouveauSuivi, reviser } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
@@ -405,7 +405,10 @@ async function porteVerte(w, d, L, i, etape, depuis, nouveau, sortie, correction
     throw new PasRefuse("Les tests unitaires ont été modifiés pendant le pas de code : ils sont gelés depuis leur rouge. Le tour est annulé ; modifie uniquement le code de production.");
   const k = natures(L.disp);
   const changes = await w.fichiersModifies(depuis);
-  if (etape !== "refactor" && !changes.some((f) => k.production(f.path)))
+  // Correction où tout est contesté ou renvoyé, sans test rouge à faire passer : rien à modifier,
+  // la lentille arbitrera (D7 de docs/12).
+  const rienAModifier = etape === "fix" && !correction.cibles.length && allDisputed(correction.fils, sortie.responses ?? [], pourDev);
+  if (etape !== "refactor" && !rienAModifier && !changes.some((f) => k.production(f.path)))
     throw new PasRefuse("Aucun fichier de production modifié : écris le code qui fait passer le test.");
   // Garde du contrat ratifié (ADR 0047) : une correction ne retire pas ce que le contrat exige.
   if (etape === "fix" && L.contrat.length) {
@@ -743,6 +746,7 @@ async function deroulerCorrection(w, d, L, s, i, depart, max) {
   let unitTests = [];
   let etape = s.fils.some((t) => isActive(t) && pourTests(t)) ? "fix-test" : "fix";
   for (;;) {
+    c.fils = s.fils;
     const r = await pas(w, d, L, i, etape, point, [], max, [], null, c);
     point = r.cp;
     const concerne = etape === "fix-test" ? pourTests : pourDev;

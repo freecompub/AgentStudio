@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D11.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D11.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -257,6 +257,11 @@ Priorités proposées :
   contestation motivée est refusée 3 × 3 fois, puis escalade, et la lentille n'arbitre jamais.
 - **Proposition** : au pas `fix`, accepter de ne rien modifier si **chaque** défaut reçu a une
   réponse `contested` ou `outOfScope`. Le fil part alors en arbitrage.
+- **Corrigé le 2026-10-11**, dans l'extension et dans le workflow, comme proposé : `allDisputed`
+  (`review-thread`) vrai si chaque défaut actif du développeur a une réponse `contested` ou
+  `outOfScope` motivée (un défaut maintenu par l'humain ne compte pas). Il faut en plus qu'aucun
+  test rouge de la correction côté tests ne reste à faire passer. Extension : le réducteur pose
+  `nothingToChange` sur `verifyUnitGreen` ; workflow : `porteVerte` le calcule.
 
 ### D8 — Rapports de revue écrasés ou ressuscités
 

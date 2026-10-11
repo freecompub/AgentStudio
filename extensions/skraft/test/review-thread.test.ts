@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { LensVerdict } from "../src/review.js";
 import {
   agentFeedback,
+  allDisputed,
   applyArbitration,
   applyResponses,
   effectiveTarget,
@@ -205,5 +206,26 @@ describe("endTurn", () => {
       { id: "c", lens: "c", severity: "major", description: "z", target: "test", status: "contested", contestation: "r", round: 1 },
     ];
     expect(endTurn(threads, (t) => t.target === "test").map((t) => [t.id, t.status])).toEqual([["a", "fixed"], ["b", "open"], ["c", "contested"]]);
+  });
+});
+
+describe("allDisputed (D7 de docs/12)", () => {
+  const fil = (id: string, extra: Partial<DefectThread> = {}): DefectThread => ({ id, lens: "c", severity: "major", description: "x", target: "code", status: "open", round: 1, ...extra });
+  const dev = (t: DefectThread) => t.target !== "test";
+
+  it("chaque défaut de l'agent contesté ou renvoyé, avec sa raison : vrai", () => {
+    const r = [{ defect: "a", status: "contested", reason: "r" }, { defect: "b", status: "outOfScope", reason: "un test" }] as const;
+    expect(allDisputed([fil("a"), fil("b"), fil("t", { target: "test" })], r, dev)).toBe(true);
+  });
+
+  it("un défaut corrigé, sans réponse ou contesté sans raison : faux, il fallait toucher au code", () => {
+    expect(allDisputed([fil("a"), fil("b")], [{ defect: "a", status: "contested", reason: "r" }, { defect: "b", status: "fixed" }], dev)).toBe(false);
+    expect(allDisputed([fil("a"), fil("b")], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
+    expect(allDisputed([fil("a")], [{ defect: "a", status: "contested", reason: " " }], dev)).toBe(false);
+  });
+
+  it("un défaut maintenu par l'humain ne se conteste plus ; aucun défaut actif : faux", () => {
+    expect(allDisputed([fil("a", { status: "humanMaintained" })], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
+    expect(allDisputed([fil("a", { status: "contested" })], [], dev)).toBe(false);
   });
 });

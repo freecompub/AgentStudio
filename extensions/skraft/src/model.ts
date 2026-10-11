@@ -287,6 +287,8 @@ export type SkraftEffect =
       targets?: string[];
       /** Correction : éléments du contrat ratifié qui doivent rester dans le code (ADR 0047). */
       contractSymbols?: string[];
+      /** Correction où chaque défaut est contesté ou renvoyé : le pas peut ne rien modifier (D7 de docs/12). */
+      nothingToChange?: true;
     }
   | { kind: "scenarioGate"; scenarioId: string; since: string; unitTests: string[]; pending: string[] };
 

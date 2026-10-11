@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D7 : en correction, contester n'oblige plus à modifier le code
+
+- Règle « aucun fichier de production modifié » levée au pas `fix` quand **chaque** défaut actif
+  du développeur est `contested` ou `outOfScope` avec une raison (`allDisputed`), et qu'aucun
+  test rouge de la correction côté tests n'attend. Sinon, la contestation proposée par la consigne
+  était refusée 3 × 3 fois et la lentille n'arbitrait jamais.
+- Extension : décision dans le réducteur (`nothingToChange` sur l'effet), l'effet ne fait que la
+  lire. Workflow : `porteVerte`, avec les fils transmis par `correction.fils`.
+- Pas de garde sur le commit : `commit`/`commiter` rendent `null` sans changement.
+
+Prochaine étape : D8 (rapports de revue écrasés ou ressuscités), D9, D10.
+
+---
+
 ## 11/10 — D6 : faits de revue du run en cours, sans rapports de revue
 
 - Rapports `/reviews/` exclus des livrables (workflow : `enregistrerLivrables` ; extension :

@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "correction-toute-contestee",
+      "title": "En correction de DELIVER, un développeur qui conteste ou renvoie chaque défaut n'est pas refusé pour « aucun fichier modifié » ; la lentille arbitre",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"conteste tout|allDisputed|D7\"",
+      "passes": true,
+      "notes": "D7 de docs/12, 2026-10-11. allDisputed (review-thread, les deux). Extension : nothingToChange posé par deliver-machine.ts sur verifyUnitGreen (fix, sans fixTargets), lu par deliver-effects.ts. Workflow : porteVerte (livraison.mjs), fils passés par correction.fils. Tests : pur, réducteur, bout en bout dans les deux, vérifiés en échec sans la correction."
+    },
+    {
       "id": "adr-statut-a-la-ratification",
       "title": "Le statut d'un ADR est écrit dans son fichier dès sa ratification ; un ADR décidé ne se réécrit plus",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"aussitôt|gel est passé\"",

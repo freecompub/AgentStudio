@@ -261,7 +261,7 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
     return fail("Les tests unitaires ont été modifiés pendant le pas de code : ils sont gelés depuis leur rouge. Le tour est annulé ; modifie uniquement le code de production.");
   const k = kinds(ctx);
   const changed = await ctx.workspace.changedFiles(e.since);
-  if (e.mode !== "refactor" && !changed.some((f) => k.production(f.path))) return fail("Aucun fichier de production modifié : écris le code qui fait passer le test.");
+  if (e.mode !== "refactor" && !e.nothingToChange && !changed.some((f) => k.production(f.path))) return fail("Aucun fichier de production modifié : écris le code qui fait passer le test.");
   // Garde du contrat ratifié (ADR 0047) : le 03/10, une « correction » de revue a supprimé ce que
   // le contrat de DESIGN exigeait, pour faire taire un défaut de couverture.
   if (e.contractSymbols?.length) {

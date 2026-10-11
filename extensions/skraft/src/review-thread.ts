@@ -194,6 +194,22 @@ export function applyResponses(
 }
 
 /**
+ * Correction où l'agent ne modifie rien (D7 de docs/12) : permis seulement si **chaque** défaut actif
+ * qui le concerne reçoit une contestation ou un renvoi motivés. La lentille arbitrera ; sans cela,
+ * la règle « aucun fichier modifié » refuserait la contestation que sa consigne lui propose.
+ */
+export function allDisputed(threads: DefectThread[], responses: readonly DefectResponse[], concerns: (t: DefectThread) => boolean): boolean {
+  const mine = threads.filter((t) => isActive(t) && concerns(t));
+  return (
+    mine.length > 0 &&
+    mine.every((t) => {
+      const r = responses.find((x) => x.defect === t.id);
+      return t.status !== "humanMaintained" && (r?.status === "contested" || r?.status === "outOfScope") && !!r.reason?.trim();
+    })
+  );
+}
+
+/**
  * Fin du tour d'un agent en correction : ses défauts encore actifs sont tenus pour traités. La revue
  * suivante rejuge le livrable et signalera de nouveau ce qui persiste. Sans cela, un agent qui ne
  * remplit pas `responses` laisse ses défauts actifs pour toujours, et la correction rebondit entre

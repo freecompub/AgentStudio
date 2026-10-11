@@ -1021,6 +1021,17 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(run.feedback.join("\n")).toMatch(/aucun test ne couvre ATPayer/);
     });
 
+    it("D7 (docs/12) : chaque défaut contesté ou renvoyé, sans test rouge à faire passer : le pas peut ne rien modifier", () => {
+      const onlyCode = LENSES({ lens: "quality-gates", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague", target: "code" }] });
+      const fix = play([...delivered, onlyCode]);
+      const conteste = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "contested", reason: "le contrat l'impose" }] } as Ev);
+      expect(conteste.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "fix", nothingToChange: true })]);
+      const corrige = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "fixed" }] } as Ev);
+      expect(corrige.effects[0]).not.toHaveProperty("nothingToChange");
+      const muet = transition(fix.state, REP_DEV);
+      expect(muet.effects[0]).not.toHaveProperty("nothingToChange");
+    });
+
     it("la référence du contrat relevée à la revue accompagne la correction du développeur", () => {
       const review = { ...(LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "taux négatif", target: "code" }] }) as object), contractSymbols: ["Soustrait", "ATPayer"] } as Ev;
       const fix = play([...delivered, review]);

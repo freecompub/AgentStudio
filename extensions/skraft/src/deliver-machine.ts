@@ -1,7 +1,7 @@
 import { levelEffects } from "./difficulty.js";
 import type { DeliverState, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
-import { agentFeedback, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
+import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
 
 type Out = { state: SkraftState; effects: SkraftEffect[] };
 type AgentStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix";
@@ -101,6 +101,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
               pending: [],
               ...(d.fixTargets?.length ? { targets: d.fixTargets } : {}),
               ...(d.contractSymbols?.length ? { contractSymbols: d.contractSymbols } : {}),
+              // Tout contesté ou renvoyé, sans test rouge à faire passer : rien à modifier (D7 de docs/12).
+              ...(!d.fixTargets?.length && allDisputed(s.reviewThreads ?? [], e.responses ?? [], forDev) ? { nothingToChange: true as const } : {}),
             },
           ],
         };
