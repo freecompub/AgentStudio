@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D16 : un nettoyage ne change pas le comportement
+
+- Décision du responsable du projet (option B, dans les deux) : un nettoyage qui fait passer
+  l'acceptance du scénario de vert à rouge est refusé. On revient au vert et le nettoyage est
+  annulé, sans escalade (SPEC §8.3). Le workflow prend en plus le résultat du nettoyage, comme
+  l'extension.
+- Avant : le workflow rembobinait tout le scénario à la porte de fin ; l'extension continuait le
+  cycle sur un code cassé.
+- Test : la pile « par marques » casse l'acceptance (marque `// ac-1` retirée) sans casser les
+  tests unitaires. Le mode sessions séparées correspond au niveau `challenging`.
+
+Prochaine étape : D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D14 : une panne pendant une correction ne rembobine plus toute la phase
 
 - Workflow : `corriger` attrape aussi `PanneEnvironnement`. Il rembobine à l'entrée de la

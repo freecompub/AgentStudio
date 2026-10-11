@@ -296,6 +296,10 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le code boucle-t-il ?");
   const suite = suiteProblems(run.results, e.pending, k.acceptanceResult);
   if (suite.length) return fail(suite.join(" "));
+  // Un nettoyage ne change pas le comportement : l'acceptance du scénario, verte, le reste (D16 de docs/12).
+  const acceptanceTestId = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!.acceptanceTestId;
+  if (e.mode === "refactor" && state.deliver?.acceptanceGreen && run.results.find((r) => r.id === acceptanceTestId)?.status !== "passed")
+    return fail(`Le nettoyage a fait passer le test d'acceptance du scénario au rouge (${acceptanceTestId}) : un nettoyage ne change pas le comportement.`);
   if (e.newTest) {
     const own = run.results.filter((r) => concerns(r.id, e.newTest!) || r.file === e.newTest);
     if (own.length === 0) return fail(`Le test du pas est introuvable : ${e.newTest}.`);
@@ -311,7 +315,6 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   const kind = { dev: "feat", green: "feat", refactor: "refactor", fix: "fix" }[e.mode];
   await ctx.git.commit(`${kind}(${state.slug}): ${e.mode === "fix" ? "correction de revue" : e.scenarioId}`);
   const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : ${e.mode} ${e.scenarioId}`);
-  const acceptanceTestId = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!.acceptanceTestId;
   return {
     type: "STEP_OK",
     checkpointId: cp.id,

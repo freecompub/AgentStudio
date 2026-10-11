@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "nettoyage-sans-changement-de-comportement",
+      "title": "Un nettoyage qui fait passer l'acceptance du scénario de vert à rouge est refusé : retour au vert, sans reprendre le scénario",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"nettoyage qui casse\"",
+      "passes": true,
+      "notes": "D16 de docs/12, 2026-10-11, option B. Workflow : derouler prend le résultat du nettoyage, porteVerte refuse (livraison.mjs, L.acceptanceVerte). Extension : verifyUnitGreen en mode refactor refuse (deliver-effects.ts, deliver.acceptanceGreen). Bouts en bout dans les deux (pile par marques, niveau challenging), vérifiés en échec sans la correction."
+    },
+    {
       "id": "panne-en-correction-reprise",
       "title": "Après une panne pendant une correction de DELIVER, « relancer » reprend la correction, sans rejouer les scénarios ni la revue",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"panne pendant une correction|D14\"",

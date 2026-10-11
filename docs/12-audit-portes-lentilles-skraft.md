@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D14, D15, D22 (ADR 0065), D23.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D7, D8, D9, D10, D11, D12, D14, D15, D16, D22 (ADR 0065), D23.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -435,6 +435,13 @@ Priorités proposées :
   scénario, là où E continue le cycle.
 - **Proposition** : prendre le vert après le nettoyage, et refuser un nettoyage qui fait passer
   l'acceptance du scénario de vert à rouge.
+- **Corrigé le 2026-10-11, dans les deux**, sur décision du responsable du projet (option B).
+  - Workflow : le résultat du pas nettoyage décide si l'acceptance est verte, comme dans
+    l'extension.
+  - Dans les deux : la porte du nettoyage refuse qu'il fasse passer l'acceptance du scénario de vert
+    à rouge. Le refus existait déjà : retour au vert, nettoyage annulé, note, sans escalade.
+  - C'est une règle nouvelle pour l'extension, qui continuait jusque-là le cycle sur le code
+    cassé.
 
 ---
 

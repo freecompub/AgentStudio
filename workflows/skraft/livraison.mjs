@@ -230,10 +230,14 @@ async function derouler(w, d, L, i, cpScenario, motifs, max) {
       const g = await pas(w, d, L, i, "green", point, [], max, unitTests, rouge.nouveau);
       point = g.cp;
       vert = g.acceptanceVerte;
+      // La porte du nettoyage refuse qu'il fasse repasser l'acceptance du scénario au rouge (D16 de docs/12).
+      L.acceptanceVerte = vert;
       // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3).
       try {
         const r = await pas(w, d, L, i, "refactor", point, [], 1, unitTests, null);
         point = r.cp;
+        // Le dernier état du code est celui du nettoyage : c'est lui qui dit si l'acceptance est verte.
+        vert = r.acceptanceVerte;
       }
       catch (e) {
         if (!(e instanceof ScenarioEchoue))
@@ -438,6 +442,9 @@ async function porteVerte(w, d, L, i, etape, depuis, nouveau, sortie, correction
   const suite = problemesDeSuite(run.results, etape === "fix" ? [] : enCours(L, i, true), k.resultatAcceptance);
   if (suite.length)
     throw new PasRefuse(suite.join(" "));
+  // Un nettoyage ne change pas le comportement : l'acceptance du scénario, verte, le reste (D16 de docs/12).
+  if (etape === "refactor" && L.acceptanceVerte && run.results.find((r) => r.id === sc.acceptanceTestId)?.status !== "passed")
+    throw new PasRefuse(`Le nettoyage a fait passer le test d'acceptance du scénario au rouge (${sc.acceptanceTestId}) : un nettoyage ne change pas le comportement.`);
   if (nouveau && etape !== "fix") {
     const siens = run.results.filter((r) => concerns(r.id, nouveau) || r.file === nouveau);
     if (siens.length === 0)
