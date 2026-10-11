@@ -8,7 +8,7 @@
   « test » a été reproduit par un test jetable : appels directs à `transition` pour l'extension,
   vrai moteur de rejeu sur un disque en mémoire pour le workflow. Ces tests sont supprimés et le
   dépôt n'est pas modifié. Aucun appel à Copilot.
-- Statut : **constats et propositions** ; rien n'est corrigé.
+- Statut : **constats et propositions**. Corrigés : D1 (ADR 0059), D2, D3 (ADR 0064), D6, D4 (ADR 0063), D5 (ADR 0062), D11.
 
 Légende : **E** = extension, **W** = workflow, **E+W** = les deux.
 
@@ -96,6 +96,12 @@ Priorités proposées :
     plutôt que la tenir en mémoire. Le disque est rembobiné, lui.
   - Une phase sautée ne passe jamais en RATIFICATION.
 
+- **Corrigé le 2026-10-11**, dans l'extension et dans le workflow :
+  - W : la liste des ADR est relue sur le disque (`adrsDuDisque`), à la porte cohérence et après
+    chaque rembobinage de DESIGN (escalade, saut) ;
+  - E : la liste est prise à l'entrée de la phase (`adrsAvantPhase`) et restaurée à chaque
+    rembobinage ou saut ; au `GATE_OK`, les propositions sont celles que la porte vient de lire.
+
 ### D3 — Un ADR accepté peut être réécrit et rester « Accepted » sans nouvelle ratification
 
 - **Où** :
@@ -115,6 +121,10 @@ Priorités proposées :
     l'ADR accepté.
   - À défaut, enregistrer l'empreinte de chaque ADR accepté et refuser à la porte toute
     modification.
+
+- **Corrigé le 2026-10-11 (ADR 0064)**, dans l'extension et dans le workflow : statut écrit dès
+  la décision, ADR décidé en lecture seule pour les agents, exclu des vérifications « nouvel ADR »
+  de la porte. Reste lié : D2 (la mémoire n'est pas remise au point d'un rembobinage).
 
 ### D4 — Une lentille en échec fait payer le producteur
 
@@ -175,6 +185,11 @@ Priorités proposées :
   - **Tests** : chaque implémentation doit couvrir trois cas : la question, le rejeu non compté,
     et l'escalade à la 3ᵉ question.
 
+- **Corrigé le 2026-10-11 (ADR 0063)**, dans l'extension et dans le workflow, avec une
+  rectification : les lentilles n'avaient pas `report_blocker`, l'exemple ci-dessus ne pouvait pas
+  se produire. Seul le silence d'une lentille faisait payer le producteur. Les lentilles reçoivent
+  l'outil, et la décision ci-dessus est appliquée ; en DELIVER, seule la revue est relancée.
+
 ### D5 — En DELIVER, un rejet n'atteint aucun agent quand tout est déjà vert
 
 - **Où** :
@@ -222,6 +237,13 @@ Priorités proposées :
   - Exclure `/reviews/` dès l'enregistrement des livrables, pas seulement des changements.
   - Numéroter les essais sans jamais revenir en arrière, au moins dans les noms de rapport (voir
     D8).
+- **Corrigé le 2026-10-11**, dans l'extension et dans le workflow :
+  - les rapports de revue (`/reviews/`) ne sont plus enregistrés comme livrables ;
+  - au rembobinage, les livrables du run effacé ne nourrissent plus les faits. W : le suivi des
+    livrables est vidé dans `apresRembobinage`. E : la liste reste en ajout seul (invariant 4,
+    §5.3) ; `debutDuRun` marque où commence le run en cours, et `artifactsDuRun` ne lit que lui.
+  - Le suivi des revues n'est pas remis à zéro : la numérotation des défauts entrerait en collision
+    avec les fils conservés. La numérotation des rapports reste à traiter avec D8.
 
 ---
 
@@ -289,6 +311,12 @@ Priorités proposées :
   - `if (vue.questions.length) await w.etape("ROUTE")`.
   - `await w.rejet("revue", […défauts])` avant `throw new Escalade`.
   - Une porte nommée `plan de test`, dans les deux implémentations.
+- **Corrigé le 2026-10-11**, avec une rectification : `w.etape` n'écrit rien dans la trace, et
+  ROUTE n'y apparaît que si une question est posée pendant l'étape. Le banc ne voyait donc pas
+  d'étape QUESTIONS en trop ; seul le journal (et la phase affichée) l'annonçait. Corrigé quand même,
+  avec un test sur le journal. REJECTED est tracé sous la porte « revue » avec les lentilles qui
+  rejettent (workflow : `w.rejet` ; extension : `rejections` et `lastRejection`, ce qui règle aussi
+  la partie REJECTED de D21). « Plan de test absent » a sa porte `plan de test` dans les deux.
 
 ### D12 — Échec d'une correction ciblée : état non restauré, correction impossible
 

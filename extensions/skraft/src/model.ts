@@ -157,8 +157,17 @@ export interface SkraftState {
   lenses: LensName[];
   /** DESIGN se déroule en deux sessions : modélisation puis décisions (§7.2). */
   designStep: "model" | "decide";
-  /** Blocage signalé par un agent, en attente de réponse (§5.2, BLOCKED). */
-  blocker: { question: string; choices: string[] } | null;
+  /** Blocage signalé par un agent, en attente de réponse (§5.2, BLOCKED) ; `lens` : par une lentille de revue. */
+  blocker: { question: string; choices: string[]; lens?: LensName } | null;
+  /**
+   * Par phase, index dans `artifacts` du premier livrable du run en cours : ceux d'avant viennent
+   * d'un run effacé par un rembobinage, et ne doivent plus nourrir les faits (D6 de docs/12).
+   */
+  debutDuRun?: Partial<Record<Phase, number>>;
+  /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
+  adrsAvantPhase?: AdrRecord[];
+  /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */
+  reviewQuestions?: number;
   /** Origine d'une escalade, pour savoir quoi relancer. */
   escalation: { from: "INIT" | "CLASSIFY" | "PHASE"; reason: string } | null;
   /** Réponses de l'utilisateur à transmettre au prochain dossier de passation. */
@@ -199,6 +208,8 @@ export type SkraftEvent =
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
   | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
+  /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
+  | { type: "LENS_BLOCKED"; lens: LensName; question: string; choices: string[] }
   | {
       type: "GATE_OK";
       artifacts: ArtifactRecord[];
@@ -248,7 +259,8 @@ export type SkraftEffect =
   | { kind: "runReview"; phase: Phase; lenses: LensName[]; attempt: number }
   | { kind: "askRatification"; adr: AdrRecord }
   | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
-  | { kind: "askBlocker"; question: string; choices: string[] }
+  /** `lens` : question d'une lentille de revue (D4 de docs/12). */
+  | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
   | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }

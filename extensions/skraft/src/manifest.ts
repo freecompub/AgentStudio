@@ -118,6 +118,8 @@ export const manifest: ExtensionManifest = {
         role: ROLES.lens,
         output: "submit_lens_verdict" as const,
         modelClass: LENS_MODEL_CLASS[name],
+        // Une décision métier qui manque part à l'humain, au lieu d'être devinée (D4 de docs/12).
+        tools: ["report_blocker"],
         skills: skillsOf(ROLE_SKILLS.lens),
       })),
     ],

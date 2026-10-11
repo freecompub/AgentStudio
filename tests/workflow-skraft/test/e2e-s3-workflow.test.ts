@@ -96,4 +96,174 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(git(root, "show", `${design}:docs/adr/adr-001-plafond-applique-dans-le-domaine.md`)).toContain("- Statut : Accepted");
     expect(app.posted.at(-1)).toContain("ADR : ADR-001 (Accepted).");
   }, 120_000);
+
+  // D3 (docs/12) : un ADR accepté ne se réécrit plus pendant l'amendement d'un autre.
+  it("ADR accepté pendant que l'autre est amendé : statut écrit aussitôt, écriture refusée, réécriture annulée", async () => {
+    const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
+    const ADR2 = "docs/adr/adr-002-alerte-dans-l-interface.md";
+    const ADR2_ARGS = { ...ADR_ARGS, title: "Alerte dans l'interface", decision: "L'interface affiche l'alerte du domaine." };
+    let amendement = "";
+    let amendementFini = false;
+    const probes: unknown[] = [];
+    const decide: ScriptedBehavior = async (t) => {
+      const amending = t.prompt.includes("Amendement demandé sur ADR-002");
+      await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+      if (amending) {
+        amendement = await readFile(join(root, ADR1), "utf8");
+        probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ADR1 }));
+        // Contournement de la garde : la réécriture doit être annulée par le code.
+        await put(root, ADR1, amendement.replace("`BolusCapPolicy` applique le plafond dans le module Domain.", "Plafond appliqué dans l'interface."));
+        await put(root, ADR2, renderAdr(2, { ...ADR2_ARGS, consequences: "Alerte par prise." }, "2026-10-10"));
+        amendementFini = true;
+      } else if (!t.prompt.includes("cet ADR appartient à une autre story ou est déjà décidé")) {
+        await put(root, ADR1, renderAdr(1, ADR_ARGS, "2026-10-10"));
+        await put(root, ADR2, renderAdr(2, ADR2_ARGS, "2026-10-10"));
+      }
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    const ratifier = async (adr: string, action: string, commentaire?: string) => {
+      await until(async () => (await app.interactions.pending()).some((x) => x.title === `Ratifier ${adr}`), 60_000);
+      const q = (await app.interactions.pending()).find((x) => x.title === `Ratifier ${adr}`)!;
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, commentaire, { role: "architecte" });
+    };
+    await ratifier("ADR-001", "accept");
+    await ratifier("ADR-002", "amend", "alerte par prise");
+    await until(async () => amendementFini, 60_000);
+    // Le statut est dans le fichier dès la ratification, avant l'amendement de l'autre ADR.
+    expect(amendement).toContain("- Statut : Accepted");
+    expect(probes).toEqual([expect.objectContaining({ decision: "deny" })]);
+    await ratifier("ADR-002", "accept");
+    await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+    const adr1 = await readFile(join(root, ADR1), "utf8");
+    expect(adr1).toContain("`BolusCapPolicy` applique le plafond dans le module Domain.");
+    expect(adr1).toContain("- Statut : Accepted");
+    expect(await readFile(join(root, ADR2), "utf8")).toContain("Alerte par prise.");
+  }, 120_000);
+
+  // D2 (docs/12) : la liste des ADR suit le disque, que le rembobinage remet au début de la phase.
+  describe("ADR proposés puis effacés par un rembobinage (D2)", () => {
+    const DOMAINE = "docs/adr/adr-001-plafond-dans-le-domaine.md";
+    const INTERFACE = "docs/adr/adr-001-plafond-dans-l-interface.md";
+    const scenario = async (decision: "relancer" | "sauter") => {
+      let escalade = false;
+      const decide: ScriptedBehavior = async (t) => {
+        await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+        if (escalade) await put(root, INTERFACE, renderAdr(1, { ...ADR_ARGS, title: "Plafond dans l'interface" }, "2026-10-10"));
+        else await put(root, DOMAINE, renderAdr(1, { ...ADR_ARGS, title: "Plafond dans le domaine" }, "2026-10-10"));
+        await t.callTool("report_phase", { summary: "décisions", files: [] });
+      };
+      const model: ScriptedBehavior = async (t) => {
+        await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+        await t.callTool("report_phase", { summary: "modèle", files: [] });
+      };
+      // Première revue de DESIGN : deux lentilles rejettent, donc REJECTED et escalade.
+      const lentille = (lens: string): ScriptedBehavior => async (t) => {
+        const rejette = t.prompt.includes("phase DESIGN") && !escalade;
+        await t.callTool("submit_lens_verdict", { lens, verdict: rejette ? "REJECTED" : "APPROVED", defects: [] });
+      };
+      const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+        "skraft-architect-model": model,
+        "skraft-architect-decide": decide,
+        "skraft-lens-cold-reader": lentille("cold-reader"),
+        "skraft-lens-architecture": lentille("architecture"),
+      });
+      const app = await assemble(root, runtime, tasksDir);
+      answerQuestions(app);
+      await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+      await until(async () => (await app.engine.list()).length > 0);
+      const id = (await app.engine.list())[0]!.id;
+      await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+      const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+      await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+      await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
+      escalade = true;
+      const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(decision))!.id, undefined, { role: "architecte" });
+      return { app, id };
+    };
+
+    it("relancer : la ratification porte sur le nouvel ADR, l'ancien chemin est oublié", async () => {
+      const { app, id } = await scenario("relancer");
+      await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
+      const q = (await app.interactions.pending()).find((x) => x.title === "Ratifier ADR-001")!;
+      expect(q.detail).toContain(INTERFACE);
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":accept"))!.id, undefined, { role: "architecte" });
+      await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+      expect(((await app.engine.status(id))!.state as { fin?: { statut: string } }).fin?.statut).toBe("fini");
+      expect(await readFile(join(root, INTERFACE), "utf8")).toContain("- Statut : Accepted");
+    }, 120_000);
+
+    it("sauter : aucun ADR fantôme à ratifier, la tâche continue sans DESIGN", async () => {
+      const { app, id } = await scenario("sauter");
+      await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+      expect(((await app.engine.status(id))!.state as { fin?: { statut: string } }).fin?.statut).toBe("fini");
+      expect(app.posted.at(-1)).not.toContain("ADR-001");
+    }, 120_000);
+  });
+
+  // D6 (docs/12) : les lentilles ne reçoivent ni faits d'un run effacé, ni rapports de revue en livrables.
+  it("après un rembobinage, les faits de la revue portent sur le run en cours ; les rapports de revue ne sont pas des livrables", async () => {
+    let revues = 0;
+    let relance = false;
+    const prompts: string[] = [];
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const decide: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/contracts.md", relance ? "`CapBolus` produit `BolusCapped` (v2).\n" : `\`CapBolus\` produit \`BolusCapped\` (essai ${revues + 1}).\n`);
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    // Run 1 : revue 1 « changements demandés », revue 2 REJECTED (escalade). Run 2 : approuvée.
+    const parLentille: Record<string, number> = {};
+    const lentille = (lens: string): ScriptedBehavior => async (t) => {
+      if (!t.prompt.includes("phase DESIGN")) return void (await t.callTool("submit_lens_verdict", { lens, verdict: "APPROVED", defects: [] }));
+      const n = (parLentille[lens] = (parLentille[lens] ?? 0) + 1);
+      if (lens === "architecture") {
+        prompts.push(t.prompt);
+        revues = n;
+      }
+      const verdict = relance ? "APPROVED" : n === 1 && lens === "architecture" ? "CHANGES_REQUESTED" : n === 2 && (lens === "architecture" || lens === "cold-reader") ? "REJECTED" : "APPROVED";
+      const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", description: "contrat incomplet", target: "deliverable" }] : [];
+      await t.callTool("submit_lens_verdict", { lens, verdict, defects });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-architect-model": model,
+      "skraft-architect-decide": decide,
+      "skraft-lens-cold-reader": lentille("cold-reader"),
+      "skraft-lens-architecture": lentille("architecture"),
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
+    relance = true;
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
+    expect(prompts).toHaveLength(3);
+    // Revue 2 : le rapport de la revue 1 est sur le disque, mais ce n'est pas un livrable.
+    expect(prompts[1]).not.toContain("/reviews/");
+    // Revue du run 2 : seul l'essai en cours, pas l'essai 2 du run effacé.
+    expect(prompts[2]).toContain("validée à l'essai 1");
+    expect(prompts[2]).not.toContain("à l'essai 2");
+  }, 120_000);
 });

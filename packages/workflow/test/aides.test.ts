@@ -38,6 +38,17 @@ describe("essayer : budget d'essais appliqué par le code (D24)", () => {
     ]);
   });
 
+  it("rejet non compté (question de revue, D4 de docs/12) : l'essai est rejoué avec ses motifs, sans consommer de budget ni retracer", async () => {
+    rejets.length = 0;
+    const vus: [readonly string[], number][] = [];
+    const issues = [{ motifs: ["Question de la revue (architecture) : par ligne ? — Réponse : par ligne"], nonCompte: true as const }, ["porte"], []];
+    let i = 0;
+    await essayer(w, { max: 2 }, async (motifs, essai) => (vus.push([motifs, essai]), issues[i++]!));
+    expect(vus).toEqual([[[], 1], [["Question de la revue (architecture) : par ligne ? — Réponse : par ligne"], 1], [["porte"], 2]]);
+    // Le script a déjà tracé la question et sa réponse : essayer ne retrace que le rejet compté.
+    expect(rejets.map((r) => r.porte)).toEqual(["porte"]);
+  });
+
   it("budget épuisé : Escalade avec les derniers motifs, après exactement max essais", async () => {
     let essais = 0;
     const r = await essayer(w, { max: 3 }, async (_m, essai) => (essais++, [`rejet ${essai}`])).catch((e: unknown) => e);

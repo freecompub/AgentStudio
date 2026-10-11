@@ -10,8 +10,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
+import type { EtatWorkflow } from "@agent-studio/workflow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { acceptanceWriter, answerQuestions, assemble, createProject, fakeStack, git, put, researchDoc, shutdownHosts, simulatedAgents, unitTestWriter, until } from "./support/harness.js";
+import { fin, lancerWorkflow } from "./support/fin.js";
 
 describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () => {
   let root: string;
@@ -185,6 +187,52 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
     await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
     await until(async () => (await app.interactions.pending()).some((p) => p.title.includes("Revue sans défaut à corriger")), 60_000);
+  }, 90_000);
+
+  // D11 (docs/12) : la trace doit se découper comme celle de l'extension pour que le banc compare.
+  it("sans question ouverte, aucune étape ROUTE : comme l'extension, on passe directement à DESIGN", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-7.md");
+    await fin(app, id, 60_000);
+    // `w.etape` ne laisse rien dans la trace : on lit les étapes annoncées dans le journal du workflow.
+    const etat = (await app.engine.status(id))!.state as EtatWorkflow;
+    const etapes = etat.journal.filter((e) => e.appel === "etape").map((e) => ("clair" in e.args ? (e.args.clair as { nom: string }).nom : "?"));
+    expect(etapes).toContain("DONE");
+    expect(etapes).not.toContain("ROUTE");
+  }, 90_000);
+
+  it("plan de test absent : rejet tracé sous sa propre porte, pas sous « valeurs » (D11)", async () => {
+    let essais = 0;
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await accept(t);
+        if (essais++ === 0) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await fin(app, id, 60_000);
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us-12/distill/test-plan.md"] }));
+  }, 90_000);
+
+  it("verdict REJECTED : rejet tracé sous la porte « revue », avec les lentilles qui rejettent (D11)", async () => {
+    const rejette = (lens: string) => async (t: { prompt: string; callTool: (n: string, a: unknown) => Promise<unknown> }) => {
+      await t.callTool("submit_lens_verdict", t.prompt.includes("phase DESIGN")
+        ? { lens, verdict: "REJECTED", defects: lens === "cold-reader" ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] }
+        : { lens, verdict: "APPROVED", defects: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-lens-cold-reader": rejette("cold-reader"), "skraft-lens-architecture": rejette("architecture") });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets.at(-1)).toMatchObject({ porte: "revue", motifs: ["cold-reader : REJECTED — conception hors sujet", "architecture : REJECTED"] });
   }, 90_000);
 
   it("citation hors limites rejetée avec le motif exact, corrigée au réessai ; questions posées ; réponses dans le dossier de DESIGN", async () => {

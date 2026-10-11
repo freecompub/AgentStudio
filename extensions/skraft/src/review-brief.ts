@@ -14,6 +14,11 @@ const short = (h: string) => h.slice(0, 12);
  * Livrables du dernier essai validé : la liste de l'état est en ajout seul (invariant 4), mais un
  * rollback de réessai efface les fichiers des essais précédents. Dernière empreinte par chemin.
  */
+/** Livrables du run en cours de la phase : ceux d'un run effacé par un rembobinage sont ignorés (D6 de docs/12). */
+export function artifactsDuRun(state: SkraftState, phase: Phase): ArtifactRecord[] {
+  return state.artifacts[phase].slice(state.debutDuRun?.[phase] ?? 0);
+}
+
 export function latestArtifacts(records: ArtifactRecord[]): ArtifactRecord[] {
   const last = Math.max(0, ...records.map((a) => a.attempt));
   const byPath = new Map<string, ArtifactRecord>();
@@ -23,7 +28,7 @@ export function latestArtifacts(records: ArtifactRecord[]): ArtifactRecord[] {
 
 export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence[]): string[] {
   const facts: string[] = [];
-  for (const a of latestArtifacts(state.artifacts[phase])) facts.push(`Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
+  for (const a of latestArtifacts(artifactsDuRun(state, phase))) facts.push(`Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
   if ((phase === "DISTILL" || phase === "DELIVER") && state.acceptanceHash)
     facts.push(`Tests d'acceptance gelés, empreinte ${short(state.acceptanceHash)}${phase === "DELIVER" ? ", vérifiée inchangée à chaque pas de DELIVER" : ""}.`);
   for (const r of state.regressions) facts.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);

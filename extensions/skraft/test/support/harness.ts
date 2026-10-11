@@ -11,6 +11,7 @@ import {
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
+  createJsonlTraceStore,
   createRegistry,
   createTaskAgentRunner,
   createUsageRecorder,
@@ -280,7 +281,10 @@ export function fakeStack(): StackAdapter {
 export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir: string, opts: { hang?: HangPoint; isolated?: boolean; stack?: StackAdapter } = {}) {
   const workspace = withHang(await openWorkspace(root), opts.hang);
   const usage = createUsageRecorder(join(tasksDir, "usage"));
+  // Trace d'exécution (ADR 0032) : c'est là qu'un run dit pourquoi chaque travail a été refait.
+  const trace = createJsonlTraceStore(join(tasksDir, "traces"));
   const engine = createTaskEngine({
+    trace,
     usage,
     store: createJsonTaskStore(tasksDir),
     checkpoints: workspace.checkpoints,
@@ -313,7 +317,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     const { runtimeEntry, extDir } = await isolatedArtifacts();
     handles.push(await activateIsolated({ manifest, directory: extDir, entry: join(extDir, "dist/index.mjs") }, hostDeps, { launcher: createNodeLauncher(), runtimeEntry }));
   } else handles.push(await activateInProcess({ manifest, module: skraftExtension, directory: EXTENSION_DIR }, hostDeps));
-  return { engine, interactions, registry, posted, workspace, usage };
+  return { engine, interactions, registry, posted, workspace, usage, trace };
 }
 
 export async function until(check: () => Promise<boolean>, timeoutMs = 30_000): Promise<void> {

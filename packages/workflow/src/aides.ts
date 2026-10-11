@@ -10,7 +10,21 @@ import type { OptionsAgent, W } from "./protocols.js";
  * donne un essai de plus malgré un budget épuisé : un arbitrage humain a maintenu un défaut, il a
  * droit à sa correction (`docs/09` §13, écart 9).
  */
-export type Rejet = readonly string[] | { motifs: readonly string[]; revue?: true; garanti?: boolean; /** Nom de la porte, pour la trace. */ porte?: string };
+export type Rejet =
+  | readonly string[]
+  | {
+      motifs: readonly string[];
+      revue?: true;
+      garanti?: boolean;
+      /** Nom de la porte, pour la trace. */
+      porte?: string;
+      /**
+       * Information nouvelle plutôt qu'échec (question de revue tranchée par l'humain, D4 de
+       * `docs/12`) : l'essai est rejoué avec ces motifs sans consommer de budget. Le script l'a
+       * déjà tracé, avec la réponse.
+       */
+      nonCompte?: true;
+    };
 
 /**
  * Motifs rendus après un tour interrompu (ADR 0029, 0040). La seconde phrase compte autant que la
@@ -28,6 +42,7 @@ export const motifsInterruption = (raison: string): string[] => [
  * - le budget est partagé entre portes et revue (ADR 0042) ; avec `premiereRevueGarantie`, la
  *   première revue défavorable obtient un essai même si le budget est épuisé, une seule fois ;
  * - un tour interrompu compte comme un rejet, avec la consigne de reprendre ;
+ * - un rejet `nonCompte` rejoue l'essai avec ses motifs, sans le compter ;
  * - une panne d'environnement n'est pas comptée et remonte aussitôt (D25).
  */
 export async function essayer(w: W, opts: { max: number; premiereRevueGarantie?: boolean }, fn: (motifs: readonly string[], essai: number) => Promise<Rejet>): Promise<void> {
@@ -43,10 +58,15 @@ export async function essayer(w: W, opts: { max: number; premiereRevueGarantie?:
       rejet = motifsInterruption(e.message);
       interrompu = true;
     }
-    const objet = Array.isArray(rejet) ? null : (rejet as { motifs: readonly string[]; revue?: true; porte?: string });
+    const objet = Array.isArray(rejet) ? null : (rejet as { motifs: readonly string[]; revue?: true; porte?: string; nonCompte?: true });
     const revue = objet?.revue === true;
     const m = objet ? objet.motifs : (rejet as readonly string[]);
     if (!m.length) return;
+    if (objet?.nonCompte) {
+      motifs = m;
+      essai--;
+      continue;
+    }
     // Chaque essai refusé est tracé, avec sa cause : c'est ce qui dira, après un run, pourquoi
     // un travail a été refait (docs/10 §4.3).
     await w.rejet(objet?.porte ?? (interrompu ? "délai" : revue ? "revue" : "porte"), m);

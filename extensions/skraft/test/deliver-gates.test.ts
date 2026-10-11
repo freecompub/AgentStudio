@@ -209,7 +209,7 @@ describe("Barre de qualité hors de portée des agents", () => {
   it("le gel est passé à chaque lancement de spécialiste, pas seulement déclaré", async () => {
     // Une constante que personne ne transmet ne protège rien.
     const src = await readFile(new URL("../src/effects.ts", import.meta.url), "utf8");
-    expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS\]/);
+    expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS[,\]]/);
   });
 });
 

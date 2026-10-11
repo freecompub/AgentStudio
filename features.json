@@ -151,6 +151,41 @@
       "notes": "ADR 0062, D5 de docs/12. Extension : CORRECTIONS_DE_FIN et minorThreads (reducer.ts, review-thread.ts) ; workflow : correctionDeFin et minorThreads (livraison.mjs, review-thread.mjs). Tests réducteur + bout en bout dans les deux implémentations, tous vérifiés en échec sans la correction. Reste : délai dépassé pendant la revue → réessai de phase (relance la revue). Non testé en bout en bout dans le workflow : « aucun livrable » (difficile à provoquer : un scénario échoue avant)."
     },
     {
+      "id": "trace-d11",
+      "title": "Trace comparable : pas d'étape ROUTE sans question, verdict REJECTED tracé sous « revue », porte « plan de test » distincte de « valeurs »",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D11|aucune étape ROUTE|REJECTED est tracé\"",
+      "passes": true,
+      "notes": "D11 de docs/12, 2026-10-11. Workflow : workflow.mjs (ROUTE conditionnel), revue.mjs (w.rejet avant l'escalade), distillation.mjs ; extension : reducer.ts (rejections + lastRejection sur REJECTED), effects.ts (porte « plan de test »). Le harnais de l'extension a maintenant une trace (app.trace). Rectification de l'audit : sans question, ROUTE n'apparaissait que dans le journal, pas dans la trace du banc. Tests vérifiés en échec sans la correction."
+    },
+    {
+      "id": "question-ou-silence-de-lentille",
+      "title": "Une lentille peut poser une question (à l'humain, phase rejouée sans essai, 2 au plus par phase) ; une lentille muette est relancée seule ; le producteur ne paie plus",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D4|non compté\"",
+      "passes": true,
+      "notes": "ADR 0063, D4 de docs/12. Lentilles avec report_blocker (manifest.ts, workflow.mjs). Extension : LENS_BLOCKED, afterReviewQuestion, reviewQuestions (reducer.ts), runLens (effects.ts). Workflow : reviser/lentille/questionDeRevue (revue.mjs), rejet nonCompte d'essayer (packages/workflow/src/aides.ts). Tests : réducteur (4), essayer (1), bout en bout dans les deux implémentations (4 chacun : question en DESIGN, 3e question, lentille muette, question en DELIVER), vérifiés en échec sans la correction."
+    },
+    {
+      "id": "adr-sans-fantome",
+      "title": "Aucun ADR fantôme : la liste des ADR revient au début de DESIGN avec le dépôt (escalade, relance, saut)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"fantôme|oublié|sauter » DESIGN\"",
+      "passes": true,
+      "notes": "D2 de docs/12, 2026-10-11. Workflow : adrsDuDisque (conception.mjs), appelée à la porte cohérence et dans apresRembobinage. Extension : adrsAvantPhase (model.ts), oublierAdrsDeLaPhase aux rembobinages (failure épuisée, escalate, skip), fusion du GATE_OK de DESIGN sur ce que la porte a lu (reducer.ts). Tests : réducteur (saut) et bout en bout (REJECTED → escalade → relancer / sauter) dans les deux ; les tests du saut vérifiés en échec sans la restauration, ceux de la relance avant toute correction."
+    },
+    {
+      "id": "faits-de-revue-du-run-en-cours",
+      "title": "Les lentilles ne reçoivent ni livrables d'un run effacé par un rembobinage, ni rapports de revue présentés comme livrables",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"run en cours|400 suites\"",
+      "passes": true,
+      "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
+    },
+    {
+      "id": "adr-statut-a-la-ratification",
+      "title": "Le statut d'un ADR est écrit dans son fichier dès sa ratification ; un ADR décidé ne se réécrit plus",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"aussitôt|gel est passé\"",
+      "passes": true,
+      "notes": "ADR 0064, D3 de docs/12. Extension : applyAdrStatuses à chaque décision (reducer.ts), readOnly des ADR décidés et isNew exclu (effects.ts). Workflow : setAdrStatus dans ratifier et isNew exclu (conception.mjs), lectureSeule des ADR décidés (revue.mjs). Tests : réducteur + bout en bout (accepter ADR-001, amender ADR-002, l'architecte tente de réécrire ADR-001) dans les deux, vérifiés en échec sans la correction. Divergence : l'extension n'annule pas une écriture par shell (le workflow, si : controlerAdrs)."
+    },
+    {
       "id": "extensions-sans-langage",
       "title": "Aucune extension ne mentionne un langage dans son code",
       "verify": "! grep -rniE 'swift|typescript|vitest|xctest|react|uikit' extensions/*/src/*.ts | grep -v '^\\S*: *[*/]'",

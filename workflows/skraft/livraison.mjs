@@ -46,7 +46,14 @@ export async function livrer(w, d, lentilles, max) {
     for (const r of suivi.revues)
       await ecrireRapport(w, d.slug, "DELIVER", r.essai, r.lentilles);
     return true;
-  }, { commit: commitMessage("DELIVER", d.slug), apresRembobinage: () => creerDossiers(w, d.slug) });
+  }, {
+    commit: commitMessage("DELIVER", d.slug),
+    apresRembobinage: () => {
+      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
+      suivi.livrables = [];
+      return creerDossiers(w, d.slug);
+    },
+  });
   return faite === true;
 }
 /**

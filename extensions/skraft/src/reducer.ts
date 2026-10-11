@@ -1,6 +1,6 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
 import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
-import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
+import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
@@ -133,6 +133,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "BLOCKED":
       if (e.type === "HUMAN_DECISION" && s.blocker && s.phase) {
         const answer = e.comment ? `${e.decision} (${e.comment})` : e.decision;
+        if (s.blocker.lens) return afterReviewQuestion(s, s.blocker.lens, s.blocker.question, answer);
         const ns: SkraftState = { ...s, stage: "SPECIALIST", blocker: null, answers: [...s.answers, { question: s.blocker.question, answer }] };
         if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, []);
         return { state: ns, effects: [specialist(ns, [])] };
@@ -143,12 +144,16 @@ export function transition(s0: SkraftState, e: Ev): Out {
       const p = s.phase;
       if (!p) break;
       if (e.type === "GATE_OK") {
-        const known = new Set(s.adrs.map((a) => a.id));
+        // Seule la conception produit des ADR (§7.2). Les propositions de la phase sont celles que la
+        // porte vient de lire sur le disque : une proposition d'un essai précédent, renommée ou
+        // retirée depuis, ne survit pas (D2 de docs/12). Les ADR décidés et ceux d'avant la phase restent.
+        const avant = new Set((s.adrsAvantPhase ?? []).map((a) => a.id));
+        const gardes = s.adrs.filter((a) => a.status !== "Proposed" || avant.has(a.id));
+        const known = new Set(gardes.map((a) => a.id));
         const ns: SkraftState = {
           ...s,
           artifacts: { ...s.artifacts, [p]: [...s.artifacts[p], ...e.artifacts] },
-          // Seule la conception produit des ADR (§7.2).
-          adrs: p === "DESIGN" ? [...s.adrs, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
+          adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
           lastRejection: null,
           // Mutation de fin de DELIVER (ADR 0049) : ses faits et notes vont aux lentilles.
@@ -191,6 +196,15 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (r.persistent.length) return { state: { ...ns, stage: "ARBITRATION" }, effects: r.persistent.map((thread) => ({ kind: "askArbitration", thread })) };
         return resolveReview(ns, r.lenses, false);
       }
+      if (e.type === "LENS_BLOCKED") {
+        // D4 de docs/12 : une question n'est pas un échec du producteur ; elle part à l'humain.
+        const n = (s.reviewQuestions ?? 0) + 1;
+        if (n > MAX_QUESTIONS_DE_REVUE) return escalate(s, `Plus de ${MAX_QUESTIONS_DE_REVUE} questions de revue dans la phase ${p} : « ${e.question} » (${e.lens})`);
+        return {
+          state: { ...s, stage: "BLOCKED", reviewQuestions: n, blocker: { question: e.question, choices: e.choices, lens: e.lens } },
+          effects: [{ kind: "askBlocker", question: e.question, choices: e.choices, lens: e.lens }],
+        };
+      }
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
@@ -207,12 +221,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const status = action === "accept" ? "Accepted" : "Rejected";
         const adrs = s.adrs.map((a): AdrRecord => (a.id === adr.id ? { ...a, status, decisionBy: "user" } : a));
         const ns: SkraftState = { ...s, adrs };
-        if (adrs.some((a) => a.status === "Proposed")) return { state: ns, effects: [] };
-        // Statuts basculés dans les fichiers par le code, puis enregistrement de la phase (ou reprise de la route).
-        const apply: SkraftEffect = {
-          kind: "applyAdrStatuses",
-          adrs: adrs.filter((a) => a.status !== "Proposed").map((a) => ({ path: a.path, status: a.status as "Accepted" | "Rejected" })),
-        };
+        // Statut écrit dans le fichier par le code dès la décision (D3 de docs/12) : pendant
+        // l'amendement d'un autre ADR, celui-ci est déjà décidé, donc protégé.
+        const apply: SkraftEffect = { kind: "applyAdrStatuses", adrs: [{ path: adr.path, status }] };
+        if (adrs.some((a) => a.status === "Proposed")) return { state: ns, effects: [apply] };
+        // Tous décidés : enregistrement de la phase (ou reprise de la route).
         const next = ns.phase && !ns.phasesCompleted.includes(ns.phase) ? commit(ns) : route(ns);
         return { state: next.state, effects: [apply, ...next.effects] };
       }
@@ -255,6 +268,29 @@ export function transition(s0: SkraftState, e: Ev): Out {
 }
 
 // ---------- aides -------------------------------------------------------------------
+
+/** Au-delà, une question de revue escalade : le budget ne borne plus ces rejeux (D4 de docs/12). */
+const MAX_QUESTIONS_DE_REVUE = 2;
+
+/**
+ * Réponse à la question d'une lentille (D4 de docs/12) : une information nouvelle, pas un échec.
+ * La phase est rejouée avec la question et la réponse, sans consommer d'essai ; en DELIVER, où tout
+ * est déjà vert, seule la revue est relancée. La réponse rejoint celles de la story.
+ */
+function afterReviewQuestion(s: SkraftState, lens: LensName, question: string, answer: string): Out {
+  const p = s.phase!;
+  const motif = `Question de la revue (${lens}) : ${question} — Réponse de l'utilisateur : ${answer}`;
+  const ns: SkraftState = {
+    ...s,
+    blocker: null,
+    answers: [...s.answers, { question, answer }],
+    rejections: (s.rejections ?? 0) + 1,
+    lastRejection: { gate: "question de revue", reasons: [motif] },
+  };
+  if (p === "DELIVER") return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
+  const replay: SkraftState = { ...ns, stage: "SPECIALIST", designStep: "model" };
+  return { state: replay, effects: [specialist(replay, [motif])] };
+}
 
 /**
  * Portes de fin de DELIVER qui désignent leur correcteur : un test trop faible (mutation, lignes
@@ -309,7 +345,11 @@ function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: b
     if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
     return commit(ns);
   }
-  if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
+  if (verdict === "REJECTED") {
+    // Tracé comme tout rejet (D11 de docs/12) : sinon la cause n'existe que dans le texte de l'escalade.
+    const motifs = lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
+    return escalate({ ...ns, rejections: (ns.rejections ?? 0) + 1, lastRejection: { gate: "revue", reasons: motifs } }, `Revue : verdict REJECTED (${motifs.join(" ; ")})`);
+  }
   const threads = ns.reviewThreads ?? [];
   const active = threads.filter(isActive);
   // DELIVER : correction ciblée depuis le dernier vert, routée vers l'agent concerné (§9.3, ADR 0046).
@@ -382,7 +422,7 @@ function route(s: SkraftState): Out {
       effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text })),
     };
   }
-  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null }, effects: [{ kind: "checkpointPhase", phase: next }] };
+  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };
 }
 
 function commit(s: SkraftState): Out {
@@ -438,6 +478,19 @@ function rembobiner(s: SkraftState): SkraftEffect[] {
   return [{ kind: "rollback", to: cp }, ...(s.phase ? [{ kind: "forgetSessions", roles: phaseRoles(s.phase) } as SkraftEffect] : [])];
 }
 
+/**
+ * Le rembobinage efface les fichiers de la phase. La mémoire suit : la liste des ADR revient à
+ * celle du début de la phase (D2 de docs/12) — sans cela, la ratification portait sur un ADR effacé,
+ * et une phase sautée passait quand même en RATIFICATION —, et ses livrables sont oubliés (D6).
+ */
+function oublierLaPhase(s: SkraftState): SkraftState {
+  // Livrables du run effacé : leurs essais ne seront pas renumérotés, ils fausseraient les faits
+  // donnés aux lentilles (D6 de docs/12).
+  // Ajout seul (invariant 4, §5.3) : on n'efface pas, on marque où commence le run suivant.
+  const sansLivrables = s.phase ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length } } : s;
+  return s.adrsAvantPhase ? { ...sansLivrables, adrs: s.adrsAvantPhase } : sansLivrables;
+}
+
 function leverGelDistill(s: SkraftState): SkraftState {
   return s.phase === "DISTILL" && !s.phasesCompleted.includes("DISTILL")
     ? { ...s, acceptanceHash: null, regressions: [] }
@@ -453,7 +506,7 @@ function failure(etat: SkraftState, gate: string, reasons: string[], essaiGarant
   const lastRejection = { gate, reasons };
   if (epuise) {
     return {
-      state: { ...s, stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
+      state: { ...oublierLaPhase(s), stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
       effects: [...rollback, { kind: "askEscalation", reason: `${gate} : ${reasons.join(" ; ")}`, options: ["retry", "skip", "abort"] }],
     };
   }
@@ -468,7 +521,7 @@ function escalate(etat: SkraftState, reason: string): Out {
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   return {
-    state: { ...s, stage: "ESCALATED", escalation: { from: "PHASE", reason } },
+    state: { ...oublierLaPhase(s), stage: "ESCALATED", escalation: { from: "PHASE", reason } },
     effects: [...rembobiner(s), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
   };
 }
@@ -493,7 +546,7 @@ function decide(s: SkraftState, decision: string): Out {
   }
   if (decision === "skip" && from === "PHASE" && s.phase) {
     const efface = rembobiner(s);
-    const r = route({ ...s, skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null });
+    const r = route({ ...oublierLaPhase(s), skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null });
     return { state: r.state, effects: [...efface, ...r.effects] };
   }
   return { state: s, effects: [] };

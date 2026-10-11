@@ -22,6 +22,8 @@ export async function distiller(w, d, lentilles, max) {
     apresRembobinage: () => {
       d.acceptanceHash = null;
       d.regressions = [];
+      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
+      suivi.livrables = [];
       return creerDossiers(w, d.slug);
     },
   });
@@ -76,7 +78,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   catch (e) {
     if (e instanceof PanneEnvironnement)
       throw e;
-    return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "valeurs" };
+    return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test" };
   }
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)

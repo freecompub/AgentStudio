@@ -352,6 +352,34 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     ]);
   });
 
+  // D3 (docs/12) : pendant l'amendement d'un autre ADR, le fichier d'un ADR décidé le dit déjà.
+  it("chaque décision écrit aussitôt son statut dans le fichier, sans attendre les autres ADR", () => {
+    const deux: Ev = { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Proposed" }, { id: "ADR-009", path: "docs/adr/adr-009-alerte.md", status: "Proposed" }] };
+    const base = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, deux, LENSES(lens("APPROVED"))];
+    const un = play([...base, DECIDE("accept:ADR-008")]);
+    expect(un.state.stage).toBe("RATIFICATION");
+    expect(un.effects).toEqual([{ kind: "applyAdrStatuses", adrs: [{ path: "docs/adr/adr-008-plafond.md", status: "Accepted" }] }]);
+    const amende = play([...base, DECIDE("accept:ADR-008"), DECIDE("amend:ADR-009", "alerte par prise")]);
+    expect(kinds(amende.effects)).toEqual(["runSpecialist"]);
+    const fin = play([...base, DECIDE("accept:ADR-008"), DECIDE("reject:ADR-009")]);
+    expect(fin.effects).toEqual([
+      { kind: "applyAdrStatuses", adrs: [{ path: "docs/adr/adr-009-alerte.md", status: "Rejected" }] },
+      expect.objectContaining({ kind: "commitPhase", phase: "DESIGN" }),
+    ]);
+  });
+
+  // D2 (docs/12) : le rembobinage efface les ADR de la phase ; la liste les oublie aussi.
+  it("escalade puis « sauter » DESIGN : l'ADR proposé et effacé n'est pas ratifié, DESIGN n'est pas commitée", () => {
+    const rejete = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, withAdr, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })];
+    const esc = play(rejete);
+    expect(esc.state.stage).toBe("ESCALATED");
+    expect(esc.state.adrs).toEqual([]);
+    const saute = transition(esc.state, DECIDE("skip"));
+    expect(saute.state.stage).not.toBe("RATIFICATION");
+    expect(kinds(saute.effects)).not.toContain("askRatification");
+    expect(saute.state.skipPhases).toContain("DESIGN");
+  });
+
   it("amend → relance de skraft-architect-decide avec la demande", () => {
     const { state, effects } = play([...toRatification, DECIDE("amend:ADR-008", "préciser le plafond journalier")]);
     expect(state.stage).toBe("SPECIALIST");
@@ -659,6 +687,52 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   });
 });
 
+/**
+ * D4 (docs/12) : une question de lentille n'est pas un échec du producteur. Elle part à l'humain ;
+ * la phase est rejouée avec la question et la réponse, sans consommer d'essai (DELIVER : seule la
+ * revue est relancée). Au-delà de deux questions de revue dans une phase, escalade.
+ */
+describe("question d'une lentille (D4)", () => {
+  const enRevueDesign = () => [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK];
+  const QUESTION: Ev = { type: "LENS_BLOCKED", lens: "architecture", question: "Le palier s'applique-t-il par ligne ou par commande ?", choices: ["par ligne", "par commande"] };
+
+  it("la question part à l'humain, au nom de la lentille", () => {
+    const r = play([...enRevueDesign(), QUESTION]);
+    expect(r.state.stage).toBe("BLOCKED");
+    expect(r.effects).toEqual([{ kind: "askBlocker", question: "Le palier s'applique-t-il par ligne ou par commande ?", choices: ["par ligne", "par commande"], lens: "architecture" }]);
+  });
+
+  it("la réponse fait rejouer la phase depuis la modélisation, sans consommer d'essai, avec la question et la réponse", () => {
+    const avant = play(enRevueDesign()).state;
+    const r = play([...enRevueDesign(), QUESTION, DECIDE("par ligne")]);
+    const motif = "Question de la revue (architecture) : Le palier s'applique-t-il par ligne ou par commande ? — Réponse de l'utilisateur : par ligne";
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-model", attempt: avant.attempts + 1, feedback: [motif] }]);
+    expect(r.state).toMatchObject({ stage: "SPECIALIST", attempts: avant.attempts, designStep: "model", blocker: null });
+    expect(r.state.answers).toContainEqual({ question: "Le palier s'applique-t-il par ligne ou par commande ?", answer: "par ligne" });
+    // Tracé comme un rejeu, avec sa vraie cause (docs/10 §4.3).
+    expect(r.state.rejections).toBe((avant.rejections ?? 0) + 1);
+    expect(r.state.lastRejection).toEqual({ gate: "question de revue", reasons: [motif] });
+  });
+
+  it("une troisième question de revue dans la phase : escalade", () => {
+    const tour = [REPORTED, REPORTED, GATE_OK];
+    const r = play([...enRevueDesign(), QUESTION, DECIDE("par ligne"), ...tour, { ...QUESTION, question: "Q2 ?" } as Ev, DECIDE("oui"), ...tour, { ...QUESTION, question: "Q3 ?" } as Ev]);
+    expect(r.state.stage).toBe("ESCALATED");
+    expect(r.state.escalation?.reason).toMatch(/Plus de 2 questions de revue.*Q3 \?/);
+  });
+
+  it("DELIVER : la réponse relance la revue seule, rien n'est rejoué à vide", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const delivered = [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
+    ];
+    const r = play([...delivered, QUESTION, DECIDE("par ligne")]);
+    expect(r.state.stage).toBe("REVIEW");
+    expect(kinds(r.effects)).toEqual(["runReview"]);
+  });
+});
+
 describe("Skills chargées à la demande (D26)", () => {
   it("chaque AGENT_REPORTED qui porte des skills est tracé avec sa phase et son rôle, sans changer la suite", () => {
     const base = [...toFirstPhase(), CP("RESEARCH")];
@@ -842,6 +916,14 @@ describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les
   it("un verdict REJECTED escalade toujours, budget ou non : ce n'est pas une demande de changement", () => {
     const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
     expect(state.stage).toBe("ESCALATED");
+  });
+
+  it("un verdict REJECTED est tracé comme un rejet de la porte « revue », avec les lentilles qui rejettent (D11)", () => {
+    const avant = play([...jusquADistill, REPORTED, GATE_OK]).state.rejections ?? 0;
+    const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED", ["blocker"]), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
+    expect(state.rejections).toBe(avant + 1);
+    expect(state.lastRejection).toEqual({ gate: "revue", reasons: ["cold-reader : REJECTED — défaut blocker", "architecture : REJECTED"] });
+    expect(state.escalation?.reason).toBe("Revue : verdict REJECTED (cold-reader : REJECTED — défaut blocker ; architecture : REJECTED)");
   });
 });
 

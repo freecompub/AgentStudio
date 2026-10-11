@@ -22,8 +22,33 @@ export async function concevoir(w, d, lentilles, max) {
     for (const r of suivi.revues)
       await ecrireRapport(w, d.slug, "DESIGN", r.essai, r.lentilles);
     return true;
-  }, { commit: commitMessage("DESIGN", d.slug), apresRembobinage: () => creerDossiers(w, d.slug) });
+  }, {
+    commit: commitMessage("DESIGN", d.slug),
+    // Le rembobinage efface les ADR de la phase : la liste les oublie aussi (D2 de docs/12).
+    apresRembobinage: async () => {
+      await creerDossiers(w, d.slug);
+      d.adrs = await adrsDuDisque(w, d.slug);
+      // Livrables du run effacé : leurs essais ne seront pas renumérotés (D6 de docs/12).
+      suivi.livrables = [];
+    },
+  });
   return faite === true;
+}
+/**
+* ADR de cette story, lus sur le disque (ligne `Story`, ADR 0055) : le disque est rembobiné avec la
+* phase et porte le statut dès la ratification (ADR 0064). Une liste tenue en mémoire, elle,
+* gardait des ADR effacés (D2 de docs/12).
+*/
+async function adrsDuDisque(w, slug) {
+  const adrs = [];
+  for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p)).sort()) {
+    const md = await w.lireFichier(path);
+    if (storyDe(md) !== slug)
+      continue;
+    const { id, status } = parseAdr(md);
+    adrs.push({ id, path, status: status === "Accepted" || status === "Rejected" ? status : "Proposed" });
+  }
+  return adrs;
 }
 /**
 * Un essai : modélisation puis décisions avec les mêmes motifs, porte, revue, ratification. Un
@@ -63,11 +88,13 @@ async function porteCoherence(w, d, s, cp, essai) {
   const changes = await w.fichiersModifies(cp);
   const ajoutes = new Set(changes.filter((f) => f.status === "added").map((f) => f.path));
   const adrs = [];
+  const decides = new Set(d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
   for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p))) {
     const md = await w.lireFichier(path);
     // Un ADR de cette story est « nouveau » pour la porte même s'il existait avant la phase :
     // il a pu être proposé avant un arrêt, puis amendé après la reprise.
-    adrs.push({ path, md, isNew: ajoutes.has(path) || storyDe(md) === d.slug });
+    // Un ADR déjà décidé n'est plus « nouveau » : son statut n'est plus Proposed (D3 de docs/12).
+    adrs.push({ path, md, isNew: !decides.has(path) && (ajoutes.has(path) || storyDe(md) === d.slug) });
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
   const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
@@ -75,12 +102,8 @@ async function porteCoherence(w, d, s, cp, essai) {
   if (reasons.length)
     return reasons;
   await enregistrerLivrables(w, s, changes.filter((c) => c.status !== "deleted").map((c) => c.path), essai, sha256);
-  const connus = new Set(d.adrs.map((a) => a.id));
-  for (const a of adrs.filter((x) => x.isNew)) {
-    const { id, status } = parseAdr(a.md);
-    if (!connus.has(id))
-      d.adrs = [...d.adrs, { id, path: a.path, status: status === "Accepted" || status === "Rejected" ? status : "Proposed" }];
-  }
+  // Ce que dit le disque, et non ce qu'un essai précédent avait enregistré (D2 de docs/12).
+  d.adrs = await adrsDuDisque(w, d.slug);
   return [];
 }
 /** Contenu de chaque ADR du dépôt, relevé avant le tour de l'architecte. */
@@ -147,12 +170,17 @@ async function ratifier(w, d) {
     const dec = decisions[i];
     if (dec.decision === "amend")
       amendements.push(`Amendement demandé sur ${a.id} : ${dec.commentaire ?? "(sans précision)"}`);
-    else
-      d.adrs = d.adrs.map((x) => (x.id === a.id ? { ...x, status: dec.decision === "accept" ? "Accepted" : "Rejected" } : x));
+    else {
+      const status = dec.decision === "accept" ? "Accepted" : "Rejected";
+      d.adrs = d.adrs.map((x) => (x.id === a.id ? { ...x, status } : x));
+      // Écrit aussitôt (D3 de docs/12) : pendant l'amendement d'un autre ADR, le fichier dit déjà
+      // « décidé », et `controlerAdrs` annule toute réécriture.
+      await w.ecrireFichier(a.path, setAdrStatus(await w.lireFichier(a.path), status));
+    }
   }
   return amendements;
 }
-/** Statuts basculés dans les fichiers par le code, une fois tous les ADR décidés. */
+/** Statuts dans les fichiers, une fois tous les ADR décidés ; déjà écrits à la ratification (D3), ceci ne fait que confirmer. */
 async function statuerAdrs(w, d) {
   for (const a of d.adrs.filter((x) => x.status !== "Proposed"))
     await w.ecrireFichier(a.path, setAdrStatus(await w.lireFichier(a.path), a.status));

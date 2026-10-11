@@ -197,6 +197,25 @@ describe("skraft — critères de sortie de S1", () => {
     expect(s.escalation?.reason).toContain("Revue sans défaut à corriger");
   }, 90_000);
 
+  it("plan de test absent : rejet tracé sous sa propre porte, pas sous « valeurs » (D11)", async () => {
+    let essais = 0;
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await accept(t);
+        if (essais++ === 0) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us-12/distill/test-plan.md"] }));
+  }, 90_000);
+
   it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
     const app = await assemble(root, runtime, tasksDir, { isolated });

@@ -19,7 +19,9 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
   let retour = motifs;
   for (;;) {
     await w.etape(phase);
-    const r = await w.agent(nom, buildBrief(d, phase, retour) + suffixe, { lectureSeule: GELÉS });
+    // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
+    const decides = d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
+    const r = await w.agent(nom, buildBrief(d, phase, retour) + suffixe, { lectureSeule: [...GELÉS, ...decides] });
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);
@@ -32,20 +34,80 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
     retour = [];
   }
 }
-/** Revue à lentilles ; rend `undefined` si elle approuve, le rejet sinon. */
+/** Au-delà, une question de revue escalade : le budget ne borne plus ces rejeux (D4 de docs/12). */
+const MAX_QUESTIONS_DE_REVUE = 2;
+/**
+* Revue à lentilles ; rend `undefined` si elle approuve, le rejet sinon.
+*
+* Question d'une lentille (D4 de docs/12) : une information nouvelle, pas un échec du producteur.
+* Elle part à l'humain, puis la phase est rejouée avec la question et la réponse sans consommer
+* d'essai (rejet `nonCompte`) ; en DELIVER, où tout est déjà vert, seule la revue est relancée.
+*/
 export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
-  await w.etape("REVIEW");
+  for (;;) {
+    await w.etape("REVIEW");
+    const disp = await w.disposition();
+    const fichiers = await fichiersDePhase(w, s, cp, disp);
+    const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted") };
+    const reponses = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer })), ...d.reponses];
+    const tousFaits = [...faits, ...reponses.map((r) => `Réponse de l'utilisateur : « ${r.question} » → ${r.answer}`)];
+    const issues = await Promise.all(lentilles.map((l) => lentille(w, l, lensBrief(l, contexte, phase, fichiers, tousFaits, lensHistory(s.fils, l)), reponses)));
+    const q = issues.find((x) => x.question);
+    if (!q)
+      return juger(w, d, s, phase, essai, issues.map((x) => x.sortie), disp);
+    const motif = await questionDeRevue(w, d, s, phase, q);
+    if (phase !== "DELIVER")
+      return { motifs: [motif], porte: "question de revue", nonCompte: true };
+  }
+}
+/**
+* Une lentille, menée jusqu'à son verdict : une question nouvelle remonte ; une question déjà
+* tranchée, un silence ou un délai dépassé relancent la lentille **seule**, une fois, sans toucher
+* au producteur ; au second échec, « revue impossible » (escalade, sans essai consommé).
+*/
+async function lentille(w, l, brief, reponses) {
+  const normaliser = (t) => t.toLowerCase().replace(/\s+/g, " ").trim();
+  let consigne = brief;
+  for (let tentative = 1;; tentative++) {
+    let r;
+    try {
+      r = await w.agent(`skraft-lens-${l}`, consigne);
+    }
+    catch (e) {
+      if (!(e instanceof TourInterrompu))
+        throw e;
+      if (tentative >= 2)
+        throw new Escalade([`revue impossible : ${l}, ${e.message}`]);
+      continue;
+    }
+    if (r.sortie)
+      return { sortie: r.sortie };
+    const deja = reponses.find((x) => normaliser(x.question) === normaliser(r.blocage.question));
+    if (!deja)
+      return { question: r.blocage.question, choix: r.blocage.choix, lentille: l };
+    if (tentative >= 2)
+      throw new Escalade([`revue impossible : ${l}, question déjà tranchée (« ${deja.question} » → ${deja.answer})`]);
+    consigne = `${brief}\n\nTa question « ${r.blocage.question} » a déjà une réponse de l'utilisateur : ${deja.answer}. Rends ton verdict avec submit_lens_verdict.`;
+  }
+}
+/** La question d'une lentille, soumise à l'humain ; rend le motif du rejeu, déjà tracé. */
+async function questionDeRevue(w, d, s, phase, q) {
+  s.questionsDeRevue = (s.questionsDeRevue ?? 0) + 1;
+  if (s.questionsDeRevue > MAX_QUESTIONS_DE_REVUE)
+    throw new Escalade([`Plus de ${MAX_QUESTIONS_DE_REVUE} questions de revue dans la phase ${phase} : « ${q.question} » (${q.lentille})`]);
+  const choix = q.choix.length ? q.choix : ["Répondre"];
+  await w.etape("BLOCKED");
+  const rep = await w.humain("question-de-revue", `Question de la revue (${phase}, ${q.lentille})`, choix.map((c) => ({ id: c, label: c })), { detail: q.question });
+  const answer = rep.commentaire ? `${rep.decision} (${rep.commentaire})` : rep.decision;
+  d.reponses = [...d.reponses, { question: q.question, answer }];
+  const motif = `Question de la revue (${q.lentille}) : ${q.question} — Réponse de l'utilisateur : ${answer}`;
+  await w.rejet("question de revue", [motif]);
+  return motif;
+}
+/** Verdicts rendus : rapports, fils de défauts, arbitrages, synthèse. */
+async function juger(w, d, s, phase, essai, bruts, disp) {
   const tour = s.revues.length + 1;
-  const disp = await w.disposition();
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
-  const fichiers = await fichiersDePhase(w, s, cp, disp);
-  const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted") };
-  const bruts = await Promise.all(lentilles.map(async (l) => {
-    const r = await w.agent(`skraft-lens-${l}`, lensBrief(l, contexte, phase, fichiers, faits, lensHistory(s.fils, l)));
-    if (!r.sortie)
-      throw new TourInterrompu(`Blocage inattendu : ${r.blocage.question}`);
-    return r.sortie;
-  }));
   const verdicts = numberDefects(bruts, tour, classer);
   await ecrireRapport(w, d.slug, phase, essai, verdicts);
   const r = reviewRound(s.fils, verdicts, tour);
@@ -65,14 +127,22 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
   const verdict = synthesize(lenses);
   if (verdict === "APPROVED")
     return undefined;
-  if (verdict === "REJECTED")
-    throw new Escalade(["Revue : verdict REJECTED"]);
+  if (verdict === "REJECTED") {
+    // Tracé comme tout rejet (D11 de docs/12) : sinon la cause n'existe que dans le texte de l'escalade.
+    const motifs = motifsDeRejet(lenses);
+    await w.rejet("revue", motifs);
+    throw new Escalade([`Revue : verdict REJECTED (${motifs.join(" ; ")})`]);
+  }
   return {
     motifs: s.fils.some(isActive) ? agentFeedback(s.fils, () => true) : [sansDefautCorrigible(lenses)],
     revue: true,
     // Première revue de la phase (ADR 0042), ou défaut maintenu par l'humain (§13, écart 9).
     garanti: s.revues.length === 1 || parHumain,
   };
+}
+/** Une ligne par lentille qui rejette, avec ses défauts. */
+function motifsDeRejet(lenses) {
+  return lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
 }
 async function arbitrer(w, t) {
   const d = await w.humain("arbitrer", `Arbitrer un désaccord de revue (${t.id})`, [
@@ -103,7 +173,9 @@ export async function ecrireRapport(w, slug, phase, essai, lentilles) {
 }
 /** Livrables d'un essai validé par la porte, avec leur empreinte. */
 export async function enregistrerLivrables(w, s, chemins, essai, sha256) {
-  for (const path of chemins)
+  // Les rapports de revue sont écrits par le code à chaque revue : ce ne sont pas des livrables à
+  // soumettre aux lentilles (D6 de docs/12).
+  for (const path of chemins.filter((p) => !p.includes("/reviews/")))
     s.livrables.push({ path, sha256: sha256(await w.lireFichier(path)), attempt: essai });
 }
 /** Revue « changements demandés » sans défaut blocker ni major. */

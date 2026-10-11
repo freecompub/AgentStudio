@@ -5,6 +5,84 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D6 : faits de revue du run en cours, sans rapports de revue
+
+- Rapports `/reviews/` exclus des livrables (workflow : `enregistrerLivrables` ; extension :
+  `pasUnRapport` dans les trois portes). Ils sont écrits sur le disque à **chaque** revue, d'où
+  leur présence dans les fichiers modifiés de l'essai suivant.
+- Au rembobinage : workflow, `suivi.livrables = []` dans `apresRembobinage` ; extension, **pas
+  d'effacement** — le test d'invariants (§5.3, invariant 4 : `artifacts` en ajout seul) l'interdit.
+  `debutDuRun[phase]` marque le début du run, `artifactsDuRun` ne lit que lui.
+- Non remis à zéro : le suivi des revues (collision des identifiants de défauts avec les fils
+  conservés). Numérotation des rapports : D8.
+- Piège de test : lentilles en parallèle, compteur partagé → course ; un compteur par lentille.
+
+Prochaine étape : D7 à D10, ou D8 (rapports écrasés/ressuscités) qui prolonge celui-ci.
+
+---
+
+## 11/10 — D2 : plus d'ADR fantôme après un rembobinage
+
+- Workflow : la liste des ADR (`d.adrs`) est **relue sur le disque** (`adrsDuDisque`, fichiers de
+  `docs/adr/` avec `Story : <slug>`), à la porte cohérence et dans `apresRembobinage` de DESIGN.
+  Le disque est rembobiné et porte le statut dès la ratification (ADR 0064) : il dit vrai.
+- Extension : `adrsAvantPhase` pris à l'entrée de la phase, restauré par `oublierAdrsDeLaPhase` à
+  chaque rembobinage (budget épuisé, escalade, saut) ; au `GATE_OK` de DESIGN, une proposition
+  d'un essai précédent qui n'est plus sur le disque disparaît.
+- Les deux moitiés se testent séparément : la relance est couverte par la relecture à la porte,
+  le saut par la restauration.
+
+Prochaine étape : D6 — fait juste après.
+
+---
+
+## 11/10 — D3 : statut d'un ADR écrit dès sa ratification (ADR 0064)
+
+- Accept/reject écrit le statut dans le fichier aussitôt (extension : `applyAdrStatuses` par
+  décision ; workflow : `ratifier`). ADR décidés en lecture seule pour les agents, avec les gelés.
+- **Piège** : un ADR décidé reste « ajouté » depuis le checkpoint de DESIGN ; sans l'exclure de
+  `isNew`, la porte cohérence le refusait (« statut Accepted, Proposed attendu »).
+- Un test lit le source d'`effects.ts` (`readOnly: [...GELÉS]`) : motif élargi à `GELÉS` suivi
+  d'autres chemins.
+- Lié : D2 (mémoire `adrs` non remise au point d'un rembobinage) — fait juste après.
+
+---
+
+## 11/10 — D4 : question ou silence d'une lentille (ADR 0063)
+
+- **Rectification de l'audit** : les lentilles n'avaient pas `report_blocker` ; la branche
+  « Blocage inattendu » était morte. Décision utilisateur (option A) : leur donner l'outil, puis
+  appliquer la décision du 10/10.
+- Question → humain (« Question de la revue (<phase>, <lentille>) ») → réponse dans celles de la
+  story et dans les faits des lentilles → phase rejouée sans essai (workflow : rejet `nonCompte`
+  d'`essayer` ; extension : `afterReviewQuestion`, `attempts` intact). DELIVER : revue relancée
+  seule. 3e question dans la phase → escalade. Question déjà tranchée → renvoyée une fois.
+- Lentille muette ou en délai → relancée seule une fois, puis « revue impossible » (escalade sans
+  essai). **Piège** : le moteur d'agents relance déjà une fois un agent sans sortie, dans le même
+  appel — une lentille « muette » se simule avec deux tours vides.
+- **Piège** : dans l'extension, reconnaître un défaut de travail par le **nom** de l'erreur, pas
+  par `instanceof` : en mode isolé, l'erreur est recréée par le runtime de l'hôte.
+
+Prochaine étape : `docs/12` §8 — D2, D3, D6.
+
+---
+
+## 11/10 — D11 : trace comparable entre l'extension et le workflow
+
+- ROUTE annoncé seulement s'il reste des questions (workflow). **Piège / rectification de
+  l'audit** : `w.etape` n'écrit rien dans la trace ; ROUTE n'y apparaît que si une question est
+  posée pendant l'étape. Le banc ne voyait donc rien de faux. Le test lit le journal
+  (`etat.journal`, appels `etape`).
+- Verdict REJECTED tracé sous la porte « revue », une ligne par lentille qui rejette, dans les deux
+  (workflow : `w.rejet` avant `Escalade` ; extension : `rejections` + `lastRejection`, que le moteur
+  lit). Le motif d'escalade cite ces lignes.
+- « Plan de test absent » : porte `plan de test` au lieu de `valeurs`, dans les deux.
+- Le harnais de l'extension expose maintenant la trace (`app.trace`), comme celui du workflow.
+
+Prochaine étape : D4 (fait juste après, voir au-dessus).
+
+---
+
 ## 11/10 — Revue des commits du 10/10, client Copilot réparé, Swift retiré
 
 Revue des trois commits rapatriés (`45680cf`, `036016a`, `f8c2d16`) ; constats complets dans la

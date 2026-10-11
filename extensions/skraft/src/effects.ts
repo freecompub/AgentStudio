@@ -13,7 +13,7 @@ import { checkAcceptanceRed, checkValues } from "./distill.js";
 import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
-import { latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
+import { artifactsDuRun, latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
@@ -33,6 +33,48 @@ const expectOutput = <N extends TerminalToolName>(r: AgentRunResult<N>): Termina
   if (r.blocker) throw new WorkDefectError(`Blocage inattendu : ${r.blocker.question}`);
   return r.output;
 };
+
+/**
+ * Défaut de travail d'un agent (délai, fin sans sortie…). Par le nom et non par `instanceof` : en
+ * mode isolé, l'erreur est recréée par le runtime de l'hôte, dont la classe n'est pas celle du
+ * paquet de l'extension.
+ */
+const defautDeTravail = (err: unknown) =>
+  err instanceof WorkDefectError || ["WorkDefectError", "TurnTimeoutError", "TurnBudgetError", "TurnCostError", "TurnContextError"].includes((err as Error | undefined)?.name ?? "");
+
+const normaliser = (q: string) => q.toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Une lentille, menée jusqu'à son verdict (D4 de docs/12) :
+ * - une question nouvelle remonte telle quelle : le réducteur la soumet à l'humain ;
+ * - une question déjà tranchée, un silence ou un délai dépassé : la lentille est relancée **seule**,
+ *   une fois, sans toucher au producteur ; au second échec, « revue impossible » (escalade sans essai).
+ */
+async function runLens(
+  ctx: ExtensionContext,
+  lens: LensName,
+  brief: string,
+  reponses: { question: string; answer: string }[],
+  signal: AbortSignal,
+  evidence: { taskId: string; phase: string },
+): Promise<{ verdict: LensVerdict } | { lens: LensName; question: string; choices: string[] }> {
+  let consigne = brief;
+  for (let tentative = 1; ; tentative++) {
+    let r: AgentRunResult<"submit_lens_verdict">;
+    try {
+      r = await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, consigne, { signal, evidence });
+    } catch (err) {
+      if (!defautDeTravail(err)) throw err;
+      if (tentative >= 2) throw new EnvFailureError(`revue impossible : ${lens}, ${(err as Error).message}`);
+      continue;
+    }
+    if (!r.blocker) return { verdict: r.output };
+    const deja = reponses.find((x) => normaliser(x.question) === normaliser(r.blocker!.question));
+    if (!deja) return { lens, question: r.blocker.question, choices: r.blocker.choices };
+    if (tentative >= 2) throw new EnvFailureError(`revue impossible : ${lens}, question déjà tranchée (« ${deja.question} » → ${deja.answer})`);
+    consigne = `${brief}\n\nTa question « ${r.blocker.question} » a déjà une réponse de l'utilisateur : ${deja.answer}. Rends ton verdict avec submit_lens_verdict.`;
+  }
+}
 
 /** Forme du dépôt pour les indicateurs de difficulté : modules = dossiers de `Sources/`, `src/` ou `packages/`. */
 export function repositoryShape(files: string[]): RepositoryShape {
@@ -130,7 +172,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // Seul l'emplacement est dynamique : il vient de la stack. La norme de nommage et de recopie
       // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
-      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS], evidence: tag(effect.phase) });
+      // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
+      const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
+      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase) });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return {
         type: "AGENT_REPORTED",
@@ -151,16 +195,20 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const files = await phaseFiles(ctx, state, effect.phase);
       // Chaque lentille revoit SES défauts précédents et la réponse de l'agent (ADR 0046).
       const threads = state.reviewThreads ?? [];
-      const raw = await Promise.all(
-        effect.lenses.map(async (lens: LensName) =>
-          expectOutput(
-            await ctx.agents.run<"submit_lens_verdict">(`skraft-lens-${lens}`, lensBrief(lens, state, effect.phase, files, facts, lensHistory(threads, lens)), {
-              signal,
-              evidence: tag("REVIEW"),
-            }),
-          ),
+      // Réponses de l'utilisateur : une lentille ne doit pas reposer une question déjà tranchée (D4).
+      const reponses = [
+        ...state.openQuestions.filter((q) => q.answer !== undefined).map((q) => ({ question: q.text, answer: q.answer! })),
+        ...state.answers,
+      ];
+      const allFacts = [...facts, ...reponses.map((r) => `Réponse de l'utilisateur : « ${r.question} » → ${r.answer}`)];
+      const runs = await Promise.all(
+        effect.lenses.map((lens: LensName) =>
+          runLens(ctx, lens, lensBrief(lens, state, effect.phase, files, allFacts, lensHistory(threads, lens)), reponses, signal, tag("REVIEW")),
         ),
       );
+      const question = runs.find((r) => "question" in r);
+      if (question && "question" in question) return { type: "LENS_BLOCKED", lens: question.lens, question: question.question, choices: question.choices };
+      const raw = runs.map((r) => ("verdict" in r ? r.verdict : null)).filter((v): v is LensVerdict => v !== null);
       // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
       const verdicts = numberDefects(raw, state.reviews[effect.phase].length + 1, defectTargetOf(ctx));
       const reportPath = await writeReview(ctx, state.slug, effect.phase, effect.attempt, verdicts);
@@ -208,7 +256,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     case "askBlocker":
       await ctx.interactions.request({
         taskId,
-        title: `Question de l'agent (${state.phase ?? "skraft"})`,
+        title: effect.lens ? `Question de la revue (${state.phase ?? "skraft"}, ${effect.lens})` : `Question de l'agent (${state.phase ?? "skraft"})`,
         detail: effect.question,
         options: (effect.choices.length ? effect.choices : ["Répondre"]).map((c) => ({ id: c, label: c })),
         requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
@@ -304,7 +352,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   if (changed.length === 0) return { type: "GATE_FAIL", gate: "livrables", reasons: [`Aucun livrable produit pendant la phase ${phase}.`] };
   const producedBy = phase;
   const artifacts: ArtifactRecord[] = [];
-  for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
+  for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy, attempt });
   if (phase !== "DELIVER") return { type: "GATE_OK", artifacts };
   const { bar } = await loadQualityBar(ctx);
   const sources = (await ctx.workspace.changedFiles(state.qualityCheckpoint ?? cp))
@@ -379,6 +427,8 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
 }
 
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+/** Les rapports de revue sont écrits par le code à chaque revue : ce ne sont pas des livrables (D6 de docs/12). */
+const pasUnRapport = (f: { path: string }) => !f.path.includes("/reviews/");
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
 
 /** Porte cohérence (§7.2) : documents de conception et ADR de la phase, vérifiés par le code. */
@@ -398,7 +448,9 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   const added = new Set(changed.filter((f) => f.status === "added").map((f) => f.path));
   const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && ADR_FILE.test(f.path)).map((f) => f.path);
   const adrPaths = (await ctx.workspace.listFiles()).filter((p) => ADR_FILE.test(p));
-  const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) })));
+  // Un ADR déjà décidé n'est plus « nouveau » : son statut n'est plus Proposed (D3 de docs/12).
+  const decides = new Set(state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
+  const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) && !decides.has(path) })));
   let supersessions = "";
   try {
     supersessions = await ctx.workspace.readFile(SUPERSESSIONS);
@@ -408,7 +460,7 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   const reasons = checkDesign({ docs, adrs, supersessions, modifiedExistingAdrs });
   if (reasons.length) return { type: "GATE_FAIL", gate: "cohérence", reasons };
   const artifacts: ArtifactRecord[] = [];
-  for (const f of changed.filter((c) => c.status !== "deleted"))
+  for (const f of changed.filter((c) => c.status !== "deleted").filter(pasUnRapport))
     artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: ADR_FILE.test(f.path) ? "render_adr" : "skraft-architect", attempt });
   return {
     type: "GATE_OK",
@@ -440,7 +492,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   try {
     testPlan = await ctx.workspace.readFile(`${dir}/test-plan.md`);
   } catch {
-    return { type: "GATE_FAIL", gate: "valeurs", reasons: [`Plan de test absent : ${dir}/test-plan.md`] };
+    return { type: "GATE_FAIL", gate: "plan de test", reasons: [`Plan de test absent : ${dir}/test-plan.md`] };
   }
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
@@ -453,7 +505,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
 
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
   const artifacts: ArtifactRecord[] = [];
-  for (const f of changed) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
+  for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
 }
 
@@ -472,7 +524,7 @@ async function phaseFiles(ctx: ExtensionContext, state: SkraftState, phase: Phas
   const code = changed.filter((p) => !tests.includes(p) && matchesAny(ctx.stack.layout.sources, p));
   // Livrables du dernier essai seulement, et encore présents (un rollback a pu effacer ceux d'avant).
   const existing = new Set(await ctx.workspace.listFiles());
-  const latest = latestArtifacts(state.artifacts[phase]).map((a) => a.path).filter((p) => existing.has(p));
+  const latest = latestArtifacts(artifactsDuRun(state, phase)).map((a) => a.path).filter((p) => existing.has(p));
   const artifacts = [...new Set([...latest, ...changed.filter((p) => !tests.includes(p) && !code.includes(p))])];
   return { artifacts, code, tests };
 }

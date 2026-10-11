@@ -1,4 +1,5 @@
 import type { Phase, SkraftState } from "./model.js";
+import { artifactsDuRun } from "./review-brief.js";
 
 /**
  * Dossier de passation (SPEC.md §6.6, SPEC-skraft E4) : construit par le code à partir des phases
@@ -15,7 +16,7 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   lines.push(`Dossier de travail : .skraft/${s.slug}/`);
   lines.push(`Phase en cours : ${phase}`);
   const done = s.phasesCompleted.map((p) => {
-    const files = s.artifacts[p].map((a) => a.path);
+    const files = artifactsDuRun(s, p).map((a) => a.path);
     return `  - ${p}${files.length ? ` : ${files.join(", ")}` : ""}`;
   });
   if (done.length) lines.push("Phases terminées :", ...done);
