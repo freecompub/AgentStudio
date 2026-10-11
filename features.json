@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "phase-sautee-sans-heritage",
+      "title": "Une phase sautée ne transmet ni son motif de rejet ni ses défauts de revue à la phase suivante",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D18\"",
+      "passes": true,
+      "notes": "D18 de docs/12, 2026-10-11. Extension : decide « skip » vide lastRejection et reviewThreads (reducer.ts) ; « retry » les garde. Workflow : pas de défaut (nouveauSuivi par phase, relance vide après un saut), test de contrôle. Bout en bout (RESEARCH sautée, décideur de DESIGN) dans les deux et réducteur ; celui de l'extension vérifié en échec sans la correction."
+    },
+    {
       "id": "panne-pendant-les-questions-ouvertes",
       "title": "Une panne pendant les questions ouvertes (ROUTE) escalade avec relancer ou abandonner ; relancer repose les seules questions non posées",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D17\"",

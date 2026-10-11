@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D18 : une phase sautée ne transmet plus son motif ni ses défauts (extension)
+
+- « Sauter » vide `lastRejection` et `reviewThreads`, comme le commit d'une phase. Pas dans
+  `oublierLaPhase` : « relancer » réutilise le motif, et les fils survivent à une relance
+  (ADR 0046).
+- Le workflow n'a pas ce défaut : un suivi par phase et une `relance` vide après un saut. Un test
+  de contrôle le confirme (il passe d'emblée).
+- Test : RESEARCH sans document, donc la porte citations échoue jusqu'à l'escalade, puis
+  « sauter ». Le décideur de DESIGN ne doit pas recevoir « Document de recherche absent ».
+
+Prochaine étape : D19 à D21 (E), restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D17 : panne pendant les questions ouvertes (ROUTE)
 
 - Extension : l'escalade proposait « relancer » et « sauter », qui ne faisaient rien hors phase.

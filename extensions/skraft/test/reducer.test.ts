@@ -399,6 +399,15 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     expect(effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 1, feedback: ["Amendement demandé sur ADR-008 : préciser le plafond journalier"] }]);
   });
 
+  it("D18 (docs/12) : sauter efface le motif et les défauts de la phase ; relancer les garde", () => {
+    const escalated = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, REPORTED, GATE_FAIL, REPORTED, GATE_FAIL]);
+    expect(escalated.state.stage).toBe("ESCALATED");
+    expect(escalated.state.lastRejection).not.toBeNull();
+    const saute = transition({ ...escalated.state, reviewThreads: [{ id: "x#1.1", lens: "x", severity: "major", description: "d", target: "code", status: "open", round: 1 }] }, DECIDE("skip"));
+    expect(saute.state).toMatchObject({ lastRejection: null, reviewThreads: [] });
+    expect(transition(escalated.state, DECIDE("retry")).state.lastRejection).toEqual(escalated.state.lastRejection);
+  });
+
   it("ESCALATED : retry relance la phase, skip la saute avec rollback, abort termine", () => {
     const escalated = [...toFirstPhase(), CP("RESEARCH"), { type: "ENV_FAILURE", reason: "x" } as Ev];
     expect(play([...escalated, DECIDE("retry")]).effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 1, feedback: [] }]);

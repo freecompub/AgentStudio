@@ -606,7 +606,9 @@ function decide(s: SkraftState, decision: string): Out {
   }
   if (decision === "skip" && from === "PHASE" && s.phase) {
     const efface = rembobiner(s);
-    const r = route({ ...oublierLaPhase(s), skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null });
+    // Comme le commit d'une phase : son motif et ses défauts ne passent pas à la suivante (D18 de docs/12).
+    // Un « relancer », lui, les garde : la phase reprend avec eux.
+    const r = route({ ...oublierLaPhase(s), skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null, lastRejection: null, reviewThreads: [] });
     return { state: r.state, effects: [...efface, ...r.effects] };
   }
   return { state: s, effects: [] };
