@@ -83,6 +83,26 @@ export function reviewRound(prev, lenses, round) {
   return { threads: [...carried, ...fresh], persistent, lenses: forSynthesis };
 }
 /**
+* Défauts mineurs d'une revue, en fils (D5 de `docs/12`). Une revue de DELIVER « changements
+* demandés » qui ne relève que des mineurs n'a aucun fil actif : rejouer la phase, où tout est déjà
+* vert, ne ferait travailler personne. Ses mineurs sont alors corrigés comme des majeurs.
+*/
+export function minorThreads(lenses, round) {
+  return lenses.flatMap((l) => l.defects
+    .filter((d) => d.severity === "minor")
+    .map((d, i) => ({
+    id: `${l.lens}#${round}.mineur${i + 1}`,
+    lens: l.lens,
+    severity: "minor",
+    description: d.description,
+    ...(d.file ? { file: d.file } : {}),
+    ...(d.line ? { line: d.line } : {}),
+    target: d.target ?? "code",
+    status: "open",
+    round,
+  })));
+}
+/**
 * Réponses de l'agent aux fils qui le concernent. Contester sans raison ne vaut rien.
 *
 * « Hors de mon périmètre » (ADR 0047) : le défaut est juste mais revient à l'autre agent.

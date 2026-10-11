@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, fakeStack, git, type HangPoint, put, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
+import { acceptanceWriter, answerQuestions, assemble, createProject, fakeStack, git, type HangPoint, put, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, unitTestWriter, until } from "./support/harness.js";
 
 type App = Awaited<ReturnType<typeof assemble>>;
 
@@ -109,6 +109,92 @@ describe("skraft — critères de sortie de S1", () => {
       expect(state.escalation?.reason).toContain("Lignes non couvertes : 1.");
       expect(state.escalation?.reason).not.toContain("non couvertes : 8");
     }
+  }, 90_000);
+
+  // D5 (docs/12) : une source écrite en DISTILL n'est vue que par la porte de fin de DELIVER. Les
+  // scénarios étant verts, rejouer la phase ne ferait travailler personne : le motif va au testeur.
+  it("couverture du diff en fin de DELIVER sur une source de DISTILL : correction ciblée par le testeur, puis livré", async () => {
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
+    const stack = fakeStack();
+    const original = stack.runTests;
+    // La ligne du squelette n'est couverte qu'une fois le second test unitaire écrit.
+    stack.runTests = async (opts) => {
+      const unit = await readFile(join(root, "tests/unit/bolus-cap.test.ts"), "utf8").catch(() => "");
+      const covered = unit.includes("plafond 2");
+      return {
+        ...await original(opts),
+        coverage: { files: [
+          { file: "src/domain/bolus-stub.ts", covered: covered ? 1 : 0, total: 1, score: covered ? 100 : 0, lines: [{ number: 1, covered }] },
+          { file: "src/domain/bolus-cap.ts", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+        ] },
+      };
+    };
+    const testPrompts: string[] = [];
+    const writeTest = unitTestWriter(root);
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await put(root, "src/domain/bolus-stub.ts", "export const plafond = (dose: number, max: number) => Math.min(dose, max);\n");
+        await accept(t);
+      },
+      "skraft-test": async (t) => {
+        testPrompts.push(t.prompt);
+        await writeTest(t);
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const correction = testPrompts.find((p) => p.includes("[couverture#"));
+    expect(correction).toMatch(/\[couverture#\d+\.1, major, test\].*src\/domain\/bolus-stub\.ts.*Lignes non couvertes : 1\..*test qui exerce/s);
+  }, 90_000);
+
+  // D5 (docs/12) : revue de DELIVER sans défaut bloquant ni majeur, alors que tout est vert.
+  it("revue de DELIVER à défauts mineurs seulement : le développeur les corrige, puis livré", async () => {
+    let deliverReviews = 0;
+    const devPrompts: string[] = [];
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        devPrompts.push(t.prompt);
+        // En correction, le développeur renomme : un pas de correction doit modifier le code.
+        const corrige = t.prompt.includes("mineur1");
+        await put(root, "src/domain/bolus-cap.ts", corrige ? "export class PlafondDeBolus {}\nexport { PlafondDeBolus as BolusCap };\n" : "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: ["src/domain/bolus-cap.ts"] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
+        await t.callTool("submit_lens_verdict", premiere
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague : BolusCap", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    expect(devPrompts.some((p) => p.includes("[cold-reader#1.mineur1, minor, code] nom vague : BolusCap"))).toBe(true);
+  }, 90_000);
+
+  it("revue de DELIVER « changements demandés » sans aucun défaut : escalade, personne à qui l'adresser", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-lens-cold-reader": async (t) => {
+        await t.callTool("submit_lens_verdict", t.prompt.includes("phase DELIVER")
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED", 60_000);
+    const s = stateOf(await app.engine.status(id))!;
+    expect(s.escalation?.reason).toContain("Revue sans défaut à corriger");
   }, 90_000);
 
   it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {

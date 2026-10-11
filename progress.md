@@ -25,8 +25,20 @@ conversation, les principaux ci-dessous.
   la phase est rejouée sans agent destinataire ; tous scénarios verts → même échec jusqu'au
   budget. À corriger avec D5 (`docs/12`, non commité).
 
+- **D5 corrigé en partie** (ADR 0062) : mutation, couverture du diff → testeur ; suite finale →
+  développeur, par la correction ciblée de l'ADR 0046, dans les deux implémentations. Piège : le
+  test « couverture du diff en isolation » existant échoue sur la porte du *scénario*, pas de fin
+  de phase — le vrai cas D5 est un squelette écrit en DISTILL (nouveau test bout en bout). Aide
+  `acceptanceWriter` exportée par les deux harnais.
+- **Puis le reste de D5** (accord utilisateur) : revue de DELIVER à mineurs seuls → mineurs en fils
+  (`minorThreads`), corrigés comme des majeurs ; revue sans aucun défaut ou aucun livrable →
+  escalade sans essai (qui rembobine, comme toute escalade). Piège : dans le test bout en bout, le
+  faux développeur doit *modifier* le code en correction, sinon la porte refuse le pas (« Aucun
+  fichier de production modifié »). Workflow : le motif d'une `Escalade` est dans le **titre** de
+  l'interaction (`Phase DELIVER : …`), pas dans `detail`.
+
 Prochaine étape : S5/S6 n'ont plus de bout en bout sur une vraie chaîne — en écrire un (TypeScript
-ou .NET) ; puis D5 ; puis mettre `docs/12` à jour (D1 corrigé par l'ADR 0059, lignes du workflow
+ou .NET) ; puis mettre `docs/12` à jour (D1 corrigé par l'ADR 0059, lignes du workflow
 décalées).
 
 ---

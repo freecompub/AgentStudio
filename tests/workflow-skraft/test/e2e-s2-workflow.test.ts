@@ -6,12 +6,12 @@
  * la commande, les identifiants d'options et ce qui suit RESEARCH (le workflow s'arrête avant
  * DESIGN et publie le dossier de passation que DESIGN recevrait).
  */
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, fakeStack, git, put, researchDoc, shutdownHosts, simulatedAgents, until } from "./support/harness.js";
+import { acceptanceWriter, answerQuestions, assemble, createProject, fakeStack, git, put, researchDoc, shutdownHosts, simulatedAgents, unitTestWriter, until } from "./support/harness.js";
 
 describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () => {
   let root: string;
@@ -97,6 +97,94 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       await until(async () => (await app.interactions.pending()).some((p) => p.detail?.includes("Lignes non couvertes : 1.")), 60_000);
       expect((await app.interactions.pending()).map((p) => p.detail).join("\n")).not.toContain("non couvertes : 8");
     }
+  }, 90_000);
+
+  // D5 (docs/12) : une source écrite en DISTILL n'est vue que par la porte de fin de DELIVER. Les
+  // scénarios étant verts, rejouer la phase ne ferait travailler personne : le motif va au testeur.
+  it("couverture du diff en fin de DELIVER sur une source de DISTILL : correction ciblée par le testeur, puis livré", async () => {
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
+    const stack = fakeStack();
+    const original = stack.runTests;
+    // La ligne du squelette n'est couverte qu'une fois le second test unitaire écrit.
+    stack.runTests = async (opts) => {
+      const unit = await readFile(join(root, "tests/unit/bolus-cap.test.ts"), "utf8").catch(() => "");
+      const covered = unit.includes("plafond 2");
+      return {
+        ...await original(opts),
+        coverage: { files: [
+          { file: "src/domain/bolus-stub.ts", covered: covered ? 1 : 0, total: 1, score: covered ? 100 : 0, lines: [{ number: 1, covered }] },
+          { file: "src/domain/bolus-cap.ts", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+        ] },
+      };
+    };
+    const testPrompts: string[] = [];
+    const writeTest = unitTestWriter(root);
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await put(root, "src/domain/bolus-stub.ts", "export const plafond = (dose: number, max: number) => Math.min(dose, max);\n");
+        await accept(t);
+      },
+      "skraft-test": async (t) => {
+        testPrompts.push(t.prompt);
+        await writeTest(t);
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack });
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
+    await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
+    const correction = testPrompts.find((p) => p.includes("[couverture#"));
+    expect(correction).toMatch(/\[couverture#\d+\.1, major, test\].*src\/domain\/bolus-stub\.ts.*Lignes non couvertes : 1\..*test qui exerce/s);
+  }, 90_000);
+
+  // D5 (docs/12) : revue de DELIVER sans défaut bloquant ni majeur, alors que tout est vert.
+  it("revue de DELIVER à défauts mineurs seulement : le développeur les corrige, puis livré", async () => {
+    let deliverReviews = 0;
+    const devPrompts: string[] = [];
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        devPrompts.push(t.prompt);
+        // En correction, le développeur renomme : un pas de correction doit modifier le code.
+        const corrige = t.prompt.includes("mineur1");
+        await put(root, "src/domain/bolus-cap.ts", corrige ? "export class PlafondDeBolus {}\nexport { PlafondDeBolus as BolusCap };\n" : "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: ["src/domain/bolus-cap.ts"] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
+        await t.callTool("submit_lens_verdict", premiere
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague : BolusCap", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
+    await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
+    expect(devPrompts.some((p) => p.includes("[cold-reader#1.mineur1, minor, code] nom vague : BolusCap"))).toBe(true);
+  }, 90_000);
+
+  it("revue de DELIVER « changements demandés » sans aucun défaut : escalade, personne à qui l'adresser", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-lens-cold-reader": async (t) => {
+        await t.callTool("submit_lens_verdict", t.prompt.includes("phase DELIVER")
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.includes("Revue sans défaut à corriger")), 60_000);
   }, 90_000);
 
   it("citation hors limites rejetée avec le motif exact, corrigée au réessai ; questions posées ; réponses dans le dossier de DESIGN", async () => {

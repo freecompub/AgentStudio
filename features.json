@@ -144,6 +144,13 @@
       "notes": "ADR 0061, 2026-10-11, à la demande de l'utilisateur : les 4 tests de bout en bout Swift cassaient depuis le précontrôle (ADR 0060). Lecteur JUnit XML déplacé dans src/reports/junit-xml.ts. Pile simulée des tests skraft passée en TypeScript (`fakeStack`). Conséquence : les critères S5 « US-12 livrée » et S6 « bout en bout 13.3 » ne sont plus couverts que par la pile simulée ; un bout en bout sur une vraie chaîne (TypeScript ou .NET) est à écrire. Les chemins `.swift` qui restent dans les tests unitaires de skraft sont des données de texte."
     },
     {
+      "id": "corrections-ciblees-fin-deliver",
+      "title": "En fin de DELIVER, aucun échec ne rejoue la phase à vide : correction ciblée (mutation, couverture du diff, suite finale, revue à défauts mineurs) ou escalade sans essai (revue sans défaut, aucun livrable)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D5|source de DISTILL|mutant survivant en fin de DELIVER|revue de DELIVER|mineurs seulement|sans aucun défaut|aucun livrable en fin\"",
+      "passes": true,
+      "notes": "ADR 0062, D5 de docs/12. Extension : CORRECTIONS_DE_FIN et minorThreads (reducer.ts, review-thread.ts) ; workflow : correctionDeFin et minorThreads (livraison.mjs, review-thread.mjs). Tests réducteur + bout en bout dans les deux implémentations, tous vérifiés en échec sans la correction. Reste : délai dépassé pendant la revue → réessai de phase (relance la revue). Non testé en bout en bout dans le workflow : « aucun livrable » (difficile à provoquer : un scénario échoue avant)."
+    },
+    {
       "id": "extensions-sans-langage",
       "title": "Aucune extension ne mentionne un langage dans son code",
       "verify": "! grep -rniE 'swift|typescript|vitest|xctest|react|uikit' extensions/*/src/*.ts | grep -v '^\\S*: *[*/]'",

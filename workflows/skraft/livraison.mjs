@@ -12,7 +12,7 @@ import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGre
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
-import { agentFeedback, applyResponses, endTurn, isActive } from "./review-thread.mjs";
+import { agentFeedback, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
 import { ecrireRapport, enregistrerLivrables, nouveauSuivi, reviser } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
@@ -543,18 +543,55 @@ async function mutationDeFin(w, L, cpPhase) {
   const r = await muter(w, barre, sources, "fin de DELIVER");
   return { motifs: r.motifs, faits: r.faits, notes: [...notes, ...r.notes] };
 }
-/** Motifs de la mutation de fin → défauts adressés au testeur (ADR 0049). */
-function filsDeMutation(motifs, tour) {
-  return motifs.map((description, j) => ({
-    id: `mutation#${tour}.${j + 1}`,
-    lens: "mutation",
-    severity: "major",
-    description: `${description} Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. ` +
-      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+/**
+* Portes de fin de DELIVER qui désignent leur correcteur : un test trop faible (mutation, lignes
+* modifiées non couvertes) va au testeur, un test existant cassé au développeur.
+*/
+const CORRECTIONS_DE_FIN = {
+  mutation: {
+    id: "mutation",
     target: "test",
+    consigne: "Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. " +
+      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+  },
+  "couverture du diff": {
+    id: "couverture",
+    target: "test",
+    consigne: "Ajoute le test qui exerce ces lignes par un comportement observable. " +
+      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+  },
+  "suite finale": {
+    id: "suite finale",
+    target: "code",
+    consigne: "Corrige le code pour que ce test repasse ; ne modifie pas ce test.",
+  },
+};
+/** Motifs d'une porte de fin de DELIVER → défauts adressés à son correcteur. */
+function filsDeFin(porte, motifs, tour) {
+  const c = CORRECTIONS_DE_FIN[porte];
+  return motifs.map((description, j) => ({
+    id: `${c.id}#${tour}.${j + 1}`,
+    lens: c.id,
+    severity: "major",
+    description: `${description} ${c.consigne}`,
+    target: c.target,
     status: "open",
     round: tour,
   }));
+}
+/**
+* Porte de fin de DELIVER en échec avec un correcteur (ADR 0049, D5 de docs/12) : les scénarios sont
+* verts, rejouer la phase ne ferait travailler personne. Correction ciblée depuis le dernier vert si
+* le budget le permet ; rend vrai si elle a eu lieu.
+*/
+async function correctionDeFin(w, d, L, s, max, tentatives, consommer, porte, motifs) {
+  if (!L.dernierVert || tentatives() + 1 >= max)
+    return false;
+  await w.rejet(`${porte} (correction ciblée)`, motifs);
+  consommer();
+  s.fils = [...s.fils, ...filsDeFin(porte, motifs, tentatives())];
+  await corriger(w, d, L, s, max);
+  return true;
 }
 /**
 * Fin de phase : porte (livrables, mutation), revue, et corrections ciblées tant que le budget le
@@ -564,8 +601,9 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
   for (;;) {
     const essai = tentatives() + 1;
     const changes = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted");
+    // Rien produit : personne à qui adresser le motif, l'humain décide sans qu'un essai soit consommé (D5).
     if (changes.length === 0)
-      return { motifs: ["Aucun livrable produit pendant la phase DELIVER."], garanti: false, porte: "livrables" };
+      throw new Escalade(["livrables : Aucun livrable produit pendant la phase DELIVER."]);
     if (!d.qualityCheckpoint)
       L.notes = uniq([...L.notes, "Référence de qualité initiale absente (ancienne tâche) : couverture du diff limitée à DELIVER."]);
     const sources = (await w.fichiersModifies(d.qualityCheckpoint ?? cpPhase))
@@ -573,27 +611,28 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
     if (sources.length) {
       const run = await w.lancerTests({ etiquette: "DELIVER_COVERAGE" });
       const problems = problemesTestsExistants(run);
-      if (problems.length)
+      if (problems.length) {
+        if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "suite finale", problems))
+          continue;
         return { motifs: problems, garanti: false, porte: "suite finale" };
+      }
       if (run.coverage) {
         const { barre } = await barreDeQualite(w, L.disp);
         const diff = couvertureDuDiff(run.coverage, sources);
         const motifs = checkCoverage(diff.report, sources.map((f) => f.path), barre, true);
-        if (motifs.length)
+        if (motifs.length) {
+          if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "couverture du diff", motifs))
+            continue;
           return { motifs, garanti: false, porte: "couverture du diff" };
+        }
         L.notes = uniq([...L.notes, ...diff.notes]);
         L.faits = uniq([...L.faits, ...diff.report.files.map((f) => `Couverture du diff (tâche) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`)]);
       } else L.notes = uniq([...L.notes, "Couverture non mesurée : la commande de test du projet n'en produit pas."]);
     }
     const m = await mutationDeFin(w, L, cpPhase);
     if (m.motifs.length) {
-      if (L.dernierVert && tentatives() + 1 < max) {
-        await w.rejet("mutation (correction ciblée)", m.motifs);
-        consommer();
-        s.fils = [...s.fils, ...filsDeMutation(m.motifs, tentatives())];
-        await corriger(w, d, L, s, max);
+      if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "mutation", m.motifs))
         continue;
-      }
       return { motifs: m.motifs, garanti: false, porte: "mutation" };
     }
     await enregistrerLivrables(w, s, changes.map((c) => c.path), essai, sha256);
@@ -615,6 +654,21 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
       consommer();
       await corriger(w, d, L, s, max);
       continue;
+    }
+    // Sans défaut bloquant ni majeur (D5 de docs/12) : tout est vert, rejouer la phase ne ferait
+    // travailler personne. Les mineurs sont corrigés comme des majeurs ; sans aucun défaut, personne
+    // à qui adresser la revue : l'humain décide, sans qu'un essai soit consommé.
+    if (!s.fils.some(isActive) && L.dernierVert) {
+      const mineurs = minorThreads(s.revues.at(-1).lentilles, s.revues.length);
+      if (!mineurs.length)
+        throw new Escalade([`Revue sans défaut à corriger : ${motifs.join(" ; ")}`]);
+      if (tentatives() + 1 < max || garanti || parHumain) {
+        await w.rejet("revue (correction ciblée)", agentFeedback(mineurs, () => true));
+        consommer();
+        s.fils = [...s.fils, ...mineurs];
+        await corriger(w, d, L, s, max);
+        continue;
+      }
     }
     return { motifs, garanti, porte: "revue" };
   }

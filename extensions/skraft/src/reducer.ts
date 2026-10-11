@@ -3,7 +3,7 @@ import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { synthesize, type LensVerdict } from "./review.js";
-import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, reviewRound, type DefectThread } from "./review-thread.js";
+import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
@@ -161,10 +161,13 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
       }
-      // Mutant survivant en fin de DELIVER (ADR 0049) : un test trop faible, pas une phase à refaire.
-      // Chaque motif devient un défaut adressé au testeur, par la correction de l'ADR 0046.
-      if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "mutation" && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase)
-        return startReviewFix(s, [...(s.reviewThreads ?? []), ...mutationThreads(e.reasons, s.attempts + 1)]);
+      // Porte de fin de DELIVER avec une cible (ADR 0049, D5 de docs/12) : les scénarios sont verts,
+      // rejouer la phase ne ferait travailler personne. Chaque motif devient un défaut adressé à
+      // l'agent concerné, par la correction de l'ADR 0046.
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && Object.hasOwn(CORRECTIONS_DE_FIN, e.gate) && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase)
+        return startReviewFix(s, [...(s.reviewThreads ?? []), ...endGateThreads(e.gate, e.reasons, s.attempts + 1)]);
+      // Rien produit : personne à qui adresser le motif, l'humain décide sans qu'un essai soit consommé (D5).
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "livrables") return escalate(s, `${e.gate} : ${e.reasons.join(" ; ")}`);
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
@@ -253,16 +256,41 @@ export function transition(s0: SkraftState, e: Ev): Out {
 
 // ---------- aides -------------------------------------------------------------------
 
-/** Motifs de la mutation de fin de DELIVER → défauts adressés au testeur (ADR 0049). */
-function mutationThreads(reasons: string[], round: number): DefectThread[] {
-  return reasons.map((description, i) => ({
-    id: `mutation#${round}.${i + 1}`,
-    lens: "mutation",
-    severity: "major" as const,
-    description:
-      `${description} Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. ` +
+/**
+ * Portes de fin de DELIVER qui désignent leur correcteur : un test trop faible (mutation, lignes
+ * modifiées non couvertes) va au testeur, un test existant cassé au développeur.
+ */
+const CORRECTIONS_DE_FIN: Record<string, { id: string; target: "test" | "code"; consigne: string }> = {
+  mutation: {
+    id: "mutation",
+    target: "test",
+    consigne:
+      "Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. " +
       "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
-    target: "test" as const,
+  },
+  "couverture du diff": {
+    id: "couverture",
+    target: "test",
+    consigne:
+      "Ajoute le test qui exerce ces lignes par un comportement observable. " +
+      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+  },
+  "suite finale": {
+    id: "suite finale",
+    target: "code",
+    consigne: "Corrige le code pour que ce test repasse ; ne modifie pas ce test.",
+  },
+};
+
+/** Motifs d'une porte de fin de DELIVER → défauts adressés à son correcteur. */
+function endGateThreads(gate: string, reasons: string[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN[gate]!;
+  return reasons.map((description, i) => ({
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
+    severity: "major" as const,
+    description: `${description} ${c.consigne}`,
+    target: c.target,
     status: "open" as const,
     round,
   }));
@@ -286,6 +314,14 @@ function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: b
   const active = threads.filter(isActive);
   // DELIVER : correction ciblée depuis le dernier vert, routée vers l'agent concerné (§9.3, ADR 0046).
   if (p === "DELIVER" && active.length && ns.deliver?.stepCheckpoint && (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || decidedByHuman)) return startReviewFix(ns, threads);
+  // DELIVER sans défaut bloquant ni majeur (D5 de docs/12) : tout est vert, rejouer la phase ne ferait
+  // travailler personne. Les mineurs sont corrigés comme des majeurs ; sans aucun défaut, personne à
+  // qui adresser la revue : l'humain décide, sans qu'un essai soit consommé.
+  if (p === "DELIVER" && !active.length && ns.deliver?.stepCheckpoint) {
+    const mineurs = minorThreads(lenses, ns.reviews[p].length);
+    if (!mineurs.length) return escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
+    if (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || ns.reviews[p].length === 1 || decidedByHuman) return startReviewFix(ns, [...threads, ...mineurs]);
+  }
   // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
   // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
   // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade

@@ -36,7 +36,8 @@ export type ThreadStatus =
 export interface DefectThread {
   id: string;
   lens: string;
-  severity: "blocker" | "major";
+  /** `minor` : seulement en fin de DELIVER, quand la revue ne demande rien d'autre (`minorThreads`). */
+  severity: "blocker" | "major" | "minor";
   description: string;
   file?: string;
   line?: number;
@@ -142,6 +143,29 @@ export function reviewRound(prev: DefectThread[], lenses: LensVerdict[], round: 
     return { ...l, verdict: l.verdict === "REJECTED" ? l.verdict : ("CHANGES_REQUESTED" as const), defects: [...l.defects, ...extra] };
   });
   return { threads: [...carried, ...fresh], persistent, lenses: forSynthesis };
+}
+
+/**
+ * Défauts mineurs d'une revue, en fils (D5 de `docs/12`). Une revue de DELIVER « changements
+ * demandés » qui ne relève que des mineurs n'a aucun fil actif : rejouer la phase, où tout est déjà
+ * vert, ne ferait travailler personne. Ses mineurs sont alors corrigés comme des majeurs.
+ */
+export function minorThreads(lenses: LensVerdict[], round: number): DefectThread[] {
+  return lenses.flatMap((l) =>
+    l.defects
+      .filter((d) => d.severity === "minor")
+      .map((d, i) => ({
+        id: `${l.lens}#${round}.mineur${i + 1}`,
+        lens: l.lens,
+        severity: "minor" as const,
+        description: d.description,
+        ...(d.file ? { file: d.file } : {}),
+        ...(d.line ? { line: d.line } : {}),
+        target: d.target ?? "code",
+        status: "open" as const,
+        round,
+      })),
+  );
 }
 
 /**

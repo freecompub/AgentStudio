@@ -617,12 +617,24 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
       expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);
     });
 
-    it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
-      const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague" }] });
+    // D5 (docs/12) : tout est vert, rejouer la phase ne ferait travailler personne.
+    it("changements demandés avec des défauts mineurs seulement : correction ciblée, comme un majeur", () => {
+      const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague", target: "code" }] });
       const r = play([...delivered, minorOnly]);
-      expect(r.effects).toEqual([{ kind: "planDeliver" }]);
-      expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague) ; test-integrity : APPROVED ; architecture : APPROVED ; quality-gates : APPROVED."] });
-      expect(r.state.deliver?.step).not.toBe("fix");
+      expect(r.effects).toEqual([
+        { kind: "rollback", to: "cp-s2" },
+        { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: ["[cold-reader#1.mineur1, minor, code] nom vague", RESPONSE_INSTRUCTION] },
+      ]);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    it("changements demandés sans aucun défaut : personne à qui l'adresser, escalade sans consommer d'essai", () => {
+      const empty = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] });
+      const before = play(delivered).state.attempts;
+      const r = play([...delivered, empty]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.state.attempts).toBe(before);
+      expect(r.state.escalation?.reason).toMatch(/sans défaut à corriger.*cold-reader : CHANGES_REQUESTED/);
     });
   });
 
@@ -979,6 +991,44 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(run.step).toBe("fix-test");
       expect(run.feedback.join("\n")).toMatch(/\[mutation#1\.1, major, test\].*ligne 25.*tue ce mutant/s);
       expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    // D5 (docs/12) : tous les scénarios sont verts, rejouer la phase ne ferait travailler personne.
+    const toutLivre = () => [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev,
+    ];
+
+    it("couverture du diff insuffisante en fin de DELIVER : défaut adressé au testeur, sans relancer la phase (D5)", () => {
+      const motif = "Couverture du diff : src/Panier.cs à 62 % (minimum 80 %). Lignes non couvertes : 14.";
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "couverture du diff", reasons: [motif] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(run.feedback.join("\n")).toMatch(/\[couverture#1\.1, major, test\].*Lignes non couvertes : 14\..*test qui exerce/s);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+      expect(r.state.attempts).toBe(1);
+    });
+
+    it("suite finale en échec en fin de DELIVER : défaut adressé au développeur, sans relancer la phase (D5)", () => {
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "suite finale", reasons: ["Tests en échec : tests/PanierTests.cs > Total."] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix");
+      expect(run.feedback.join("\n")).toMatch(/\[suite finale#1\.1, major, code\].*PanierTests\.cs > Total.*ne modifie pas ce test/s);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    it("couverture insuffisante, budget épuisé : escalade, pas de correction de plus", () => {
+      const motif = "Couverture du diff : src/Panier.cs à 62 % (minimum 80 %). Lignes non couvertes : 14.";
+      const epuise = { ...play(toutLivre()).state, attempts: 2 };
+      const r = transition(epuise, { type: "GATE_FAIL", gate: "couverture du diff", reasons: [motif] });
+      expect(r.state.stage).toBe("ESCALATED");
+    });
+
+    it("aucun livrable en fin de DELIVER : personne à qui l'adresser, escalade sans consommer d'essai", () => {
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "livrables", reasons: ["Aucun livrable produit pendant la phase DELIVER."] }]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.state.attempts).toBe(0);
+      expect(kinds(r.effects)).toContain("askEscalation");
     });
 
     it("mutation réussie en fin de DELIVER : ses faits vont aux lentilles", () => {
