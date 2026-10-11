@@ -11,14 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, fakeSwiftStack, git, put, researchDoc, shutdownHosts, simulatedAgents, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, fakeStack, git, put, researchDoc, shutdownHosts, simulatedAgents, until } from "./support/harness.js";
 
 describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () => {
   let root: string;
   let tasksDir: string;
   beforeEach(async () => {
     root = await createProject();
-    await put(root, "Sources/Domain/BolusCalculator.swift", Array.from({ length: 55 }, (_, i) => `// ligne ${i + 1}`).join("\n") + "\n");
+    await put(root, "src/domain/bolus-calculator.ts", Array.from({ length: 55 }, (_, i) => `// ligne ${i + 1}`).join("\n") + "\n");
     git(root, "commit", "-qam", "calculateur");
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-tasks-"));
   });
@@ -30,9 +30,9 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
 
   it.each(["failed", "skipped", "exit", "timeout"] as const)("précontrôle %s : bloque avant le classifieur, sans appel LLM", async (status) => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
-    const stack = fakeSwiftStack();
+    const stack = fakeStack();
     stack.runTests = async () => ({
-      results: [{ id: "test existant", file: "Tests/Existing.swift", status: status === "failed" || status === "skipped" ? status : "passed" }],
+      results: [{ id: "test existant", file: "tests/existing.test.ts", status: status === "failed" || status === "skipped" ? status : "passed" }],
       exitCode: status === "exit" ? 1 : 0, timedOut: status === "timeout", output: "", durationMs: 1,
     });
     const app = await assemble(root, runtime, tasksDir, { stack });
@@ -45,10 +45,10 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
   it("la dette de couverture initiale est notifiée mais ne bloque pas le classifieur", async () => {
     await put(root, ".skraft/quality.json", '{"coverage":{"core":90}}\n');
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
-    const stack = fakeSwiftStack();
+    const stack = fakeStack();
     stack.runTests = async () => ({
       results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1,
-      coverage: { files: [{ file: "Sources/Domain/BolusCalculator.swift", covered: 1, total: 2, score: 50 }] },
+      coverage: { files: [{ file: "src/domain/bolus-calculator.ts", covered: 1, total: 2, score: 50 }] },
     });
     const app = await assemble(root, runtime, tasksDir, { stack });
     await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
@@ -59,23 +59,23 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
   });
 
   it.each([true, false])("couverture du diff en isolation : ligne modifiée couverte=%s, dette historique inchangée", async (covered) => {
-    const before = "public struct BolusCalculator {}\n\n\n\n\n\n\n// propriété existante non couverte\n";
-    await put(root, "Sources/Domain/BolusCalculator.swift", before);
+    const before = "export class BolusCalculator {}\n\n\n\n\n\n\n// propriété existante non couverte\n";
+    await put(root, "src/domain/bolus-calculator.ts", before);
     await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
-    const stack = fakeSwiftStack();
+    const stack = fakeStack();
     const original = stack.runTests;
     stack.runTests = async (opts) => ({
       ...await original(opts),
       coverage: { files: [
-        { file: "Sources/Domain/BolusCalculator.swift", covered: covered ? 1 : 0, total: 2, score: covered ? 50 : 0, lines: [{ number: 1, covered }, { number: 8, covered: false }] },
-        { file: "Sources/Domain/BolusCap.swift", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+        { file: "src/domain/bolus-calculator.ts", covered: covered ? 1 : 0, total: 2, score: covered ? 50 : 0, lines: [{ number: 1, covered }, { number: 8, covered: false }] },
+        { file: "src/domain/bolus-cap.ts", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
       ] },
     });
     let deliverReview = "";
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-dev": async (t) => {
-        await put(root, "Sources/Domain/BolusCalculator.swift", before.replace("{}", "{ /* raccordement */ }"));
-        await put(root, "Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n");
+        await put(root, "src/domain/bolus-calculator.ts", before.replace("{}", "{ /* raccordement */ }"));
+        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
         await t.callTool("report_phase", { summary: "code", files: [] });
       },
       "skraft-lens-test-integrity": async (t) => {
@@ -91,7 +91,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
     if (covered) {
       await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
-      expect(deliverReview).toContain("Couverture du diff (tâche) : Sources/Domain/BolusCalculator.swift à 100 %");
+      expect(deliverReview).toContain("Couverture du diff (tâche) : src/domain/bolus-calculator.ts à 100 %");
       expect(app.posted.join("\n")).toContain("avertissement non bloquant");
     } else {
       await until(async () => (await app.interactions.pending()).some((p) => p.detail?.includes("Lignes non couvertes : 1.")), 60_000);
@@ -107,7 +107,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       await put(
         root,
         ".skraft/us-12/research/research.md",
-        researchDoc({ Découvertes: bad ? "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:40-72`." : "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:40-55`." }),
+        researchDoc({ Découvertes: bad ? "Le calcul vit dans `src/domain/bolus-calculator.ts:40-72`." : "Le calcul vit dans `src/domain/bolus-calculator.ts:40-55`." }),
       );
       await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
     };
@@ -132,16 +132,16 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     // Présélection par le code dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
     expect(researchPrompts[0]).toContain("Fichiers utiles (présélection) :");
-    expect(researchPrompts[0]).toContain("Sources/Domain/BolusCalculator.swift");
+    expect(researchPrompts[0]).toContain("src/domain/bolus-calculator.ts");
 
     // Porte citations : rejet précis, relance ciblée, puis questions posées à la fin de RESEARCH.
     await until(async () => (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte")).length === 2);
     expect(researchPrompts).toHaveLength(2);
     expect(researchPrompts[1]).toContain("Rejet précédent :");
-    expect(researchPrompts[1]).toContain("`Sources/Domain/BolusCalculator.swift:40-72` : plage hors du fichier, qui compte 55 lignes.");
+    expect(researchPrompts[1]).toContain("`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes.");
     // Le rejeu est tracé avec sa porte et son motif exact (docs/10 §4.3).
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
-    expect(rejets).toEqual([expect.objectContaining({ porte: "citations", motifs: ["`Sources/Domain/BolusCalculator.swift:40-72` : plage hors du fichier, qui compte 55 lignes."] })]);
+    expect(rejets).toEqual([expect.objectContaining({ porte: "citations", motifs: ["`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes."] })]);
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
     expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });

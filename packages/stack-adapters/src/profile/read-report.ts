@@ -1,8 +1,7 @@
 import type { LintReport, TestResult } from "../protocols.js";
-import { parseXunit } from "../swift/swift-report.js";
+import { parseXunit } from "../reports/junit-xml.js";
 import { classifyFailure, parseVitestReport } from "../typescript/vitest-report.js";
 import { parseEslintReport } from "../typescript/eslint-report.js";
-import { parseSwiftLintReport } from "../swift/swiftlint-report.js";
 import type { StackProfile } from "./stack-profile.js";
 
 /**
@@ -26,6 +25,5 @@ export function lireTests(reader: StackProfile["tests"]["report"], brut: string,
 
 export function lireLint(reader: NonNullable<StackProfile["lint"]>["report"], brut: unknown, root: string): LintReport {
   if (reader === "eslint-json") return parseEslintReport(brut, root);
-  if (reader === "swiftlint-json") return parseSwiftLintReport(brut, root);
   throw new Error(`Le format « ${reader} » ne décrit pas un rapport de linter.`);
 }

@@ -19,7 +19,7 @@ describe("Configuration administrateur (D6, O5)", () => {
   it("programmes autorisés par défaut : lanceurs de tests, linters et outils de mutation courants (O12)", async () => {
     const c = await loadAdminConfig(join(dir, "absent.json"));
     // Ce sont ceux qu'un profil de stack peut nommer sans que l'administrateur intervienne.
-    expect(c.allowedPrograms).toEqual(expect.arrayContaining(["pytest", "eslint", "swiftlint", "muter"]));
+    expect(c.allowedPrograms).toEqual(expect.arrayContaining(["pytest", "eslint", "stryker"]));
     // Et jamais de quoi sortir du projet ou atteindre le réseau.
     for (const interdit of ["curl", "wget", "rm", "bash", "sh", "ssh", "node", "npm"])
       expect(c.allowedPrograms, interdit).not.toContain(interdit);

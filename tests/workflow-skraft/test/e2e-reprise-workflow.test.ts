@@ -29,7 +29,7 @@ describe("skraft en workflow — reprise après un crash", () => {
     // Premier démarrage : le développeur écrit un fichier à moitié, puis le processus « meurt ».
     const avant = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-dev": async (t) => {
-        await put(root, "Sources/Domain/BolusCap.swift", "public struct BolusCap { // à moitié écrit\n");
+        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap { // à moitié écrit\n");
         t.hang();
       },
     });
@@ -54,6 +54,6 @@ describe("skraft en workflow — reprise après un crash", () => {
     expect(s.phases).toEqual(["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]);
     // Le fichier à moitié écrit a été effacé par le retour au checkpoint du tour, puis réécrit.
     const { readFile } = await import("node:fs/promises");
-    expect(await readFile(join(root, "Sources/Domain/BolusCap.swift"), "utf8")).toBe("public struct BolusCap {}\n");
+    expect(await readFile(join(root, "src/domain/bolus-cap.ts"), "utf8")).toBe("export class BolusCap {}\n");
   }, 120_000);
 });

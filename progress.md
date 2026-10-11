@@ -5,6 +5,32 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — Revue des commits du 10/10, client Copilot réparé, Swift retiré
+
+Revue des trois commits rapatriés (`45680cf`, `036016a`, `f8c2d16`) ; constats complets dans la
+conversation, les principaux ci-dessous.
+
+- **Client Copilot** : `env: { GH_HOST }` (ADR 0057) remplaçait tout l'environnement du CLI —
+  le SDK fait `options.env ?? process.env`. Plus de PATH, HOME ni proxy pour les agents. Corrigé
+  en `{ ...process.env, GH_HOST }` (`sdkCopilotClientOptions` prend l'environnement en paramètre
+  pour le test). Piège : le test d'origine figeait le défaut avec `toEqual`.
+- **Swift retiré** (ADR 0061, demande utilisateur). Cause : le précontrôle de `036016a` lance les
+  tests avant tout agent, et le projet Swift de démonstration déclarait la cible
+  `AcceptanceTests` avant que DISTILL n'en crée le dossier. Les 4 tests Swift étaient sautés sous
+  macOS et en CI : seule cette machine les voyait échouer. Retirés : adaptateur, lecteurs
+  SwiftLint/Muter, profil, modèle `/stack init`, programmes autorisés, `swift test` souple,
+  bouts en bout réels. JUnit XML déplacé dans `src/reports/`. Pile simulée skraft en TypeScript.
+- Défaut trouvé en passant : `profiles/typescript.yaml` lisait Stryker avec `muter-json`.
+- **D5 aggravé par `036016a`** : la porte « couverture du diff » échoue en fin de DELIVER, toute
+  la phase est rejouée sans agent destinataire ; tous scénarios verts → même échec jusqu'au
+  budget. À corriger avec D5 (`docs/12`, non commité).
+
+Prochaine étape : S5/S6 n'ont plus de bout en bout sur une vraie chaîne — en écrire un (TypeScript
+ou .NET) ; puis D5 ; puis mettre `docs/12` à jour (D1 corrigé par l'ADR 0059, lignes du workflow
+décalées).
+
+---
+
 ## 10/10 — Publication des corrections et de la campagne comparative
 
 À la demande utilisateur, publication sur `feat/workflow-rejouable` des corrections

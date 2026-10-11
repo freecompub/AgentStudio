@@ -18,11 +18,11 @@ import { z } from "zod";
  */
 export const DEFAULT_ALLOWED_PROGRAMS = [
   // tests
-  "pytest", "go", "cargo", "gradle", "mvn", "dotnet", "swift", "vitest", "jest", "phpunit", "rspec",
+  "pytest", "go", "cargo", "gradle", "mvn", "dotnet", "vitest", "jest", "phpunit", "rspec",
   // qualité de forme
-  "eslint", "swiftlint", "ruff", "flake8", "pylint", "ktlint", "rubocop", "phpcs",
+  "eslint", "ruff", "flake8", "pylint", "ktlint", "rubocop", "phpcs",
   // mutation
-  "muter", "stryker", "mutmut", "pitest",
+  "stryker", "mutmut", "pitest",
 ] as const;
 
 /** Un nom de commande, jamais un chemin : `./x` ou `/usr/bin/x` échapperaient à la liste. */

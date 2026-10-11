@@ -45,7 +45,7 @@ describe("parseQualityBar", () => {
     expect(r.bar.mutation).toEqual({ active: true, domain: 100, application: 100, rest: 90, moment: "phase-end" });
     // Le nom en français et préfixé du projet d'essai fait partie des noms usuels reconnus.
     expect(layerOf("src/Tarification.Domaine/Montant.cs", r.bar)).toBe("domain");
-    expect(layerOf("Sources/Domain/Bolus.swift", r.bar)).toBe("domain");
+    expect(layerOf("src/domain/bolus.ts", r.bar)).toBe("domain");
     expect(layerOf("src/Tarification.Application/CalculDuPanier.cs", r.bar)).toBe("application");
     expect(layerOf("src/Infra/Db.cs", r.bar)).toBe("rest");
   });

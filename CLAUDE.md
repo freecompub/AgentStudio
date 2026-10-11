@@ -11,8 +11,8 @@ Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, bl
 `pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`) ; seule
 `tdd` est livrée avec l'application. `skraft` se distribue à part en paquet `.asx`
 (`pnpm ext:build` puis `pnpm ext:pack`), non signé donc réservé au mode développeur (ADR 0021).
-J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift utilisent la chaîne de
-`~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
+J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`). Swift a été **retiré** le 2026-10-11
+(ADR 0061) : adaptateur, profil, lecteurs SwiftLint et Muter, tests sur la vraie chaîne.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
 skraft : S0 tranché (ADR 0012, option C : l'auteur autorise la reprise ; elle n'a pas commencé,

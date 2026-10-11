@@ -50,8 +50,7 @@ export interface MutationReport {
 
 /**
  * Rapport du linter du projet. La qualité de forme — longueur des méthodes, imbrication,
- * nombre d'attributs — est jugée par l'outil que le projet a déjà configuré (ESLint, SwiftLint,
- * ruff…), avec ses propres seuils : deux autorités contradictoires sur la même question
+ * nombre d'attributs — est jugée par l'outil que le projet a déjà configuré (ESLint, ruff…), avec ses propres seuils : deux autorités contradictoires sur la même question
  * bloqueraient du code que la CI du projet accepte.
  */
 export interface LintReport {
@@ -87,11 +86,11 @@ export interface StackLayout {
 }
 
 export interface StackAdapter {
-  readonly id: "typescript" | "swift" | "dotnet";
+  readonly id: "typescript" | "dotnet";
   readonly layout: StackLayout;
   /**
    * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
-   * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `SwiftUI` ne veut
+   * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `Microsoft.AspNetCore` ne veut
    * rien dire en Python — donc elle vit ici, et non dans une extension, qui doit rester
    * indépendante des langages (D10).
    */

@@ -3,16 +3,11 @@ export { coverageForChanges, baselineProblems } from "./coverage/changed-coverag
 export { createTypeScriptAdapter, type TypeScriptAdapterDeps } from "./typescript/typescript-adapter.js";
 export { parseVitestReport, classifyFailure } from "./typescript/vitest-report.js";
 export { parseEslintReport } from "./typescript/eslint-report.js";
-export { parseSwiftLintReport } from "./swift/swiftlint-report.js";
 export { createNodeProcessRunner } from "./process/node-process-runner.js";
 export { fingerprintFiles, type ReadableFiles } from "./fingerprint.js";
-export { createSwiftAdapter, type SwiftAdapterDeps, type SwiftToolchain } from "./swift/swift-adapter.js";
-export { analyzeSwiftImports, parseSwiftImports } from "./swift/swift-architecture.js";
-export { parseMuterReport } from "./swift/muter-report.js";
+export { parseXunit, type XunitCase } from "./reports/junit-xml.js";
 export { parseStrykerReport } from "./mutation/stryker-report.js";
-export { classifySwiftBuildError, parseSwiftBuildErrors, parseXcTestFailures, parseXunit } from "./swift/swift-report.js";
 export { selectStackAdapter } from "./select-stack.js";
-export { findLocalSwiftToolchain } from "./swift/local-toolchain.js";
 export { parseStackProfile, CANARY_KINDS, REPORT_READERS, type CanaryKind, type ReportReader, type StackProfile } from "./profile/stack-profile.js";
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./glob.js";
 export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile-adapter.js";

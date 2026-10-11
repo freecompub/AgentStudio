@@ -18,7 +18,7 @@ lint:
 
 mutation:
   command: [stryker, run]
-  report: muter-json
+  report: stryker-json
 
 layout:
   acceptanceTests: ["tests/acceptance/**"]

@@ -66,12 +66,12 @@ En tant que patient, je veux voir l'unité de la dose.
 1. La dose est affichée avec « U ».
 `;
 
-/** Projet Swift de démonstration (code seulement : S1 ne lance aucun test). */
+/** Projet TypeScript de démonstration (code seulement : S1 ne lance aucun test). */
 export async function createProject(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "agent-studio-skraft-"));
-  await put(root, "Package.swift", "// swift-tools-version:5.9\n");
-  await put(root, "Sources/Domain/BolusCalculator.swift", "public struct BolusCalculator {}\n");
-  await put(root, "Sources/Settings/MaxBolusSetting.swift", "public struct MaxBolusSetting {}\n");
+  await put(root, "package.json", '{ "name": "demo", "type": "module" }\n');
+  await put(root, "src/domain/bolus-calculator.ts", "export class BolusCalculator {}\n");
+  await put(root, "src/settings/max-bolus-setting.ts", "export class MaxBolusSetting {}\n");
   await put(root, "stories/us-12.md", US12);
   await put(root, "stories/us-7.md", SIMPLE);
   await put(root, "stories/us-15.md", US15);
@@ -87,10 +87,10 @@ export const ROLE = (name: string) => `agent-studio.skraft/${name}`;
 export function researchDoc(over: Partial<Record<string, string>> = {}): string {
   const body: Record<string, string> = {
     "Périmètre et critères de succès": "Plafonner la dose proposée au maximum défini par le médecin.",
-    "Fichiers analysés": "- `Sources/Domain/BolusCalculator.swift:1-1`\n- `Sources/Settings/MaxBolusSetting.swift`",
-    "Recherches effectuées": "XCTest : https://developer.apple.com/documentation/xctest",
+    "Fichiers analysés": "- `src/domain/bolus-calculator.ts:1-1`\n- `src/settings/max-bolus-setting.ts`",
+    "Recherches effectuées": "Vitest : https://vitest.dev/api/",
     "Conventions du projet": "Objets-valeurs immuables dans le domaine.",
-    Découvertes: "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:1-1`.",
+    Découvertes: "Le calcul vit dans `src/domain/bolus-calculator.ts:1-1`.",
     "Approches évaluées": "1. Plafond dans le domaine.\n2. Plafond dans l'interface.",
     Recommandation: "Appliquer le plafond dans le domaine.",
     "Passage de relais": "Décision à valider : emplacement du plafond.\n\n### Questions ouvertes\n- Le plafond est-il rappelé au patient ?",
@@ -118,12 +118,28 @@ export function answerQuestions(app: { interactions: import("@agent-studio/core"
 export function unitTestWriter(root: string): ScriptedBehavior {
   return async (t) => {
     const { readFile: read } = await import("node:fs/promises");
-    const rel = "Tests/UnitTests/BolusCapTests.swift";
+    const rel = "tests/unit/bolus-cap.test.ts";
     const existing = await read(join(root, rel), "utf8").catch(() => "");
-    const n = [...existing.matchAll(/func test/g)].length + 1;
-    const tests = [...existing.matchAll(/^  func .*$/gm)].map((m) => m[0]);
-    tests.push(`  func testCap${n}() { XCTAssertEqual(BolusCap().max, 10) }`);
-    await put(root, rel, `import XCTest\n@testable import Domain\nfinal class BolusCapTests: XCTestCase {\n${tests.join("\n")}\n}\n`);
+    const n = [...existing.matchAll(/^it\(/gm)].length + 1;
+    const tests = [...existing.matchAll(/^it\(.*$/gm)].map((m) => m[0]);
+    tests.push(`it("plafond ${n}", () => expect(new BolusCap().max).toBe(10));`);
+    await put(root, rel, `import { expect, it } from "vitest";\nimport { BolusCap } from "../../src/domain/bolus-cap.js";\n\n${tests.join("\n")}\n`);
+    await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
+  };
+}
+
+/** Agent d'acceptance simulé : feature, plans et un test d'acceptance rouge par critère de la story. */
+export function acceptanceWriter(root: string): ScriptedBehavior {
+  return async (t) => {
+    const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
+    const criteria = [...t.prompt.matchAll(/^\s+(\d+)\. (.+)$/gm)].map((m) => ({ n: m[1]!, text: m[2]! }));
+    const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
+    const tests = criteria.map((c) => `it("ac-${c.n}", () => expect.fail(${JSON.stringify(c.text)}));`).join("\n");
+    await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
+    await put(root, `.skraft/${slug}/distill/test-plan.md`, "# Plan de test\n");
+    await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
+    const rel = "tests/acceptance/story.acceptance.test.ts";
+    await put(root, rel, `import { expect, it } from "vitest";\n\n${tests}\n`);
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
   };
 }
@@ -156,18 +172,9 @@ export function simulatedAgents(
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
       await writer(`.skraft/${slug}/design/contracts.md`, "`BolusCapped`\n")(t);
     },
-    "skraft-acceptance": async (t) => {
-      const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
-      const criteria = [...t.prompt.matchAll(/^\s+(\d+)\. (.+)$/gm)].map((m) => ({ n: m[1]!, text: m[2]! }));
-      const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
-      const tests = criteria.map((c) => `  func testAc${c.n}() { XCTFail(${JSON.stringify(c.text)}) } // ac-${c.n}`).join("\n");
-      await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
-      await put(root, `.skraft/${slug}/distill/test-plan.md`, "# Plan de test\n");
-      await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
-      await writer("Tests/AcceptanceTests/StoryAcceptanceTests.swift", `import XCTest\nfinal class StoryAcceptanceTests: XCTestCase {\n${tests}\n}\n`)(t);
-    },
+    "skraft-acceptance": acceptanceWriter(root),
     "skraft-test": unitTestWriter(root),
-    "skraft-dev": writer("Sources/Domain/BolusCap.swift", "public struct BolusCap {}\n"),
+    "skraft-dev": writer("src/domain/bolus-cap.ts", "export class BolusCap {}\n"),
     ...Object.fromEntries(
       ["cold-reader", "test-integrity", "architecture", "quality-gates"].map((l) => [
         `skraft-lens-${l}`,
@@ -227,44 +234,46 @@ export async function shutdownHosts(): Promise<void> {
 }
 
 /**
- * Fausse exécution Swift : chaque test d'acceptance marqué `ac-<n>` est rouge sur assertion tant que le
- * fichier de production `Sources/Domain/BolusCap.swift` n'existe pas, vert ensuite ; chaque test
- * unitaire de `Tests/UnitTests` est rouge sur symbole manquant tant que ce fichier n'existe pas.
+ * Fausse exécution Vitest : chaque test d'acceptance nommé `ac-<n>` est rouge sur assertion tant que le
+ * fichier de production `src/domain/bolus-cap.ts` n'existe pas, vert ensuite ; chaque test
+ * unitaire de `tests/unit` est rouge sur symbole manquant tant que ce fichier n'existe pas.
+ * Identifiants au format Vitest : `<fichier> > <nom du test>`.
  */
-async function fakeSwiftRun(opts: { root: string }) {
+async function fakeTypeScriptRun(opts: { root: string }) {
   const { readdir, readFile: read, access } = await import("node:fs/promises");
   const results: { id: string; file: string; status: "passed" | "failed"; failureKind?: "assertion" | "missing_symbol"; message?: string }[] = [];
-  const dir = join(opts.root, "Tests/AcceptanceTests");
-  const delivered = await access(join(opts.root, "Sources/Domain/BolusCap.swift")).then(() => true, () => false);
+  const dir = join(opts.root, "tests/acceptance");
+  const delivered = await access(join(opts.root, "src/domain/bolus-cap.ts")).then(() => true, () => false);
   for (const f of await readdir(dir).catch(() => [] as string[])) {
     const content = await read(join(dir, f), "utf8");
-    for (const m of content.matchAll(/func (testAc\d+)/g))
+    const file = `tests/acceptance/${f}`;
+    for (const m of content.matchAll(/^it\("(ac-\d+)"/gm))
       results.push(delivered
-        ? { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "passed" }
-        : { id: `AcceptanceTests.${f.replace(".swift", "")}/${m[1]}`, file: `Tests/AcceptanceTests/${f}`, status: "failed", failureKind: "assertion", message: "XCTFail" });
+        ? { id: `${file} > ${m[1]}`, file, status: "passed" }
+        : { id: `${file} > ${m[1]}`, file, status: "failed", failureKind: "assertion", message: "AssertionError" });
   }
-  const unitDir = join(opts.root, "Tests/UnitTests");
+  const unitDir = join(opts.root, "tests/unit");
   for (const f of await readdir(unitDir).catch(() => [] as string[])) {
     const content = await read(join(unitDir, f), "utf8");
-    for (const m of content.matchAll(/func (test\w+)/g)) {
-      const id = `UnitTests.${f.replace(".swift", "")}/${m[1]}`;
-      const file = `Tests/UnitTests/${f}`;
-      results.push(delivered ? { id, file, status: "passed" } : { id, file, status: "failed", failureKind: "missing_symbol", message: "cannot find 'BolusCap' in scope" });
+    const file = `tests/unit/${f}`;
+    for (const m of content.matchAll(/^it\("([^"]+)"/gm)) {
+      const id = `${file} > ${m[1]}`;
+      results.push(delivered ? { id, file, status: "passed" } : { id, file, status: "failed", failureKind: "missing_symbol", message: "Cannot find module '../../src/domain/bolus-cap.js'" });
     }
   }
   return { results, exitCode: results.some((r) => r.status === "failed") ? 1 : 0, timedOut: false, output: "", durationMs: 1 };
 }
 
-/** Pile Swift simulée (aucune chaîne réelle) : tests d'acceptance et unitaires lus sur le disque. */
-export function fakeSwiftStack(): StackAdapter {
+/** Pile TypeScript simulée (aucune chaîne réelle) : tests d'acceptance et unitaires lus sur le disque. */
+export function fakeStack(): StackAdapter {
   return {
-    id: "swift",
-    layout: { acceptanceTests: ["Tests/AcceptanceTests/**"], unitTests: ["Tests/**"], sources: ["Sources/**"] },
+    id: "typescript",
+    layout: { acceptanceTests: ["tests/acceptance/**"], unitTests: ["tests/**"], sources: ["src/**"] },
     infrastructureModules: ["Infrastructure"],
     detect: async () => true,
-    isTestFile: (p) => /(^|\/)Tests\//.test(p),
-    testFilePattern: "(^|\\/)Tests\\/",
-    runTests: fakeSwiftRun,
+    isTestFile: (p) => /(^|\/)tests\//.test(p),
+    testFilePattern: "(^|\\/)tests\\/",
+    runTests: fakeTypeScriptRun,
   };
 }
 
@@ -291,7 +300,7 @@ export async function assemble(root: string, runtime: ScriptedRuntime, tasksDir:
     engine,
     agents: createTaskAgentRunner({ runtime, root: workspace.root, idleMs: 3_600_000 }),
     workspace,
-    stack: opts.stack ?? fakeSwiftStack(),
+    stack: opts.stack ?? fakeStack(),
     interactions,
     chat: { post: (_e, md) => void posted.push(md) },
     evidence: createJsonEvidenceStore(join(tasksDir, "evidence")),

@@ -97,7 +97,7 @@ export interface PermissionArbiterDeps {
 }
 
 /** Commande de test seule, sans enchaînement ni redirection. */
-const TEST_COMMAND = /^\s*(?:(?:npm|pnpm|yarn)\s+(?:run\s+)?test|(?:npx\s+|pnpm\s+(?:exec\s+)?)?vitest\s+run|swift\s+test|dotnet\s+test)\b[^;&|`$<>()\n]*$/;
+const TEST_COMMAND = /^\s*(?:(?:npm|pnpm|yarn)\s+(?:run\s+)?test|(?:npx\s+|pnpm\s+(?:exec\s+)?)?vitest\s+run|dotnet\s+test)\b[^;&|`$<>()\n]*$/;
 
 /**
  * Arbitre unique (D27) : politique du cœur → hooks d'extension (premier refus l'emporte, plantage

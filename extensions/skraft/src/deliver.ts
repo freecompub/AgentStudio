@@ -52,7 +52,7 @@ export function planScenarios(input: { implPlan: string; acceptanceTestIds: stri
 
 /**
  * Un résultat désigne-t-il ce test ? Un fichier qui ne compile plus apparaît sous son seul nom :
- * - en `chemin > test` (Vitest, Swift), le chemin est un préfixe de l'identifiant ;
+ * - en `chemin > test` (Vitest), le chemin est un préfixe de l'identifiant ;
  * - en JUnit, l'identifiant est une classe qualifiée (`Projet.Tests.QuantiteTests.Methode`) : le
  *   fichier `…/QuantiteTests.cs` désigne alors les tests de la classe du même nom. Le 03/10, faute
  *   de cette règle, la porte GREEN a déclaré introuvable un test rouge par compilation devenu vert.
@@ -96,7 +96,7 @@ export function defaultDependencyRules(infrastructureModules: readonly string[])
   return [{ module: "Domain", forbidden: [...infrastructureModules] }];
 }
 // Les seuils de forme ne figurent plus ici : ils appartiennent à la configuration du linter du
-// projet (`.eslintrc`, `.swiftlint.yml`…), seul endroit où ils ne peuvent pas se contredire.
+// projet (`.eslintrc`…), seul endroit où ils ne peuvent pas se contredire.
 
 export { parseQualityBar, type QualityBar } from "@agent-studio/extension-api";
 

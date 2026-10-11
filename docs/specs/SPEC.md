@@ -19,7 +19,7 @@
 8. **Deux fichiers de référence accompagnent ce document** : `reference/tdd-orchestrator.ts` (machine à états TDD complète, compilée en TypeScript strict) et `reference/copilot-agents.ts` (adaptateur Copilot SDK : sessions par rôle, garde de périmètre, outils terminaux). Ce sont des prototypes à reprendre et découper, pas du code de production.
    La spécification détaillée de l'extension skraft est dans `SPEC-skraft.md`.
 9. **Ne jamais exposer un objet du SDK à une extension** (voir D10). C'est la règle de sécurité la plus importante du projet.
-10. **Aucun code propre à un langage hors des profils de stack** (section 8) : les extensions et le moteur de portes ne connaissent ni Swift, ni TypeScript, ni .NET.
+10. **Aucun code propre à un langage hors des profils de stack** (section 8) : les extensions et le moteur de portes ne connaissent ni TypeScript, ni .NET, ni aucun autre langage.
 
 ---
 
@@ -267,7 +267,7 @@ agent-studio/
 │   ├── extension-manifest/      # schéma JSON du manifeste + validation
 │   └── stack-profiles/          # moteur générique : lecteurs JUnit/TAP/Stryker, classification, imports,
 │                                #   schéma stack-profile@1, /stack init, /stack doctor, bac à sable des parseurs
-├── profiles/                    # profils d'exemple (swift-spm, typescript-vitest, dotnet) et gabarits de canaris
+├── profiles/                    # profils d'exemple (typescript-vitest, dotnet) et gabarits de canaris
 ├── extensions/
 │   ├── tdd/                     # première extension interne (jalon J2)
 │   └── skraft/                  # deuxième extension (jalons S1 à S6)
@@ -517,42 +517,42 @@ Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON S
 
 ```yaml
 schema: agent-studio/stack-profile@1
-name: swift-spm
-detect: ["Package.swift"]
+name: dotnet
+detect: ["*.sln", "*.csproj"]
 
 paths:
-  sources: ["Sources/**"]
-  unitTests: ["Tests/DomainTests/**", "Tests/ApplicationTests/**"]
-  acceptanceTests: ["Tests/AcceptanceTests/**"]
+  sources: ["src/**"]
+  unitTests: ["tests/**/*UnitTests/**"]
+  acceptanceTests: ["tests/**/*AcceptanceTests/**"]
 
 tests:
-  run: "swift test --parallel --xunit-output .build/junit.xml"
-  runOne: "swift test --filter {testId} --xunit-output .build/junit.xml"
-  report: { format: junit-xml, path: ".build/junit.xml" }
+  run: "dotnet test --logger \"junit;LogFilePath=TestResults/junit.xml\""
+  runOne: "dotnet test --filter {testId} --logger \"junit;LogFilePath=TestResults/junit.xml\""
+  report: { format: junit-xml, path: "TestResults/junit.xml" }
   timeoutSeconds: 600
   failureKinds:
-    missingSymbol: ["cannot find '.+' in scope", "has no member '.+'"]
-    syntax: ["expected expression", "consecutive statements"]
+    missingSymbol: ["CS0103", "CS0246", "CS0117"]
+    syntax: ["CS1002", "CS1513"]
 
 mutation:
-  run: "muter --format json --output .build/muter.json"
-  report: { format: custom, parser: "parsers/muter.js", path: ".build/muter.json" }
+  run: "dotnet stryker --reporter json"
+  report: { format: stryker-json, path: "StrykerOutput/**/mutation-report.json" }
   thresholds: { Domain: 100, Application: 100, Infrastructure: 90 }
 
 architecture:
-  imports: '^\s*(?:@testable\s+)?import\s+(\w+)'
+  imports: '^\s*using\s+([\w.]+)\s*;'
   layers:
-    Domain:         { paths: ["Sources/Domain/**"],         mayImport: ["Foundation"] }
-    Application:    { paths: ["Sources/Application/**"],    mayImport: ["Foundation", "Domain"] }
-    Infrastructure: { paths: ["Sources/Infrastructure/**"], mayImport: ["*"] }
+    Domain:         { paths: ["src/*.Domain/**"],         mayImport: ["System"] }
+    Application:    { paths: ["src/*.Application/**"],    mayImport: ["System", "*.Domain"] }
+    Infrastructure: { paths: ["src/*.Infrastructure/**"], mayImport: ["*"] }
 
 hints:
-  testFramework: "XCTest, une classe par comportement, XCTAssertEqual"
-  naming: "test<Comportement>_<Condition>"
+  testFramework: "xUnit, une classe par comportement, Assert.Equal"
+  naming: "<Comportement>_<Condition>"
 
 verification:            # écrit par /stack doctor, jamais à la main
   lastRun: "2026-09-24T10:12:00Z"
-  toolVersions: { swift: "6.1" }
+  toolVersions: { dotnet: "10.0" }
   results: { tests: ok, failureKinds: ok, mutation: ok, architecture: ok }
 ```
 
@@ -794,11 +794,11 @@ Pour chaque scénario, dans l'ordre du plan d'implémentation :
 
 ### 10.7 Stacks prises en charge
 
-skraft ne contient aucun adaptateur par langage : il utilise le profil de stack du projet (section 8). Une porte dont la capacité manque au profil (mutation, architecture) est « non disponible » et suit la politique du projet (D45). Le fil rouge US-12 suppose un profil Swift vérifié par `/stack doctor`.
+skraft ne contient aucun adaptateur par langage : il utilise le profil de stack du projet (section 8). Une porte dont la capacité manque au profil (mutation, architecture) est « non disponible » et suit la politique du projet (D45). Le fil rouge US-12 suppose un profil vérifié par `/stack doctor`. Swift n'est plus pris en charge (ADR 0061).
 
 ### 10.8 Scénario de validation de bout en bout (fil rouge)
 
-À utiliser comme test d'acceptance de l'extension skraft, sur un projet Swift de démonstration :
+À utiliser comme test d'acceptance de l'extension skraft, sur un projet de démonstration :
 
 > **US-12 — Plafonner le bolus proposé.** Quand le calcul propose une dose supérieure au plafond défini par le médecin, la dose proposée est limitée à ce plafond et une alerte explique pourquoi.
 > 1. Plafond 10 U, calcul 6 U → 6 U, pas d'alerte.
@@ -879,13 +879,13 @@ Chaque jalon est livrable seul et a des critères de sortie vérifiables.
 | **J2** | Registre, routeur, API `ctx` minimale ; moteur de tâches (réducteur, effets, persistance, watchdog, reprise) ; extension `tdd` **chargée en processus** ; moteur de profils minimal (JUnit XML, classification) et un profil TypeScript écrit à la main | `/tdd` déroule un cycle complet sur un projet TypeScript ; tous les tests du réducteur passent sans LLM ; une modification de test par l'agent dev est détectée et annulée ; un redémarrage en plein GREEN reprend proprement |
 | **J3** | Outil `run_tests` et preuves produites par le code ; granularité par défaut (un tour par comportement) ; demandes d'interaction persistées ; cartes, jalons, alertes | Preuves de rouge puis vert présentes pour chaque comportement ; une escalade survit à un redémarrage et reprend après réponse |
 | **J4** | Isolation en `utilityProcess` ; arbitre de permissions ; composition des hooks ; manifeste validé | L'extension `tdd` tourne hors du processus principal sans perte de fonction ; une permission non déclarée est refusée ; un hook qui plante n'autorise rien |
-| **J5** | Profils de stack complets : schéma, TAP et mutation Stryker, analyse d'imports, capacités, `/stack init`, `/stack doctor`, parseurs en bac à sable ; instrumentation de l'usage | Un profil généré par `/stack init` et vérifié par `/stack doctor` sur un projet Swift et un projet TypeScript ; `/tdd` fonctionne sur les deux ; usage affiché par état |
+| **J5** | Profils de stack complets : schéma, TAP et mutation Stryker, analyse d'imports, capacités, `/stack init`, `/stack doctor`, parseurs en bac à sable ; instrumentation de l'usage | Un profil généré par `/stack init` et vérifié par `/stack doctor` sur un projet Swift et un projet TypeScript ; `/tdd` fonctionne sur les deux ; usage affiché par état. Swift retiré le 2026-10-11 (ADR 0061) |
 | **J6** | Paquets signés, installation depuis un fichier, révocation ; modes simple et avancé ; profils | Une extension tierce s'installe depuis un fichier ; un profil non-développeur mène une tâche sans aide |
 | **S1** | Extension `skraft` : réducteur du pipeline, INIT, difficulté, routage ; état unifié | Pipeline complet à vide avec agents simulés ; les quatre phases toujours enchaînées |
 | **S2** | RESEARCH : présélection, porte citations, questions ouvertes | Citation hors limites rejetée sur le fil rouge |
 | **S3** | DESIGN : `artifact adr`, porte cohérence, état Ratification | Incohérence de nom d'événement rejetée ; DISTILL impossible avant ratification |
 | **S4** | DISTILL : porte valeurs, porte RED d'acceptance, tous les tests d'acceptance | Valeur arrondie rejetée ; test déjà vert requalifié |
-| **S5** | DELIVER : sous-machine par scénario, mutation, architecture | Fil rouge US-12 livré en Swift avec preuves produites par le code |
+| **S5** | DELIVER : sous-machine par scénario, mutation, architecture | Fil rouge US-12 livré en Swift avec preuves produites par le code. Swift retiré le 2026-10-11 (ADR 0061) : seule la pile simulée reste |
 | **S6** | Revue : faits établis par le code, lentilles à schéma, synthèse par le code | Verdict reproductible à partir des mêmes JSON de lentilles |
 | **API 1.0** | Gel de l'API `ctx` | Après S6 (D14) |
 
@@ -906,7 +906,7 @@ Restent donc à faire, et le vocabulaire de J2, J5, O11 et O13 s'y rapporte :
 - commandes `/stack init` et `/stack doctor` ;
 - parseurs exécutés en bac à sable ;
 - liste des programmes autorisés par profil (O12, D47), linter compris (ADR 0022) ;
-- mutation Stryker pour TypeScript — seul Muter (Swift) est branché.
+- mutation Stryker pour TypeScript — seul Muter (Swift) est branché. (Depuis : lecteur `stryker-json` branché, Muter retiré avec Swift, ADR 0061.)
 
 ---
 
@@ -926,7 +926,7 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | Plugins CLI | Mis en cache à l'installation : réinstaller pour prendre en compte une modification locale |
 | Claude Agent SDK | Clé API ou fournisseur cloud obligatoire pour une application tierce ; pas de connexion claude.ai sans accord d'Anthropic ; le produit garde sa propre marque |
 | ACP | Copilot CLI se lance en mode ACP avec `copilot --acp` ; pas d'équivalent aux hooks en code ; protocole encore en évolution |
-| Profils de stack | Options des outils à confirmer par `/stack doctor` : `swift test --xunit-output` (SwiftPM seulement ; un projet Xcode doit convertir son `xcresult`), format JSON de Muter (conforme ou non au schéma Stryker), reporters JUnit de Vitest, Jest et `dotnet test` |
+| Profils de stack | Options des outils à confirmer par `/stack doctor` : reporters JUnit de Vitest, Jest et `dotnet test` |
 
 ---
 
@@ -958,4 +958,4 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | O10 | Nom définitif de l'application (D39) | `agent-studio` comme nom de code |
 | O11 | Format du profil de stack : YAML ou JSON ? | YAML pour la lisibilité, validé par JSON Schema |
 | O12 | Contenu initial de la liste des programmes autorisés dans un profil (D47) | Lanceurs de tests et outils de mutation courants, extensible par l'utilisateur |
-| O13 | Premier profil à livrer en exemple | Swift (SwiftPM) et TypeScript (Vitest) |
+| O13 | Premier profil à livrer en exemple | TypeScript (Vitest) ; Swift retiré (ADR 0061) |

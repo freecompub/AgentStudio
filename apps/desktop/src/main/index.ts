@@ -9,7 +9,7 @@ import { API_VERSION } from "@agent-studio/extension-api";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
 import { fabriquesDEssai, modeEssaiActif } from "./mode-essai.js";
-import { createSwiftAdapter, createTypeScriptAdapter, findLocalSwiftToolchain } from "@agent-studio/stack-adapters";
+import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, cloneWorkspace, openWorkspace } from "@agent-studio/workspace";
 import { events, REQUEST_CHANNELS, type EventChannel, type EventPayload } from "../shared/ipc-contract.js";
 import { createAppController, type AppController } from "./app-controller.js";
@@ -193,9 +193,9 @@ async function createController(): Promise<AppController> {
         launcher: createUtilityProcessLauncher({ onStderr: (c) => logger.warn("sortie d'erreur d'un workflow", { output: c.slice(0, 2_000) }) }),
         runtimeEntry: WORKFLOW_RUNTIME,
       },
-      // Swift (SwiftPM) puis TypeScript (Vitest) ; chaîne Swift du système ou installée hors système.
+      // TypeScript (Vitest).
       // Un projet qui déclare son propre profil (`.agent-studio/stack.yaml`) l'emporte sur eux.
-      stacks: [createSwiftAdapter({ toolchain: findLocalSwiftToolchain() ?? {} }), createTypeScriptAdapter()],
+      stacks: [createTypeScriptAdapter()],
       // Programmes qu'un profil peut nommer : la liste vient de l'administrateur (D47, O12).
       allowedPrograms: admin.allowedPrograms,
       tasksDir: join(userData, "tasks"),

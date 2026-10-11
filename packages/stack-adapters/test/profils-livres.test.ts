@@ -19,14 +19,14 @@ const charger = (nom: string) => {
 };
 
 describe("Profils d'exemple livrés", () => {
-  it.each(["typescript", "swift"])("%s est valide et ses programmes sont autorisés par défaut", (nom) => {
+  it.each(["typescript"])("%s est valide et ses programmes sont autorisés par défaut", (nom) => {
     const p = charger(nom);
     expect(p.id).toBe(nom);
     expect(p.layout.sources.length).toBeGreaterThan(0);
   });
 
   it("chacun donne un adaptateur utilisable", () => {
-    for (const nom of ["typescript", "swift"]) {
+    for (const nom of ["typescript"]) {
       const a = createProfileAdapter(charger(nom));
       expect(a.lint).toBeDefined();
       expect(a.mutation).toBeDefined();
@@ -35,7 +35,7 @@ describe("Profils d'exemple livrés", () => {
   });
 
   it("chacun déclare des canaris, sans quoi `/stack doctor` ne vérifierait rien", () => {
-    for (const nom of ["typescript", "swift"]) {
+    for (const nom of ["typescript"]) {
       const kinds = charger(nom).canaries.map((c) => c.kind);
       // `passed`, `assertion` et `syntax` au minimum : le trio qui prouve que la porte RED
       // distingue un rouge légitime d'un code qui ne compile pas.
@@ -46,6 +46,6 @@ describe("Profils d'exemple livrés", () => {
   it("ce qu'un profil ne sait pas encore exprimer reste absent, plutôt que faux", () => {
     // L'analyse des imports n'a pas de section dans le schéma : avec un profil, la règle de
     // dépendance n'est pas vérifiée, et la porte le dit — elle n'invente pas un résultat.
-    expect(createProfileAdapter(charger("swift")).architecture).toBeUndefined();
+    expect(createProfileAdapter(charger("typescript")).architecture).toBeUndefined();
   });
 });

@@ -54,10 +54,10 @@
     },
     {
       "id": "j5-profils-exemple",
-      "title": "Des profils d'exemple existent pour TypeScript et Swift",
+      "title": "Un profil d'exemple existe pour TypeScript",
       "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
       "passes": true,
-      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Swift déclare ses quatre canaris depuis que `buildErrors` existe. Reste en dessous des adaptateurs écrits à la main sur deux points : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+      "notes": "`profiles/typescript.yaml`, à copier dans `.agent-studio/stack.yaml`. `profiles/swift.yaml` retiré le 2026-10-11 (ADR 0061) ; le profil TypeScript lisait `muter-json` pour Stryker, il lit `stryker-json`. Reste en dessous de l'adaptateur écrit à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
     },
     {
       "id": "j5-chargement-profil",
@@ -85,7 +85,7 @@
       "title": "Un profil peut fournir l'analyse des imports (règle de dépendance)",
       "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'architecture'",
       "passes": false,
-      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
+      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. Depuis le retrait de Swift (ADR 0061), aucun adaptateur ne fournit cette analyse : la porte d'architecture est « non disponible » partout."
     },
     {
       "id": "j5-canaris",
@@ -127,7 +127,7 @@
       "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
       "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
       "passes": false,
-      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, swiftlint-json, muter-json. N'annoncer un format qu'une fois son lecteur écrit."
+      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, stryker-json (swiftlint-json et muter-json retirés avec Swift, ADR 0061). N'annoncer un format qu'une fois son lecteur écrit."
     },
     {
       "id": "j5-stack-init-doctor",
@@ -135,6 +135,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
       "passes": true,
       "notes": "§8.6 : la vérification PAR EXÉCUTION est faite depuis le 25/09 — `/stack doctor` ouvre un git worktree et y lance les canaris. Manquent encore : proposition par un agent via `submit_stack_profile`, réessai ciblé à budget, relance sur changement du verrou de dépendances."
+    },
+    {
+      "id": "retrait-swift",
+      "title": "Swift est retiré : aucun adaptateur, lecteur, profil ni programme autorisé Swift dans le code",
+      "verify": "! git grep -n -iE \"swift|muter-json|swiftlint\" -- 'packages/*/src' 'apps/desktop/src' 'extensions/*/src' workflows 'profiles/*.yaml' && pnpm vitest run --project stack-adapters --project ext-skraft --project workflow-skraft --project ext-tdd --project desktop --project core",
+      "passes": true,
+      "notes": "ADR 0061, 2026-10-11, à la demande de l'utilisateur : les 4 tests de bout en bout Swift cassaient depuis le précontrôle (ADR 0060). Lecteur JUnit XML déplacé dans src/reports/junit-xml.ts. Pile simulée des tests skraft passée en TypeScript (`fakeStack`). Conséquence : les critères S5 « US-12 livrée » et S6 « bout en bout 13.3 » ne sont plus couverts que par la pile simulée ; un bout en bout sur une vraie chaîne (TypeScript ou .NET) est à écrire. Les chemins `.swift` qui restent dans les tests unitaires de skraft sont des données de texte."
     },
     {
       "id": "extensions-sans-langage",
@@ -732,10 +739,10 @@
     },
     {
       "id": "skraft-deliver-en-workflow",
-      "title": "skraft-workflow mène DELIVER et tout le pipeline : jumeaux de e2e-s5 et e2e-s6 (vraie chaîne Swift, correction de revue, usage sur trois stories) et reprise après un crash au milieu de DELIVER",
+      "title": "skraft-workflow mène DELIVER et tout le pipeline : jumeaux de e2e-s5 et e2e-s6 (pile simulée, correction de revue, usage sur trois stories) et reprise après un crash au milieu de DELIVER",
       "verify": "pnpm vitest run --project workflow-skraft test/e2e-s5-workflow.test.ts test/e2e-s6-workflow.test.ts test/e2e-reprise-workflow.test.ts test/deliver-gates.test.ts",
       "passes": true,
-      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/livraison.ts : 595 lignes de code, portes comprises (skraft : deliver-machine 299 + deliver-effects 340). Pipeline complet : 1 015 lignes contre 1 624 dans skraft (dont 269 de types d’état, d’événements et d’effets). Divergences assumées : rembobiner fait oublier les agents (ADR 0053, décidé ; le réducteur ne le faisait pas en DELIVER) ; usage par phase (pas d’états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non comptés ; relancer après escalade pendant une correction de revue reprend la correction (le réducteur repartait du pas « test »). Les tests Swift tournent si la chaîne est installée (~/.cache/agent-studio/swift). Coexistence avec skraft décidée (ADR 0054) ; l’extension s’empaquette et s’installe comme skraft (test/install.test.ts)."
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/livraison.ts : 595 lignes de code, portes comprises (skraft : deliver-machine 299 + deliver-effects 340). Pipeline complet : 1 015 lignes contre 1 624 dans skraft (dont 269 de types d’état, d’événements et d’effets). Divergences assumées : rembobiner fait oublier les agents (ADR 0053, décidé ; le réducteur ne le faisait pas en DELIVER) ; usage par phase (pas d’états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non comptés ; relancer après escalade pendant une correction de revue reprend la correction (le réducteur repartait du pas « test »). Les tests Swift tournent si la chaîne est installée (~/.cache/agent-studio/swift). Coexistence avec skraft décidée (ADR 0054) ; l’extension s’empaquette et s’installe comme skraft (test/install.test.ts). — 2026-10-11 : les jumeaux sur la vraie chaîne Swift sont retirés avec Swift (ADR 0061) ; restent les tests sur pile simulée."
     },
     {
       "id": "skraft-distill-en-workflow",

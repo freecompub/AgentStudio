@@ -46,8 +46,8 @@ ces erreurs, sans quoi ce rouge légitime n'atteint jamais la porte.
 
 ```yaml
 buildErrors:
-  pattern: '^(?<file>[^\s:]+\.swift):\d+:\d+: error: (?<message>.*)$'
-  missingSymbol: ["cannot find", "no such module"]
+  pattern: '^(?<file>[^\s(]+\.cs)\(\d+,\d+\): error (?<message>.*)$'
+  missingSymbol: ["CS0103", "CS0246"]
 ```
 
 Le motif est appliqué **ligne à ligne**, et les groupes nommés `file` et `message` sont
@@ -76,10 +76,10 @@ main. Elles sont inscrites dans `features.json`.
   se rabat sur la présence d'un `vitest.config.ts`, ce qui est plus fragile.
 - **L'analyse des imports n'a pas de section.** Avec un profil, `ctx.stack.architecture()` renvoie
   `null` : la règle de dépendance n'est pas vérifiée, et la porte de fin de scénario le dit au
-  lieu d'inventer un résultat. L'adaptateur Swift sait le faire, un profil non.
+  lieu d'inventer un résultat. Aucun adaptateur ne le fait depuis le retrait de Swift (ADR 0061).
 - **La classification des échecs est générique.** Le lecteur `junit-xml` déduit la raison d'un
   rouge — assertion, symbole manquant, autre — de motifs communs à plusieurs langages. Les
   adaptateurs écrits à la main connaissent leur outil et sont plus précis.
 
-Autrement dit, les deux profils ci-contre **ne remplacent pas encore** les adaptateurs Swift et
-TypeScript : ils montrent ce qu'un projet tiers peut déclarer aujourd'hui.
+Autrement dit, le profil ci-contre **ne remplace pas encore** l'adaptateur
+TypeScript : il montre ce qu'un projet tiers peut déclarer aujourd'hui.
