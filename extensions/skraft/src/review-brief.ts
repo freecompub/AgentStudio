@@ -40,6 +40,8 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
   if (phase === "DELIVER")
     for (const x of state.derogations ?? [])
       facts.push(`Dérogation de mutation (${x.par}) : ${x.file}:${x.line} (${x.operator}) — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
+  if (phase === "DELIVER")
+    for (const x of state.derogationsCouverture ?? []) facts.push(`Ligne exemptée de la couverture du diff (humain) : ${x.file}:${x.line} — ${x.raison}.`);
   const last = evidence.filter((e) => e.source === "gate" && e.phase?.startsWith(phase)).at(-1);
   if (last)
     facts.push(

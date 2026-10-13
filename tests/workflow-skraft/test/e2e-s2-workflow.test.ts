@@ -140,7 +140,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
     await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
     const correction = testPrompts.find((p) => p.includes("[couverture#"));
-    expect(correction).toMatch(/\[couverture#\d+\.1, major, test\].*src\/domain\/bolus-stub\.ts.*Lignes non couvertes : 1\..*test qui exerce/s);
+    expect(correction).toMatch(/\[couverture#\d+\.1, major, test\].*src\/domain\/bolus-stub\.ts, lignes non couvertes : 1\..*test qui exerce/s);
   }, 90_000);
 
   // D5 (docs/12) : revue de DELIVER sans défaut bloquant ni majeur, alors que tout est vert.

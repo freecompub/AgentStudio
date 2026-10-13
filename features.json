@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "couverture-contestee-arbitree-par-l-humain",
+      "title": "En fin de DELIVER, une couverture du diff contestée est tranchée par l'humain : dérogation sur des lignes précises (tracée, commitée) ou à tester",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project stack-adapters e2e-arbitrage-couverture deliver-gates",
+      "passes": true,
+      "notes": "Suite de D22 (ADR 0065), 2026-10-13. lignesSousLeSeuil et sansLignesExemptees (deliver). Workflow : filsDeCouverture, arbitrerCouverture (livraison.mjs), humain arbitrer-couverture. Extension : couvertureThreads (reducer.ts), file d'arbitrage commune (deliver-machine.ts), askMutationArbitration pour la couverture (effects.ts). Bouts en bout dans les deux (source écrite en DISTILL), vérifiés en échec sans la correction. Limite : une ligne écrite pendant un scénario est jugée par la porte du scénario."
+    },
+    {
       "id": "gel-annonce-quand-il-est-definitif",
       "title": "Le gel des tests d'acceptance n'est annoncé qu'une fois définitif ; une DISTILL sautée est signalée au début de DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft e2e-gel",

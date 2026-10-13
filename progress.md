@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/10 — Couverture du diff contestée : l'humain tranche (suite de D22)
+
+- En fin de DELIVER, une contestation de couverture va directement à l'humain : dérogation sur les
+  lignes précises (retirées du calcul, tracées, commitées dans `derogations.md`), ou « à tester »
+  sans recours. Les défauts de couverture portent maintenant leur fichier et leurs lignes.
+- **Limite découverte en testant** : la couverture est aussi mesurée à la porte de **chaque
+  scénario**. Une ligne écrite pendant un scénario fait échouer le scénario, puis il y a escalade,
+  sans défaut à contester. L'arbitrage ne vaut donc que pour les sources écrites hors des
+  scénarios (en DISTILL, par exemple). Même structure pour la « suite finale » : un test existant
+  cassé est refusé dès le pas vert.
+- **Décision du responsable du projet** pour le test existant devenu obsolète : remonter à
+  l'humain avec deux options. « Rejouer DISTILL » efface DELIVER. « Mettre en pause » demande
+  ensuite d'où repartir. À concevoir (ADR à venir).
+
+---
+
 ## 11/10 — D1 terminé : gel annoncé quand il est définitif, DISTILL sautée signalée
 
 - Le fait de revue de DISTILL disait « Tests d'acceptance gelés », alors que la revue peut encore

@@ -19,7 +19,7 @@ import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
-import { checkCoverage } from "./deliver.js";
+import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees } from "./deliver.js";
 import { lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
@@ -330,7 +330,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       for (const [i, r] of state.reviews[effect.phase].entries())
         if (i >= (state.debutDesRevues?.[effect.phase] ?? 0)) await writeReview(ctx, state.slug, effect.phase, i + 1, r.attempt, r.lenses);
       // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
-      if (effect.phase === "DELIVER" && state.derogations?.length)
+      if (effect.phase === "DELIVER" && (state.derogations?.length || state.derogationsCouverture?.length))
         await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/derogations.md`, rapportDeDerogations(state));
       return { type: "COMMITTED", sha: await ctx.git.commit(effect.message) };
 
@@ -348,6 +348,21 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 
     case "askMutationArbitration": {
       const t = effect.thread;
+      if (t.couverture) {
+        const element = `${t.couverture.file}:${t.couverture.lines.join(", ")}`;
+        await ctx.interactions.request({
+          taskId,
+          title: `Arbitrer un défaut de couverture (${t.id})`,
+          detail: `Lignes non couvertes : ${element}\nContestation du testeur : « ${t.contestation ?? "?"} »\nJustifie ta décision en commentaire : elle est tracée et commitée.`,
+          options: [
+            { id: `derogation:${t.id}`, label: "Lignes inatteignables ou sans comportement : accorder la dérogation" },
+            { id: `corriger:${t.id}`, label: "À tester : le testeur doit les couvrir" },
+          ],
+          freeText: true,
+          requiredRoles: ["developpeur", "architecte", "administrateur"],
+        });
+        return;
+      }
       const m = t.mutant!;
       await ctx.interactions.request({
         taskId,
@@ -411,9 +426,10 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
     const problems = baselineProblems(run);
     if (problems.length) return { type: "GATE_FAIL", gate: "suite finale", reasons: problems };
     if (run.coverage) {
-      const diff = coverageForChanges(run.coverage, sources);
+      // Lignes exemptées par l'humain : hors du calcul (arbitrage de la couverture contestée).
+      const diff = coverageForChanges(run.coverage, sansLignesExemptees(sources, state.derogationsCouverture ?? []));
       const reasons = checkCoverage(diff.report, sources.map((f) => f.path), bar, true);
-      if (reasons.length) return { type: "GATE_FAIL", gate: "couverture du diff", reasons };
+      if (reasons.length) return { type: "GATE_FAIL", gate: "couverture du diff", reasons, lignes: lignesSousLeSeuil(diff.report, sources.map((f) => f.path), bar) };
       coverageNotes.push(...diff.notes);
       coverageFacts.push(...diff.report.files.map((f) => `Couverture du diff (tâche) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`));
     } else coverageNotes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
@@ -598,15 +614,35 @@ async function briefArbitre(ctx: ExtensionContext, state: SkraftState, threads: 
 /** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
 function rapportDeDerogations(s: SkraftState): string {
   const cellule = (x: string) => x.replace(/\|/g, "\\|");
+  const mutants = s.derogations ?? [];
+  const lignes = s.derogationsCouverture ?? [];
   return [
-    `# Dérogations de mutation — ${s.story?.id ?? s.slug}`,
+    `# Dérogations — ${s.story?.id ?? s.slug}`,
     "",
-    "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
-    "",
-    "| Mutant | Décidé par | Raison | Contestation du testeur |",
-    "| --- | --- | --- | --- |",
-    ...(s.derogations ?? []).map((x) => `| ${x.file}:${x.line} (${x.operator}) | ${x.par} | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
-    "",
+    ...(mutants.length
+      ? [
+          "## Mutation",
+          "",
+          "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
+          "",
+          "| Mutant | Décidé par | Raison | Contestation du testeur |",
+          "| --- | --- | --- | --- |",
+          ...mutants.map((x) => `| ${x.file}:${x.line} (${x.operator}) | ${x.par} | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
+    ...(lignes.length
+      ? [
+          "## Couverture du diff",
+          "",
+          "Lignes exemptées par l'humain, après contestation du testeur.",
+          "",
+          "| Ligne | Décidé par | Raison | Contestation du testeur |",
+          "| --- | --- | --- | --- |",
+          ...lignes.map((x) => `| ${x.file}:${x.line} | humain | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -622,6 +658,9 @@ function finalReport(s: SkraftState): string {
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
     ...(s.nonCommitees?.length ? [`Phases non commitées : ${s.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
+    ...(s.derogationsCouverture?.length
+      ? [`Lignes exemptées de la couverture du diff : ${s.derogationsCouverture.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`]
+      : []),
     ...(s.derogations?.length
       ? [
           `Dérogations de mutation : ${s.derogations.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`,

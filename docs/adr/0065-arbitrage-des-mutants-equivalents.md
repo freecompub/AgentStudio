@@ -54,7 +54,13 @@ ont été mesurés.
 - Extension : les défauts créés par une porte de fin de DELIVER sont désormais tenus dans
   `reviewThreads`. Avant, ils ne servaient qu'à la consigne, et les réponses du testeur ou du
   développeur à ces défauts étaient ignorées (le workflow les tenait déjà).
-- Hors périmètre : la couverture du diff et la suite finale n'ont pas de dérogation. Leur
-  contestation n'a toujours pas d'arbitre ; elle finit en escalade sur le motif de la porte.
+- **Complété le 2026-10-13 : couverture du diff.** En fin de DELIVER, une contestation va
+  directement à l'**humain**, sans agent : il accorde une dérogation sur les lignes précises (hors
+  du calcul, tracée, commitée dans `derogations.md`, section « Couverture du diff »), ou exige le test, sans
+  recours. Limite : cela ne vaut que pour les sources que seule la porte de fin mesure (écrites hors
+  des scénarios, par exemple en DISTILL). Une ligne écrite pendant un scénario est jugée par la
+  porte du scénario, qui n'a pas de défaut à contester.
+- La suite finale n'a pas de dérogation : un test existant cassé est d'abord refusé par les portes
+  des pas. Le cas du test devenu obsolète relève d'une autre décision.
 - La mutation par scénario (`moment: scenario`) n'ouvre pas d'arbitrage : un échec y reprend le
   scénario. Les dérogations déjà accordées y sont appliquées.

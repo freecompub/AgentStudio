@@ -180,7 +180,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const threads = [
           ...(s.reviewThreads ?? []),
           // Mutation : un défaut par mutant survivant, qui peut être tué ou contesté puis arbitré (ADR 0065).
-          ...(e.gate === "mutation" && e.mutants?.length ? mutationThreads(e.mutants, s.attempts + 1) : endGateThreads(e.gate, e.reasons, s.attempts + 1)),
+          ...(e.gate === "mutation" && e.mutants?.length
+            ? mutationThreads(e.mutants, s.attempts + 1)
+            : e.gate === "couverture du diff" && e.lignes?.length
+              ? couvertureThreads(e.lignes, s.attempts + 1)
+              : endGateThreads(e.gate, e.reasons, s.attempts + 1)),
         ];
         // Les fils sont tenus dans l'état, comme ceux d'une revue : les réponses de l'agent s'y appliquent.
         return startReviewFix({ ...s, reviewThreads: threads }, threads);
@@ -328,7 +332,8 @@ const CORRECTIONS_DE_FIN: Record<string, { id: string; target: "test" | "code"; 
     target: "test",
     consigne:
       "Ajoute le test qui exerce ces lignes par un comportement observable. " +
-      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si elle ne peut pas être exercée (code défensif inatteignable), conteste le défaut avec ta raison : l'humain tranchera.",
   },
   "suite finale": {
     id: "suite finale",
@@ -346,6 +351,21 @@ function endGateThreads(gate: string, reasons: string[], round: number): DefectT
     severity: "major" as const,
     description: `${description} ${c.consigne}`,
     target: c.target,
+    status: "open" as const,
+    round,
+  }));
+}
+
+/** Lignes non couvertes → un défaut par fichier, adressé au testeur, qui garde ses lignes. */
+function couvertureThreads(lignes: { file: string; lines: number[] }[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN["couverture du diff"]!;
+  return lignes.map((x, i) => ({
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
+    severity: "major" as const,
+    description: `Couverture du diff : ${x.file}, lignes non couvertes : ${x.lines.join(", ")}. ${c.consigne}`,
+    target: c.target,
+    couverture: x,
     status: "open" as const,
     round,
   }));
@@ -547,7 +567,7 @@ function oublierLaPhase(s: SkraftState): SkraftState {
     ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
     : s;
   // Le code effacé emporte les mutants exemptés (ADR 0065) ; les arbitrages, eux, restent tracés.
-  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [] } : sansLivrables;
+  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [] } : sansLivrables;
   return s.adrsAvantPhase ? { ...sansDerogations, adrs: s.adrsAvantPhase } : sansDerogations;
 }
 

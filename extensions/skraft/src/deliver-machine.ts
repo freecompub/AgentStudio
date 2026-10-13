@@ -472,11 +472,14 @@ function arbitrerMutants(s0: SkraftState, d: DeliverState): Out {
     // Déjà exempté (correction reprise après un échec) : rien à rejuger.
     if ((s.derogations ?? []).some((x) => memeMutant(x, t.mutant!))) s = avecStatut(s, t.id, "accepted");
     else aJuger.push(t);
-  if (!aJuger.length) return apresCorrectionTests(s, d);
-  const nd: DeliverState = { ...d, step: "mutation-arbitration", mutationArbitration: { human: [] } };
+  // Couverture du diff contestée : pas d'arbitre, l'humain tranche directement.
+  const couverture = (s.reviewThreads ?? []).filter((t) => t.couverture !== undefined && (t.status === "contested" || t.status === "recontested")).map((t) => ({ id: t.id, avis: "" }));
+  if (!aJuger.length && !couverture.length) return apresCorrectionTests(s, d);
+  const nd: DeliverState = { ...d, step: "mutation-arbitration", mutationArbitration: { human: couverture } };
+  if (!aJuger.length) return demanderHumain(s, nd);
   if (restantes(s) > 0) return { state: { ...s, stage: "ARBITRATION", deliver: nd }, effects: [{ kind: "arbitrateMutants", threads: aJuger }] };
   const avis = `L'arbitre n'a pas été consulté : plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre atteint.`;
-  return demanderHumain(s, { ...nd, mutationArbitration: { human: aJuger.map((t) => ({ id: t.id, avis })) } });
+  return demanderHumain(s, { ...nd, mutationArbitration: { human: [...couverture, ...aJuger.map((t) => ({ id: t.id, avis }))] } });
 }
 
 const restantes = (s: SkraftState) => MAX_DEROGATIONS_PAR_ARBITRE - (s.derogations ?? []).filter((x) => x.par === "agent").length;
@@ -503,7 +506,7 @@ function arbitrageEnCours(s0: SkraftState, d: DeliverState, e: Ev): Out | null {
           : `L'arbitre le juge non équivalent : ${j.reason ?? "sans raison"}.`;
       human.push({ id: t.id, avis });
     }
-    return demanderHumain(s, { ...d, mutationArbitration: { human } });
+    return demanderHumain(s, { ...d, mutationArbitration: { human: [...(d.mutationArbitration?.human ?? []), ...human] } });
   }
   if (e.type === "HUMAN_DECISION") {
     const attendu = d.mutationArbitration?.human[0];
@@ -511,6 +514,10 @@ function arbitrageEnCours(s0: SkraftState, d: DeliverState, e: Ev): Out | null {
     const [choix, id] = [e.decision.slice(0, i), e.decision.slice(i + 1)];
     const t = attendu && id === attendu.id ? fil(id) : undefined;
     if (!t || (choix !== "derogation" && choix !== "corriger")) return { state: s, effects: [] };
+    if (t.couverture) {
+      s = choixCouverture(s, t, choix === "derogation", e.comment);
+      return demanderHumain(s, { ...d, mutationArbitration: { human: d.mutationArbitration!.human.slice(1) } });
+    }
     s =
       choix === "derogation"
         ? avecStatut(accorder(s, t, "humain", e.comment ?? "(sans justification)"), t.id, "humanAccepted")
@@ -518,6 +525,16 @@ function arbitrageEnCours(s0: SkraftState, d: DeliverState, e: Ev): Out | null {
     return demanderHumain(s, { ...d, mutationArbitration: { human: d.mutationArbitration!.human.slice(1) } });
   }
   return null;
+}
+
+/** Couverture contestée, tranchée par l'humain : dérogation sur ces lignes, ou à tester sans recours. */
+function choixCouverture(s: SkraftState, t: DefectThread, derogation: boolean, comment: string | undefined): SkraftState {
+  const c = t.couverture!;
+  const raison = comment ?? (derogation ? "(sans justification)" : "");
+  const trace: ArbitrageRecord = { porte: "couverture du diff", élément: `${c.file}:${c.lines.join(", ")}`, contestation: t.contestation ?? "", décision: derogation ? "dérogation" : "à corriger", par: "humain", raison };
+  const ns: SkraftState = { ...s, arbitrages: [...(s.arbitrages ?? []), trace] };
+  const exemptees = derogation ? c.lines.map((line) => ({ file: c.file, line, raison, contestation: t.contestation ?? "", defaut: t.id })) : [];
+  return avecStatut({ ...ns, derogationsCouverture: [...(s.derogationsCouverture ?? []), ...exemptees] }, t.id, derogation ? "humanAccepted" : "humanMaintained");
 }
 
 /** Prochain mutant à soumettre à l'humain ; quand il n'y en a plus, la correction reprend. */

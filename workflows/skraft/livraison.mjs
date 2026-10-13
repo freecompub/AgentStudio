@@ -8,7 +8,7 @@
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief } from "./brief.mjs";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, planScenarios } from "./deliver.mjs";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -45,7 +45,7 @@ export async function livrer(w, d, lentilles, max) {
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
     await ecrireRapports(w, d.slug, "DELIVER", suivi);
     // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
-    if (d.derogations.length)
+    if (d.derogations.length || d.derogationsCouverture.length)
       await w.ecrireFichier(`.skraft/${d.slug}/deliver/derogations.md`, rapportDeDerogations(d));
     return true;
   }, {
@@ -57,6 +57,7 @@ export async function livrer(w, d, lentilles, max) {
       oublierLeRun(suivi);
       // Le code effacé emporte les mutants qu'on avait exemptés (ADR 0065) ; la trace les garde.
       d.derogations = [];
+      d.derogationsCouverture = [];
       return creerDossiers(w, d.slug);
     },
   });
@@ -596,7 +597,8 @@ const CORRECTIONS_DE_FIN = {
     id: "couverture",
     target: "test",
     consigne: "Ajoute le test qui exerce ces lignes par un comportement observable. " +
-      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
+      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si elle ne peut pas être exercée (code défensif inatteignable), conteste le défaut avec ta raison : l'humain tranchera.",
   },
   "suite finale": {
     id: "suite finale",
@@ -605,6 +607,20 @@ const CORRECTIONS_DE_FIN = {
   },
 };
 const elementDe = (m) => `${m.file}:${m.line} (${m.operator})`;
+/** Lignes non couvertes → un défaut par fichier, adressé au testeur, qui garde ses lignes. */
+function filsDeCouverture(lignes, tour) {
+  const c = CORRECTIONS_DE_FIN["couverture du diff"];
+  return lignes.map((x, j) => ({
+    id: `${c.id}#${tour}.${j + 1}`,
+    lens: c.id,
+    severity: "major",
+    description: `Couverture du diff : ${x.file}, lignes non couvertes : ${x.lines.join(", ")}. ${c.consigne}`,
+    target: c.target,
+    couverture: x,
+    status: "open",
+    round: tour,
+  }));
+}
 /** Mutants survivants → un défaut chacun, adressé au testeur, qui garde le mutant exact (ADR 0065). */
 function filsDeMutation(mutants, tour) {
   const c = CORRECTIONS_DE_FIN.mutation;
@@ -637,7 +653,8 @@ function filsDeFin(porte, motifs, tour) {
 * verts, rejouer la phase ne ferait travailler personne. Correction ciblée depuis le dernier vert si
 * le budget le permet ; rend vrai si elle a eu lieu.
 */
-async function correctionDeFin(w, d, L, s, max, tentatives, consommer, porte, motifs, fils = (tour) => filsDeFin(porte, motifs, tour)) {
+async function correctionDeFin(w, d, L, s, max, tentatives, consommer, porte, motifs, fils) {
+  fils ??= (tour) => filsDeFin(porte, motifs, tour);
   if (!L.dernierVert || tentatives() + 1 >= max)
     return false;
   await w.rejet(`${porte} (correction ciblée)`, motifs);
@@ -671,10 +688,14 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
       }
       if (run.coverage) {
         const { barre } = await barreDeQualite(w, L.disp);
-        const diff = couvertureDuDiff(run.coverage, sources);
+        // Lignes exemptées par l'humain : hors du calcul (arbitrage de la couverture contestée).
+        const diff = couvertureDuDiff(run.coverage, sansLignesExemptees(sources, d.derogationsCouverture));
         const motifs = checkCoverage(diff.report, sources.map((f) => f.path), barre, true);
         if (motifs.length) {
-          if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "couverture du diff", motifs))
+          const lignes = lignesSousLeSeuil(diff.report, sources.map((f) => f.path), barre);
+          // Un défaut par fichier, qui garde ses lignes : contesté, l'humain peut les exempter.
+          const fils = lignes.length ? (tour) => filsDeCouverture(lignes, tour) : undefined;
+          if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "couverture du diff", motifs, fils))
             continue;
           return { motifs, garanti: false, porte: "couverture du diff" };
         }
@@ -746,6 +767,8 @@ function faitsDeLivraison(d, s, L, execution) {
     faits.push(execution);
   for (const x of d.derogations)
     faits.push(`Dérogation de mutation (${x.par}) : ${elementDe(x)} — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
+  for (const x of d.derogationsCouverture)
+    faits.push(`Ligne exemptée de la couverture du diff (humain) : ${x.file}:${x.line} — ${x.raison}.`);
   for (const sc of L.scenarios.filter((x) => x.status === "done")) {
     if (sc.role === "regression")
       faits.push(`Scénario ${sc.id} : non-régression, vert dès DISTILL (${sc.acceptanceTestId}).`);
@@ -822,6 +845,7 @@ async function deroulerCorrection(w, d, L, s, i, depart, max, motifs) {
       // Mutants contestés : l'arbitre, puis l'humain si besoin (ADR 0065). Un mutant maintenu par
       // l'humain repart au testeur.
       await arbitrerMutants(w, d, s);
+      await arbitrerCouverture(w, d, s);
       if (s.fils.some((t) => isActive(t) && pourTests(t))) {
         c.retourTests = agentFeedback(s.fils, pourTests);
         continue;
@@ -972,14 +996,59 @@ async function briefArbitre(w, d, fils) {
 }
 /** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
 function rapportDeDerogations(d) {
+  const cellule = (x) => x.replace(/\|/g, "\\|");
   return [
-    `# Dérogations de mutation — ${d.story.id}`,
+    `# Dérogations — ${d.story.id}`,
     "",
-    "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
-    "",
-    "| Mutant | Décidé par | Raison | Contestation du testeur |",
-    "| --- | --- | --- | --- |",
-    ...d.derogations.map((x) => `| ${elementDe(x)} | ${x.par} | ${x.raison.replace(/\|/g, "\\|")} | ${x.contestation.replace(/\|/g, "\\|")} |`),
-    "",
+    ...(d.derogations.length
+      ? [
+          "## Mutation",
+          "",
+          "Mutants survivants reconnus équivalents après arbitrage, exemptés de la porte de mutation (ADR 0065).",
+          "",
+          "| Mutant | Décidé par | Raison | Contestation du testeur |",
+          "| --- | --- | --- | --- |",
+          ...d.derogations.map((x) => `| ${elementDe(x)} | ${x.par} | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
+    ...(d.derogationsCouverture.length
+      ? [
+          "## Couverture du diff",
+          "",
+          "Lignes exemptées par l'humain, après contestation du testeur.",
+          "",
+          "| Ligne | Décidé par | Raison | Contestation du testeur |",
+          "| --- | --- | --- | --- |",
+          ...d.derogationsCouverture.map((x) => `| ${x.file}:${x.line} | humain | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
   ].join("\n");
+}
+/**
+* Couverture du diff contestée par le testeur (code défensif inatteignable) : l'humain tranche.
+* Dérogation : les lignes sortent du calcul, la décision est tracée et commitée ; sinon, à tester.
+*/
+async function arbitrerCouverture(w, d, s) {
+  const contestes = s.fils.filter((t) => t.couverture && (t.status === "contested" || t.status === "recontested"));
+  if (!contestes.length)
+    return;
+  await w.etape("ARBITRATION");
+  for (const t of contestes) {
+    const element = `${t.couverture.file}:${t.couverture.lines.join(", ")}`;
+    const rep = await w.humain("arbitrer-couverture", `Arbitrer un défaut de couverture (${t.id})`, [
+      { id: "derogation", label: "Lignes inatteignables ou sans comportement : accorder la dérogation" },
+      { id: "corriger", label: "À tester : le testeur doit les couvrir" },
+    ], {
+      detail: `Lignes non couvertes : ${element}\nContestation du testeur : « ${t.contestation ?? "?"} »\nJustifie ta décision en commentaire : elle est tracée et commitée.`,
+      texteLibre: true,
+    });
+    const derogation = rep.decision === "derogation";
+    const raison = rep.commentaire ?? (derogation ? "(sans justification)" : "");
+    await w.arbitrage({ porte: "couverture du diff", élément: element, contestation: t.contestation ?? "", décision: derogation ? "dérogation" : "à corriger", par: "humain", raison });
+    if (derogation)
+      d.derogationsCouverture = [...d.derogationsCouverture, ...t.couverture.lines.map((line) => ({ file: t.couverture.file, line, raison, contestation: t.contestation ?? "", defaut: t.id }))];
+    s.fils = s.fils.map((x) => (x.id === t.id ? { ...x, status: derogation ? "humanAccepted" : "humanMaintained" } : x));
+  }
 }

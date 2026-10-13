@@ -37,6 +37,7 @@ export const meta = {
     escalade: ["developpeur", "architecte", "administrateur"],
     arbitrer: ["developpeur", "architecte", "administrateur"],
     "arbitrer-mutation": ["developpeur", "architecte", "administrateur"],
+    "arbitrer-couverture": ["developpeur", "architecte", "administrateur"],
     "ratifier-adr": ["architecte"],
   },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
@@ -201,6 +202,8 @@ export default async function skraft(w, entree) {
     qualityCheckpoint,
     // Mutants reconnus équivalents par arbitrage, exemptés de la porte de mutation (ADR 0065).
     derogations: [],
+    // Lignes exemptées de la couverture du diff par l'humain, après contestation du testeur.
+    derogationsCouverture: [],
     // Phases approuvées dont le commit a échoué, continuées sans commit (D19 de docs/12).
     nonCommitees: [],
   };
@@ -259,6 +262,9 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...(d.derogationsCouverture?.length
+      ? [`Lignes exemptées de la couverture du diff : ${d.derogationsCouverture.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`]
+      : []),
     ...(d.nonCommitees?.length ? [`Phases non commitées : ${d.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(d.derogations?.length
       ? [`Dérogations de mutation : ${d.derogations.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`, ...d.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`)]

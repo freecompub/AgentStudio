@@ -54,6 +54,8 @@ export interface DefectThread {
   rerouted?: boolean;
   /** Défaut de la porte de mutation : le mutant exact, que l'arbitrage peut exempter (ADR 0065). */
   mutant?: MutantSurvivant;
+  /** Défaut de la couverture du diff : le fichier et ses lignes, que l'humain peut exempter. */
+  couverture?: { file: string; lines: number[] };
 }
 
 export interface DefectResponse {

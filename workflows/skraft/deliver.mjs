@@ -109,6 +109,24 @@ export function checkCoverage(report, sources, bar, diff = false) {
   }
   return reasons;
 }
+/** Lignes non couvertes des fichiers sous leur seuil : chaque fichier devient un défaut, que l'humain peut exempter. */
+export function lignesSousLeSeuil(report, sources, bar) {
+  const res = [];
+  for (const path of sources) {
+    const seuil = bar.coverage[layerOf(path, bar)];
+    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (seuil === undefined || !f || f.score + 1e-9 >= seuil)
+      continue;
+    const lines = f.lines?.filter((l) => !l.covered).map((l) => l.number) ?? [];
+    if (lines.length)
+      res.push({ file: path, lines });
+  }
+  return res;
+}
+/** Lignes modifiées, sans celles qu'une dérogation humaine a exemptées de la couverture du diff. */
+export function sansLignesExemptees(changes, derogations) {
+  return changes.map((c) => (c.lines ? { ...c, lines: c.lines.filter((n) => !derogations.some((d) => d.file === c.path && d.line === n)) } : c));
+}
 /**
 * Mutants d'un fichier, sans ceux qu'une dérogation a reconnus équivalents (ADR 0065) : le score est
 * recalculé sur les mutants restants quand le rapport donne ses comptes ; sinon, le score mesuré reste.

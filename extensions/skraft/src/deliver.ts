@@ -124,6 +124,24 @@ export function checkCoverage(report: CoverageReport, sources: string[], bar: Qu
 }
 
 /** Seuils de mutation sur les fichiers de production : par couche (domaine, application, reste), ADR 0049. */
+/** Lignes non couvertes des fichiers sous leur seuil : chaque fichier devient un défaut, que l'humain peut exempter. */
+export function lignesSousLeSeuil(report: CoverageReport, sources: string[], bar: QualityBar): { file: string; lines: number[] }[] {
+  const res: { file: string; lines: number[] }[] = [];
+  for (const path of sources) {
+    const seuil = bar.coverage[layerOf(path, bar)];
+    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (seuil === undefined || !f || f.score + 1e-9 >= seuil) continue;
+    const lines = f.lines?.filter((l) => !l.covered).map((l) => l.number) ?? [];
+    if (lines.length) res.push({ file: path, lines });
+  }
+  return res;
+}
+
+/** Lignes modifiées, sans celles qu'une dérogation humaine a exemptées de la couverture du diff. */
+export function sansLignesExemptees<C extends { path: string; lines?: number[] }>(changes: C[], derogations: readonly { file: string; line: number }[]): C[] {
+  return changes.map((c) => (c.lines ? { ...c, lines: c.lines.filter((n) => !derogations.some((d) => d.file === c.path && d.line === n)) } : c));
+}
+
 /** Mutant reconnu équivalent par un arbitrage : exempté de la porte de mutation (ADR 0065). */
 export interface MutantExempte {
   file: string;

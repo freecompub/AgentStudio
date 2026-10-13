@@ -195,6 +195,8 @@ export interface SkraftState {
   retour?: string[];
   /** Mutants exemptés de la porte de mutation, pour le run en cours de DELIVER (ADR 0065). */
   derogations?: Derogation[];
+  /** Lignes exemptées de la couverture du diff par l'humain, pour le run en cours de DELIVER. */
+  derogationsCouverture?: { file: string; line: number; raison: string; contestation: string; defaut: string }[];
   /** Toutes les décisions d'arbitrage, en ajout seul : le moteur trace chaque nouvelle (ADR 0065). */
   arbitrages?: ArbitrageRecord[];
   /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
@@ -258,7 +260,7 @@ export type SkraftEvent =
       facts?: string[];
       notes?: string[];
     }
-  | { type: "GATE_FAIL"; gate: string; reasons: string[]; /** Porte de mutation : les survivants, un défaut chacun (ADR 0065). */ mutants?: MutantSurvivant[] }
+  | { type: "GATE_FAIL"; gate: string; reasons: string[]; /** Porte de mutation : les survivants, un défaut chacun (ADR 0065). */ mutants?: MutantSurvivant[]; /** Couverture du diff : les lignes non couvertes, par fichier. */ lignes?: { file: string; lines: number[] }[] }
   | { type: "QUESTION_ASKED"; id: string }
   | { type: "MUTANTS_JUDGED"; rulings: { defect: string; decision: "accepted" | "maintained"; reason?: string }[] }
   | {
