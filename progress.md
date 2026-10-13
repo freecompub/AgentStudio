@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/10 — À faire : escalade d'un scénario selon sa cause (ADR 0066, proposé)
+
+- Document de travail : `docs/13-escalade-de-scenario-selon-sa-cause.md`. Il contient le
+  problème, les décisions, la proposition, le point à trancher et le plan.
+- Il y a deux causes qu'aucune option d'escalade actuelle ne résout :
+  - **un test existant devenu rouge**, parce que la story change ce comportement. Personne ne
+    peut le mettre à jour (développeur, testeur depuis D10, agent d'acceptance) ;
+  - **des lignes non couvertes** écrites pendant un scénario. La porte du scénario les refuse sans
+    défaut à contester.
+- **Décisions du responsable du projet** :
+  - présenter le problème à l'humain, avec « rejouer DISTILL » (DELIVER effacée) ou « mettre en
+    pause » (puis lui demander d'où repartir) ;
+  - pour la couverture, l'humain tranche.
+- **Point ouvert** (§4 du document) : qui met à jour un test **unitaire** obsolète, puisque
+  l'agent d'acceptance n'écrit pas les tests unitaires. L'option A est recommandée : la pause
+  seule, l'humain corrige.
+- Deux critères ajoutés à `features.json`, à `false` : `escalade-de-scenario-test-existant-obsolete`
+  et `escalade-de-scenario-lignes-non-couvertes`.
+
+Prochaine étape : trancher le §4, passer l'ADR 0066 à « accepté », puis coder selon le plan
+(§5), dans les deux implémentations.
+
+---
+
 ## 13/10 — Couverture du diff contestée : l'humain tranche (suite de D22)
 
 - En fin de DELIVER, une contestation de couverture va directement à l'humain : dérogation sur les

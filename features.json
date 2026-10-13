@@ -179,6 +179,20 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "escalade-de-scenario-test-existant-obsolete",
+      "title": "Un scénario qui échoue sur un test existant devenu rouge escalade en présentant le problème : rejouer DISTILL (DELIVER effacée) ou mettre en pause (puis choix du point de reprise)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"test existant obsolète\"",
+      "passes": false,
+      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations. Point à trancher avant de coder : qui met à jour un test unitaire obsolète (§4 : A recommandée, B, C)."
+    },
+    {
+      "id": "escalade-de-scenario-lignes-non-couvertes",
+      "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",
+      "passes": false,
+      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations ; réutilise derogationsCouverture et sansLignesExemptees à la porte du scénario."
+    },
+    {
       "id": "couverture-contestee-arbitree-par-l-humain",
       "title": "En fin de DELIVER, une couverture du diff contestée est tranchée par l'humain : dérogation sur des lignes précises (tracée, commitée) ou à tester",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project stack-adapters e2e-arbitrage-couverture deliver-gates",
