@@ -5,6 +5,16 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/10 — Étude : skraft en serveur MCP local (aucune décision)
+
+- Document : `docs/14-skraft-en-serveur-mcp.md`. Pas d'ADR tant que l'option n'est pas choisie.
+- Conclusion : faisable si le serveur MCP **orchestre** et lance ses propres agents (option A) ;
+  exposer seulement les portes au LLM de l'hôte (option B) casse « le code décide ».
+- Vérifié : le moteur (`workflow`, `core`, `task-engine`, `runtime-copilot`, `extension-host`) et
+  `apps/desktop/src/main/workspace-services.ts` n'importent pas Electron ; un lanceur Node existe.
+- Non vérifié : la reprise (tâches et journal de rejeu) hors Electron.
+- Prochaine étape proposée : ADR (option A, workflow seulement), puis essai avec `ScriptedRuntime`.
+
 ## 13/10 — À faire : escalade d'un scénario selon sa cause (ADR 0066, proposé)
 
 - Document de travail : `docs/13-escalade-de-scenario-selon-sa-cause.md`. Il contient le
