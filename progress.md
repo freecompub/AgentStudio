@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D21 : tous les rejets de l'extension comptés et tracés
+
+- Trois rejets échappaient au compteur `rejections`, donc à la trace : le plafond de 20 cycles,
+  le nettoyage refusé et la relance du classifieur. Le workflow les tracait déjà : la comparaison
+  sur banc (ADR 0054) était faussée en faveur de l'extension.
+- Les noms de porte sont repris du workflow : « scénario ac-N », « pas refactor (ac-N) »,
+  « classifieur ». Le motif du classifieur est effacé dès que la difficulté est fixée, pour ne pas
+  devenir le « Rejet précédent » de la première phase (piège de D18).
+- **Tests instables corrigés** : trois tests de l'extension (`e2e-arbitrage-mutation`,
+  `e2e-commit`, `e2e-s1`) lisaient le rapport final dès le stade DONE. Or ce rapport est publié par
+  un effet **après** cette transition, ce qui crée une course sous charge. Ils attendent maintenant
+  sa publication.
+
+Prochaine étape : restes de D1, S1 à S5.
+
+---
+
 ## 11/10 — D20 : une escalade de DELIVER fait aussi oublier les sessions (extension)
 
 - Les deux escalades de la sous-machine DELIVER (budget d'échecs du scénario et panne) émettaient

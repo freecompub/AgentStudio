@@ -89,6 +89,8 @@ async function finie(app: App, id: string) {
   const s = stateOf(await app.engine.status(id))!;
   expect(s.escalation?.reason).toBeUndefined();
   expect(s.stage).toBe("DONE");
+  // Le rapport final est publié par un effet, après la transition vers DONE : on l'attend aussi.
+  await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
 }
 
 describe("skraft — arbitrage d'un mutant contesté (D22, ADR 0065)", () => {

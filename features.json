@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "rejets-comptes-et-traces",
+      "title": "Plafond de cycles, nettoyage refusé et relance du classifieur sont comptés et tracés comme rejets, sous les noms de porte du workflow",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D21|nettoyage qui casse\"",
+      "passes": true,
+      "notes": "D21 de docs/12, 2026-10-11. Extension : afterCode (plafond) et nettoyage refusé passent par bumpRetries (deliver-machine.ts) ; relancerClassifieur compte et pose lastRejection « classifieur », effacé par applyDifficulty (reducer.ts). Trace du nettoyage refusé vérifiée dans les deux (e2e-nettoyage). Tests du réducteur vérifiés en échec sans la correction."
+    },
+    {
       "id": "escalade-de-deliver-oublie-les-sessions",
       "title": "Une escalade de DELIVER rembobine le scénario ET fait oublier les sessions du testeur et du développeur",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D20\"",

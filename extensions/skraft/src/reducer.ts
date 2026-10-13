@@ -442,6 +442,8 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
   const fx = levelEffects(level);
   return route({
     ...s,
+    // Le motif d'une relance du classifieur n'est pas un « rejet précédent » pour la première phase.
+    lastRejection: null,
     difficulty: { level, indicators: s.indicators, confirmedBy },
     skipPhases: fx.skipResearch ? ["RESEARCH"] : [],
     lenses: fx.lenses,
@@ -486,7 +488,9 @@ function commit(s: SkraftState): Out {
  * toute phase, donc `failure()` ne s'applique pas : le budget est compté ici, faute de quoi un
  * agent qui répond toujours de travers rebouclerait sans fin, une requête par tour (D24).
  */
-function relancerClassifieur(s: SkraftState, reason: string): Out {
+function relancerClassifieur(s0: SkraftState, reason: string): Out {
+  // Compté et tracé comme rejet, porte « classifieur » comme dans le workflow (D21 de docs/12).
+  const s: SkraftState = { ...s0, rejections: (s0.rejections ?? 0) + 1, lastRejection: { gate: "classifieur", reasons: [reason] } };
   const attempts = s.attempts + 1;
   if (attempts >= s.budget.maxAttemptsPerPhase) return escalateFrom({ ...s, attempts }, "CLASSIFY", reason, ["retry", "abort"]);
   return {

@@ -610,6 +610,22 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     ]);
     expect(refused.state.deliver?.attempts).toBe(0);
     expect(refused.state.deliver?.notes).toEqual(["Scénario ac-1 : nettoyage annulé (suite rouge)"]);
+    // D21 (docs/12) : compté et tracé, sous le nom de porte du workflow.
+    expect(refused.state.rejections).toBe((play([...strict, REP_DEV, GREEN_OK(true), REP_DEV]).state.rejections ?? 0) + 1);
+    expect(refused.state.lastRejection).toEqual({ gate: "pas refactor (ac-1)", reasons: ["suite rouge"] });
+  });
+
+  it("D21 (docs/12) : plafond de cycles et relance du classifieur comptés et tracés comme rejets", () => {
+    const cycles = (n: number) => Array.from({ length: n }, () => [REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(false)]).flat();
+    const avant = play([...toDeliver(), PLANNED, STARTED, ...cycles(19), REP_TEST, RED_OK(1), REP_DEV]);
+    const plafond = transition(avant.state, GREEN_OK(false));
+    expect(plafond.state.rejections).toBe((avant.state.rejections ?? 0) + 1);
+    expect(plafond.state.lastRejection).toEqual({ gate: "scénario ac-1", reasons: [expect.stringMatching(/reste rouge après 20 cycles/)] });
+    const inconnu = play([INITIALIZED, PROPOSED("très difficile")]);
+    expect(inconnu.state.rejections).toBe(1);
+    expect(inconnu.state.lastRejection).toEqual({ gate: "classifieur", reasons: ["Niveau de difficulté inconnu : très difficile"] });
+    // Le motif du classifieur n'est pas un « rejet précédent » pour la première phase.
+    expect(play([INITIALIZED, PROPOSED("très difficile"), PROPOSED("medium"), DECIDE("medium")]).state.lastRejection).toBeNull();
   });
 
   describe("D20 (docs/12) : une escalade de DELIVER rembobine ET fait oublier les sessions (ADR 0050)", () => {

@@ -46,6 +46,8 @@ describe("skraft en workflow — nettoyage qui casse l'acceptance (D16)", () => 
     expect(bilan.livraison?.notes.some((n) => n.startsWith("Scénario ac-1 : nettoyage annulé") && n.includes("acceptance"))).toBe(true);
     const rejets = ((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).map((r) => r.porte);
     expect(rejets).not.toContain("scénario ac-1");
+    // D21 (docs/12) : le nettoyage refusé est tracé, sous le même nom de porte dans les deux.
+    expect(rejets).toContain("pas refactor (ac-1)");
     expect(await readFile(join(root, CODE), "utf8")).toContain("// ac-1\n");
   }, 90_000);
 });

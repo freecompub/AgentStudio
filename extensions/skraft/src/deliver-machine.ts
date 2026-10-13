@@ -14,8 +14,9 @@ const forDev = (t: DefectThread) => t.target !== "test";
 const otherAgent = (t: DefectThread) => (t.target === "test" ? "code" : "test");
 
 /**
- * Réessais par phase, pour les mesures d'usage (§12). Tout rejet passe par ici, ce qui en fait
- * aussi le seul endroit où compter `rejections`, que le moteur lit pour tracer chaque rejet.
+ * Réessais par phase, pour les mesures d'usage (§12), et compteur `rejections`, que le moteur lit
+ * pour tracer chaque rejet avec `lastRejection`. Chaque rejet doit passer par ici, porte nommée
+ * comme dans le workflow, sinon le banc compare des traces inégales (D21 de docs/12).
  */
 export function bumpRetries(s: SkraftState, key: string): SkraftState {
   const retries = s.retries ?? {};
@@ -163,9 +164,11 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     case "TIMEOUT": {
       const reason = e.reason;
       if (d.step === "scenario-gate") return scenarioFailure(s, d, [reason]);
-      // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3).
+      // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3). Compté et tracé comme
+      // rejet, sous le nom de porte du workflow (D21 de docs/12).
       if (d.step === "refactor") {
-        const r = afterCode(s, { ...d, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
+        const rejete = { ...bumpRetries(s, "DELIVER"), lastRejection: { gate: `pas refactor (${scenario.id})`, reasons: [reason] } };
+        const r = afterCode(rejete, { ...d, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
         return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
       }
       return stepFailure(s, d, [reason]);
@@ -242,8 +245,9 @@ function afterCode(s: SkraftState, d: DeliverState, acceptanceGreen: boolean): O
   // Chaque cycle ajoute un test unitaire et un checkpoint : sans plafond, un scénario dont
   // l'acceptance ne verdit jamais tournerait sans fin, une requête par tour (D24).
   const cycles = d.cycles + 1;
+  // Compté comme rejet ici : `scenarioFailure` ne compte que l'échec de la porte de scénario (D21 de docs/12).
   if (cycles >= s.budget.maxCyclesPerScenario)
-    return scenarioFailure(s, { ...d, cycles }, [
+    return scenarioFailure(bumpRetries(s, "DELIVER"), { ...d, cycles }, [
       `Le test d'acceptance du scénario reste rouge après ${cycles} cycles test puis code.`,
     ]);
   return agent(s, { ...d, acceptanceGreen: false, step: "test", cycles }, []);

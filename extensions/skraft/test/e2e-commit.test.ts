@@ -28,6 +28,8 @@ async function lancer(app: App): Promise<string> {
 async function finie(app: App, id: string) {
   await until(async () => ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? "") && !(await app.interactions.pending()).length, 60_000);
   expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+  // Le rapport final est publié par un effet, après la transition vers DONE : on l'attend aussi.
+  await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
 }
 
 describe("skraft — commit de phase en échec (D19)", () => {

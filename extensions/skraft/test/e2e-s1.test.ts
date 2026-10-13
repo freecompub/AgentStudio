@@ -290,6 +290,8 @@ describe("skraft — critères de sortie de S1", () => {
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
     ]);
+    // Le rapport final est publié par un effet, après la transition vers DONE : on l'attend.
+    await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
     expect(app.posted.at(-1)).toMatch(/Pipeline skraft terminé pour \*\*US-12\*\*/);
     // Usage par état (D37).
     expect((await app.usage.report(id)).map((r) => r.phase)).toEqual(expect.arrayContaining(["CLASSIFY", "RESEARCH", "DESIGN", "REVIEW", "DELIVER"]));
