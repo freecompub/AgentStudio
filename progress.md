@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/10 — D1 terminé : gel annoncé quand il est définitif, DISTILL sautée signalée
+
+- Le fait de revue de DISTILL disait « Tests d'acceptance gelés », alors que la revue peut encore
+  faire corriger un test : le gel n'est définitif qu'au commit. Il est reformulé dans les deux.
+- DISTILL sautée : il n'y a pas d'empreinte, donc la vérification du gel passait en silence.
+  DELIVER prévient maintenant l'utilisateur dans le fil, et la note va aux lentilles.
+- Tous les défauts D1 à D23 de l'audit sont traités. D13 ne se reproduit plus depuis D4 et D5,
+  il n'a pas été modifié.
+
+Prochaine étape : l'arbitrage des contestations de couverture et de suite finale (ouvert depuis
+D22), puis les écarts de spécification S1 à S5 (décisions à prendre).
+
+---
+
 ## 11/10 — D21 : tous les rejets de l'extension comptés et tracés
 
 - Trois rejets échappaient au compteur `rejections`, donc à la trace : le plafond de 20 cycles,

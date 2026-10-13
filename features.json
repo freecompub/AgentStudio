@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "gel-annonce-quand-il-est-definitif",
+      "title": "Le gel des tests d'acceptance n'est annoncé qu'une fois définitif ; une DISTILL sautée est signalée au début de DELIVER",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft e2e-gel",
+      "passes": true,
+      "notes": "Restes de D1 de docs/12, 2026-10-11. Fait de revue de DISTILL reformulé (review-brief.ts, distillation.mjs). DISTILL sautée : message au début de DELIVER et note aux lentilles (extension : SANS_GEL, sansGel dans deliver-machine.ts, planDeliver ; workflow : planifier dans livraison.mjs). Bouts en bout dans les deux, vérifiés en échec sans la correction."
+    },
+    {
       "id": "rejets-comptes-et-traces",
       "title": "Plafond de cycles, nettoyage refusé et relance du classifieur sont comptés et tracés comme rejets, sous les noms de porte du workflow",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D21|nettoyage qui casse\"",

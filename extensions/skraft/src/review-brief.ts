@@ -30,7 +30,12 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
   const facts: string[] = [];
   for (const a of latestArtifacts(artifactsDuRun(state, phase))) facts.push(`Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
   if ((phase === "DISTILL" || phase === "DELIVER") && state.acceptanceHash)
-    facts.push(`Tests d'acceptance gelés, empreinte ${short(state.acceptanceHash)}${phase === "DELIVER" ? ", vérifiée inchangée à chaque pas de DELIVER" : ""}.`);
+    facts.push(
+      // Le gel n'est définitif qu'au commit de DISTILL : la revue peut encore faire corriger un test (D1 de docs/12).
+      phase === "DELIVER"
+        ? `Tests d'acceptance gelés, empreinte ${short(state.acceptanceHash)}, vérifiée inchangée à chaque pas de DELIVER.`
+        : `Empreinte des tests d'acceptance prise (${short(state.acceptanceHash)}) : le gel devient définitif au commit de DISTILL.`,
+    );
   for (const r of state.regressions) facts.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);
   if (phase === "DELIVER")
     for (const x of state.derogations ?? [])

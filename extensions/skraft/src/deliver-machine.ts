@@ -29,6 +29,10 @@ export function bumpRetries(s: SkraftState, key: string): SkraftState {
  * jusqu'au vert du test d'acceptance ; puis porte de fin de scénario. Un scénario en échec en mode
  * tour repart de son début en sessions séparées (D22) ; en sessions séparées, le budget s'applique.
  */
+/** DISTILL sautée : rien n'est gelé, et DELIVER le dit au lieu de vérifier en silence (D1 de docs/12). */
+export const SANS_GEL = "DISTILL a été sautée : les tests d'acceptance ne sont pas gelés. DELIVER ne peut pas vérifier qu'ils restent inchangés.";
+export const sansGel = (s: SkraftState) => !s.acceptanceHash && s.skipPhases.includes("DISTILL");
+
 export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
   let s = s0;
   if (e.type === "DELIVER_PLANNED") {
@@ -52,7 +56,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       scenarioFailures: 0,
       cycles: 0,
       feedback: s.lastRejection?.reasons ?? [],
-      notes: [],
+      notes: sansGel(s) ? [SANS_GEL] : [],
       facts: [],
       fixing: false,
     });

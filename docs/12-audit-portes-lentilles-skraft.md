@@ -70,6 +70,12 @@ Priorités proposées :
       modifier `d` depuis l'intérieur d'un essai.
   - Une phase DISTILL sautée ne gèle rien. DELIVER doit alors le dire, au lieu de comparer à une
     empreinte d'un état effacé.
+- **Restes corrigés le 2026-10-11, dans les deux** :
+  - le fait de revue de DISTILL ne dit plus « gelés ». Il dit que l'empreinte est prise et que le
+    gel devient définitif au commit de DISTILL. Les consignes des agents étaient déjà justes,
+    puisque l'empreinte est effacée avant chaque essai ;
+  - DISTILL sautée : au début de DELIVER, l'utilisateur est prévenu que les tests d'acceptance ne
+    sont pas gelés, et la note va aux lentilles (« À noter »).
 
 ### D2 — ADR fantômes après un rembobinage ou un saut de DESIGN
 

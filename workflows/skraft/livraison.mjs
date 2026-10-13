@@ -128,7 +128,12 @@ export async function barreDeQualite(w, disp) {
   return { barre: q.bar, notes: [...q.warnings, ...vides] };
 }
 /** Début de DELIVER : suite de référence (seuls les tests d'acceptance peuvent être rouges), puis plan des scénarios. */
+/** DISTILL sautée : rien n'est gelé, et DELIVER le dit au lieu de vérifier en silence (D1 de docs/12). */
+const SANS_GEL = "DISTILL a été sautée : les tests d'acceptance ne sont pas gelés. DELIVER ne peut pas vérifier qu'ils restent inchangés.";
 async function planifier(w, d) {
+  const sansGel = !d.acceptanceHash && d.phasesSautees.includes("DISTILL");
+  if (sansGel)
+    await w.informer(SANS_GEL);
   if (!(await gelIntact(w, d)))
     throw new PanneEnvironnement("Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés : restaurez-les avant de relancer.");
   const disp = await w.disposition();
@@ -147,7 +152,7 @@ async function planifier(w, d) {
     baseline: { all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) },
     unitTestsHash: null,
     dernierVert: null,
-    notes: [],
+    notes: sansGel ? [SANS_GEL] : [],
     faits: [],
     contrat: [],
   };

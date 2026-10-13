@@ -1,6 +1,7 @@
 import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief } from "./brief.js";
+import { SANS_GEL, sansGel } from "./deliver-machine.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
@@ -72,6 +73,7 @@ async function readOr(ctx: ExtensionContext, path: string): Promise<string | nul
 
 /** Début de DELIVER : suite de référence (seuls les tests d'acceptance peuvent être rouges), puis plan des scénarios. */
 export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<Ev> {
+  if (sansGel(state)) ctx.chat.post(SANS_GEL);
   if (!(await acceptanceFrozen(ctx, state))) throw new EnvFailureError("Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés : restaurez-les avant de relancer.");
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_BASELINE" } });
   if (run.timedOut) throw new EnvFailureError("Les tests ont dépassé le délai avant le début de DELIVER.");

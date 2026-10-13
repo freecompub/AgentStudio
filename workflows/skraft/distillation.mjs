@@ -44,7 +44,8 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
       return porte;
     const faits = [
       ...reviewFacts(s.livrables, "DISTILL"),
-      `Tests d'acceptance gelés, empreinte ${d.acceptanceHash.slice(0, 12)}.`,
+      // Le gel n'est définitif qu'au commit de DISTILL : la revue peut encore faire corriger un test (D1 de docs/12).
+      `Empreinte des tests d'acceptance prise (${d.acceptanceHash.slice(0, 12)}) : le gel devient définitif au commit de DISTILL.`,
       ...d.regressions.map((r) => `Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`),
       ...(d.derniereExecution ? [d.derniereExecution] : []),
     ];
