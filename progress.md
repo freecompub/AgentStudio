@@ -5,6 +5,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 14/10 — Constat : nos agents face à ceux de skraft-plugin (v1.6.1 et main 1.15.1)
+
+- Document : `docs/15-agents-face-a-skraft-plugin.md`. Aucune correction faite.
+- Globalement équivalents ; la procédure (commits, preuves, portes, ratification, synthèse) est
+  dans notre code, comme prévu par `docs/licences/autorisation-skraft.md`.
+- À corriger (E et W) : `test-integrity` ne reçoit pas le code de production alors que son prompt
+  l'annonce ; `architecture` doit juger les doublures sans recevoir les tests ; `cold-reader`
+  annonce des faits qu'elle ne reçoit pas ; pas de plafond `medium` pour `cold-reader`.
+- À décider : revue propre à DESIGN et DISTILL, méthode de DESIGN, plan de test de DISTILL,
+  reprise des évolutions de main (l'autorisation ne couvre que la v1.6.1).
+- Piège : le plugin a beaucoup bougé depuis la reprise (v1.6.1 → 1.15.1) ; comparer aux deux.
+
 ## 13/10 — Étude : skraft en serveur MCP local (aucune décision)
 
 - Document : `docs/14-skraft-en-serveur-mcp.md`. Pas d'ADR tant que l'option n'est pas choisie.
