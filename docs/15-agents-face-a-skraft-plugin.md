@@ -173,8 +173,14 @@ va donc plus loin.
   `contracts.md`, `diagrams.md` et les nouveaux ADR, et refuse les catégories incompatibles du
   plugin : commande et requête, entité et objet-valeur, agrégat et service de domaine. La porte
   écrit `design/consistency-matrix.md` à chaque essai ; il est commité avec DESIGN.
-  Non repris : le `STRUCTURAL_DRIFT` (concept d'un ADR absent d'un document), trop sujet aux faux
-  positifs sur des noms en PascalCase qui ne sont pas des concepts.
+- **`STRUCTURAL_DRIFT`** (« le concept existe dans un artefact et pas dans l'autre ») :
+  - sens « ADR → modèle », **en code** (`conceptsAbsentsDuModele`) : un concept classé dans un
+    nouvel ADR, hors de sa section « Alternatives », existe dans `event-model.md` ou
+    `domain-model.md`. Le plugin n'exclut pas les alternatives et exige toutes ses colonnes
+    (event-model, diagrams, contracts) : adaptation de notre part ;
+  - sens « document → ADR » (un agrégat qu'aucun ADR ne justifie), **à la lentille**
+    `architecture`, dans ses consignes de DESIGN. Agrégats seulement : un dépôt en tant que tel est
+    une règle de base que le plugin interdit lui-même de ratifier par un ADR (G15).
 - Non repris en code : DESIGN G7 (chaque critère a son déclencheur), laissé au jugement de
   `test-integrity` en DESIGN.
 

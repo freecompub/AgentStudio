@@ -207,6 +207,13 @@
       "notes": "G10 de skraft-plugin v1.6.1, docs/15 §4.5. matriceDeCoherence et matriceMarkdown (design.ts, design.mjs), écrite par la porte cohérence (effects.ts, conception.mjs)."
     },
     {
+      "id": "concept-d-adr-present-dans-le-modele",
+      "title": "DESIGN refuse un concept classé dans un nouvel ADR (hors section Alternatives) qui n'existe ni dans event-model.md ni dans domain-model.md",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"Concept d'un ADR absent du modèle\"",
+      "passes": true,
+      "notes": "STRUCTURAL_DRIFT de skraft-plugin v1.6.1, sens ADR → modèle, docs/15 §4.5. Le sens document → ADR est dans les consignes DESIGN de la lentille architecture."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",

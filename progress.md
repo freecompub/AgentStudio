@@ -25,6 +25,9 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   écrite par la porte cohérence à chaque essai et commitée. Le décideur ne l'écrit plus.
 - Piège : le drapeau `i` sur la regex faisait accepter un nom en minuscules (`onClick`) ; le
   libellé est décliné en minuscule, majuscule initiale et capitales, le nom reste `[A-Z]`.
+- `STRUCTURAL_DRIFT` du plugin : sens « ADR → modèle » en code (`conceptsAbsentsDuModele`, hors
+  section Alternatives) ; sens « agrégat → ADR » laissé à la lentille architecture (décision du
+  responsable : un essai en code aurait demandé un ADR par agrégat, y compris existant).
 - Reste : docs/15 §4.6, 4.7 et §5.
 
 ## 14/10 — Lentilles : chacune reçoit ce que son prompt annonce ; cold-reader plafonnée (docs/15 §4.1 à 4.4)

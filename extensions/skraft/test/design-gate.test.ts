@@ -230,3 +230,18 @@ describe("Matrice de cohérence construite par le code (G10 de skraft-plugin, do
     expect(md).toMatch(/consistency-gate: PASS\n$/);
   });
 });
+
+describe("Concept d'un ADR absent du modèle (STRUCTURAL_DRIFT de skraft-plugin, docs/15 §4.5)", () => {
+  // Plugin v1.6.1, consistency-matrix.template.md : « le concept existe dans un artefact et pas dans
+  // l'autre (un ADR mentionne un agrégat que le diagramme n'a jamais dessiné, ou les contrats
+  // définissent un Repository qu'aucun ADR n'a ratifié) ». Ici, vérifié par le code.
+  it("un concept classé dans un nouvel ADR, absent du modèle : rejet", () => {
+    const adrs = [...input().adrs, { path: "docs/adr/adr-003-historique.md", md: adr(3, { decision: "Agrégat `DoseLedger` conserve l'historique des doses." }), isNew: true }];
+    expect(checkDesign(input({ adrs }))).toEqual(["`DoseLedger`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."]);
+  });
+
+  it("un concept cité seulement dans les alternatives écartées de l'ADR : accepté", () => {
+    const adrs = [...input().adrs, { path: "docs/adr/adr-003-historique.md", md: adr(3, { alternatives: "Agrégat `DoseLedger` : écarté, l'historique n'est pas demandé." }), isNew: true }];
+    expect(checkDesign(input({ adrs }))).toEqual([]);
+  });
+});

@@ -94,6 +94,8 @@ const CONSIGNES_DE_PHASE: Partial<Record<Phase, Partial<Record<LensName, string[
       "Domaine et Application ne dépendent ni de l'infrastructure ni de l'API ; les interfaces de dépôt et de passerelle sont déclarées dans la couche Application.",
       // G5
       "Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.",
+      // STRUCTURAL_DRIFT, sens « document → ADR » (le sens « ADR → modèle » est vérifié par le code)
+      "Chaque agrégat introduit par les documents (modèle, contrats, diagrammes) est nommé par un ADR, nouveau ou existant, qui le justifie ; un dépôt, en tant que tel, n'en demande pas.",
       // G9, G11
       "Aucun agrégat, contexte ou patron sans critère de la story qui le justifie ; un patron coûteux cite une force mesurée et évalue l'option « sans le patron ».",
       // G15

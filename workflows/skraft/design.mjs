@@ -28,6 +28,7 @@ export function checkDesign(i) {
     reasons.push(`context-map.md : la relation « ${r} » ne nomme aucun patron (ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language, Partnership, Separate Ways).`);
 
   reasons.push(...matriceDeCoherence(i).incoherences);
+  reasons.push(...conceptsAbsentsDuModele(i));
 
   for (const p of i.modifiedExistingAdrs)
     reasons.push(`ADR existant modifié : ${p} (les ADR sont append-only ; en rédiger un nouveau qui le remplace).`);
@@ -217,4 +218,34 @@ export function matriceMarkdown(m) {
     `consistency-gate: ${m.verdict}`,
     "",
   ].join("\n");
+}
+
+/** Texte d'un ADR sans sa section « Alternatives » : ce qu'on y a écarté n'engage rien. */
+function horsAlternatives(md) {
+  let dedans = false;
+  return md
+    .split("\n")
+    .filter((l) => {
+      if (/^##\s/.test(l)) dedans = /^##\s+Alternatives/i.test(l);
+      return !dedans;
+    })
+    .join("\n");
+}
+
+/**
+* Concept d'un ADR absent du modèle (STRUCTURAL_DRIFT de skraft-plugin v1.6.1, vérifié ici par le
+* code ; docs/15 §4.5) : un concept classé dans un nouvel ADR, hors de ses alternatives, existe dans
+* le modèle. Le sens inverse (un agrégat sans ADR qui le justifie) est laissé à la lentille
+* architecture, dans ses consignes de DESIGN.
+*/
+export function conceptsAbsentsDuModele(i) {
+  const reasons = [];
+  const known = new Set(MODEL_DOCS.flatMap((d) => extractCodeIdentifiers(i.docs[d] ?? "")));
+  for (const a of i.adrs.filter((x) => x.isNew)) {
+    const id = parseAdr(a.md).id || a.path;
+    for (const [nom, cats] of classements(horsAlternatives(a.md)))
+      if (!known.has(nom))
+        reasons.push(`\`${nom}\`, ${NOM_DE[cats[0]]} dans ${id}, n'existe ni dans ${MODEL_DOCS.join(" ni dans ")}.`);
+  }
+  return reasons;
 }

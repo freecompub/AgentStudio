@@ -484,6 +484,9 @@ d'architecture (ADR), que l'architecte humain ratifie.
   chaque document (« Commande `X` », « objet-valeur `Y` »…), modèle, contrats, diagrammes et
   nouveaux ADR. Un même nom classé commande et requête, entité et objet-valeur, ou agrégat et
   service de domaine est refusé. La porte écrit `consistency-matrix.md` à chaque essai.
+- Un concept classé dans un nouvel ADR (« Agrégat `X` »…), hors de sa section « Alternatives »,
+  existe dans `event-model.md` ou `domain-model.md`. L'inverse, un agrégat qu'aucun ADR ne justifie,
+  est examiné par la lentille `architecture`.
 
 == La ratification
 Après une revue approuvée, le code envoie une demande par ADR proposé, réservée à l'architecte :

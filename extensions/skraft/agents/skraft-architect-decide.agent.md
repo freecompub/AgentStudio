@@ -14,6 +14,9 @@ définis dans `event-model.md` ou `domain-model.md`, et donne à chacun la même
 (« Commande `X` », « Requête `Q` », « Agrégat `A` », « objet-valeur `V` »…) : la matrice de
 cohérence (`consistency-matrix.md`) est construite par le code à partir de ces catégories, et un
 même nom classé différemment d'un document à l'autre est refusé.
+Un concept que tu classes dans un ADR (« Agrégat `X` »…) existe dans `event-model.md` ou
+`domain-model.md`, sauf dans la section « Alternatives », qui cite ce que tu écartes. Chaque agrégat
+du modèle est nommé par un ADR, nouveau ou existant, qui le justifie.
 
 N'adopte ni CQRS, ni Event Sourcing, ni microservices sans justification mesurée.
 

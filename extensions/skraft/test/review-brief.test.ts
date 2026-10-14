@@ -164,6 +164,8 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     const a = lensBrief("architecture", state, "DESIGN", files, []);
     expect(a).toContain("Points à examiner en DESIGN :");
     expect(a).toContain("Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.");
+    // STRUCTURAL_DRIFT de skraft-plugin, sens « document → ADR » : jugé par la lentille, pas par le code.
+    expect(a).toContain("Chaque agrégat introduit par les documents (modèle, contrats, diagrammes) est nommé par un ADR, nouveau ou existant, qui le justifie ; un dépôt, en tant que tel, n'en demande pas.");
   });
 
   it("DISTILL : test-integrity examine les cas limites tranchés par les critères", () => {
