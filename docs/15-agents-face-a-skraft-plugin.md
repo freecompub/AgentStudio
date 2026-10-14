@@ -1,7 +1,7 @@
 # Nos agents face à ceux de skraft-plugin
 
 - Date : 2026-10-14, branche `feat/workflow-rejouable`.
-- Statut : **constat**. §4.1 à 4.4 corrigés le 2026-10-14 (extension et workflow) ; §4.5 à 4.7 et §5 à décider.
+- Statut : **constat**. §4.1 à 4.5 corrigés le 2026-10-14 (extension et workflow) ; §4.6, 4.7 et §5 à décider.
 - Question : nos agents font-ils la même chose que ceux de skraft-plugin
   (`github.com/SebastienDegodez/skraft-plugin`) ?
 - Versions comparées :
@@ -149,6 +149,35 @@ va donc plus loin.
 - Nous appliquons ces quatre lentilles, faites pour du code, aux documents de DESIGN et de
   DISTILL.
 
+**Traité le 2026-10-14, options C puis A :**
+
+| Porte du plugin | Traitement chez nous |
+|---|---|
+| DESIGN G2, G12 (registre des remplacements tenu des deux côtés) | Déjà en code (`design.ts`) |
+| DESIGN G8 (chaque commande a un événement) | **Code** : `commandesSansEvenement`, porte « cohérence » |
+| DESIGN G6 (chaque relation entre contextes nomme son patron) | **Code** : `relationsSansPatron`, porte « cohérence » (si `context-map.md` existe) |
+| DISTILL G6 (chaque critère dans `impl-plan.md`) | **Code** : `checkPlans`, porte « plan de test », avant toute exécution |
+| DISTILL G8 (au moins un walking skeleton) | **Code** : `checkPlans`, ligne « - @ac-N : walking skeleton — … » dans `test-plan.md` |
+| DISTILL G1, G3, G4, G9, G10 | Déjà en code (portes valeurs, gherkin, RED d'acceptance) |
+| DESIGN G1, G3, G4, G5, G9, G11, G15 ; DISTILL G2, G3, G5, G7, G11 | **Jugement** : « Points à examiner en DESIGN / DISTILL » ajoutés au dossier de la lentille concernée (`CONSIGNES_DE_PHASE`, `review-brief.ts`, `.mjs`) |
+
+- Les prompts des producteurs annoncent les formats vérifiés : `skraft-architect-model`
+  (« Commande `X` → événement `Y` », patron par relation) et `skraft-acceptance` (critères dans
+  `impl-plan.md`, ligne walking skeleton).
+- Les skills `architecture-review-criteria` et `acceptance-review-criteria` restent à la demande :
+  elles portent aussi la dérivation du verdict du plugin (« Verdict Derivation », « Dissent
+  Handling »), que notre code remplace.
+- **DESIGN G10 (matrice de cohérence) : construite par le code**, et non plus par l'architecte qui
+  s'y décernait `consistency-gate: PASS`. `matriceDeCoherence` relève la catégorie donnée à chaque
+  nom (« Commande `X` », « objet-valeur `Y` »…) dans `event-model.md`, `domain-model.md`,
+  `contracts.md`, `diagrams.md` et les nouveaux ADR, et refuse les catégories incompatibles du
+  plugin : commande et requête, entité et objet-valeur, agrégat et service de domaine. La porte
+  écrit `design/consistency-matrix.md` à chaque essai ; il est commité avec DESIGN.
+  Non repris : le `STRUCTURAL_DRIFT` (concept d'un ADR absent d'un document), trop sujet aux faux
+  positifs sur des noms en PascalCase qui ne sont pas des concepts.
+- Non repris en code : DESIGN G7 (chaque critère a son déclencheur), laissé au jugement de
+  `test-integrity` en DESIGN.
+
 **4.6 Méthode de DESIGN.** Les phases 3.5 à 8 de `solution-architect` ne sont ni dans nos prompts,
 ni vérifiées par une porte :
 - les engagements structurels et les déclencheurs obligatoires d'ADR ;
@@ -195,8 +224,9 @@ Présentes dans main (1.15.1), absentes chez nous :
    - Le prompt de `cold-reader` ne parle plus de faits ; il annonce son plafond.
    - Le plafond est appliqué par le code dans `numberDefects` (`review-thread.ts`, `.mjs`) :
      `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, écart tracé dans `severityNote`.
-2. **Décider** pour 4.5 à 4.7 : des lentilles propres à DESIGN et DISTILL, et la part de la
-   méthode de DESIGN à vérifier par une porte plutôt qu'à confier au prompt.
+2. ~~4.5~~ : **fait le 2026-10-14** (options C puis A, voir §4.5). **Décider** pour 4.6 et 4.7 :
+   la part de la méthode de DESIGN à vérifier par une porte plutôt qu'à confier au prompt, et le
+   contenu du plan de test.
 3. **Décider** quelles évolutions du §5 reprendre (reprise depuis main, et non plus depuis la
    v1.6.1 : l'autorisation actuelle ne porte que sur la branche
    `refactor/v1.6.0-tracking-substrate` et le tag v1.6.1).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderAdr, supersessionLine } from "../src/adr.js";
-import { checkDesign, type DesignInput } from "../src/design.js";
+import { checkDesign, matriceDeCoherence, matriceMarkdown, type DesignInput } from "../src/design.js";
 
 const adr = (n: number, over: Record<string, unknown> = {}) =>
   renderAdr(n, { title: `Décision ${n}`, status: "Proposed", context: "c", decision: "d", consequences: "q", alternatives: "a", ...over } as never, "2026-09-23");
@@ -162,5 +162,71 @@ describe("Anti-patrons d'ADR reconnaissables sans interprétation", () => {
   it("un titre qui nomme une décision passe", () => {
     for (const titre of ["Event Sourcing pour le journal des paiements", "Découpage domaine / application", "Résultat typé plutôt qu'exception"])
       expect(avecAdr("docs/adr/adr-001-sujet.md", titre), titre).toEqual([]);
+  });
+});
+
+describe("Porte cohérence : modèle et carte des contextes (option C de docs/15 §4.5)", () => {
+  // Repris de skraft-plugin v1.6.1, solution-architect-reviewer : G8 (« chaque commande a au moins
+  // un événement ») et G6 (« chaque relation entre contextes porte un patron explicite »). Chez
+  // eux, une lentille le lit ; ici, le code le vérifie.
+  it("une commande sans événement : rejet (G8)", () => {
+    const docs = { ...input().docs, "event-model.md": "Commande `CapBolus` → événement `BolusCapped`.\nCommande `ResetCap` : remet le plafond.\n" };
+    expect(checkDesign(input({ docs }))).toEqual([
+      "Commande `ResetCap` : aucun événement dans event-model.md. Chaque commande produit au moins un événement : « Commande `ResetCap` → événement `…` ».",
+    ]);
+  });
+
+  it("une commande reliée à son événement dans un tableau : acceptée ; une requête n'a pas besoin d'événement", () => {
+    const docs = { ...input().docs, "event-model.md": "Commande `CapBolus` → événement `BolusCapped`.\nCommande `ResetCap` : remet le plafond.\n\n| `ResetCap` | `CapReset` |\n\nRequête `GetDose` → vue `ProposedDose`.\n" };
+    expect(checkDesign(input({ docs }))).toEqual([]);
+  });
+
+  it("une relation entre contextes sans patron : rejet (G6) ; avec un patron : acceptée", () => {
+    const sans = { ...input().docs, "context-map.md": "`Bolus` → `Patient`\n" };
+    expect(checkDesign(input({ docs: sans }))).toEqual([
+      "context-map.md : la relation « `Bolus` → `Patient` » ne nomme aucun patron (ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language, Partnership, Separate Ways).",
+    ]);
+    const avec = { ...input().docs, "context-map.md": "`Bolus` → `Patient` : ACL, le dossier patient est traduit à la frontière.\n" };
+    expect(checkDesign(input({ docs: avec }))).toEqual([]);
+  });
+});
+
+describe("Matrice de cohérence construite par le code (G10 de skraft-plugin, docs/15 §4.5)", () => {
+  // Chez le plugin, l'architecte remplit la matrice et se donne « consistency-gate: PASS ». Ici, le
+  // code relève la catégorie de chaque nom dans chaque document et juge lui-même.
+  it("même catégorie partout : PASS, une ligne par concept, la catégorie relevée dans chaque document", () => {
+    const m = matriceDeCoherence(input());
+    expect(m.verdict).toBe("PASS");
+    expect(m.lignes.find((l) => l.concept === "CapBolus")).toEqual({ concept: "CapBolus", cellules: { "event-model.md": ["command"] }, verdict: "PASS" });
+    expect(m.lignes.find((l) => l.concept === "MaxBolus")).toEqual({ concept: "MaxBolus", cellules: { "domain-model.md": ["valueObject"] }, verdict: "PASS" });
+  });
+
+  it("une requête dans un ADR, une commande dans le modèle : FAIL et rejet nommant les deux documents", () => {
+    const adrs = [...input().adrs, { path: "docs/adr/adr-003-dose.md", md: adr(3, { decision: "Requête `GetProposedDose` en lecture seule." }), isNew: true }];
+    const docs = { ...input().docs, "event-model.md": "Commande `CapBolus` → événement `BolusCapped`.\nCommande `GetProposedDose` → événement `DoseProposed`.\n" };
+    const i = input({ docs, adrs });
+    expect(matriceDeCoherence(i).verdict).toBe("FAIL");
+    expect(checkDesign(i)).toContain(
+      "`GetProposedDose` est classé Commande (event-model.md) et Requête (ADR-003) : catégories incompatibles (matrice de cohérence).",
+    );
+  });
+
+  it("une entité et un objet-valeur sous le même nom : incompatibles ; un agrégat et une entité : compatibles", () => {
+    const docs = { ...input().docs, "domain-model.md": "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`, entité `BolusCalculation`.\n", "diagrams.md": "Entité `MaxBolus`.\n" };
+    const r = checkDesign(input({ docs }));
+    expect(r).toEqual(["`MaxBolus` est classé Objet-valeur (domain-model.md) et Entité (diagrams.md) : catégories incompatibles (matrice de cohérence)."]);
+  });
+
+  it("libellé en majuscule ou minuscule ; un nom en minuscules n'est pas un concept", () => {
+    const docs = { ...input().docs, "event-model.md": "COMMANDE `CapBolus` → événement `BolusCapped`.\nevent `onClick`.\n" };
+    const m = matriceDeCoherence(input({ docs }));
+    expect(m.lignes.map((l) => l.concept)).toEqual(["CapBolus", "BolusCapped", "BolusCalculation", "MaxBolus"]);
+  });
+
+  it("rendu Markdown : écrit par le code, une colonne par document, ligne consistency-gate", () => {
+    const md = matriceMarkdown(matriceDeCoherence(input()));
+    expect(md).toContain("Écrite par le code");
+    expect(md).toContain("| `CapBolus` | Commande | — | — | — | PASS |");
+    expect(md).toMatch(/consistency-gate: PASS\n$/);
   });
 });

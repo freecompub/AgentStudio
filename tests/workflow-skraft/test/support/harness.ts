@@ -140,8 +140,8 @@ export function acceptanceWriter(root: string): ScriptedBehavior {
     const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
     const tests = criteria.map((c) => `it("ac-${c.n}", () => expect.fail(${JSON.stringify(c.text)}));`).join("\n");
     await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
-    await put(root, `.skraft/${slug}/distill/test-plan.md`, "# Plan de test\n");
-    await put(root, `.skraft/${slug}/distill/impl-plan.md`, "# Plan d'implémentation\n");
+    await put(root, `.skraft/${slug}/distill/test-plan.md`, `# Plan de test\n- @ac-${criteria[0]?.n ?? 1} : walking skeleton — premier critère, de bout en bout.\n`);
+    await put(root, `.skraft/${slug}/distill/impl-plan.md`, `# Plan d'implémentation\n${criteria.map((c) => `${c.n}. ac-${c.n}`).join("\n")}\n`);
     const rel = "tests/acceptance/story.acceptance.test.ts";
     await put(root, rel, `import { expect, it } from "vitest";\n\n${tests}\n`);
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });

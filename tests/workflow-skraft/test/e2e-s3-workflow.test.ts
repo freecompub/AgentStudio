@@ -102,6 +102,10 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     // Les phases suivantes commitent ensuite : le commit de DESIGN est dans l'historique, avec l'ADR accepté.
     const design = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us-12"))!.split(" ")[0]!;
     expect(git(root, "show", `${design}:docs/adr/adr-001-plafond-applique-dans-le-domaine.md`)).toContain("- Statut : Accepted");
+    // La matrice de cohérence est écrite par le code et commitée avec DESIGN (G10, docs/15 §4.5).
+    const matrice = git(root, "show", `${design}:.skraft/us-12/design/consistency-matrix.md`);
+    expect(matrice).toContain("| `CapBolus` | Commande |");
+    expect(matrice).toContain("consistency-gate: PASS");
     expect(app.posted.at(-1)).toContain("ADR : ADR-001 (Accepted).");
   }, 120_000);
 

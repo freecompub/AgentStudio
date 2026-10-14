@@ -9,8 +9,8 @@ import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
 import { checkResearch } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
-import { checkDesign } from "./design.js";
-import { checkAcceptanceRed, checkValues } from "./distill.js";
+import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
+import { checkAcceptanceRed, checkPlans, checkValues } from "./distill.js";
 import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
@@ -520,11 +520,17 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   } catch {
     supersessions = "";
   }
-  const reasons = checkDesign({ docs, adrs, supersessions, modifiedExistingAdrs });
+  const input = { docs, adrs, supersessions, modifiedExistingAdrs };
+  // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
+  // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
+  const matrice = `${dir}/consistency-matrix.md`;
+  await ctx.workspace.writeFile(matrice, matriceMarkdown(matriceDeCoherence(input)));
+  const reasons = checkDesign(input);
   if (reasons.length) return { type: "GATE_FAIL", gate: "cohérence", reasons };
   const artifacts: ArtifactRecord[] = [];
-  for (const f of changed.filter((c) => c.status !== "deleted").filter(pasUnRapport))
+  for (const f of changed.filter((c) => c.status !== "deleted" && c.path !== matrice).filter(pasUnRapport))
     artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: ADR_FILE.test(f.path) ? "render_adr" : "skraft-architect", attempt });
+  artifacts.push({ path: matrice, sha256: await sha256(ctx, matrice), producedBy: "porte cohérence", attempt });
   return {
     type: "GATE_OK",
     artifacts,
@@ -557,6 +563,10 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   } catch {
     return { type: "GATE_FAIL", gate: "plan de test", reasons: [`Plan de test absent : ${dir}/test-plan.md`] };
   }
+  // Plans vérifiés avant d'exécuter quoi que ce soit (option C de docs/15 §4.5).
+  const implPlan = await ctx.workspace.readFile(`${dir}/impl-plan.md`).catch(() => null);
+  const planReasons = checkPlans({ criteria, testPlan, implPlan });
+  if (planReasons.length) return { type: "GATE_FAIL", gate: "plan de test", reasons: planReasons };
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
   // La suite entière est transmise : c'est la porte qui reconnaît ses tests, au marqueur `ac-<n>`

@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 14 octobre 2026, commit suivant `3456f90` \
+      État du code : 14 octobre 2026, commit suivant `7cc4192` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -225,6 +225,13 @@ seules `cold-reader` et `test-integrity` revoient.
 Les *faits* sont établis par le code et présentés comme acquis : livrables et empreintes, résultat
 de la dernière exécution des tests, séquences rouge puis vert, mutation, couverture, dérogations,
 réponses de l'utilisateur. Une mesure absente est dite absente, jamais présentée comme favorable.
+
+En DESIGN et en DISTILL, les lentilles jugent des documents, pas du code : leur dossier ajoute des
+*points à examiner* propres à la phase. Par exemple, en DESIGN, `architecture` vérifie que chaque
+agrégat garantit ses invariants et que chaque patron coûteux est justifié ; en DISTILL,
+`test-integrity` vérifie que chaque cas limite tranché par les critères a son scénario. Ces points
+viennent des relecteurs de DESIGN et de DISTILL de skraft-plugin, pour la part qui demande un
+jugement ; le reste est vérifié par les portes.
 
 === Ce que rend une lentille
 
@@ -444,7 +451,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
 #tableau(
   ("", "Contenu"),
   ([Entrées], [Le dossier de passation : story, réponses aux questions, `research.md` s'il existe, ADR déjà décidés.]),
-  ([Sorties], [Dans `.skraft/<slug>/design/` : `event-model.md`, `domain-model.md`, `context-map.md` (modélisateur) ; `contracts.md`, `diagrams.md`, `consistency-matrix.md` (décideur). Dans `docs/adr/` : les ADR, au statut `Proposed` puis `Accepted` ou `Rejected`.]),
+  ([Sorties], [Dans `.skraft/<slug>/design/` : `event-model.md`, `domain-model.md`, `context-map.md` (modélisateur) ; `contracts.md`, `diagrams.md` (décideur) ; `consistency-matrix.md` (écrite par le code). Dans `docs/adr/` : les ADR, au statut `Proposed` puis `Accepted` ou `Rejected`.]),
   ([Vers la suite], [Les ADR décidés (cités dans chaque dossier de passation, en lecture seule pour tous les agents) ; les noms du contrat (`contracts.md`), que DELIVER protège pendant une correction.]),
 )
 
@@ -452,7 +459,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
 #tableau(
   ("Qui", "Ce qu'il fait"),
   ([#AGENT `skraft-architect-model`], [Premier tour : modèle d'événements, modèle du domaine, carte des contextes. Les noms sont en PascalCase entre accents graves.]),
-  ([#AGENT `skraft-architect-decide`], [Second tour, avec le même motif : contrats, diagrammes, matrice de cohérence, en ne citant que des noms définis par le modélisateur. Écrit les ADR *uniquement* par l'outil `render_adr` ; il n'a pas d'accès direct à `docs/adr/`.]),
+  ([#AGENT `skraft-architect-decide`], [Second tour, avec le même motif : contrats et diagrammes, en ne citant que des noms définis par le modélisateur, chacun avec la même catégorie partout. Écrit les ADR *uniquement* par l'outil `render_adr` ; il n'a pas d'accès direct à `docs/adr/`.]),
   ([#CODE `render_adr`], [Valide l'ADR (champs non vides, statut `Proposed`), le numérote (plus grand numéro + 1), l'écrit avec le gabarit (Contexte, Décision, Conséquences, Alternatives). Un même titre encore proposé est réécrit, pas dupliqué. Refuse d'amender un ADR déjà décidé.]),
   ([#CODE porte « cohérence »], [Voir ci-dessous.]),
   ([#AGENT lentilles], [Revue par `cold-reader`, `test-integrity` et `architecture` (pas `quality-gates`).]),
@@ -468,6 +475,15 @@ d'architecture (ADR), que l'architecte humain ratifie.
   de fichier, pas de titre de bonne pratique (« ne pas », « toujours »…).
 - Numérotation sans doublon ni trou ; registre des remplacements (`supersessions.md`) cohérent dans
   les deux sens.
+- Chaque commande de `event-model.md` (« Commande `X` ») a au moins un événement : « `X` → événement
+  `Y` », ou une ligne de tableau qui les associe. Une requête en est exemptée.
+- Chaque relation entre contextes de `context-map.md` (« `A` → `B` ») nomme son patron sur la même
+  ligne : ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language,
+  Partnership ou Separate Ways.
+- *Matrice de cohérence*, construite par le code : pour chaque nom, la catégorie que lui donne
+  chaque document (« Commande `X` », « objet-valeur `Y` »…), modèle, contrats, diagrammes et
+  nouveaux ADR. Un même nom classé commande et requête, entité et objet-valeur, ou agrégat et
+  service de domaine est refusé. La porte écrit `consistency-matrix.md` à chaque essai.
 
 == La ratification
 Après une revue approuvée, le code envoie une demande par ADR proposé, réservée à l'architecte :
@@ -520,7 +536,7 @@ sans jamais les modifier.
   ("Porte", "Ce que vérifie le code", "Motifs (texte exact)"),
   ([gherkin], [Pas de détail technique dans les étapes (verbe HTTP, chemin d'URL, identifiant technique, base de données, DTO…) ; une seule action `Quand` ; pas d'assertion vague ; 7 étapes au plus ; pas de tag technique (`@api`, `@ui`…).], [« Le Gherkin décrit ce que fait le métier, pas comment le code s'y prend. » ; « N étapes « Quand ». Un seul déclencheur par scénario » ; « l'assertion « … » ne nomme aucun résultat métier observable »]),
   ([valeurs], [Pour chaque critère : un scénario `@ac-N`, un test portant `ac-N`, et chaque valeur du critère présente dans le scénario et dans le test (`12,5` vaut `12.5`).], [« Aucun scénario tagué \@ac-N » ; « La valeur « … » du critère N n'apparaît pas dans le scénario \@ac-N »]),
-  ([plan de test], [`test-plan.md` existe.], [« Plan de test absent : … »]),
+  ([plan de test], [`test-plan.md` et `impl-plan.md` existent ; `impl-plan.md` cite chaque critère (`ac-N`) ; `test-plan.md` désigne au moins un walking skeleton (« - \@ac-N : walking skeleton — … »). Vérifié avant toute exécution des tests.], [« Plan de test absent : … », « impl-plan.md ne cite pas le critère N », « test-plan.md ne désigne aucun walking skeleton »]),
   ([RED d'acceptance], [Le code lance la suite. Chaque test d'acceptance doit échouer pour une bonne raison (assertion ou symbole manquant), ni ignoré, ni en erreur d'une autre nature. Un test déjà vert n'est accepté que s'il est requalifié en non-régression avec sa justification.], [« … échoue pour une mauvaise raison » ; « … est ignoré » ; « … passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md »]),
 )
 
@@ -683,7 +699,7 @@ passation, les portes et les faits de revue.
   ([`research.md`], [RESEARCH (agent)], [DESIGN et suivantes], [livrable cité dans le dossier de passation]),
   ([Questions ouvertes], [story ; RESEARCH (section « Passage de relais »)], [ROUTE (humain)], [une demande par question]),
   ([Réponses de l'humain], [ROUTE ; questions bloquantes ; questions de revue], [tous les agents et lentilles suivants], [dossier de passation ; faits de revue. Gardées même après un rembobinage.]),
-  ([Modèle, contrats, matrice], [DESIGN (agents)], [DISTILL, DELIVER, lentilles], [livrables ; noms du contrat protégés pendant les corrections de DELIVER]),
+  ([Modèle, contrats, matrice], [DESIGN (agents ; matrice par le code)], [DISTILL, DELIVER, lentilles], [livrables ; noms du contrat protégés pendant les corrections de DELIVER]),
   ([ADR décidés], [DESIGN (agent, puis humain)], [toutes les étapes suivantes], [dossier de passation ; lecture seule ; lentille architecture]),
   ([Scénarios Gherkin, `test-plan.md`], [DISTILL (agent)], [DELIVER], [le Gherkin du scénario est joint à chaque pas]),
   ([`impl-plan.md`], [DISTILL (agent)], [DELIVER], [ordre des scénarios]),

@@ -72,11 +72,11 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
       await put(root, ".skraft/us-12/distill/features/plafond.feature", FEATURE(attempt === 1 ? "12 U" : "12,5 U"));
-      await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n2. ac-2\n");
+      await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n2. ac-2\n3. ac-3\n");
       await put(
         root,
         ".skraft/us-12/distill/test-plan.md",
-        attempt >= 3 ? "# Plan\n- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : "# Plan\n",
+        `# Plan\n- @ac-1 : walking skeleton — le cas nominal traverse le cas d'usage.\n${attempt >= 3 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""}`,
       );
       await put(root, "tests/acceptance/plafond.test.ts", ACCEPTANCE);
       if (attempt === 4)

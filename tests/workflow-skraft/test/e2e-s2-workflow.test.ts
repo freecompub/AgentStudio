@@ -333,6 +333,30 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(etapes).not.toContain("ROUTE");
   }, 90_000);
 
+  it("plans de DISTILL incomplets : rejet sous « plan de test », avant toute exécution (option C de docs/15 §4.5)", async () => {
+    let essais = 0;
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await accept(t);
+        if (essais++ === 0) {
+          await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n");
+          await put(root, ".skraft/us-12/distill/test-plan.md", "# Plan de test\n");
+        }
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await fin(app, id, 60_000);
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: [
+      "impl-plan.md ne cite pas le critère 2 (ac-2) : chaque critère y a sa place dans l'ordre de livraison.",
+      "impl-plan.md ne cite pas le critère 3 (ac-3) : chaque critère y a sa place dans l'ordre de livraison.",
+      "test-plan.md ne désigne aucun walking skeleton : marque au moins un scénario par une ligne « - @ac-<n> : walking skeleton — <raison> ».",
+    ] }));
+  }, 90_000);
+
   it("plan de test absent : rejet tracé sous sa propre porte, pas sous « valeurs » (D11)", async () => {
     let essais = 0;
     const accept = acceptanceWriter(root);

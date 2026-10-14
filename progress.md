@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 14/10 — Revue de DESIGN et de DISTILL : portes en code, puis consignes de phase (docs/15 §4.5)
+
+- Option C (code), E et W :
+  - DESIGN, porte « cohérence » : chaque « Commande `X` » a un événement (« `X` → … `Y` » ou ligne
+    de tableau) ; chaque relation « `A` → `B` » de `context-map.md` nomme son patron.
+  - DISTILL, porte « plan de test », **avant** l'exécution des tests : `impl-plan.md` présent et
+    citant chaque `ac-N` ; `test-plan.md` avec au moins une ligne « - @ac-N : walking skeleton — … ».
+- Option A (jugement) : `CONSIGNES_DE_PHASE` ajoute « Points à examiner en DESIGN / DISTILL » au
+  dossier des lentilles ; rien en DELIVER.
+- Prompts : `skraft-architect-model` et `skraft-acceptance` annoncent les formats vérifiés.
+- Les skills `*-review-criteria` restent à la demande : elles contiennent la dérivation du verdict
+  du plugin, que notre code remplace.
+- Piège : les harnais de test écrivaient des plans vides ; ils citent maintenant chaque critère et
+  un walking skeleton (E et W, `support/harness.ts`, `e2e-s4*`).
+- PDF régénérés (porte cohérence, porte plan de test, consignes de phase, organigrammes).
+- Matrice de cohérence (G10) **construite par le code** : catégorie de chaque nom relevée par
+  libellé (« Commande `X` »…), refus des paires incompatibles du plugin, `consistency-matrix.md`
+  écrite par la porte cohérence à chaque essai et commitée. Le décideur ne l'écrit plus.
+- Piège : le drapeau `i` sur la regex faisait accepter un nom en minuscules (`onClick`) ; le
+  libellé est décliné en minuscule, majuscule initiale et capitales, le nom reste `[A-Z]`.
+- Reste : docs/15 §4.6, 4.7 et §5.
+
 ## 14/10 — Lentilles : chacune reçoit ce que son prompt annonce ; cold-reader plafonnée (docs/15 §4.1 à 4.4)
 
 - `test-integrity` reçoit maintenant le code de production ; `architecture` reçoit les tests

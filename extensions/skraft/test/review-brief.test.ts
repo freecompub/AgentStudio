@@ -156,3 +156,23 @@ describe("Verdict reproductible (§9.3)", () => {
     expect(() => replayReview("DELIVER", 1, '[{"lens":"x","verdict":"OK","defects":[]}]')).toThrow();
   });
 });
+
+describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
+  const files = { artifacts: [".skraft/us-12/design/diagrams.md"], code: [], tests: [] };
+
+  it("DESIGN : architecture examine les invariants d'agrégat et la justification des patrons", () => {
+    const a = lensBrief("architecture", state, "DESIGN", files, []);
+    expect(a).toContain("Points à examiner en DESIGN :");
+    expect(a).toContain("Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.");
+  });
+
+  it("DISTILL : test-integrity examine les cas limites tranchés par les critères", () => {
+    const t = lensBrief("test-integrity", state, "DISTILL", files, []);
+    expect(t).toContain("Points à examiner en DISTILL :");
+    expect(t).toContain("Chaque cas limite ou négatif tranché par les critères a son scénario.");
+  });
+
+  it("DELIVER : aucune consigne de phase, les lentilles jugent le code", () => {
+    for (const lens of ["cold-reader", "test-integrity", "architecture", "quality-gates"] as const) expect(lensBrief(lens, state, "DELIVER", files, [])).not.toContain("Points à examiner");
+  });
+});

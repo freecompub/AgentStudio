@@ -13,6 +13,57 @@ export function latestArtifacts(records) {
 export function reviewFacts(livrables, phase) {
   return latestArtifacts(livrables).map((a) => `Livrable ${a.path} : porte de ${phase} validée à l'essai ${a.attempt} (sha256 ${short(a.sha256)}).`);
 }
+/**
+* Consignes de phase (option A de docs/15 §4.5) : en DESIGN et en DISTILL, les lentilles jugent des
+* documents, pas du code. Repris des lentilles internes des relecteurs de skraft-plugin v1.6.1
+* (`solution-architect-reviewer`, `acceptance-designer-reviewer`), pour la part qui demande un
+* jugement ; ce qui se vérifie mécaniquement est dans les portes (`design.ts`, `distill.ts`).
+* Entre parenthèses dans les commentaires : la porte d'origine.
+*/
+const CONSIGNES_DE_PHASE = {
+  DESIGN: {
+    "cold-reader": [
+      "Le vocabulaire du modèle (commandes, événements, agrégats) est celui de la story : une personne du métier s'y retrouve sans connaître le code.",
+    ],
+    "test-integrity": [
+      // G7
+      "Chaque critère d'acceptation a son déclencheur dans event-model.md : une commande s'il change l'état, une requête s'il ne fait que lire.",
+      "Chaque résultat attendu par un critère est observable dans le modèle (événement ou vue) : on pourra l'écrire en test d'acceptance.",
+    ],
+    architecture: [
+      // G1
+      "Chaque engagement structurel visible dans les diagrammes (agrégat, contexte, CQRS, Event Sourcing, saga, couche anticorruption) est justifié par un ADR.",
+      // G3, G4
+      "Domaine et Application ne dépendent ni de l'infrastructure ni de l'API ; les interfaces de dépôt et de passerelle sont déclarées dans la couche Application.",
+      // G5
+      "Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.",
+      // G9, G11
+      "Aucun agrégat, contexte ou patron sans critère de la story qui le justifie ; un patron coûteux cite une force mesurée et évalue l'option « sans le patron ».",
+      // G15
+      "Aucun ADR ne ratifie une règle que le projet impose déjà (linter, test d'architecture, convention).",
+    ],
+  },
+  DISTILL: {
+    "cold-reader": [
+      // G3
+      "Chaque scénario se lit par une personne du métier, sans connaissance technique.",
+    ],
+    "test-integrity": [
+      // G2
+      "Chaque cas limite ou négatif tranché par les critères a son scénario.",
+      // G5
+      "Chaque étape est non ambiguë et implémentable telle quelle.",
+      "Chaque test d'acceptance vérifie le résultat métier de son scénario, pas un détail d'implémentation.",
+    ],
+    architecture: [
+      // G7
+      "Chaque scénario entre par le cas d'usage de la couche Application nommé dans contracts.md.",
+      // G11
+      "Le plan de test place chaque scénario à la bonne couche ; un cas d'usage nouveau est testé au niveau Application, pas seulement de bout en bout.",
+    ],
+  },
+};
+
 const list = (title, xs) => (xs.length ? [title, ...xs.map((x) => `  - ${x}`)] : []);
 export function lensBrief(lens, c, phase, files, facts, history = []) {
   const lines = [`Revue de la phase ${phase}.`, ...history];
@@ -38,5 +89,6 @@ export function lensBrief(lens, c, phase, files, facts, history = []) {
       lines.push(...list("Livrables :", files.artifacts));
       break;
   }
+  lines.push(...list(`Points à examiner en ${phase} :`, CONSIGNES_DE_PHASE[phase]?.[lens] ?? []));
   return lines.join("\n");
 }

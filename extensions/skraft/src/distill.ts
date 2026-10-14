@@ -115,3 +115,19 @@ export function checkAcceptanceRed(i: { criteria: Criterion[]; testPlan: string;
   }
   return { reasons, regressions };
 }
+
+/**
+ * Plans de DISTILL (G6 et G8 de skraft-plugin v1.6.1, acceptance-designer-reviewer, vérifiés ici par
+ * le code) : `impl-plan.md` cite chaque critère, puisque DELIVER en tire l'ordre des scénarios, et
+ * `test-plan.md` désigne au moins un walking skeleton.
+ */
+export function checkPlans(i: { criteria: Criterion[]; testPlan: string; implPlan: string | null }): string[] {
+  if (i.implPlan === null) return ["Plan d'implémentation absent : impl-plan.md."];
+  const reasons: string[] = [];
+  for (const c of i.criteria)
+    if (!new RegExp(`\\bac-${c.n}(?![0-9])`, "i").test(i.implPlan))
+      reasons.push(`impl-plan.md ne cite pas le critère ${c.n} (ac-${c.n}) : chaque critère y a sa place dans l'ordre de livraison.`);
+  if (!i.testPlan.split("\n").some((l) => /@ac-\d+/.test(l) && /walking[ -]skeleton/i.test(l)))
+    reasons.push("test-plan.md ne désigne aucun walking skeleton : marque au moins un scénario par une ligne « - @ac-<n> : walking skeleton — <raison> ».");
+  return reasons;
+}

@@ -6,7 +6,7 @@
 */
 import { essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { avecStory, parseAdr, setAdrStatus, storyDe } from "./adr.mjs";
-import { checkDesign } from "./design.mjs";
+import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -100,10 +100,15 @@ async function porteCoherence(w, d, s, cp, essai) {
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
   const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
-  const reasons = checkDesign({ docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs });
+  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs };
+  // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
+  // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
+  const matrice = `.skraft/${d.slug}/design/consistency-matrix.md`;
+  await w.ecrireFichier(matrice, matriceMarkdown(matriceDeCoherence(input)));
+  const reasons = checkDesign(input);
   if (reasons.length)
     return reasons;
-  await enregistrerLivrables(w, s, changes.filter((c) => c.status !== "deleted").map((c) => c.path), essai, sha256);
+  await enregistrerLivrables(w, s, [...changes.filter((c) => c.status !== "deleted" && c.path !== matrice).map((c) => c.path), matrice], essai, sha256);
   // Ce que dit le disque, et non ce qu'un essai précédent avait enregistré (D2 de docs/12).
   d.adrs = await adrsDuDisque(w, d.slug);
   return [];

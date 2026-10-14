@@ -1,7 +1,7 @@
 // Repris de extensions/skraft-workflow/test/distill-gates.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import { describe, expect, it } from "vitest";
-import { acOf, checkAcceptanceRed, checkValues, featureScenarios } from "../../../workflows/skraft/distill.mjs";
+import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios } from "../../../workflows/skraft/distill.mjs";
 import { matchesAny } from "@agent-studio/extension-api";
 import { parseStory } from "../../../workflows/skraft/story.mjs";
 import { US12 } from "./story.test.js";
@@ -189,5 +189,32 @@ describe("Porte RED : reconnaître ses tests par leur marqueur, pas par leur ran
     expect(motif).toMatch(/NOM/);
     expect(motif).toContain("Tarification.Tests.RemiseParPalierAcceptanceTests."); // ce qu'elle a vu
     expect(motif).not.toMatch(/n'a été exécuté/);
+  });
+});
+
+describe("Porte plan de test : plans de DISTILL (option C de docs/15 §4.5)", () => {
+  // Repris de skraft-plugin v1.6.1, acceptance-designer-reviewer : G6 (« chaque scénario a sa
+  // place dans le plan d'implémentation ») et G8 (« au moins un walking skeleton »).
+  const testPlan = "# Plan\n- @ac-1 : walking skeleton — traverse le cas d'usage de bout en bout.\n";
+  const implPlan = "1. ac-1\n2. ac-2\n3. ac-3\n";
+
+  it("plans complets : aucun rejet", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan })).toEqual([]);
+  });
+
+  it("un critère absent du plan d'implémentation : rejet (G6)", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan: "1. ac-1\n2. ac-3\n" })).toEqual([
+      "impl-plan.md ne cite pas le critère 2 (ac-2) : chaque critère y a sa place dans l'ordre de livraison.",
+    ]);
+  });
+
+  it("plan d'implémentation absent : rejet", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan: null })).toEqual(["Plan d'implémentation absent : impl-plan.md."]);
+  });
+
+  it("aucun walking skeleton désigné : rejet (G8)", () => {
+    expect(checkPlans({ criteria, testPlan: "# Plan\n", implPlan })).toEqual([
+      "test-plan.md ne désigne aucun walking skeleton : marque au moins un scénario par une ligne « - @ac-<n> : walking skeleton — <raison> ».",
+    ]);
   });
 });

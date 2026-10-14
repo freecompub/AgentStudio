@@ -193,6 +193,27 @@
       "notes": "docs/15-agents-face-a-skraft-plugin.md §4.1 à 4.4, extension et workflow. Plafond repris de skraft-plugin v1.6.1 (cold-reader-lens) : blocker → major, REJECTED → CHANGES_REQUESTED, écart noté dans severityNote."
     },
     {
+      "id": "portes-de-design-et-distill-reprises-du-plugin",
+      "title": "DESIGN refuse une commande sans événement et une relation entre contextes sans patron ; DISTILL refuse un critère absent de impl-plan.md et un plan de test sans walking skeleton",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option C de docs/15\"",
+      "passes": true,
+      "notes": "docs/15 §4.5, option C. Extension et workflow. Portes G8 et G6 (DESIGN), G6 et G8 (DISTILL) de skraft-plugin v1.6.1, vérifiées par le code."
+    },
+    {
+      "id": "matrice-de-coherence-par-le-code",
+      "title": "La matrice de cohérence de DESIGN est construite par le code : un même nom classé dans deux catégories incompatibles est refusé ; la matrice est écrite et commitée avec DESIGN",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"matrice de cohérence|Matrice de cohérence|incohérence rejetée\"",
+      "passes": true,
+      "notes": "G10 de skraft-plugin v1.6.1, docs/15 §4.5. matriceDeCoherence et matriceMarkdown (design.ts, design.mjs), écrite par la porte cohérence (effects.ts, conception.mjs)."
+    },
+    {
+      "id": "lentilles-consignes-de-phase",
+      "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",
+      "passes": true,
+      "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
+    },
+    {
       "id": "escalade-de-scenario-lignes-non-couvertes",
       "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",

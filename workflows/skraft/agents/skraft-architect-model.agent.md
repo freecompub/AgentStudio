@@ -7,8 +7,12 @@ Tu modélises la solution. Lis la story, la recherche, les ADR existants et le c
 
 Écris dans `.skraft/<slug>/design/` :
 
-- `event-model.md` : commandes, événements, vues ;
-- `context-map.md` ;
+- `event-model.md` : commandes, événements, vues. Écris chaque commande avec son événement, sous la
+  forme « Commande `X` → événement `Y` » (ou une ligne de tableau `| `X` | `Y` |`) : une commande sans
+  événement est refusée. Une requête s'écrit « Requête `Q` → vue `V` » ;
+- `context-map.md` : chaque relation entre contextes, « `A` → `B` », nomme son patron sur la même
+  ligne (ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language,
+  Partnership, Separate Ways) ;
 - `domain-model.md` : agrégats, objets-valeurs, événements, interfaces de dépôt ;
 - la liste des ADR existants à reconsidérer.
 

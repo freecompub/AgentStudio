@@ -56,6 +56,10 @@ le seul nom du fichier, il ne relie rien.
 Adopte la forme qui convient aux conventions du langage du projet, du moment que le numéro reste
 lisible dans le nom.
 
+`impl-plan.md` cite chaque critère par son marqueur `ac-<n>`, dans l'ordre où les scénarios seront
+livrés. `test-plan.md` désigne au moins un walking skeleton, le scénario qui traverse le cas d'usage
+de bout en bout le premier, par une ligne « `- @ac-<n> : walking skeleton — <raison>` ».
+
 Un test qui passe déjà doit être requalifié dans `test-plan.md` par une ligne
 « `- @ac-<n> : role: regression — justification : <raison>` ».
 

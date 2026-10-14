@@ -27,3 +27,23 @@ describe("Contexte des lentilles (§9.2)", () => {
     expect(a).toContain("Tests :\n  - test/domain/plafond.test.ts");
   });
 });
+
+describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
+  const f = { artifacts: [".skraft/us-12/design/diagrams.md"], code: [], tests: [] };
+
+  it("DESIGN : architecture examine les invariants d'agrégat et la justification des patrons", () => {
+    const a = lensBrief("architecture", c, "DESIGN", f, []);
+    expect(a).toContain("Points à examiner en DESIGN :");
+    expect(a).toContain("Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.");
+  });
+
+  it("DISTILL : test-integrity examine les cas limites tranchés par les critères", () => {
+    const t = lensBrief("test-integrity", c, "DISTILL", f, []);
+    expect(t).toContain("Points à examiner en DISTILL :");
+    expect(t).toContain("Chaque cas limite ou négatif tranché par les critères a son scénario.");
+  });
+
+  it("DELIVER : aucune consigne de phase, les lentilles jugent le code", () => {
+    for (const lens of ["cold-reader", "test-integrity", "architecture", "quality-gates"]) expect(lensBrief(lens, c, "DELIVER", f, [])).not.toContain("Points à examiner");
+  });
+});

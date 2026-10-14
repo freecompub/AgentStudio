@@ -4,7 +4,7 @@
 * d'acceptance exécuté par le code (D20), puis gel des tests d'acceptance (D21) et revue.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { checkAcceptanceRed, checkValues } from "./distill.mjs";
+import { checkAcceptanceRed, checkPlans, checkValues } from "./distill.mjs";
 import { checkGherkin } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
@@ -83,6 +83,18 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
       throw e;
     return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test" };
   }
+  // Plans vérifiés avant d'exécuter quoi que ce soit (option C de docs/15 §4.5).
+  let implPlan = null;
+  try {
+    implPlan = await w.lireFichier(`${dir}/impl-plan.md`);
+  }
+  catch (e) {
+    if (e instanceof PanneEnvironnement)
+      throw e;
+  }
+  const plans = checkPlans({ criteria: d.story.criteria, testPlan, implPlan });
+  if (plans.length)
+    return { motifs: plans, porte: "plan de test" };
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)
     return { motifs: ["Les tests ont dépassé le délai."], porte: "RED d'acceptance" };

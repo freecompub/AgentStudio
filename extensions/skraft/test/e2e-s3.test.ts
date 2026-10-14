@@ -145,6 +145,10 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     expect(adr).toContain("Plafond par prise");
     expect(git(root, "show", "--name-only", "--format=%s", `HEAD`)).toMatch(/^docs\(skraft\): design de us-12/);
     expect(git(root, "show", "HEAD:docs/adr/adr-001-plafond-applique-dans-le-domaine.md")).toContain("- Statut : Accepted");
+    // La matrice de cohérence est écrite par le code et commitée avec DESIGN (G10, docs/15 §4.5).
+    const matrice = git(root, "show", "HEAD:.skraft/us-12/design/consistency-matrix.md");
+    expect(matrice).toContain("| `CapBolus` | Commande |");
+    expect(matrice).toContain("consistency-gate: PASS");
     expect(stateOf(await app.engine.status(id))!.adrs[0]).toMatchObject({ status: "Accepted", decisionBy: "user" });
   }, 120_000);
 
