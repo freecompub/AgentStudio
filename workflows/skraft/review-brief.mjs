@@ -22,10 +22,12 @@ export function lensBrief(lens, c, phase, files, facts, history = []) {
       lines.push("Tu n'as aucun contexte du producteur : juge uniquement ce que disent les fichiers ci-dessous.", ...list("Livrables :", files.artifacts), ...list("Code :", files.code), ...list("Tests :", files.tests));
       break;
     case "test-integrity":
-      lines.push(...list("Critères d'acceptation :", c.criteria.map((x) => `${x.n}. ${x.text}`)), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...factBlock);
+      // Le code de production aussi : un test miroir du code ne se voit qu'en lisant les deux (4.1 de docs/15).
+      lines.push(...list("Critères d'acceptation :", c.criteria.map((x) => `${x.n}. ${x.text}`)), ...list("Tests :", files.tests), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...factBlock);
       break;
     case "architecture":
-      lines.push(...list("ADR ratifiés :", c.adrs.map((a) => `${a.id} : ${a.path}`)), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...factBlock);
+      // Les tests aussi : une doublure dans le domaine se voit dans les tests (4.2 de docs/15).
+      lines.push(...list("ADR ratifiés :", c.adrs.map((a) => `${a.id} : ${a.path}`)), ...list("Code :", files.code), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...factBlock);
       break;
     case "quality-gates":
       lines.push("Tu n'exécutes rien.");

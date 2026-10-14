@@ -1,7 +1,7 @@
 # Nos agents face à ceux de skraft-plugin
 
 - Date : 2026-10-14, branche `feat/workflow-rejouable`.
-- Statut : **constat**. Aucune correction faite, aucune décision prise.
+- Statut : **constat**. §4.1 à 4.4 corrigés le 2026-10-14 (extension et workflow) ; §4.5 à 4.7 et §5 à décider.
 - Question : nos agents font-ils la même chose que ceux de skraft-plugin
   (`github.com/SebastienDegodez/skraft-plugin`) ?
 - Versions comparées :
@@ -111,7 +111,7 @@ va donc plus loin.
 
 ## 4. Écarts à traiter
 
-### Incohérences entre le prompt et ce que l'agent reçoit
+### Incohérences entre le prompt et ce que l'agent reçoit (corrigées)
 
 **4.1 `test-integrity` ne reçoit pas le code de production.**
 - Le prompt dit : « Tu reçois les tests ET le code de production ».
@@ -130,7 +130,7 @@ va donc plus loin.
 - Le prompt parle des « faits qui te sont fournis ».
 - Le dossier n'en contient aucun (`review-brief.ts:79-85`).
 
-### Règle absente
+### Règle absente (corrigée)
 
 **4.4 Plafond de gravité de `cold-reader`.**
 - Plugin : « Maximum severity for this lens is `medium`. Nothing here is a `blocker`. »
@@ -189,8 +189,12 @@ Présentes dans main (1.15.1), absentes chez nous :
 
 ## 6. Prochaines étapes proposées
 
-1. **Corriger 4.1 à 4.4**, dans l'extension et le workflow, en TDD : ce sont des corrections
-   locales (dossiers des lentilles, prompts, plafond de gravité appliqué par le code).
+1. ~~Corriger 4.1 à 4.4~~ : **fait le 2026-10-14**, extension et workflow.
+   - `test-integrity` reçoit le code ; `architecture` reçoit les tests et son prompt le dit
+     (`review-brief.ts`, `review-brief.mjs`).
+   - Le prompt de `cold-reader` ne parle plus de faits ; il annonce son plafond.
+   - Le plafond est appliqué par le code dans `numberDefects` (`review-thread.ts`, `.mjs`) :
+     `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, écart tracé dans `severityNote`.
 2. **Décider** pour 4.5 à 4.7 : des lentilles propres à DESIGN et DISTILL, et la part de la
    méthode de DESIGN à vérifier par une porte plutôt qu'à confier au prompt.
 3. **Décider** quelles évolutions du §5 reprendre (reprise depuis main, et non plus depuis la

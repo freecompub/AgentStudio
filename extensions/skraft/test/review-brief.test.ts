@@ -126,6 +126,14 @@ describe("Contexte des lentilles (§9.2)", () => {
     expect(a).toContain("  - Fait A.");
     expect(a).not.toContain("par prise");
   });
+
+  it("test-integrity reçoit aussi le code de production, que son prompt annonce (4.1 de docs/15)", () => {
+    expect(lensBrief("test-integrity", state, "DELIVER", files, facts)).toContain("Code :\n  - Sources/Domain/BolusCapPolicy.swift");
+  });
+
+  it("architecture reçoit aussi les tests : une doublure dans le domaine se voit dans les tests (4.2 de docs/15)", () => {
+    expect(lensBrief("architecture", state, "DELIVER", files, facts)).toContain("Tests :\n  - Tests/DomainTests/BolusCapPolicyTests.swift");
+  });
 });
 
 describe("Verdict reproductible (§9.3)", () => {

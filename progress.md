@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 14/10 — Lentilles : chacune reçoit ce que son prompt annonce ; cold-reader plafonnée (docs/15 §4.1 à 4.4)
+
+- `test-integrity` reçoit maintenant le code de production ; `architecture` reçoit les tests
+  (une doublure du domaine se voit dans les tests). Extension (`review-brief.ts`) et workflow
+  (`review-brief.mjs`).
+- Prompts : `cold-reader` ne parle plus de « faits fournis » et annonce sa gravité maximale ;
+  `architecture` dit recevoir code et tests. Les deux copies d'agents restent identiques.
+- Plafond repris du plugin v1.6.1 : appliqué par le **code** dans `numberDefects` (E et W), pas
+  seulement dans le prompt. `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, champ
+  `severityNote` (schéma de relecture E et lecteur W).
+- Piège : quatre tests de bout en bout faisaient rejeter DESIGN par `cold-reader` ; ils font
+  maintenant rejeter `test-integrity` (le scénario testé est le même : deux lentilles rejettent).
+- PDF régénérés (tableau des lentilles, écart test-integrity retiré du chapitre 11).
+- Reste : docs/15 §4.5 à 4.7 et §5, à décider.
+
 ## 14/10 — Constat : nos agents face à ceux de skraft-plugin (v1.6.1 et main 1.15.1)
 
 - Document : `docs/15-agents-face-a-skraft-plugin.md`. Aucune correction faite.

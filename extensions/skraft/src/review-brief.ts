@@ -1,8 +1,8 @@
 /**
  * Dossiers des lentilles (SPEC-skraft §9.1, §9.2), construits par le code. Pur.
  * - Faits établis : présentés comme acquis, les lentilles ne les revérifient pas.
- * - `cold-reader` ne reçoit aucun contexte du producteur ; `test-integrity` reçoit tests, critères et
- *   faits ; `architecture` reçoit les ADR ratifiés, le code et les faits.
+ * - `cold-reader` ne reçoit aucun contexte du producteur ; `test-integrity` reçoit critères, tests,
+ *   code et faits ; `architecture` reçoit les ADR ratifiés, le code, les tests et les faits.
  */
 import type { Evidence } from "@agent-studio/extension-api";
 import type { LensName } from "./difficulty.js";
@@ -86,12 +86,14 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
       break;
     case "test-integrity": {
       const criteria = state.story?.criteria.map((c) => `${c.n}. ${c.text}`) ?? [];
-      lines.push(...list("Critères d'acceptation :", criteria), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...factBlock);
+      // Le code de production aussi : un test miroir du code ne se voit qu'en lisant les deux (4.1 de docs/15).
+      lines.push(...list("Critères d'acceptation :", criteria), ...list("Tests :", files.tests), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...factBlock);
       break;
     }
     case "architecture": {
       const adrs = state.adrs.filter((a) => a.status === "Accepted").map((a) => `${a.id} : ${a.path}`);
-      lines.push(...list("ADR ratifiés :", adrs), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...factBlock);
+      // Les tests aussi : une doublure dans le domaine se voit dans les tests (4.2 de docs/15).
+      lines.push(...list("ADR ratifiés :", adrs), ...list("Code :", files.code), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...factBlock);
       break;
     }
     case "quality-gates":

@@ -128,6 +128,7 @@ function lireVerdicts(brut) {
       ...(d.target !== undefined ? { target: parmi(d.target, ["test", "code", "deliverable"], "target") } : {}),
       ...(typeof d.id === "string" ? { id: d.id } : {}),
       ...(typeof d.targetNote === "string" ? { targetNote: d.targetNote } : {}),
+      ...(typeof d.severityNote === "string" ? { severityNote: d.severityNote } : {}),
     })),
     ...(Array.isArray(l.rulings)
       ? { rulings: l.rulings.map((r) => ({ defect: texte(r.defect, "defect"), decision: parmi(r.decision, ["accepted", "maintained"], "decision"), ...(typeof r.reason === "string" ? { reason: r.reason } : {}) })) }

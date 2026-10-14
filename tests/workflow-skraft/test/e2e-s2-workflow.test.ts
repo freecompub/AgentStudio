@@ -353,16 +353,16 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
   it("verdict REJECTED : rejet tracé sous la porte « revue », avec les lentilles qui rejettent (D11)", async () => {
     const rejette = (lens: string) => async (t: { prompt: string; callTool: (n: string, a: unknown) => Promise<unknown> }) => {
       await t.callTool("submit_lens_verdict", t.prompt.includes("phase DESIGN")
-        ? { lens, verdict: "REJECTED", defects: lens === "cold-reader" ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] }
+        ? { lens, verdict: "REJECTED", defects: lens === "test-integrity" ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] }
         : { lens, verdict: "APPROVED", defects: [] });
     };
-    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-lens-cold-reader": rejette("cold-reader"), "skraft-lens-architecture": rejette("architecture") });
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-lens-test-integrity": rejette("test-integrity"), "skraft-lens-architecture": rejette("architecture") });
     const app = await assemble(root, runtime, tasksDir);
     answerQuestions(app);
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
-    expect(rejets.at(-1)).toMatchObject({ porte: "revue", motifs: ["cold-reader : REJECTED — conception hors sujet", "architecture : REJECTED"] });
+    expect(rejets.at(-1)).toMatchObject({ porte: "revue", motifs: ["test-integrity : REJECTED — conception hors sujet", "architecture : REJECTED"] });
   }, 90_000);
 
   it("citation hors limites rejetée avec le motif exact, corrigée au réessai ; questions posées ; réponses dans le dossier de DESIGN", async () => {

@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : commit `3ed82fb`, 13 octobre 2026 \
+      État du code : 14 octobre 2026, commit suivant `3456f90` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -213,9 +213,9 @@ DESIGN, DISTILL et DELIVER se terminent par une revue. RESEARCH n'en a pas.
 
 #tableau(
   ("Lentille", "Angle", "Ce qu'elle reçoit"),
-  ([cold-reader], [Vocabulaire métier, clarté des noms, intention visible. Lit sans aucun contexte du producteur.], [Livrables, code, tests. *Aucun fait mesuré.*]),
-  ([test-integrity], [Théâtre de test : test tautologique, assertion qui ne peut pas échouer, test modifié pour passer.], [Critères, tests, livrables, faits.]),
-  ([architecture], [Sens des dépendances, domaine sans doublure, fidélité aux ADR et au modèle.], [ADR acceptés, code, livrables, faits.]),
+  ([cold-reader], [Vocabulaire métier, clarté des noms, intention visible. Lit sans aucun contexte du producteur. Gravité plafonnée par le code à `major` : la clarté ne bloque jamais seule.], [Livrables, code, tests. *Aucun fait mesuré.*]),
+  ([test-integrity], [Théâtre de test : test tautologique, assertion qui ne peut pas échouer, test modifié pour passer.], [Critères, tests, code, livrables, faits.]),
+  ([architecture], [Sens des dépendances, aucune doublure du domaine dans les tests, fidélité aux ADR et au modèle.], [ADR acceptés, code, tests, livrables, faits.]),
   ([quality-gates], [Cohérence des livrables avec les mesures du code ; n'exécute et ne rejuge rien.], [Faits et livrables ; ni code ni tests.]),
 )
 
@@ -805,8 +805,6 @@ Ces points ont été vus en relisant le code ; ils ne sont pas encore corrigés.
 - *Extension* : si le commit de DISTILL échoue et que l'humain choisit « continuer sans commiter »,
   l'empreinte du gel est effacée avant le traitement du commit. DELIVER démarre alors sans
   vérification du gel, et sans avertissement. Le workflow garde l'empreinte.
-- *Extension* : la consigne de la lentille `test-integrity` affirme qu'elle reçoit le code de
-  production ; son dossier n'en contient pas.
 - *Extension* : le stade `VERDICT_GATE` est déclaré mais jamais atteint (écart S3 de l'audit).
 - *Workflow* : un défaut de travail de l'arbitre de mutation n'est pas rattrapé localement ; dans
   l'extension, il laisse le mutant à l'humain.

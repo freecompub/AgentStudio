@@ -186,6 +186,13 @@
       "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations. Point à trancher avant de coder : qui met à jour un test unitaire obsolète (§4 : A recommandée, B, C)."
     },
     {
+      "id": "lentilles-recoivent-ce-que-leur-prompt-annonce",
+      "title": "Chaque lentille reçoit ce que son prompt annonce (test-integrity : le code ; architecture : les tests), et cold-reader est plafonnée à major par le code",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"docs/15\"",
+      "passes": true,
+      "notes": "docs/15-agents-face-a-skraft-plugin.md §4.1 à 4.4, extension et workflow. Plafond repris de skraft-plugin v1.6.1 (cold-reader-lens) : blocker → major, REJECTED → CHANGES_REQUESTED, écart noté dans severityNote."
+    },
+    {
       "id": "escalade-de-scenario-lignes-non-couvertes",
       "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",

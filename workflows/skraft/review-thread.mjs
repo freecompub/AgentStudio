@@ -17,9 +17,25 @@ export function effectiveTarget(d, classify) {
     return { target: "test", note: `cible déclarée « ${declared} », fichier de ${LIBELLE[k]} : routé vers « test »` };
   return { target: declared };
 }
+/**
+* Gravité maximale par lentille (4.4 de docs/15). Repris de skraft-plugin v1.6.1, cold-reader-lens :
+* « Maximum severity for this lens is `medium`. Nothing here is a `blocker`. » La clarté ne bloque
+* jamais seule une phase : un `blocker` devient `major` et un `REJECTED` un `CHANGES_REQUESTED`.
+*/
+const GRAVITE_MAX = { "cold-reader": "major" };
+function plafonner(l) {
+  const max = GRAVITE_MAX[l.lens];
+  if (!max)
+    return l;
+  return {
+    ...l,
+    verdict: l.verdict === "REJECTED" ? "CHANGES_REQUESTED" : l.verdict,
+    defects: l.defects.map((d) => (d.severity === "blocker" ? { ...d, severity: max, severityNote: `gravité déclarée « blocker », plafonnée à « ${max} » pour la lentille ${l.lens}` } : d)),
+  };
+}
 /** Identifiants et cibles effectives, attribués par le code : un identifiant inventé par un modèle n'est pas stable. */
 export function numberDefects(lenses, round, classify) {
-  return lenses.map((l) => ({
+  return lenses.map(plafonner).map((l) => ({
     ...l,
     defects: l.defects.map((d, i) => {
       const { target, note } = effectiveTarget(d, classify);

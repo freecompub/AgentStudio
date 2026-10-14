@@ -265,7 +265,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-architect-model": model,
-      "skraft-lens-cold-reader": lentille("cold-reader"),
+      "skraft-lens-test-integrity": lentille("test-integrity"),
       "skraft-lens-architecture": lentille("architecture"),
     });
     const app = await assemble(root, runtime, tasksDir);
@@ -281,7 +281,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
     await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
-    expect(modelPrompts.at(-1)).toContain("Revue : verdict REJECTED (cold-reader : REJECTED — conception hors sujet");
+    expect(modelPrompts.at(-1)).toContain("Revue : verdict REJECTED (test-integrity : REJECTED — conception hors sujet");
   }, 120_000);
 
   // D6 (docs/12) : les lentilles ne reçoivent ni faits d'un run effacé, ni rapports de revue en livrables.
@@ -306,14 +306,14 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
         prompts.push(t.prompt);
         revues = n;
       }
-      const verdict = relance ? "APPROVED" : n === 1 && lens === "architecture" ? "CHANGES_REQUESTED" : n === 2 && (lens === "architecture" || lens === "cold-reader") ? "REJECTED" : "APPROVED";
+      const verdict = relance ? "APPROVED" : n === 1 && lens === "architecture" ? "CHANGES_REQUESTED" : n === 2 && (lens === "architecture" || lens === "test-integrity") ? "REJECTED" : "APPROVED";
       const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", description: "contrat incomplet", target: "deliverable" }] : [];
       await t.callTool("submit_lens_verdict", { lens, verdict, defects });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-architect-model": model,
       "skraft-architect-decide": decide,
-      "skraft-lens-cold-reader": lentille("cold-reader"),
+      "skraft-lens-test-integrity": lentille("test-integrity"),
       "skraft-lens-architecture": lentille("architecture"),
     });
     const app = await assemble(root, runtime, tasksDir);

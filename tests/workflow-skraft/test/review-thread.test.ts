@@ -47,6 +47,23 @@ describe("numberDefects et effectiveTarget", () => {
   });
 });
 
+describe("Plafond de gravité de cold-reader (4.4 de docs/15)", () => {
+  // Repris de skraft-plugin v1.6.1, cold-reader-lens : « Maximum severity for this lens is `medium`.
+  // Nothing here is a `blocker`. » La clarté ne bloque jamais seule : le code l'applique, pas le prompt.
+  it("un blocker de cold-reader devient major, un REJECTED devient CHANGES_REQUESTED, et l'écart est noté", () => {
+    const [v] = numberDefects([verdict("cold-reader", [{ severity: "blocker", description: "nom obscur", target: "code" }], "REJECTED")], 1, () => null);
+    expect(v!.verdict).toBe("CHANGES_REQUESTED");
+    expect(v!.defects[0]).toMatchObject({ severity: "major", severityNote: "gravité déclarée « blocker », plafonnée à « major » pour la lentille cold-reader" });
+  });
+
+  it("les autres lentilles gardent leur gravité et leur verdict", () => {
+    const [v] = numberDefects([verdict("test-integrity", [{ severity: "blocker", description: "tautologie", target: "test" }], "REJECTED")], 1, () => null);
+    expect(v!.verdict).toBe("REJECTED");
+    expect(v!.defects[0]!.severity).toBe("blocker");
+    expect(v!.defects[0]).not.toHaveProperty("severityNote");
+  });
+});
+
 describe("reviewRound", () => {
   it("chaque défaut blocker ou major devient un fil ouvert ; les mineurs n'en ouvrent pas", () => {
     const lenses = numberDefects([verdict("cold-reader", [major("a"), { severity: "minor", description: "m", target: "code" }])], 1, () => null);

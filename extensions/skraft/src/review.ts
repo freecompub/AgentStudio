@@ -29,6 +29,8 @@ export interface LensDefect {
   id?: string | undefined;
   /** Écart entre la cible déclarée et la nature du fichier cité, pour la trace. */
   targetNote?: string | undefined;
+  /** Gravité déclarée plafonnée par le code pour cette lentille, pour la trace (4.4 de docs/15). */
+  severityNote?: string | undefined;
 }
 
 /** Arbitrage d'une lentille sur un de ses défauts que l'agent a contesté (ADR 0046). */
@@ -165,6 +167,7 @@ const lensesSchema = z.array(
         target: z.enum(["test", "code", "deliverable"]).optional(),
         id: z.string().optional(),
         targetNote: z.string().optional(),
+        severityNote: z.string().optional(),
       }),
     ),
     rulings: z.array(z.object({ defect: z.string(), decision: z.enum(["accepted", "maintained"]), reason: z.string().optional() })).optional(),
