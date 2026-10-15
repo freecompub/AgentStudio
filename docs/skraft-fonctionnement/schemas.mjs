@@ -78,7 +78,7 @@ const SCHEMAS = {
       { id: "ag", type: "agent", titre: "skraft-acceptance", detail: "Gherkin @ac-N, test-plan, impl-plan, tests d'acceptance" },
       { id: "g", type: "code", titre: "Porte gherkin", detail: "pas de détail technique, une seule action, assertions précises" },
       { id: "v", type: "code", titre: "Porte valeurs", detail: "chaque valeur des critères recopiée" },
-      { id: "p", type: "code", titre: "Porte plan de test", detail: "plans présents, chaque critère dans impl-plan, un walking skeleton" },
+      { id: "p", type: "code", titre: "Porte plan de test", detail: "matrice couche et doublure, un walking skeleton, une étape par critère avec son test" },
       { id: "r", type: "code", titre: "Porte RED d'acceptance", detail: "le code lance la suite : chaque test rouge pour une bonne raison" },
       { id: "h", type: "code", titre: "Empreinte des tests d'acceptance prise" },
       { id: "revue", type: "agent", titre: "Revue par lentilles" },

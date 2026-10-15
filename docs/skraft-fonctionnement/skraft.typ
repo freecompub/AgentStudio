@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `bf0affd` \
+      État du code : 15 octobre 2026, commit suivant `6a91773` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -232,6 +232,8 @@ agrégat garantit ses invariants et que chaque patron coûteux est justifié ; e
 `test-integrity` vérifie que chaque cas limite tranché par les critères a son scénario. Ces points
 viennent des relecteurs de DESIGN et de DISTILL de skraft-plugin, pour la part qui demande un
 jugement ; le reste est vérifié par les portes.
+En DELIVER, `test-integrity` vérifie en plus que chaque test respecte la couche et la doublure
+prévues par la matrice du plan de test.
 
 === Ce que rend une lentille
 
@@ -547,7 +549,7 @@ sans jamais les modifier.
   ("Porte", "Ce que vérifie le code", "Motifs (texte exact)"),
   ([gherkin], [Pas de détail technique dans les étapes (verbe HTTP, chemin d'URL, identifiant technique, base de données, DTO…) ; une seule action `Quand` ; pas d'assertion vague ; 7 étapes au plus ; pas de tag technique (`@api`, `@ui`…).], [« Le Gherkin décrit ce que fait le métier, pas comment le code s'y prend. » ; « N étapes « Quand ». Un seul déclencheur par scénario » ; « l'assertion « … » ne nomme aucun résultat métier observable »]),
   ([valeurs], [Pour chaque critère : un scénario `@ac-N`, un test portant `ac-N`, et chaque valeur du critère présente dans le scénario et dans le test (`12,5` vaut `12.5`).], [« Aucun scénario tagué \@ac-N » ; « La valeur « … » du critère N n'apparaît pas dans le scénario \@ac-N »]),
-  ([plan de test], [`test-plan.md` et `impl-plan.md` existent ; `impl-plan.md` cite chaque critère (`ac-N`) ; `test-plan.md` désigne au moins un walking skeleton (« - \@ac-N : walking skeleton — … »). Vérifié avant toute exécution des tests.], [« Plan de test absent : … », « impl-plan.md ne cite pas le critère N », « test-plan.md ne désigne aucun walking skeleton »]),
+  ([plan de test], [`test-plan.md` et `impl-plan.md` existent. `test-plan.md` porte une matrice de couverture : une ligne par critère avec sa couche (Domaine, Application, Infrastructure) et sa doublure, et au moins un walking skeleton. `impl-plan.md` cite chaque critère, et chaque critère a une étape qui nomme son fichier de test. Vérifié avant toute exécution des tests.], [« Plan de test absent : … », « test-plan.md n'a pas de matrice de couverture », « impl-plan.md ne cite pas le critère N », « aucune étape du critère N ne nomme son fichier de test »]),
   ([RED d'acceptance], [Le code lance la suite. Chaque test d'acceptance doit échouer pour une bonne raison (assertion ou symbole manquant), ni ignoré, ni en erreur d'une autre nature. Un test déjà vert n'est accepté que s'il est requalifié en non-régression avec sa justification.], [« … échoue pour une mauvaise raison » ; « … est ignoré » ; « … passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md »]),
 )
 

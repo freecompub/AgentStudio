@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Plan de test de DISTILL (docs/15 §4.7)
+
+- Code (E et W), porte « plan de test » : matrice de couverture dans `test-plan.md` (une ligne par
+  critère, couche, doublure, walking skeleton) ; une étape par critère dans `impl-plan.md` qui
+  nomme son fichier de test. Les harnais ont `testPlanDe` et `implPlanDe` pour écrire des plans
+  conformes.
+- Prompt de `skraft-acceptance` réécrit (matrice, étapes, conventions de la recherche) ; skill
+  `clean-architecture-testing` à la demande ; consigne DELIVER de `test-integrity` (couche et
+  doublure du plan). Le workflow passe maintenant `slug` au contexte des lentilles.
+- Piège : `/tmp` (tmpfs de 3,8 Go) était plein à 80 % de dossiers `agent-studio-*` laissés par les
+  tests ; la suite échouait par fichiers entiers. Chaque lancement complet en laisse encore 42
+  (~55 Mo) : fuite à corriger dans les tests. Supprimés à la main le 15/10.
+- Instable sous charge : « ADR accepté pendant que l'autre est amendé » (e2e-s3 de l'extension),
+  passé seul trois fois.
+- Reste : docs/15 §5 ; G7 en code (proposé) ; défaut du gel perdu en DISTILL (extension).
+
 ## 15/10 — Méthode de DESIGN reprise du plugin (docs/15 §4.6)
 
 - Code, porte « cohérence » (E et W) : contexte non classé Core/Supporting/Generic ; commande,

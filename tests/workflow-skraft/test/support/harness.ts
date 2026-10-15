@@ -71,6 +71,17 @@ En tant que patient, je veux voir l'unité de la dose.
 `;
 
 /** Projet TypeScript de démonstration (code seulement : S1 ne lance aucun test). */
+/** Plan de test au format exigé par la porte (docs/15 §4.7) : matrice de couverture, premier critère en walking skeleton. */
+export function testPlanDe(criteres: (number | string)[], extra = ""): string {
+  const lignes = criteres.map((n, k) => `| @ac-${n} | cas d'usage | Application | aucune | ${k === 0 ? "oui" : "non"} |`);
+  return `# Plan de test\n\n| Scénario | Cas d'usage | Couche | Doublure | Walking skeleton |\n|---|---|---|---|---|\n${lignes.join("\n")}\n${extra}`;
+}
+
+/** Plan d'implémentation au format exigé par la porte : une étape par critère, qui nomme son test. */
+export function implPlanDe(criteres: (number | string)[], test: string): string {
+  return `# Plan d'implémentation\n\n${criteres.map((n) => `## Étape ${n} — ac-${n}\n- Test : \`${test}\`\n`).join("\n")}`;
+}
+
 export async function createProject(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "agent-studio-skraft-"));
   await put(root, "package.json", '{ "name": "demo", "type": "module" }\n');
@@ -140,8 +151,8 @@ export function acceptanceWriter(root: string): ScriptedBehavior {
     const feature = criteria.map((c) => `  @ac-${c.n}\n  Scénario: critère ${c.n}\n    Alors ${c.text}\n`).join("\n");
     const tests = criteria.map((c) => `it("ac-${c.n}", () => expect.fail(${JSON.stringify(c.text)}));`).join("\n");
     await put(root, `.skraft/${slug}/distill/features/plafond.feature`, `Fonctionnalité: story\n\n${feature}`);
-    await put(root, `.skraft/${slug}/distill/test-plan.md`, `# Plan de test\n- @ac-${criteria[0]?.n ?? 1} : walking skeleton — premier critère, de bout en bout.\n`);
-    await put(root, `.skraft/${slug}/distill/impl-plan.md`, `# Plan d'implémentation\n${criteria.map((c) => `${c.n}. ac-${c.n}`).join("\n")}\n`);
+    await put(root, `.skraft/${slug}/distill/test-plan.md`, testPlanDe(criteria.map((c) => c.n)));
+    await put(root, `.skraft/${slug}/distill/impl-plan.md`, implPlanDe(criteria.map((c) => c.n), "tests/acceptance/story.acceptance.test.ts"));
     const rel = "tests/acceptance/story.acceptance.test.ts";
     await put(root, rel, `import { expect, it } from "vitest";\n\n${tests}\n`);
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });

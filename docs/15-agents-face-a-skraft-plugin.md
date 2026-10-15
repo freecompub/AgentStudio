@@ -1,7 +1,7 @@
 # Nos agents face à ceux de skraft-plugin
 
 - Date : 2026-10-14, branche `feat/workflow-rejouable`.
-- Statut : **constat**. §4.1 à 4.5 corrigés le 2026-10-14, §4.6 le 2026-10-15 (extension et workflow) ; §4.7 et §5 à décider.
+- Statut : **constat**. §4.1 à 4.5 corrigés le 2026-10-14, §4.6 et §4.7 le 2026-10-15 (extension et workflow) ; §5 à décider.
 - Question : nos agents font-ils la même chose que ceux de skraft-plugin
   (`github.com/SebastienDegodez/skraft-plugin`) ?
 - Versions comparées :
@@ -222,6 +222,23 @@ La skill `adr-eligibility-gate` n'en couvre qu'une partie.
 - La skill `clean-architecture-testing`, reprise, n'est donnée qu'aux rôles test et dev.
 - Redondance : le prompt dit « Lance les tests », ce que le code fait déjà.
 
+
+**Traité le 2026-10-15** (extension et workflow) :
+- **Code**, porte « plan de test » (`checkPlans`), avant toute exécution :
+  - `test-plan.md` porte une matrice de couverture (colonnes Scénario, Cas d'usage, Couche,
+    Doublure, Walking skeleton) avec une ligne par critère, sa couche (Domaine, Application ou
+    Infrastructure) et sa doublure (« aucune » acceptée) ; au moins un walking skeleton, par la
+    colonne ou par la ligne « - @ac-N : walking skeleton — … » ;
+  - chaque critère de `impl-plan.md` a une étape qui nomme son fichier de test
+    (« - Test : `chemin` »).
+- **Prompt** de `skraft-acceptance` : lecture des conventions de la recherche, matrice, étapes de
+  l'extérieur vers l'intérieur ; « Lance les tests » remplacé par « seule l'exécution du code fait
+  foi ».
+- **Skill** `clean-architecture-testing` donnée à l'agent d'acceptance, à la demande.
+- **Lentille** `test-integrity` en DELIVER : chaque test respecte la couche et la doublure prévues
+  par la matrice ; un écart non justifié est un défaut.
+- Non repris : l'étape « forecast » (rapport du plugin sur ses propres fichiers d'état) ; notre
+  rapport final en tient lieu.
 ---
 
 ## 5. Évolutions du plugin depuis la v1.6.1
@@ -251,7 +268,7 @@ Présentes dans main (1.15.1), absentes chez nous :
    - Le plafond est appliqué par le code dans `numberDefects` (`review-thread.ts`, `.mjs`) :
      `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, écart tracé dans `severityNote`.
 2. ~~4.5~~ : **fait le 2026-10-14** (options C puis A, voir §4.5) ; ~~4.6~~ : **fait le
-   2026-10-15** (voir §4.6). **Décider** pour 4.7 : le contenu du plan de test.
+   2026-10-15** (voir §4.6) ; ~~4.7~~ : **fait le 2026-10-15** (voir §4.7).
 3. **Décider** quelles évolutions du §5 reprendre (reprise depuis main, et non plus depuis la
    v1.6.1 : l'autorisation actuelle ne porte que sur la branche
    `refactor/v1.6.0-tracking-substrate` et le tag v1.6.1).

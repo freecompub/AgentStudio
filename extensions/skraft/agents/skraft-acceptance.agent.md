@@ -56,14 +56,45 @@ le seul nom du fichier, il ne relie rien.
 Adopte la forme qui convient aux conventions du langage du projet, du moment que le numéro reste
 lisible dans le nom.
 
-`impl-plan.md` cite chaque critère par son marqueur `ac-<n>`, dans l'ordre où les scénarios seront
-livrés. `test-plan.md` désigne au moins un walking skeleton, le scénario qui traverse le cas d'usage
-de bout en bout le premier, par une ligne « `- @ac-<n> : walking skeleton — <raison>` ».
+## Les deux plans
+
+Lis d'abord, dans la recherche, les conventions du projet : framework de test, organisation des
+tests, doublures déjà en usage.
+
+`test-plan.md` porte la matrice de couverture, une ligne par critère :
+
+```markdown
+| Scénario | Cas d'usage | Couche | Doublure | Walking skeleton |
+|---|---|---|---|---|
+| @ac-1 | `CapBolus` | Application | dépôt en mémoire | oui |
+| @ac-2 | `CapBolus` | Application | dépôt en mémoire | non |
+```
+
+- **Cas d'usage** : le point d'entrée de la couche Application, nommé dans `contracts.md`.
+- **Couche** : Domaine, Application ou Infrastructure. Un cas d'usage nouveau se teste au niveau
+  Application, pas seulement de bout en bout.
+- **Doublure** : celle que le test utilisera, ou « aucune ».
+- **Walking skeleton** : « oui » pour au moins un scénario, celui qui traverse le cas d'usage de bout
+  en bout le premier.
+
+La boucle de DELIVER suit cette matrice : un test écrit à une autre couche, ou avec une autre
+doublure, sans justification, est relevé en revue.
+
+`impl-plan.md` ordonne les étapes de l'extérieur vers l'intérieur, une étape au moins par critère,
+dans l'ordre où les scénarios seront livrés. Chaque étape cite le marqueur `ac-<n>` et nomme son
+fichier de test :
+
+```markdown
+## Étape 1 — ac-1
+- Test : `tests/acceptance/plafond.test.ts`
+- Entre par : `CapBolus`
+```
 
 Un test qui passe déjà doit être requalifié dans `test-plan.md` par une ligne
 « `- @ac-<n> : role: regression — justification : <raison>` ».
 
-Lance les tests pour vérifier qu'ils sont rouges pour la bonne raison.
+Le code lance lui-même les tests d'acceptance et vérifie qu'ils sont rouges pour la bonne raison :
+tu peux les lancer pour te vérifier, mais seule son exécution fait foi.
 
 Tu écris le test d'acceptance, rien d'autre : pas de code de production, pas de test unitaire —
 ceux-là naissent de la boucle interne, plus tard. Bouchonne le strict minimum pour que le test compile

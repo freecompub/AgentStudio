@@ -95,17 +95,76 @@ export function checkAcceptanceRed(i) {
 }
 
 /**
-* Plans de DISTILL (G6 et G8 de skraft-plugin v1.6.1, acceptance-designer-reviewer, vérifiés ici par
-* le code) : `impl-plan.md` cite chaque critère, puisque DELIVER en tire l'ordre des scénarios, et
-* `test-plan.md` désigne au moins un walking skeleton.
+* Plans de DISTILL (docs/15 §4.5 et §4.7), vérifiés par le code. Repris de skraft-plugin v1.6.1 :
+* - `impl-plan.md` cite chaque critère, puisque DELIVER en tire l'ordre des scénarios (G6 du
+*   relecteur), et chaque critère a une étape qui nomme son fichier de test (§5 d'acceptance-designer) ;
+* - `test-plan.md` porte la matrice de couverture : une ligne par critère, avec sa couche et sa
+*   doublure (§4), et au moins un walking skeleton (G8).
 */
 export function checkPlans(i) {
   if (i.implPlan === null) return ["Plan d'implémentation absent : impl-plan.md."];
   const reasons = [];
-  for (const c of i.criteria)
-    if (!new RegExp(`\\bac-${c.n}(?![0-9])`, "i").test(i.implPlan))
+  const marqueur = (n) => new RegExp(`\\bac-${n}(?![0-9])`, "i");
+  const etapes = sections(i.implPlan);
+  for (const c of i.criteria) {
+    if (!marqueur(c.n).test(i.implPlan)) {
       reasons.push(`impl-plan.md ne cite pas le critère ${c.n} (ac-${c.n}) : chaque critère y a sa place dans l'ordre de livraison.`);
-  if (!i.testPlan.split("\n").some((l) => /@ac-\d+/.test(l) && /walking[ -]skeleton/i.test(l)))
-    reasons.push("test-plan.md ne désigne aucun walking skeleton : marque au moins un scénario par une ligne « - @ac-<n> : walking skeleton — <raison> ».");
+      continue;
+    }
+    if (!etapes.filter((e) => marqueur(c.n).test(e)).some((e) => /^\s*[-*]?\s*Test\s*:\s*\S/im.test(e)))
+      reasons.push(`impl-plan.md : aucune étape du critère ${c.n} (ac-${c.n}) ne nomme son fichier de test (« - Test : \`chemin\` »).`);
+  }
+  const m = matriceDeCouverture(i.testPlan);
+  if (!m)
+    reasons.push("test-plan.md n'a pas de matrice de couverture : un tableau aux colonnes Scénario, Cas d'usage, Couche, Doublure, Walking skeleton, une ligne par critère.");
+  else
+    for (const c of i.criteria) {
+      const ligne = m.lignes.find((l) => l.some((cellule) => marqueur(c.n).test(cellule)));
+      if (!ligne)
+        reasons.push(`test-plan.md : aucune ligne de la matrice pour le critère ${c.n} (ac-${c.n}).`);
+      else if (!/domaine|domain|application|infrastructure/i.test(ligne[m.couche] ?? ""))
+        reasons.push(`test-plan.md : le critère ${c.n} (ac-${c.n}) n'indique pas sa couche (Domaine, Application ou Infrastructure).`);
+      else if (VIDE.test(ligne[m.doublure] ?? ""))
+        reasons.push(`test-plan.md : le critère ${c.n} (ac-${c.n}) n'indique pas sa doublure (« aucune » si son test n'en utilise pas).`);
+    }
+  const parLigne = i.testPlan.split("\n").some((l) => /@ac-\d+/.test(l) && /walking[ -]skeleton/i.test(l));
+  const parColonne = m !== null && m.walkingSkeleton >= 0 && m.lignes.some((l) => !/^(?:non|no|[-—–]*)$/i.test(l[m.walkingSkeleton] ?? ""));
+  if (!parLigne && !parColonne)
+    reasons.push("test-plan.md ne désigne aucun walking skeleton : au moins une ligne de la matrice porte « oui », ou sa stratégie, dans la colonne Walking skeleton.");
   return reasons;
+}
+
+const VIDE = /^[-—–\s]*$/;
+
+/** Texte de chaque section d'un document Markdown, titre compris (le préambule en est une). */
+function sections(md) {
+  const out = [""];
+  for (const l of md.split("\n")) {
+    if (/^#{1,6}\s/.test(l))
+      out.push(l);
+    else
+      out[out.length - 1] += `\n${l}`;
+  }
+  return out;
+}
+
+/** Matrice de couverture du plan de test : le premier tableau qui a une colonne Couche et une colonne Doublure. */
+function matriceDeCouverture(md) {
+  const cellules = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((x) => x.trim());
+  const lignes = md.split("\n");
+  for (let k = 0; k < lignes.length; k++) {
+    if (!lignes[k].trim().startsWith("|"))
+      continue;
+    const entete = cellules(lignes[k]);
+    const couche = entete.findIndex((x) => /couche|layer/i.test(x));
+    const doublure = entete.findIndex((x) => /doublure|double/i.test(x));
+    if (couche < 0 || doublure < 0)
+      continue;
+    const corps = [];
+    for (let j = k + 1; j < lignes.length && lignes[j].trim().startsWith("|"); j++)
+      if (!/^\|?\s*:?-{2,}/.test(lignes[j].trim()))
+        corps.push(cellules(lignes[j]));
+    return { lignes: corps, couche, doublure, walkingSkeleton: entete.findIndex((x) => /walking/i.test(x)) };
+  }
+  return null;
 }

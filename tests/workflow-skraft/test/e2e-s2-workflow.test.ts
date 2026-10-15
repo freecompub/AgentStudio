@@ -351,9 +351,11 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await fin(app, id, 60_000);
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
     expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: [
+      "impl-plan.md : aucune étape du critère 1 (ac-1) ne nomme son fichier de test (« - Test : `chemin` »).",
       "impl-plan.md ne cite pas le critère 2 (ac-2) : chaque critère y a sa place dans l'ordre de livraison.",
       "impl-plan.md ne cite pas le critère 3 (ac-3) : chaque critère y a sa place dans l'ordre de livraison.",
-      "test-plan.md ne désigne aucun walking skeleton : marque au moins un scénario par une ligne « - @ac-<n> : walking skeleton — <raison> ».",
+      "test-plan.md n'a pas de matrice de couverture : un tableau aux colonnes Scénario, Cas d'usage, Couche, Doublure, Walking skeleton, une ligne par critère.",
+      "test-plan.md ne désigne aucun walking skeleton : au moins une ligne de la matrice porte « oui », ou sa stratégie, dans la colonne Walking skeleton.",
     ] }));
   }, 90_000);
 

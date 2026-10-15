@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, put, shutdownHosts, simulatedAgents, stateOf, until, US12 } from "./support/harness.js";
+import { answerQuestions, assemble, implPlanDe, put, shutdownHosts, simulatedAgents, stateOf, testPlanDe, until, US12 } from "./support/harness.js";
 
 const NODE_MODULES = resolve(import.meta.dirname, "../../../node_modules");
 
@@ -72,11 +72,11 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
       await put(root, ".skraft/us-12/distill/features/plafond.feature", FEATURE(attempt === 1 ? "12 U" : "12,5 U"));
-      await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n2. ac-2\n3. ac-3\n");
+      await put(root, ".skraft/us-12/distill/impl-plan.md", implPlanDe([1, 2, 3], "tests/acceptance/plafond.test.ts"));
       await put(
         root,
         ".skraft/us-12/distill/test-plan.md",
-        `# Plan\n- @ac-1 : walking skeleton — le cas nominal traverse le cas d'usage.\n${attempt >= 3 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""}`,
+        testPlanDe([1, 2, 3], attempt >= 3 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""),
       );
       await put(root, "tests/acceptance/plafond.test.ts", ACCEPTANCE);
       if (attempt === 4)

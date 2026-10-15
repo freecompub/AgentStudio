@@ -114,7 +114,7 @@ export const ROLE_SKILLS = {
   researcher: {},
   architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions"] },
   architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns"] },
-  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline"] },
+  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
   test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing"] },
   dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog"] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },

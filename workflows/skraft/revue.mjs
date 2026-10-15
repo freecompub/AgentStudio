@@ -57,7 +57,7 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
     await w.etape("REVIEW");
     const disp = await w.disposition();
     const fichiers = await fichiersDePhase(w, s, cp, disp);
-    const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted") };
+    const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted"), slug: d.slug };
     const reponses = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer })), ...d.reponses];
     const tousFaits = [...faits, ...reponses.map((r) => `Réponse de l'utilisateur : « ${r.question} » → ${r.answer}`)];
     const issues = await Promise.all(lentilles.map((l) => lentille(w, l, lensBrief(l, contexte, phase, fichiers, tousFaits, lensHistory(s.fils, l)), reponses)));

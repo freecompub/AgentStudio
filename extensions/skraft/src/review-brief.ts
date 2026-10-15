@@ -128,6 +128,12 @@ const CONSIGNES_DE_PHASE: Partial<Record<Phase, Partial<Record<LensName, string[
       "Le plan de test place chaque scénario à la bonne couche ; un cas d'usage nouveau est testé au niveau Application, pas seulement de bout en bout.",
     ],
   },
+  DELIVER: {
+    "test-integrity": [
+      // docs/15 §4.7 : la matrice de couverture de DISTILL fait foi pour la couche et la doublure
+      "Chaque test respecte la couche et la doublure que la matrice de .skraft/<slug>/distill/test-plan.md prévoit pour son critère ; un écart non justifié est un défaut.",
+    ],
+  },
 };
 
 const list = (title: string, xs: string[]) => (xs.length ? [title, ...xs.map((x) => `  - ${x}`)] : []);
@@ -174,6 +180,6 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
       lines.push(...list("Livrables :", files.artifacts));
       break;
   }
-  lines.push(...list(`Points à examiner en ${phase} :`, CONSIGNES_DE_PHASE[phase]?.[lens] ?? []));
+  lines.push(...list(`Points à examiner en ${phase} :`, (CONSIGNES_DE_PHASE[phase]?.[lens] ?? []).map((x) => x.replace("<slug>", state.slug ?? "<slug>"))));
   return lines.join("\n");
 }
