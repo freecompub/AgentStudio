@@ -47,8 +47,12 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - Piège : `/tmp` (tmpfs de 3,8 Go) était plein à 80 % de dossiers `agent-studio-*` laissés par les
   tests ; la suite échouait par fichiers entiers. Supprimés à la main le 15/10 ; fuite corrigée
   ensuite (`vitest.global-setup.ts`).
-- Instable sous charge : « ADR accepté pendant que l'autre est amendé » (e2e-s3 de l'extension),
-  passé seul trois fois.
+- **À surveiller** : « ADR accepté pendant que l'autre est amendé » (e2e-s3 de l'extension) a
+  échoué une fois, dans la suite complète lancée juste avant la saturation de /tmp ; l'assertion
+  en échec n'a pas été relevée. Passé depuis seul trois fois et dans toutes les suites complètes
+  après le nettoyage. Cause probable : /tmp plein (corrigé). Fragilité réelle : jusqu'à quatre
+  attentes de 60 s sous un plafond de 120 s. S'il revient : le relancer en boucle sous charge et
+  capturer l'assertion avant de toucher au code.
 - Reste : docs/15 §5 ; G7 en code (proposé) ; défaut du gel perdu en DISTILL (extension).
 
 ## 15/10 — Méthode de DESIGN reprise du plugin (docs/15 §4.6)
