@@ -190,6 +190,8 @@ export interface GitApi {
 }
 
 export interface StackApi {
+  /** Pile du projet, identifiant de son adaptateur (`typescript`, `dotnet`) : l'autorité sur ses commandes. */
+  readonly id: string;
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources). */
   readonly layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /**

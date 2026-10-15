@@ -66,7 +66,7 @@ export function syntaxeCommande(commande: string, entrees: MetaWorkflow["entrees
   return [`/${commande}`, ...args].join(" ");
 }
 
-/** Arguments d'une commande d'après `meta.entrees` : positionnels dans l'ordre, booléens en `--nom`. */
+/** Arguments d'une commande d'après `meta.entrees` : positionnels dans l'ordre, booléens en `--nom`, autres aussi en `--nom valeur`. */
 export function lireEntrees(entrees: MetaWorkflow["entrees"], args: string, commande = "workflow"): { ok: true; entree: Record<string, Json> } | { ok: false; usage: string } {
   const noms = Object.keys(entrees);
   const positionnels = noms.filter((n) => entrees[n]!.type !== "booleen");
@@ -74,11 +74,21 @@ export function lireEntrees(entrees: MetaWorkflow["entrees"], args: string, comm
   const entree: Record<string, Json> = {};
   for (const n of noms) if (entrees[n]!.defaut !== undefined) entree[n] = entrees[n]!.defaut as Json;
   const restants = [...positionnels];
-  for (const jeton of args.trim().split(/\s+/).filter(Boolean)) {
+  const jetons = args.trim().split(/\s+/).filter(Boolean);
+  for (let k = 0; k < jetons.length; k++) {
+    const jeton = jetons[k]!;
     if (jeton.startsWith("--")) {
       const n = jeton.slice(2);
-      if (entrees[n]?.type !== "booleen") return { ok: false, usage: usage() };
-      entree[n] = true;
+      if (!entrees[n]) return { ok: false, usage: usage() };
+      if (entrees[n]!.type === "booleen") {
+        entree[n] = true;
+        continue;
+      }
+      // Entrée nommée : `--archi java`. Elle n'est plus attendue comme positionnelle.
+      const valeur = jetons[++k];
+      if (valeur === undefined || valeur.startsWith("--")) return { ok: false, usage: usage() };
+      entree[n] = valeur;
+      restants.splice(restants.indexOf(n), 1);
       continue;
     }
     const n = restants.shift();

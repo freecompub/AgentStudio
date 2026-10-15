@@ -7,7 +7,7 @@
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
-import { buildBrief } from "./brief.mjs";
+import { buildBrief, lignePile } from "./brief.mjs";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios } from "./distill.mjs";
@@ -317,6 +317,7 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
     await w.etape("DELIVER");
     const consigne = [
       buildBrief(d, "DELIVER", rejet),
+      lignePile(L.disp.pile, L.disp),
       `Scénario en cours : ${sc.id}${critere ? ` (critère ${critere.n} : ${critere.text})` : ""}`,
       ...(gherkin ? ["Scénario :", gherkin.trim()] : []),
       `Test d'acceptance à faire passer : ${sc.acceptanceTestId}`,

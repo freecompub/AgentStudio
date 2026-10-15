@@ -9,7 +9,9 @@
  * PROVENANCE — la substance des lentilles (`agents/skraft-lens-*.agent.md`) est reprise de
  * **skraft-plugin** (GPL-3.0-or-later), fichiers
  * `com.anthropic.claude-code/agents/{cold-reader,test-integrity,architecture-boundaries,quality-gates}-lens.md` ;
- * les skills de `skills/` sont reprises du tag `v1.6.1`. Voir `docs/licences/autorisation-skraft.md`.
+ * les skills de `skills/` sont reprises du tag `v1.6.1`, sauf `architecture-patterns`,
+ * `clean-architecture-testing` et les `clean-architecture-<langage>`, du tag `v1.15.1`. Voir
+ * `docs/licences/autorisation-skraft.md`.
  *
  * ADAPTATION — les portes et seuils de l'original sont nommés là-bas dans le prompt (G4, G7, G11…) ;
  * ici ce sont **le code qui les exécute** et `ctx.stack` qui les mesure, de sorte qu'une lentille
@@ -17,6 +19,8 @@
  * (`contract-fidelity`, `mock-fidelity`) ne sont pas reprises : elles sont conditionnelles et liées
  * à une pile précise, ce que l'extension ne doit pas être.
  */
+import { SKILLS_D_ARCHITECTURE } from "./architecture.js";
+
 const PASSATION = "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.";
 
 /**
@@ -112,15 +116,19 @@ export const LENS_MODEL_CLASS = {
  */
 export const ROLE_SKILLS = {
   researcher: {},
-  architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions"] },
-  architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns"] },
+  architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions", ...SKILLS_D_ARCHITECTURE] },
+  architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns", ...SKILLS_D_ARCHITECTURE] },
   acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
-  test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing"] },
-  dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog"] },
+  test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing", ...SKILLS_D_ARCHITECTURE] },
+  dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog", ...SKILLS_D_ARCHITECTURE] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },
 } as const;
 
-/** Skills reprises de skraft-plugin v1.6.1 (catégories « méthode » et « critères de revue », SPEC-skraft §4.2). */
+/**
+ * Skills reprises de skraft-plugin (catégories « méthode » et « critères de revue », SPEC-skraft §4.2) :
+ * v1.6.1, sauf `architecture-patterns`, `clean-architecture-testing` et les `clean-architecture-<langage>`,
+ * de v1.15.1 (docs/licences/autorisation-skraft.md).
+ */
 export const SKILLS = [
   "architecture-patterns",
   "architecture-decisions",
@@ -131,6 +139,8 @@ export const SKILLS = [
   "craft-discipline",
   "test-refactoring-catalog",
   "clean-architecture-testing",
+  // Reprises de v1.15.1 : l'appel de skraft désigne laquelle charger (`--archi`, `architecture.ts`).
+  ...SKILLS_D_ARCHITECTURE,
   "adversarial-review-lenses",
   "acceptance-review-criteria",
   "architecture-review-criteria",

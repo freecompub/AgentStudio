@@ -12,8 +12,12 @@ Copier ce dossier, tel quel, à l'un de ces endroits :
   suivi serait effacé par un rembobinage (`git clean`) ;
 - pour tous ses projets : `~/.agent-studio/workflows/skraft-workflow/`.
 
-À l'ouverture du projet, agent-studio le trouve ; la commande `/skraft-workflow <story> [--auto]`
-est alors disponible, et l'agent principal peut proposer de le lancer. À la première exécution, et
+À l'ouverture du projet, agent-studio le trouve ; la commande
+`/skraft-workflow <story> [--auto] [--archi <skill>]` est alors disponible, et l'agent principal peut
+proposer de le lancer. `--auto` retient la difficulté proposée sans la faire confirmer ; `--archi`
+désigne la skill d'architecture du projet, par son nom ou son langage (`dotnet`, `java`, `python`,
+`react`). Sans `--archi`, ou si la skill est inconnue (avec un avertissement) : la clean architecture
+par défaut (`architecture-patterns`). À la première exécution, et
 après chaque modification du dossier, l'application montre ce qu'il peut faire et demande l'accord.
 
 ## Contenu
@@ -22,9 +26,11 @@ après chaque modification du dossier, l'application montre ce qu'il peut faire 
 - `conception.mjs`, `distillation.mjs`, `livraison.mjs`, `revue.mjs` : les phases et la revue.
 - les contrôles et leurs données : `story.mjs`, `difficulty.mjs`, `research.mjs`, `design.mjs`,
   `adr.mjs`, `distill.mjs`, `gherkin.mjs`, `deliver.mjs`, `review.mjs`, `review-thread.mjs`,
-  `review-brief.mjs`, `brief.mjs`, `preselect.mjs`, `text-analysis.mjs`, `support.mjs`.
+  `review-brief.mjs`, `brief.mjs`, `preselect.mjs`, `text-analysis.mjs`, `support.mjs`,
+  `architecture.mjs` (skill d'architecture choisie à l'appel).
 - `agents/` : le contenu des rôles, partageable avec Copilot CLI et Claude Code (ADR 0024).
-- `skills/` : les skills reprises de skraft-plugin `v1.6.1`.
+- `skills/` : les skills reprises de skraft-plugin, du tag `v1.6.1` ; `architecture-patterns`,
+  `clean-architecture-testing` et les `clean-architecture-<langage>` viennent du tag `v1.15.1`.
 
 Les tests de ce workflow sont dans `tests/workflow-skraft/` (ils ne sont pas copiés avec lui).
 

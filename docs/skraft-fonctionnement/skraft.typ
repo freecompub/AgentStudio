@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `1d17c54` \
+      État du code : 15 octobre 2026, commit suivant `90cd1d2` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -169,6 +169,9 @@ tout ce qu'il sait vient du dossier de passation, construit par le code. Il cont
 + la story : identifiant, titre, énoncé, critères numérotés ;
 + le niveau de difficulté et le dossier de travail `.skraft/<slug>/` ;
 + la phase en cours, les phases terminées avec leurs livrables, les phases sautées ;
++ en DESIGN, DISTILL et DELIVER : la skill d'architecture transmise à l'appel (`--archi`), ou la
+  clean architecture par défaut (`architecture-patterns`) ;
++ en DESIGN et DISTILL : les conventions et l'existant réutilisable de la recherche ;
 + les ADR décidés (identifiant, statut, chemin) ;
 + les réponses de l'utilisateur (questions ouvertes, questions bloquantes) ;
 + les tests d'acceptance requalifiés en non-régression, et la mention « gelés » dès qu'une empreinte
@@ -177,7 +180,9 @@ tout ce qu'il sait vient du dossier de passation, construit par le code. Il cont
 + le *rejet précédent* : les motifs exacts du dernier refus, quand il y en a un.
 
 Chaque phase y ajoute ce qui lui est propre : présélection de fichiers en RESEARCH, emplacement des
-tests d'acceptance en DISTILL, scénario et pas en cours en DELIVER. Le classifieur et les lentilles
+tests d'acceptance en DISTILL, scénario et pas en cours en DELIVER. En DESIGN, DISTILL et DELIVER,
+une ligne « Pile du projet » donne l'adaptateur de pile et ses emplacements : c'est lui qui connaît
+les commandes, que seul `run_tests` exécute. Le classifieur et les lentilles
 reçoivent un dossier différent, décrit à leur étape.
 
 == Le tour d'un agent
@@ -345,7 +350,7 @@ Lire et valider la story, vérifier que les tests existants sont sains, ouvrir l
 === Entrées et sorties
 #tableau(
   ("", "Contenu"),
-  ([Entrée], [Le chemin de la story (par exemple `stories/us-12.md`), donné à la commande `/skraft`.]),
+  ([Entrée], [Le chemin de la story (par exemple `stories/us-12.md`), donné à la commande `/skraft`. Options : `--auto` (difficulté retenue sans confirmation) et `--archi <skill>` (skill d'architecture du projet, par son nom ou son langage : `dotnet`, `java`, `python`, `react`) ; sans `--archi`, ou si la skill est inconnue (avec un avertissement), la clean architecture par défaut.]),
   ([Format exigé], [Un titre `# US-12 — Titre` ; une section « Critères d'acceptation » avec des lignes `1. …` (au moins une) ; une section « Questions ouvertes » facultative, en puces.]),
   ([Sorties], [La story analysée (critères, valeurs littérales de chaque critère, questions numérotées `q1`, `q2`…) ; la branche `skraft/<slug>` ; les dossiers `.skraft/<slug>/research`, `/design`, `/distill/features`, `/reviews` ; un checkpoint « qualité initiale » qui sert de base à la couverture du diff de toute la tâche.]),
 )

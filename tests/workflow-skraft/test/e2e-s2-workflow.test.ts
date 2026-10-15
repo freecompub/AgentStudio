@@ -455,6 +455,9 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
     // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
     expect(designBrief).toContain("`BolusCalculator` → `src/domain/bolus-calculator.ts`");
+    // Pile tirée de l'adaptateur, et architecture par défaut faute d'argument (docs/15 §5).
+    expect(designBrief).toContain("Pile du projet : typescript ;");
+    expect(designBrief).toContain("Architecture du projet : clean architecture par défaut, skill `architecture-patterns`.");
     expect(designBrief).toContain("RESEARCH : .skraft/us-12/research/research.md");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");

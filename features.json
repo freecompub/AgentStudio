@@ -249,6 +249,13 @@
       "notes": "docs/15 §5, lignes 1 et 2 ; repris de skraft-plugin v1.15.1 (solution-researcher, solution-architect, acceptance-designer). Extension et workflow."
     },
     {
+      "id": "skill-d-architecture-a-l-appel",
+      "title": "/skraft <story> --archi <skill> désigne la skill d'architecture (clean-architecture-dotnet, -java, -python, -react) ; absente ou inconnue, la clean architecture par défaut ; le dossier de DESIGN, DISTILL et DELIVER la nomme, avec la pile tirée de l'adaptateur",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"Skill d'architecture|skill d'architecture|--nom valeur|/skraft : chemin\"",
+      "passes": true,
+      "notes": "Skills reprises de skraft-plugin v1.15.1 (docs/licences/autorisation-skraft.md). Extension et workflow ; la plateforme accepte « --nom valeur » pour une entrée texte, et l'API des extensions expose l'identifiant de la pile (StackApi.id)."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",

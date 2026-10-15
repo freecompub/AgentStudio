@@ -1,4 +1,5 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
+import { skillDArchitecture } from "./architecture.js";
 import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
@@ -36,6 +37,7 @@ export function initialState(input: SkraftInput): SkraftState {
     pendingInteraction: null,
     deliver: null,
     confirmDifficulty: input.confirmDifficulty ?? true,
+    architecture: skillDArchitecture(input.archi).skill,
     story: null,
     indicators: null,
     proposed: null,

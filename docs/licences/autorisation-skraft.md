@@ -104,6 +104,7 @@ code de `skraft` est notre propre conception (SPEC-skraft §5 à §11) et n'est 
 | `roles.ts` → `ROLES` | Substance de `researcher`, `acceptance`, `test`, `dev` et du bloc commun | `agents/{solution-researcher,acceptance-designer,software-engineer}.md` |
 | `agents/*.agent.md` (2026-09-28) | Le contenu de `ROLES` et `LENS_FOCUS` ci-dessus, déplacé en fichiers Markdown partageables ; `roles.ts` ne garde que l'orchestration (ADR 0024) | idem |
 | `skills/` (2026-09-28) | Douze skills reprises telles quelles : `architecture-patterns`, `architecture-decisions`, `adr-eligibility-gate`, `bdd-methodology`, `test-design-mandates`, `outside-in-tdd`, `craft-discipline`, `test-refactoring-catalog`, `clean-architecture-testing`, `adversarial-review-lenses`, `acceptance-review-criteria`, `architecture-review-criteria` | tag `v1.6.1`, `plugins/skraft-framework/skills/` |
+| `skills/` (2026-10-15) | `architecture-patterns` et `clean-architecture-testing` mises à jour ; quatre skills ajoutées : `clean-architecture-dotnet`, `-java`, `-python`, `-react`. Reprises telles quelles. La skill de langage est désignée à l'appel (`--archi`) ; sans elle, `architecture-patterns` | tag `v1.15.1` (commit `1e41a98`), `plugins/skraft-framework/skills/` |
 
 Ce qui a été **écarté sciemment**, et pourquoi :
 

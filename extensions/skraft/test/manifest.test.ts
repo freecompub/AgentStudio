@@ -31,6 +31,10 @@ describe("Manifeste et commande skraft", () => {
     expect(parseSkraftArgs("stories/us-12.md")).toEqual({ storyPath: "stories/us-12.md", confirmDifficulty: true });
     expect(parseSkraftArgs("--auto stories/us-12.md")).toEqual({ storyPath: "stories/us-12.md", confirmDifficulty: false });
     expect(parseSkraftArgs("")).toBeNull();
+    // Skill d'architecture transmise à l'appel (docs/15 §5, skills de skraft-plugin v1.15.1).
+    expect(parseSkraftArgs("stories/us-12.md --archi java")).toEqual({ storyPath: "stories/us-12.md", confirmDifficulty: true, archi: "java" });
+    expect(parseSkraftArgs("--auto --archi clean-architecture-java stories/us-12.md")).toEqual({ storyPath: "stories/us-12.md", confirmDifficulty: false, archi: "clean-architecture-java" });
+    expect(parseSkraftArgs("stories/us-12.md --archi")).toBeNull();
   });
 });
 

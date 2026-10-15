@@ -1,6 +1,6 @@
 import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
-import { buildBrief } from "./brief.js";
+import { buildBrief, lignePile } from "./brief.js";
 import { SANS_GEL, sansGel } from "./deliver-machine.js";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
@@ -114,6 +114,7 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
   const { unitTests, sources } = ctx.stack.layout;
   const lines = [
     buildBrief(state, "DELIVER", e.feedback),
+    lignePile(ctx.stack.id, ctx.stack.layout),
     `Scénario en cours : ${sc.id}${criterion ? ` (critère ${criterion.n} : ${criterion.text})` : ""}`,
     ...(gherkin ? ["Scénario :", gherkin.trim()] : []),
     `Test d'acceptance à faire passer : ${sc.acceptanceTestId}`,

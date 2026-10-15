@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Skill d'architecture transmise à l'appel, pile dans le dossier
+
+- Skills reprises de v1.15.1 : `clean-architecture-{dotnet,java,python,react}`, et mise à jour de
+  `architecture-patterns` et `clean-architecture-testing`. Indispensable : notre
+  `architecture-patterns` v1.6.1 disait « dépôt dans l'application, jamais dans le domaine »,
+  contraire à nos consignes et à la v1.15.1 (« domaine ou application »).
+- `/skraft <story> --archi <skill>` (nom ou langage) ; absente ou inconnue : clean architecture
+  par défaut (`architecture-patterns`), avec avertissement si inconnue (`architecture.ts`,
+  `architecture.mjs`). Les quatre skills sont à la demande pour les architectes, le testeur et le
+  développeur ; le dossier de DESIGN, DISTILL et DELIVER nomme celle à charger.
+- Ligne « Pile du projet » (adaptateur et emplacements) en DESIGN, DISTILL et DELIVER.
+- Plateforme : `lireEntrees` accepte `--nom valeur` pour une entrée texte ; `disposition()` rend
+  `pile` ; `StackApi.id` (extension-api, hôte en processus et isolé).
+- Piège : un import ajouté conditionnellement a été sauté parce que « import » figurait dans un
+  commentaire ; et un double appel journalisé à `w.disposition()` a été évité.
+- Reste au §5 de docs/15 : `PLAN_DEVIATION`, re-revue sélective, patch partagé, mode rework.
+
 ## 15/10 — La recherche, entrée de DESIGN et DISTILL (repris de skraft-plugin v1.15.1)
 
 - Porte « citations » (E et W) : sous-section « ### Existant réutilisable » du passage de relais,

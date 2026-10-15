@@ -11,6 +11,7 @@ export const meta = {
   entrees: {
     story: { type: "fichier", obligatoire: true, aide: "La user story (« # US-2 — Titre », critères numérotés)." },
     auto: { type: "booleen", defaut: false, aide: "Retenir la difficulté proposée sans la faire confirmer." },
+    archi: { type: "texte", aide: "Skill d'architecture du projet, par son nom ou son langage (--archi java) ; sans elle, ou inconnue, la clean architecture par défaut." },
   },
   phases: {
     "DÉBUT": "Préparation et difficulté",
@@ -68,7 +69,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: [".skraft/**"],
       outils: ["list_files", "report_blocker"],
-      skills: { obligatoires: ["architecture-patterns"], aLaDemande: ["architecture-decisions"] },
+      skills: { obligatoires: ["architecture-patterns"], aLaDemande: ["architecture-decisions", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },
     "skraft-architect-decide": {
       prompt: "agents/skraft-architect-decide.agent.md",
@@ -77,7 +78,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: [".skraft/**", "docs/adr/**"],
       outils: ["list_files", "report_blocker"],
-      skills: { obligatoires: ["architecture-decisions", "adr-eligibility-gate"], aLaDemande: ["architecture-patterns"] },
+      skills: { obligatoires: ["architecture-decisions", "adr-eligibility-gate"], aLaDemande: ["architecture-patterns", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },
     "skraft-acceptance": {
       prompt: "agents/skraft-acceptance.agent.md",
@@ -95,7 +96,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: ["@stack:unitTests"],
       outils: ["list_files", "run_tests", "run_lint", "report_blocker"],
-      skills: { obligatoires: ["test-design-mandates", "outside-in-tdd#RED"], aLaDemande: ["test-refactoring-catalog", "clean-architecture-testing"] },
+      skills: { obligatoires: ["test-design-mandates", "outside-in-tdd#RED"], aLaDemande: ["test-refactoring-catalog", "clean-architecture-testing", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },
     "skraft-dev": {
       prompt: "agents/skraft-dev.agent.md",
@@ -104,7 +105,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: ["@stack:sources"],
       outils: ["list_files", "run_tests", "run_lint", "report_blocker"],
-      skills: { obligatoires: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], aLaDemande: ["clean-architecture-testing", "test-refactoring-catalog"] },
+      skills: { obligatoires: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], aLaDemande: ["clean-architecture-testing", "test-refactoring-catalog", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },
     "skraft-mutation-arbiter": {
       prompt: "agents/skraft-mutation-arbiter.agent.md",
@@ -160,6 +161,7 @@ import { buildBrief } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
 import { checkResearch, extraireInventaire } from "./research.mjs";
+import { skillDArchitecture } from "./architecture.mjs";
 import { parseStory, slugOf } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
 import { distiller } from "./distillation.mjs";
@@ -185,6 +187,10 @@ export default async function skraft(w, entree) {
   if (warnings.length || notes.length)
     await w.informer(`Précontrôle skraft — avertissement non bloquant sur le code existant :\n${[...warnings, ...notes].map((p) => `- ${p}`).join("\n")}\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.`);
   const qualityCheckpoint = await w.checkpoint(`skraft ${slug} : qualité initiale`);
+  // Skill d'architecture transmise à l'appel ; absente ou inconnue : la clean architecture par défaut.
+  const architecture = skillDArchitecture(entree.archi);
+  if (architecture.avertissement)
+    await w.informer(architecture.avertissement);
   const niveau = await evaluerDifficulte(w, story, indicateurs, !entree.auto);
   const effets = levelEffects(niveau);
   // Ce que le dossier de passation raconte, tenu à jour au fil du script.
@@ -194,6 +200,7 @@ export default async function skraft(w, entree) {
     niveau,
     phasesFaites: [],
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
+    architecture: architecture.skill,
     questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
     reponses: [],
     adrs: [],

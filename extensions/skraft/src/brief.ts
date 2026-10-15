@@ -1,3 +1,4 @@
+import { ARCHITECTURE_PAR_DEFAUT, ligneArchitecture } from "./architecture.js";
 import type { Phase, SkraftState } from "./model.js";
 import { artifactsDuRun } from "./review-brief.js";
 
@@ -21,6 +22,8 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   });
   if (done.length) lines.push("Phases terminées :", ...done);
   if (s.skipPhases.length) lines.push(`Phases sautées : ${s.skipPhases.join(", ")}`);
+  // Skill d'architecture transmise à l'appel, ou la clean architecture par défaut.
+  if (phase === "DESIGN" || phase === "DISTILL" || phase === "DELIVER") lines.push(ligneArchitecture(s.architecture ?? ARCHITECTURE_PAR_DEFAUT));
   // La recherche validée, recopiée par le code (skraft-plugin v1.15.1 : la recherche est une entrée
   // exigée de DESIGN et DISTILL) : l'agent la reçoit, qu'il pense ou non à ouvrir le fichier.
   if (phase === "DESIGN" || phase === "DISTILL") {
@@ -53,4 +56,9 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
 function extrait(texte: string): string[] {
   const t = texte.length > 2000 ? `${texte.slice(0, 2000)}…` : texte;
   return t.split("\n").map((l) => `    ${l}`);
+}
+
+/** Pile du projet, tirée de l'adaptateur de pile qui fait autorité (docs/15 §5) : une seule ligne commune. */
+export function lignePile(id: string, layout: { sources: readonly string[]; unitTests: readonly string[]; acceptanceTests: readonly string[] }): string {
+  return `Pile du projet : ${id} ; sources : ${layout.sources.join(", ")} ; tests unitaires : ${layout.unitTests.join(", ")} ; tests d'acceptance : ${layout.acceptanceTests.join(", ")}.`;
 }

@@ -116,6 +116,12 @@ describe("lecture des arguments d'après meta.entrees", () => {
     expect(lireEntrees(E, "stories/us-2.md")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: false } });
     expect(lireEntrees(E, "--auto stories/us-2.md")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: true } });
   });
+  it("une entrée texte se donne aussi en --nom valeur, n'importe où dans la commande", () => {
+    const A = { ...E, archi: { type: "texte" as const, aide: "Skill d'architecture." } };
+    expect(lireEntrees(A, "stories/us-2.md --archi java")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: false, archi: "java" } });
+    expect(lireEntrees(A, "--archi java --auto stories/us-2.md")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: true, archi: "java" } });
+    expect(lireEntrees(A, "stories/us-2.md --archi")).toMatchObject({ ok: false });
+  });
   it("obligatoire absent, option inconnue, argument en trop : refus avec l'usage", () => {
     for (const a of ["", "--vite x", "a b"]) expect(lireEntrees(E, a)).toMatchObject({ ok: false, usage: expect.stringMatching(/<story>.*\[--auto\]/) });
   });

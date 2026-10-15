@@ -1,72 +1,96 @@
-# Architecture Rules (NetArchTest)
+# Architecture Rules
 
-Layer discipline enforced by CI. Every rule is one `[Fact]`. Failure message must list violating types.
+Layer discipline enforced by CI. Every rule is one test. Failure message must list violating types. The rules are language-agnostic; the implementation below is .NET (NetArchTest), the Java one is in [examples-java.md](examples-java.md), the Python one (import-linter) in [examples-python.md](examples-python.md).
 
-## Layer Dependency Rules
+## Project References — the dependency rule
+
+Each project references exactly its inner neighbour. The reference graph is the rule; enforce it on the project files, never on imports.
+
+| Project | References | Never references |
+|---|---|---|
+| Api | Infrastructure | Application, Domain |
+| Infrastructure | Application | Domain, Api |
+| Application | Domain | Infrastructure, Api |
+| Domain | Nothing | Application, Infrastructure, Api |
+
+Types reachable through a transitive reference MAY be imported: Infrastructure uses the Domain types an Application interface exposes, Api composes Application use cases through its Infrastructure reference. Never add a direct reference to reach them.
+
+## Type Dependency Rules
+
+Correct references still let the business code import a framework, an I/O type or a network client. Guard Domain and Application with an **allow-list**: a deny-list only catches the frameworks someone thought to name, and a guard limited to the project's own layers catches none.
+
+| Layer | May depend on | Everything else fails the build, including |
+|---|---|---|
+| Domain | Domain, the language core | frameworks, I/O, network, persistence, every other layer |
+| Application | Application, Domain, the language core | frameworks, I/O, network, persistence, Infrastructure, Api |
+
+The language core excludes I/O, network and persistence (.NET: `System` minus `System.IO`, `System.Net`, `System.Data`; Java: `java.lang`, `java.util`, `java.time`, `java.math`; Python: the standard library minus I/O, network and database modules).
 
 | Source layer | Forbidden target | Reason |
 |---|---|---|
-| Domain | Application | Inversion: Domain must not know about orchestration |
-| Domain | Infrastructure | Iron Law: Infrastructure flows inward only via interfaces |
-| Domain | Api | Domain is framework-agnostic |
-| Domain | `Microsoft.EntityFrameworkCore` | Persistence is Infrastructure only |
-| Domain | `Microsoft.AspNetCore.*` | HTTP is API only |
-| Application | Infrastructure | Application depends on Domain + abstractions |
-| Application | Api | Application is transport-agnostic |
-| Application | `Microsoft.EntityFrameworkCore` | EF Core belongs to Infrastructure |
-| Application | `Microsoft.AspNetCore.*` | HTTP is API only |
-| Api | Application (except `Program.cs`) | API routes through Infrastructure DI / buses |
+| Infrastructure | Api | Infrastructure implements Application interfaces, never transport |
 | SharedKernel | Anything | SharedKernel depends on nothing |
+
+Inside Application, one feature never depends on another (`architecture-patterns`, Feature Folders): `MyApp.Application.Loans` may use `MyApp.Application.Shared`, never `MyApp.Application.Invoicing`.
 
 ## Implementation Pattern
 
 ```csharp
 public sealed class ArchitectureTests
 {
-    // ----- Domain -----
+    // ----- Project references -----
 
-    [Fact] public void Domain_ShouldNotDependOn_Application()
-        => AssertNoDependency(DomainAssembly, "MyApp.Application");
-
-    [Fact] public void Domain_ShouldNotDependOn_Infrastructure()
-        => AssertNoDependency(DomainAssembly, "MyApp.Infrastructure");
-
-    [Fact] public void Domain_ShouldNotDependOn_Api()
-        => AssertNoDependency(DomainAssembly, "MyApp.Api");
-
-    [Fact] public void Domain_ShouldNotDependOn_EntityFrameworkCore()
-        => AssertNoDependency(DomainAssembly, "Microsoft.EntityFrameworkCore");
-
-    [Fact] public void Domain_ShouldNotDependOn_AspNetCore()
-        => AssertNoDependency(DomainAssembly, "Microsoft.AspNetCore");
-
-    // ----- Application -----
-
-    [Fact] public void Application_ShouldNotDependOn_Infrastructure()
-        => AssertNoDependency(ApplicationAssembly, "MyApp.Infrastructure");
-
-    [Fact] public void Application_ShouldNotDependOn_Api()
-        => AssertNoDependency(ApplicationAssembly, "MyApp.Api");
-
-    [Fact] public void Application_ShouldNotDependOn_EntityFrameworkCore()
-        => AssertNoDependency(ApplicationAssembly, "Microsoft.EntityFrameworkCore");
-
-    [Fact] public void Application_ShouldNotDependOn_AspNetCore()
-        => AssertNoDependency(ApplicationAssembly, "Microsoft.AspNetCore");
-
-    // ----- API -----
-
-    [Fact]
-    public void Api_ShouldNotDependOn_Application_Except_Program()
+    [Theory]
+    [InlineData("MyApp.Domain")]
+    [InlineData("MyApp.Application", "MyApp.Domain")]
+    [InlineData("MyApp.Infrastructure", "MyApp.Application")]
+    [InlineData("MyApp.Api", "MyApp.Infrastructure")]
+    public void Project_ReferencesOnlyItsInnerNeighbour(string project, params string[] allowed)
     {
-        var result = Types.InAssembly(ApiAssembly)
-            .That().DoNotHaveName("Program")
-            .And().DoNotResideInNamespace("MyApp.Api.Composition")
-            .Should().NotHaveDependencyOn("MyApp.Application")
-            .GetResult();
+        var references = XDocument.Load(ProjectFile(project))
+            .Descendants("ProjectReference")
+            .Select(reference => Path.GetFileNameWithoutExtension(((string)reference.Attribute("Include")!).Replace('\\', '/')))
+            .Order()
+            .ToArray();
 
-        Assert.True(result.IsSuccessful, Format(result));
+        Assert.Equal(allowed.Order().ToArray(), references);
     }
+
+    // ----- Domain and Application: allow-list -----
+
+    [Fact] public void Domain_DependsOnlyOnItselfAndTheLanguageCore()
+        => AssertOnly(DomainAssembly, "MyApp.Domain");
+
+    [Fact] public void Application_DependsOnlyOnInnerLayersAndTheLanguageCore()
+        => AssertOnly(ApplicationAssembly, "MyApp.Application", "MyApp.Domain");
+
+    // A feature namespace never uses another feature's; Shared is for what two features need.
+    [Fact] public void ApplicationFeatures_DoNotDependOnEachOther()
+    {
+        const string root = "MyApp.Application.";
+        var features = ApplicationAssembly.GetTypes()
+            .Select(type => type.Namespace)
+            .Where(ns => ns is not null && ns.StartsWith(root, StringComparison.Ordinal))
+            .Select(ns => ns![root.Length..].Split('.')[0])
+            .Where(feature => feature != "Shared")
+            .Distinct()
+            .ToArray();
+        foreach (var feature in features)
+        {
+            var others = features.Where(other => other != feature).Select(other => root + other).ToArray();
+            if (others.Length == 0) continue;
+            var result = Types.InAssembly(ApplicationAssembly)
+                .That().ResideInNamespace(root + feature)
+                .ShouldNot().HaveDependencyOnAny(others)
+                .GetResult();
+            Assert.True(result.IsSuccessful, Format(result));
+        }
+    }
+
+    // ----- Infrastructure -----
+
+    [Fact] public void Infrastructure_ShouldNotDependOn_Api()
+        => AssertNoDependency(InfrastructureAssembly, "MyApp.Api");
 
     // ----- SharedKernel -----
 
@@ -85,8 +109,16 @@ public sealed class ArchitectureTests
     private static readonly Assembly DomainAssembly = typeof(IDomainMarker).Assembly;
     private static readonly Assembly ApplicationAssembly = typeof(IApplicationMarker).Assembly;
     private static readonly Assembly InfrastructureAssembly = typeof(IInfrastructureMarker).Assembly;
-    private static readonly Assembly ApiAssembly = typeof(IApiMarker).Assembly;
     private static readonly Assembly SharedKernelAssembly = typeof(ISharedKernelMarker).Assembly;
+
+    private static string ProjectFile(string project)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !directory.EnumerateFiles("*.sln*").Any())
+            directory = directory.Parent;
+
+        return Path.Combine(directory!.FullName, "src", project, $"{project}.csproj");
+    }
 
     private static void AssertNoDependency(Assembly assembly, string forbidden)
     {
@@ -94,6 +126,20 @@ public sealed class ArchitectureTests
             .Should().NotHaveDependencyOn(forbidden)
             .GetResult();
         Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    // `System` is the base library; I/O, network and persistence inside it are technical details too.
+    private static void AssertOnly(Assembly assembly, params string[] layers)
+    {
+        var frameworks = Types.InAssembly(assembly)
+            .Should().OnlyHaveDependenciesOn([.. layers, "System"])
+            .GetResult();
+        var io = Types.InAssembly(assembly)
+            .Should().NotHaveDependencyOnAny("System.IO", "System.Net", "System.Data")
+            .GetResult();
+
+        Assert.True(frameworks.IsSuccessful, Format(frameworks));
+        Assert.True(io.IsSuccessful, Format(io));
     }
 
     private static string Format(TestResult result)
@@ -137,4 +183,4 @@ public void AllCommandHandlers_ShouldImplementICommandHandler()
 
 ## CI Integration
 
-Architecture tests run with the unit test suite (fast, <1 s each). They MUST fail the build on violation — never `Skip = "known issue"`.
+Architecture tests live in the `IntegrationTest` project and run as a CI gate, never in the suite developers run on every save. They MUST fail the build on violation — never `Skip = "known issue"`.

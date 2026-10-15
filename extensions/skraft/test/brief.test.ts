@@ -24,4 +24,19 @@ describe("Recherche dans le dossier de passation", () => {
       "RESEARCH a été sautée : aucun inventaire de l'existant. Relève toi-même, dans le code, les conventions et ce qui peut être réutilisé.",
     );
   });
+
+  it.each(["DESIGN", "DISTILL", "DELIVER"] as const)("%s : la skill d'architecture transmise à l'appel", (phase) => {
+    expect(buildBrief({ ...base, architecture: "clean-architecture-java" }, phase, [])).toContain("Architecture du projet : charge la skill `clean-architecture-java`");
+  });
+
+  it("RESEARCH : pas de skill d'architecture dans le dossier", () => {
+    expect(buildBrief({ ...base, architecture: "clean-architecture-java" }, "RESEARCH", [])).not.toContain("Architecture du projet");
+  });
+});
+
+describe("Skill d'architecture dans l'état", () => {
+  it("résolue dès le lancement ; absente : la clean architecture par défaut", () => {
+    expect(initialState({ storyPath: "s.md", archi: "java" }).architecture).toBe("clean-architecture-java");
+    expect(initialState({ storyPath: "s.md" }).architecture).toBe("architecture-patterns");
+  });
 });

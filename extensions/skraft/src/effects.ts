@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
-import { buildBrief } from "./brief.js";
+import { buildBrief, lignePile } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
 import type { DefectThread } from "./review-thread.js";
@@ -173,6 +173,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // Seul l'emplacement est dynamique : il vient de la stack. La norme de nommage et de recopie
       // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
+      if (effect.phase === "DESIGN" || effect.phase === "DISTILL") brief += `\n${lignePile(ctx.stack.id, ctx.stack.layout)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
       const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase) });

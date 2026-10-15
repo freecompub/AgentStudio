@@ -144,6 +144,8 @@ export interface ArbitrageRecord {
 
 export interface SkraftInput {
   storyPath: string;
+  /** Skill d'architecture demandée à l'appel (`--archi`) ; absente ou inconnue : la clean architecture par défaut. */
+  archi?: string;
   /** Confirmation de la difficulté par l'utilisateur (O3 : mode simple) ; sinon automatique. */
   confirmDifficulty?: boolean;
   /** Surcharge de l'ordre des phases (tests) ; défaut : configuration unique. */
@@ -173,6 +175,8 @@ export interface SkraftState {
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
   openQuestions: { id: string; text: string; answer?: string }[];
+  /** Skill d'architecture retenue au lancement, recopiée dans le dossier de DESIGN, DISTILL et DELIVER. */
+  architecture?: string;
   /** Inventaire de la recherche validée (skraft-plugin v1.15.1) : recopié dans le dossier de DESIGN et DISTILL. */
   recherche?: { conventions: string; existant: string } | null;
   adrs: AdrRecord[];
@@ -389,6 +393,7 @@ const stateSchema = z.object({
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
   recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
+  architecture: z.string().optional(),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),

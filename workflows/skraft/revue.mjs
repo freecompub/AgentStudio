@@ -5,7 +5,7 @@
 * dans le réducteur, ils survivent à une relance par l'humain.
 */
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
-import { buildBrief } from "./brief.mjs";
+import { buildBrief, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
@@ -30,7 +30,13 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
     await w.etape(phase);
     // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
     const decides = d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
-    const r = await w.agent(nom, buildBrief(d, phase, motifs) + suffixe, { lectureSeule: [...GELÉS, ...decides] });
+    // Pile tirée de l'adaptateur, qui fait autorité (docs/15 §5).
+    let pile = "";
+    if (phase === "DESIGN" || phase === "DISTILL") {
+      const disp = await w.disposition();
+      pile = `\n${lignePile(disp.pile, disp)}`;
+    }
+    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides] });
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);

@@ -3,6 +3,8 @@
 * Dossier de passation (SPEC.md §6.6) : construit par le code à partir des phases réellement
 * exécutées ; jamais de transcription. Pur.
 */
+import { ARCHITECTURE_PAR_DEFAUT, ligneArchitecture } from "./architecture.mjs";
+
 export function buildBrief(d, phase, rejet) {
   const lines = [`Story : ${d.story.id} — ${d.story.title}`, d.story.statement, "Critères d'acceptation :"];
   for (const c of d.story.criteria)
@@ -14,6 +16,9 @@ export function buildBrief(d, phase, rejet) {
     lines.push("Phases terminées :", ...d.phasesFaites.map((p) => `  - ${p.phase}${p.fichiers.length ? ` : ${p.fichiers.join(", ")}` : ""}`));
   if (d.phasesSautees.length)
     lines.push(`Phases sautées : ${d.phasesSautees.join(", ")}`);
+  // Skill d'architecture transmise à l'appel, ou la clean architecture par défaut.
+  if (phase === "DESIGN" || phase === "DISTILL" || phase === "DELIVER")
+    lines.push(ligneArchitecture(d.architecture ?? ARCHITECTURE_PAR_DEFAUT));
   // La recherche validée, recopiée par le code (skraft-plugin v1.15.1 : la recherche est une entrée
   // exigée de DESIGN et DISTILL) : l'agent la reçoit, qu'il pense ou non à ouvrir le fichier.
   if (phase === "DESIGN" || phase === "DISTILL") {
@@ -49,4 +54,9 @@ export function buildBrief(d, phase, rejet) {
 function extrait(texte) {
   const t = texte.length > 2000 ? `${texte.slice(0, 2000)}…` : texte;
   return t.split("\n").map((l) => `    ${l}`);
+}
+
+/** Pile du projet, tirée de l'adaptateur de pile qui fait autorité (docs/15 §5) : une seule ligne commune. */
+export function lignePile(id, layout) {
+  return `Pile du projet : ${id} ; sources : ${layout.sources.join(", ")} ; tests unitaires : ${layout.unitTests.join(", ")} ; tests d'acceptance : ${layout.acceptanceTests.join(", ")}.`;
 }

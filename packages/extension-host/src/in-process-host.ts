@@ -244,6 +244,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         return testRuns.run({ source: "gate", ...(opts?.signal ? { signal: opts.signal } : {}), ...(opts?.evidence ? { tag: opts.evidence } : {}) });
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
+      id: deps.stack.id,
       layout: deps.stack.layout,
       infrastructureModules: deps.stack.infrastructureModules,
       async mutation(opts) {
