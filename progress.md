@@ -5,6 +5,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Fuite de dossiers temporaires des tests corrigée
+
+- Cause : les harnais compilent le processus enfant (et l'extension) dans `tmpdir()` « une fois
+  pour la suite », en fait une fois **par fichier** (Vitest isole les fichiers), sans jamais les
+  supprimer ; certains tests n'avaient pas de `rm` ; et une tâche qui écrit après le `rm` de son
+  dossier le recrée. Environ 115 Mo par lancement, dans un /tmp en tmpfs de 3,8 Go.
+- Correctif : `vitest.global-setup.ts`, déclaré dans `vitest.config.ts`, crée un dossier
+  `agent-studio-tests-*` par lancement, le met dans `TMPDIR` (hérité par les processus de test et
+  leurs enfants) et le supprime en entier à la fin.
+- Vérifié : sans lui, `e2e-commit-workflow` laisse `agent-studio-workflow-runtime-*` ; avec lui,
+  la suite complète (1943 tests) ne laisse aucun dossier `agent-studio-*`.
+
 ## 15/10 — Gel gardé quand le commit de DISTILL échoue (extension)
 
 - Défaut introduit par D19 : `escalate` appelait `leverGelDistill` avant de reconnaître une panne de
@@ -33,8 +45,8 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   `clean-architecture-testing` à la demande ; consigne DELIVER de `test-integrity` (couche et
   doublure du plan). Le workflow passe maintenant `slug` au contexte des lentilles.
 - Piège : `/tmp` (tmpfs de 3,8 Go) était plein à 80 % de dossiers `agent-studio-*` laissés par les
-  tests ; la suite échouait par fichiers entiers. Chaque lancement complet en laisse encore 42
-  (~55 Mo) : fuite à corriger dans les tests. Supprimés à la main le 15/10.
+  tests ; la suite échouait par fichiers entiers. Supprimés à la main le 15/10 ; fuite corrigée
+  ensuite (`vitest.global-setup.ts`).
 - Instable sous charge : « ADR accepté pendant que l'autre est amendé » (e2e-s3 de l'extension),
   passé seul trois fois.
 - Reste : docs/15 §5 ; G7 en code (proposé) ; défaut du gel perdu en DISTILL (extension).
