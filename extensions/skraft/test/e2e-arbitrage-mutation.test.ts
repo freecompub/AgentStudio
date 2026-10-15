@@ -175,4 +175,18 @@ describe("skraft — arbitrage d'un mutant contesté (D22, ADR 0065)", () => {
     await finie(app, id);
     expect(await arbitrages(app, id)).toEqual([["agent", "dérogation"], ["agent", "dérogation"], ["humain", "dérogation"]]);
   }, 90_000);
+  // Contrôle de l'écart relevé dans le workflow : un arbitre muet laisse le mutant à l'humain.
+  it("arbitre muet : le mutant va à l'humain, la livraison continue", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-test": testeur(root),
+      "skraft-mutation-arbiter": async () => {},
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack: pileAvecMutants(root, [1]), isolated: true });
+    answerQuestions(app);
+    const id = await lancer(app);
+    const q = await repondreArbitrage(app, "derogation", "équivalent, vérifié à la main");
+    expect(q.detail).toContain("n'a rien rendu");
+    await finie(app, id);
+    expect(await arbitrages(app, id)).toEqual([["humain", "dérogation"]]);
+  }, 90_000);
 });

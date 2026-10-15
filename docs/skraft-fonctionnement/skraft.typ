@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `37349d3` \
+      État du code : 15 octobre 2026, commit suivant `d743160` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -830,12 +830,16 @@ suivants ont été relevés dans le code à la date de ce document.
 )
 
 == Écarts relevés en préparant ce document
-Ces points ont été vus en relisant le code ; ils ne sont pas encore corrigés.
-- *Extension* : le stade `VERDICT_GATE` est déclaré mais jamais atteint (écart S3 de l'audit).
-- *Workflow* : un défaut de travail de l'arbitre de mutation n'est pas rattrapé localement ; dans
-  l'extension, il laisse le mutant à l'humain.
-- *Workflow* : la mutation par scénario (si la barre la demande) ne tient pas compte des
-  dérogations déjà accordées.
+Ces points ont été vus en relisant le code ; tous sont traités depuis le 15 octobre 2026.
+- *Extension* : un commit de DISTILL en échec perdait l'empreinte du gel. Corrigé : DISTILL
+  approuvée garde son empreinte, que le commit soit relancé ou que l'humain continue sans.
+- *Extension* : la lentille `test-integrity` ne recevait pas le code de production. Corrigé.
+- *Extension* : le stade `VERDICT_GATE` est déclaré mais jamais atteint. Conforme : l'ADR 0013 le
+  décide transitoire, la synthèse du verdict a lieu dans la transition qui suit la revue.
+- *Workflow* : un arbitre de mutation muet ou hors délai arrêtait la correction. Corrigé : son
+  silence laisse chaque mutant à l'humain, comme dans l'extension.
+- *Workflow* : la mutation par scénario ignorait les dérogations accordées. Aligné sur
+  l'extension ; le cas ne se produit que si la barre passe « par scénario » pendant un run.
 
 == Sources
 Extension : `extensions/skraft/src/` (`reducer.ts`, `deliver-machine.ts`, `effects.ts`,

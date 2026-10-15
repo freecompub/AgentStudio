@@ -473,7 +473,7 @@ Priorités proposées :
 |---|---|---|---|
 | S1 | Le compteur d'essais dépasse le budget avec l'essai garanti, ce que la spec interdit (invariant 3) | ADR 0042 | Amender la spec : l'essai garanti est hors budget, et compté à part |
 | S2 | RESEARCH est sautée pour les niveaux `simple` et `medium`, alors que la spec dit que les quatre phases s'exécutent toujours | `difficulty.ts:577-579`, `reducer.ts:328` ; spec §5.1, §8.1, §8.4 ; ADR 0014 | Écrire un ADR qui acte le saut, ou rétablir RESEARCH |
-| S3 | L'état `VERDICT_GATE` est déclaré mais jamais atteint | `model.ts:308` | Le retirer du modèle, ou l'implémenter |
+| S3 | L'état `VERDICT_GATE` est déclaré mais jamais atteint | `model.ts:308` | **Conforme, documenté le 2026-10-15** : l'ADR 0013 le décide transitoire (synthèse dans la transition `LENSES_DONE`) ; commentaire dans `model.ts` |
 | S4 | La spec prévoit un rollback après un rejet de porte ; les ADR 0029 et 0040 l'ont retiré | spec §5.2 | Mettre à jour la table §5.2 |
 | S5 | La spec prévoit trois lentilles en DELIVER ; le code en lance quatre, avec *quality-gates* | spec §7.4 | Mettre la spec à jour |
 

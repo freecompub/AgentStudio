@@ -19,6 +19,9 @@ export type Stage =
   | "SPECIALIST"
   | "ARTIFACT_GATE"
   | "REVIEW"
+  // Transitoire, jamais enregistré (ADR 0013) : la synthèse du verdict a lieu dans la transition
+  // `LENSES_DONE`, qui mène directement à RATIFICATION, COMMIT, SPECIALIST ou ESCALATED. Gardé
+  // parce que SPEC-skraft §5.1 le déclare (écart S3 de docs/12).
   | "VERDICT_GATE"
   | "RATIFICATION"
   | "COMMIT"

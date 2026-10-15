@@ -5,6 +5,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Écarts du chapitre 11 du PDF traités
+
+- Workflow : un défaut de travail de l'arbitre de mutation (muet, délai) n'était pas rattrapé ;
+  il laisse maintenant chaque mutant à l'humain, comme l'extension (`arbitrerMutants`). Test
+  « arbitre muet » dans les deux, celui du workflow échouait avant.
+- Workflow : la mutation de la porte de scénario reçoit les dérogations (`d.derogations`), comme
+  l'extension. Sans test de bout en bout : les dérogations naissent en fin de DELIVER, où la
+  mutation par scénario ne tourne pas ; le cas suppose une barre changée pendant le run.
+- Extension : `VERDICT_GATE` documenté transitoire (ADR 0013) dans `model.ts` ; S3 de `docs/12`
+  marqué conforme.
+- PDF : chapitre 11 réécrit, tous les écarts traités.
+
 ## 15/10 — Fuite de dossiers temporaires des tests corrigée
 
 - Cause : les harnais compilent le processus enfant (et l'extension) dans `tmpdir()` « une fois

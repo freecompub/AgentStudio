@@ -235,6 +235,13 @@
       "notes": "Défaut de l'extension introduit par D19, relevé le 13/10 en préparant docs/skraft-fonctionnement : escalate levait le gel avant de reconnaître une panne de commit. Le workflow n'était pas touché (test de contrôle)."
     },
     {
+      "id": "arbitre-de-mutation-muet",
+      "title": "Un arbitre de mutation muet ou hors délai laisse chaque mutant contesté à l'humain, et la livraison continue",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"arbitre muet\"",
+      "passes": true,
+      "notes": "Écart du workflow relevé dans docs/skraft-fonctionnement (ch. 11) ; l'extension se comportait déjà ainsi (contrôle)."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",

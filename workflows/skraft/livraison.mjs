@@ -520,7 +520,9 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
     if (!barre.mutation.active)
       notes.push("Mutation désactivée par la barre de qualité du projet.");
     else if (barre.mutation.moment === "scenario") {
-      const m = await muter(w, barre, sources, sc.id);
+      // Les dérogations accordées comptent ici aussi, comme dans l'extension. Elles ne naissent qu'en
+      // fin de DELIVER : ce cas suppose une barre passée « par scénario » pendant le run.
+      const m = await muter(w, barre, sources, sc.id, d.derogations);
       motifs.push(...m.motifs);
       faits.push(...m.faits);
       notes.push(...m.notes);
@@ -938,9 +940,17 @@ async function arbitrerMutants(w, d, s) {
   const restants = MAX_DEROGATIONS_PAR_ARBITRE - d.derogations.filter((x) => x.par === "agent").length;
   const jugements = new Map();
   if (restants > 0) {
-    const r = await w.agent("skraft-mutation-arbiter", await briefArbitre(w, d, aJuger));
-    for (const j of r.sortie?.rulings ?? [])
-      jugements.set(j.defect, j);
+    // Un défaut de travail de l'arbitre (muet, délai) n'arrête rien : son silence laisse chaque
+    // mutant à l'humain, comme dans l'extension (écart relevé dans docs/skraft-fonctionnement).
+    try {
+      const r = await w.agent("skraft-mutation-arbiter", await briefArbitre(w, d, aJuger));
+      for (const j of r.sortie?.rulings ?? [])
+        jugements.set(j.defect, j);
+    }
+    catch (e) {
+      if (!(e instanceof TourInterrompu))
+        throw e;
+    }
   }
   let accordes = 0;
   for (const t of aJuger) {
