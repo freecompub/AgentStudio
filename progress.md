@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — La recherche, entrée de DESIGN et DISTILL (repris de skraft-plugin v1.15.1)
+
+- Porte « citations » (E et W) : sous-section « ### Existant réutilisable » du passage de relais,
+  une ligne « `Nom` → `chemin` » par élément (ou « aucun ») ; **chaque nom doit figurer dans le
+  fichier cité** (ajout par rapport au plugin). `FileIndex` gagne `contains`.
+- Non repris de v1.15.1 : les commandes de build et de test dans les conventions. L'adaptateur de
+  pile en est l'autorité, et le contrat du cœur interdit aux agents de les lancer
+  (`agent-prompts.ts`) : les faire déclarer par le LLM créerait une seconde source. Les
+  emplacements des tests et des sources sont déjà injectés par le code (DISTILL, DELIVER).
+- Le code garde l'inventaire (`extraireInventaire` ; E : `GATE_OK.recherche` → `state.recherche` ;
+  W : `vue.recherche`) et le recopie dans le dossier de DESIGN et DISTILL, borné à 2 000
+  caractères par partie. RESEARCH sautée : le dossier le dit.
+- Prompts du chercheur, du modélisateur et de l'agent d'acceptance mis à jour (provenance v1.15.1).
+- Piège : la fixture S2 réécrivait `bolus-calculator.ts` en 55 lignes de commentaires, sans le nom
+  inventorié ; la première ligne déclare maintenant la classe.
+- Reste au §5 de docs/15 : `PLAN_DEVIATION`, skills clean-architecture par langage, re-revue
+  sélective, patch partagé, mode rework.
+
 ## 15/10 — Écarts du chapitre 11 du PDF traités
 
 - Workflow : un défaut de travail de l'arbitre de mutation (muet, délai) n'était pas rattrapé ;

@@ -49,7 +49,7 @@ const SCHEMAS = {
     etapes: [
       { id: "pre", type: "code", titre: "Présélection de 20 fichiers au plus", detail: "mots de la story, score sur les chemins" },
       { id: "ag", type: "agent", titre: "skraft-researcher écrit research.md", detail: "8 sections exigées" },
-      { id: "porte", type: "code", titre: "Porte citations", detail: "sections, fichiers et plages cités, URL, une seule recommandation" },
+      { id: "porte", type: "code", titre: "Porte citations", detail: "sections, fichiers et plages cités, URL, une seule recommandation, inventaire de l'existant vérifié" },
       { id: "q", type: "code", titre: "Extraction des questions ouvertes", detail: "section Passage de relais" },
       { id: "commit", type: "code", titre: "Commit : docs(skraft): research de <slug>", detail: "pas de revue par lentilles" },
     ],

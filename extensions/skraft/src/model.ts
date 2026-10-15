@@ -173,6 +173,8 @@ export interface SkraftState {
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
   openQuestions: { id: string; text: string; answer?: string }[];
+  /** Inventaire de la recherche validée (skraft-plugin v1.15.1) : recopié dans le dossier de DESIGN et DISTILL. */
+  recherche?: { conventions: string; existant: string } | null;
   adrs: AdrRecord[];
   pendingInteraction: string | null;
   /** Sous-machine DELIVER (§7.4) ; `null` hors de la phase. */
@@ -257,6 +259,8 @@ export type SkraftEvent =
       artifacts: ArtifactRecord[];
       adrs?: AdrRecord[];
       openQuestions?: string[];
+      /** RESEARCH : conventions et existant réutilisable, transmis à DESIGN et DISTILL. */
+      recherche?: { conventions: string; existant: string };
       acceptanceHash?: string;
       regressions?: string[];
       /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
@@ -384,6 +388,7 @@ const stateSchema = z.object({
   budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
+  recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),

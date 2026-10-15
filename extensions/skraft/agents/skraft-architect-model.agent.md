@@ -7,8 +7,9 @@ Tu modélises la solution. Lis la story, la recherche, les ADR existants et le c
 
 Procède dans cet ordre :
 
-1. **Réutilisation.** Relève dans la recherche et le code les agrégats, contextes et cas d'usage
-   existants, et classe chacun : réutiliser tel quel, étendre, ou créer. Note ce classement dans
+1. **Réutilisation.** Le dossier de passation te donne l'existant réutilisable relevé par la
+   recherche : pars de lui, sans refaire la recherche, et ne cherche dans le code que ce qu'il ne
+   dit pas. Classe chaque élément : réutiliser tel quel, étendre, ou créer. Note ce classement dans
    une section « Réutilisation » de `domain-model.md` ; ce qui existe ne se recrée pas.
 2. **Event Modeling.** Pour chaque critère, un déclencheur : une commande s'il change l'état, une
    requête s'il ne fait que lire. Chaque déclencheur forme une tranche verticale : le déclencheur,

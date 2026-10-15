@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `d743160` \
+      État du code : 15 octobre 2026, commit suivant `1d17c54` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -432,6 +432,13 @@ Entièrement exécutée par le code. Motifs de rejet :
   « plage hors du fichier, qui compte N lignes » ;
 - URL mal formée (http ou https, hôte avec un point, ou `localhost`) ;
 - recommandation absente, ou plus d'une recommandation.
+- sous-section « Existant réutilisable » absente du passage de relais, ou vide sans « aucun » ;
+- élément de l'inventaire (« `Nom` → `chemin` ») dont le fichier n'existe pas, ou ne contient pas
+  ce nom.
+
+Une fois la porte passée, le code garde les conventions et l'existant réutilisable : il les recopie
+dans le dossier de passation de DESIGN et de DISTILL, qui les tiennent pour acquis. Si RESEARCH a
+été sautée, le dossier le dit, et l'agent relève lui-même l'existant.
 
 == Organigramme
 #S("research")
@@ -709,7 +716,7 @@ passation, les portes et les faits de revue.
   ("Donnée", "Produite par", "Consommée par", "Comment"),
   ([Story : critères, valeurs, questions], [l'auteur (fichier `stories/…`) ; analysée par INIT], [toutes les étapes], [dossier de passation ; porte « valeurs » de DISTILL]),
   ([Niveau de difficulté], [CLASSIFY (agent et humain)], [toutes], [budget, lentilles, RESEARCH sautée ou non, granularité de DELIVER]),
-  ([`research.md`], [RESEARCH (agent)], [DESIGN et suivantes], [livrable cité dans le dossier de passation]),
+  ([`research.md`], [RESEARCH (agent)], [DESIGN et suivantes], [livrable cité dans le dossier de passation ; conventions et existant réutilisable recopiés par le code dans le dossier de DESIGN et de DISTILL]),
   ([Questions ouvertes], [story ; RESEARCH (section « Passage de relais »)], [ROUTE (humain)], [une demande par question]),
   ([Réponses de l'humain], [ROUTE ; questions bloquantes ; questions de revue], [tous les agents et lentilles suivants], [dossier de passation ; faits de revue. Gardées même après un rembobinage.]),
   ([Modèle, contrats, matrice], [DESIGN (agents ; matrice par le code)], [DISTILL, DELIVER, lentilles], [livrables ; noms du contrat protégés pendant les corrections de DELIVER]),

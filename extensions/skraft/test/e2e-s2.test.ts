@@ -16,7 +16,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
   beforeEach(async () => {
     root = await createProject();
     // Fichier de 55 lignes, comme dans la fixture de §13.2.
-    await put(root, "src/domain/bolus-calculator.ts", Array.from({ length: 55 }, (_, i) => `// ligne ${i + 1}`).join("\n") + "\n");
+    await put(root, "src/domain/bolus-calculator.ts", ["export class BolusCalculator {}", ...Array.from({ length: 54 }, (_, i) => `// ligne ${i + 2}`)].join("\n") + "\n");
     git(root, "commit", "-qam", "calculateur");
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-tasks-"));
   });
@@ -80,6 +80,8 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     expect(designBrief).toContain("Réponses de l'utilisateur :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
+    // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
+    expect(designBrief).toContain("`BolusCalculator` → `src/domain/bolus-calculator.ts`");
 
     await until(async () => stateOf(await app.engine.status(id))?.stage === "DONE", 60_000);
     expect(stateOf(await app.engine.status(id))!.artifacts.RESEARCH.map((a) => [a.path, a.attempt])).toEqual([[".skraft/us-12/research/research.md", 2]]);

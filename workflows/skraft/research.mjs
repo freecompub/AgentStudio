@@ -82,5 +82,46 @@ export function checkResearch(md, index) {
     else if (items > 1)
       reasons.push(`Une seule recommandation est attendue (${items} trouvées).`);
   }
+  reasons.push(...inventaireDeLExistant(secs, index));
   return { reasons, openQuestions: extractOpenQuestions(md) };
+}
+/**
+* Inventaire de l'existant (repris de skraft-plugin v1.15.1, `solution-researcher` : l'existant
+* réutilisable dans « Handoff to DESIGN »). Le plugin le demande au prompt ; ici, le code vérifie
+* qu'un élément inventorié existe vraiment dans le fichier qu'il cite : DESIGN et DISTILL le
+* reçoivent comme acquis. Les commandes de build et de test, que v1.15.1 ajoute aussi aux
+* conventions, ne sont pas reprises : l'adaptateur de pile en est l'autorité, et seul `run_tests`
+* les exécute.
+*/
+function inventaireDeLExistant(secs, index) {
+  const reasons = [];
+  const relais = secs.get(norm("Passage de relais"));
+  if (relais === undefined)
+    return reasons;
+  const existant = sousSection(relais, "Existant réutilisable");
+  if (existant === null) {
+    reasons.push("Passage de relais : sous-section « Existant réutilisable » absente (une ligne « `Nom` → `chemin` » par élément, ou « aucun »).");
+    return reasons;
+  }
+  const elements = [...existant.matchAll(/`([A-Za-z_]\w*)`\s*(?:→|->)\s*`([^`]+)`/g)].map((m) => ({ nom: m[1], chemin: m[2] }));
+  if (!elements.length && !/\baucun/i.test(existant))
+    reasons.push("Existant réutilisable est vide : liste les éléments (« `Nom` → `chemin` »), ou écris « aucun ».");
+  for (const { nom, chemin } of elements) {
+    if (index.lineCount(chemin) === null)
+      reasons.push(`Existant réutilisable : \`${nom}\` → \`${chemin}\` : fichier inexistant.`);
+    else if (!index.contains(chemin, nom)) reasons.push(`Existant réutilisable : \`${nom}\` n'apparaît pas dans \`${chemin}\`.`);
+  }
+  return reasons;
+}
+
+/** Texte d'une sous-section « ### titre » d'une section, ou `null` si elle n'y est pas. */
+export function sousSection(section, titre) {
+  const m = new RegExp(`^###\\s+${titre}\\s*$([\\s\\S]*?)(?=^#{2,3}\\s|$(?![\\s\\S]))`, "im").exec(section);
+  return m ? m[1].trim() : null;
+}
+
+/** Ce que DESIGN et DISTILL reçoivent de la recherche validée : conventions et existant réutilisable. */
+export function extraireInventaire(md) {
+  const secs = sections(md);
+  return { conventions: secs.get(norm("Conventions du projet")) ?? "", existant: sousSection(secs.get(norm("Passage de relais")) ?? "", "Existant réutilisable") ?? "" };
 }

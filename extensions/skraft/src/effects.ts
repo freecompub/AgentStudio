@@ -7,7 +7,7 @@ import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.j
 import type { DefectThread } from "./review-thread.js";
 import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
-import { checkResearch } from "./research.js";
+import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
 import { checkAcceptanceRed, checkPlans, checkValues } from "./distill.js";
@@ -475,17 +475,21 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
     return { type: "GATE_FAIL", gate: "citations", reasons: [`Document de recherche absent : ${path}`] };
   }
   const files = new Set(await ctx.workspace.listFiles());
-  const lines = new Map<string, number>();
+  const contenus = new Map<string, string>();
   for (const cited of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))) {
-    if (files.has(cited)) lines.set(cited, (await ctx.workspace.readFile(cited)).replace(/\n$/, "").split("\n").length);
+    if (files.has(cited)) contenus.set(cited, await ctx.workspace.readFile(cited));
   }
-  const { reasons, openQuestions } = checkResearch(md, { lineCount: (p) => lines.get(p) ?? null });
+  const { reasons, openQuestions } = checkResearch(md, {
+    lineCount: (p) => (contenus.has(p) ? contenus.get(p)!.replace(/\n$/, "").split("\n").length : null),
+    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
+  });
   if (reasons.length) return { type: "GATE_FAIL", gate: "citations", reasons };
   const known = new Set(state.openQuestions.map((q) => q.text));
   return {
     type: "GATE_OK",
     artifacts: [{ path, sha256: createHash("sha256").update(md).digest("hex"), producedBy: "skraft-researcher", attempt }],
     openQuestions: openQuestions.filter((q) => !known.has(q)),
+    recherche: extraireInventaire(md),
   };
 }
 

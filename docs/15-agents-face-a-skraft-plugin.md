@@ -247,8 +247,8 @@ Présentes dans main (1.15.1), absentes chez nous :
 
 | Évolution | Agents concernés |
 |---|---|
-| La recherche devient une **entrée exigée** de DESIGN et de DISTILL. Chez nous, `research.md` n'apparaît que comme un chemin dans « Phases terminées » (`brief.ts:18-22`), sans consigne | architecte, acceptance |
-| La recherche liste la pile, le framework de test, les commandes de build et de test, et les éléments existants réutilisables avec leur chemin | researcher |
+| La recherche devient une **entrée exigée** de DESIGN et de DISTILL | architecte, acceptance — **repris le 2026-10-15** : le code recopie conventions et existant réutilisable dans le dossier de passation (`brief.ts`, `brief.mjs`) ; prompts du modélisateur et de l'agent d'acceptance |
+| La recherche liste la pile, le framework de test, les commandes de build et de test, et les éléments existants réutilisables avec leur chemin | researcher — **existant réutilisable repris le 2026-10-15**, vérifié par la porte « citations » : chaque élément inventorié existe dans le fichier cité (le plugin ne le vérifie pas). **Commandes non reprises** : l'adaptateur de pile en est l'autorité, et seul `run_tests` les exécute (contrat du cœur, `agent-prompts.ts`) |
 | Scan structurel par script (`structural-scan.json`), au lieu d'une recherche faite par l'agent | architecte |
 | Skills `clean-architecture-{dotnet,java,python,react}` | architecte, software-engineer |
 | Respect du plan de test par l'agent, ou trace `PLAN_DEVIATION` ; `test-integrity` juge chaque test au regard du plan | software-engineer, test-integrity |

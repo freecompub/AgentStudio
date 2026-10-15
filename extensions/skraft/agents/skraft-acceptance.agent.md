@@ -58,8 +58,9 @@ lisible dans le nom.
 
 ## Les deux plans
 
-Lis d'abord, dans la recherche, les conventions du projet : framework de test, organisation des
-tests, doublures déjà en usage.
+Pars des conventions du projet que le dossier de passation recopie de la recherche : framework de
+test, organisation des tests, doublures déjà en usage. Tiens-les pour acquises ; ne cherche dans le
+code que ce qu'elles ne disent pas.
 
 `test-plan.md` porte la matrice de couverture, une ligne par critère :
 

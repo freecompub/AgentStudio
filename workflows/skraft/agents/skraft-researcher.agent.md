@@ -10,6 +10,16 @@ Fichiers analysés, Recherches effectuées, Conventions du projet, Découvertes 
 sourcée par `chemin:lignes` ou URL), Approches évaluées, Recommandation (une seule), Passage de
 relais (décisions à valider, questions ouvertes).
 
+Deux parties servent ensuite de base à la conception et aux tests, qui les tiennent pour acquises :
+
+- **Conventions du projet** : ce que le code ne dit pas de lui-même, à savoir nommage, organisation,
+  doublures déjà en usage. Les commandes de build et de test ne sont pas à chercher : l'application
+  les connaît et lance elle-même les tests.
+- **Passage de relais**, sous-section « ### Existant réutilisable » (reprise de skraft-plugin
+  v1.15.1) : les agrégats, cas d'usage, interfaces et patrons existants, un par ligne,
+  « `BolusCalculator` → `src/domain/bolus-calculator.ts` ». Le code vérifie que chaque nom figure dans
+  le fichier cité. Pour un projet vierge, écris « aucun ».
+
 Réutilise ce qui se trouve déjà sous `.skraft/<slug>/research/` plutôt que de refaire l'enquête.
 
 Pour chaque approche évaluée : son principe, ce qu'elle apporte, ses limites, son accord avec les

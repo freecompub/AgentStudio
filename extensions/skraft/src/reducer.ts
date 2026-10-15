@@ -162,6 +162,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
           artifacts: { ...s.artifacts, [p]: [...s.artifacts[p], ...e.artifacts] },
           adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
+          ...(p === "RESEARCH" && e.recherche ? { recherche: e.recherche } : {}),
           lastRejection: null,
           // Mutation de fin de DELIVER (ADR 0049) : ses faits et notes vont aux lentilles.
           ...(p === "DELIVER" && s.deliver && (e.facts?.length || e.notes?.length)

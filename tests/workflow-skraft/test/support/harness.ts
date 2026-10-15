@@ -108,7 +108,7 @@ export function researchDoc(over: Partial<Record<string, string>> = {}): string 
     Découvertes: "Le calcul vit dans `src/domain/bolus-calculator.ts:1-1`.",
     "Approches évaluées": "1. Plafond dans le domaine.\n2. Plafond dans l'interface.",
     Recommandation: "Appliquer le plafond dans le domaine.",
-    "Passage de relais": "Décision à valider : emplacement du plafond.\n\n### Questions ouvertes\n- Le plafond est-il rappelé au patient ?",
+    "Passage de relais": "Décision à valider : emplacement du plafond.\n\n### Existant réutilisable\n- `BolusCalculator` → `src/domain/bolus-calculator.ts`\n\n### Questions ouvertes\n- Le plafond est-il rappelé au patient ?",
     ...over,
   };
   return ["# Recherche", ...Object.entries(body).map(([h, t]) => `## ${h}\n\n${t}`)].join("\n\n");

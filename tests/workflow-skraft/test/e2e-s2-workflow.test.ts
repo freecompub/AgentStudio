@@ -20,7 +20,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
   let tasksDir: string;
   beforeEach(async () => {
     root = await createProject();
-    await put(root, "src/domain/bolus-calculator.ts", Array.from({ length: 55 }, (_, i) => `// ligne ${i + 1}`).join("\n") + "\n");
+    await put(root, "src/domain/bolus-calculator.ts", ["export class BolusCalculator {}", ...Array.from({ length: 54 }, (_, i) => `// ligne ${i + 2}`)].join("\n") + "\n");
     git(root, "commit", "-qam", "calculateur");
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-tasks-"));
   });
@@ -453,6 +453,8 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(designBrief).toContain("Réponses de l'utilisateur :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
+    // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
+    expect(designBrief).toContain("`BolusCalculator` → `src/domain/bolus-calculator.ts`");
     expect(designBrief).toContain("RESEARCH : .skraft/us-12/research/research.md");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");

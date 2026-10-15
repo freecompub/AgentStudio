@@ -21,6 +21,19 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   });
   if (done.length) lines.push("Phases terminées :", ...done);
   if (s.skipPhases.length) lines.push(`Phases sautées : ${s.skipPhases.join(", ")}`);
+  // La recherche validée, recopiée par le code (skraft-plugin v1.15.1 : la recherche est une entrée
+  // exigée de DESIGN et DISTILL) : l'agent la reçoit, qu'il pense ou non à ouvrir le fichier.
+  if (phase === "DESIGN" || phase === "DISTILL") {
+    const r = s.recherche;
+    if (r && (r.conventions || r.existant))
+      lines.push(
+        "Recherche (acquise : cite-la plutôt que de refaire l'enquête) :",
+        ...(r.conventions ? ["  Conventions du projet :", ...extrait(r.conventions)] : []),
+        ...(r.existant ? ["  Existant réutilisable :", ...extrait(r.existant)] : []),
+      );
+    else if (s.skipPhases.includes("RESEARCH"))
+      lines.push("RESEARCH a été sautée : aucun inventaire de l'existant. Relève toi-même, dans le code, les conventions et ce qui peut être réutilisé.");
+  }
   const decided = s.adrs.filter((a) => a.status !== "Proposed");
   if (decided.length) lines.push("ADR décidés :", ...decided.map((a) => `  - ${a.id} (${a.status}) : ${a.path}`));
   const answered = [...s.openQuestions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer! })), ...s.answers];
@@ -34,4 +47,10 @@ export function buildBrief(s: SkraftState, phase: Phase, feedback: string[]): st
   }
   if (feedback.length) lines.push("Rejet précédent :", ...feedback.map((f) => `  - ${f}`));
   return lines.join("\n");
+}
+
+/** Texte recopié dans le dossier, indenté et borné : une recherche bavarde ne noie pas le reste. */
+function extrait(texte: string): string[] {
+  const t = texte.length > 2000 ? `${texte.slice(0, 2000)}…` : texte;
+  return t.split("\n").map((l) => `    ${l}`);
 }

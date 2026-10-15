@@ -159,7 +159,7 @@ import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsEx
 import { buildBrief } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
-import { checkResearch } from "./research.mjs";
+import { checkResearch, extraireInventaire } from "./research.mjs";
 import { parseStory, slugOf } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
 import { distiller } from "./distillation.mjs";
@@ -390,16 +390,21 @@ async function porteCitations(w, vue) {
     return [`Document de recherche absent : ${chemin}`];
   }
   const existants = new Set(await w.listerFichiers());
-  const lignes = new Map();
+  const contenus = new Map();
   for (const cite of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0])))
     if (existants.has(cite))
-      lignes.set(cite, (await w.lireFichier(cite)).replace(/\n$/, "").split("\n").length);
-  const { reasons, openQuestions } = checkResearch(md, { lineCount: (p) => lignes.get(p) ?? null });
+      contenus.set(cite, await w.lireFichier(cite));
+  const { reasons, openQuestions } = checkResearch(md, {
+    lineCount: (p) => (contenus.has(p) ? contenus.get(p).replace(/\n$/, "").split("\n").length : null),
+    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
+  });
   if (reasons.length)
     return reasons;
   const connues = new Set(vue.questions.map((q) => q.text));
   const nouvelles = openQuestions.filter((q) => !connues.has(q));
   vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.length + i + 1}`, text }))];
+  // Transmise à DESIGN et DISTILL par le dossier de passation (skraft-plugin v1.15.1).
+  vue.recherche = extraireInventaire(md);
   return [];
 }
 async function relancerOuAbandonner(w, motif) {
