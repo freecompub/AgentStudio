@@ -5,6 +5,13 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Autorisation de reprise étendue à toutes les versions < v2.0.0
+
+- Déclaration du responsable du projet, consignée dans `docs/licences/autorisation-skraft.md`
+  (même nature de trace que les précédentes). Plus récente au 15/10 : `v1.15.1` (`1e41a98`).
+- Une reprise cite le tag exact d'où elle vient ; `v2.0.0` et au-delà ne sont pas couverts.
+- Conséquence : les évolutions du plugin listées au §5 de `docs/15` peuvent être reprises.
+
 ## 15/10 — Plan de test de DISTILL (docs/15 §4.7)
 
 - Code (E et W), porte « plan de test » : matrice de couverture dans `test-plan.md` (une ligne par

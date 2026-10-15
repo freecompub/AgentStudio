@@ -269,8 +269,8 @@ Présentes dans main (1.15.1), absentes chez nous :
      `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, écart tracé dans `severityNote`.
 2. ~~4.5~~ : **fait le 2026-10-14** (options C puis A, voir §4.5) ; ~~4.6~~ : **fait le
    2026-10-15** (voir §4.6) ; ~~4.7~~ : **fait le 2026-10-15** (voir §4.7).
-3. **Décider** quelles évolutions du §5 reprendre (reprise depuis main, et non plus depuis la
-   v1.6.1 : l'autorisation actuelle ne porte que sur la branche
-   `refactor/v1.6.0-tracking-substrate` et le tag v1.6.1).
+3. **Décider** quelles évolutions du §5 reprendre. Depuis le 2026-10-15, l'autorisation couvre
+   toutes les versions antérieures à `v2.0.0` (`docs/licences/autorisation-skraft.md`) : une reprise
+   depuis `v1.15.1` est possible, en citant ce tag dans sa provenance.
 4. Mettre à jour `docs/portes-comparees-skraft-plugin.md` : la ligne G14 (l.70) est périmée, car
    le code refuse désormais un verdict dans le nom du fichier d'un ADR.

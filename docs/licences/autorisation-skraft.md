@@ -78,6 +78,20 @@ Les skills de `extensions/skraft/skills/` sont reprises de ce tag (commit `6d092
 `chore(release): 1.6.1`), sans modification, depuis `plugins/skraft-framework/skills/`. Voir
 l'ADR 0024 pour la manière dont elles sont livrées et arbitrées.
 
+### Source étendue le 2026-10-15 : toutes les versions antérieures à `v2.0.0`
+
+Le responsable du projet a déclaré, le 2026-10-15, que l'autorisation couvre **toutes les versions
+de skraft-plugin inférieures à `v2.0.0`**. Au 2026-10-15, la plus récente est `v1.15.1` (commit
+`1e41a98`, `chore(release): 1.15.1`). Même nature de trace que la condition 1 : une déclaration
+rapportée, pas la pièce d'origine.
+
+Conséquences :
+- une reprise peut venir de n'importe quel tag `v1.x` ; elle cite **le tag exact** dans sa
+  provenance, comme les artefacts déjà repris citent `v1.6.1` ;
+- une version `v2.0.0` ou ultérieure n'est pas couverte : elle demanderait une nouvelle
+  autorisation ;
+- ce qui est déjà repris de la v1.6.1 reste valable et n'a pas à être remis à jour pour autant.
+
 ## Ce que la reprise touchera, exactement
 
 Recensé pour que le jour venu le travail soit un remplacement, et non une enquête. Tout le reste du
