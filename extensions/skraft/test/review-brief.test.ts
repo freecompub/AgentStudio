@@ -164,6 +164,12 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     const a = lensBrief("architecture", state, "DESIGN", files, []);
     expect(a).toContain("Points à examiner en DESIGN :");
     expect(a).toContain("Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.");
+    // Couche des dépôts : domaine OU application (solution-architect, phase 6), pas l'application seule.
+    expect(a).toContain("Les interfaces de dépôt et de passerelle sont déclarées dans le domaine ou dans l'application, jamais dans l'infrastructure, et l'ADR de l'agrégat justifie ce choix ; domaine et application ne dépendent ni de l'infrastructure ni de l'API.");
+    // Méthode de solution-architect (docs/15 §4.6) : phase 3 (réutilisation) et déclencheurs obligatoires d'ADR (phase 7).
+    expect(a).toContain("Les agrégats, contextes et cas d'usage existants relevés par la recherche sont réutilisés ou étendus, pas dupliqués.");
+    expect(a).toContain("Chaque déclencheur obligatoire d'ADR présent dans la conception a son ADR : CQRS avec bus, Event Sourcing, saga, agrégat qui franchit une frontière existante, découpage ou fusion de contextes, couche anticorruption, changement transverse (erreurs, validation, transactions).");
+    expect(lensBrief("test-integrity", state, "DESIGN", files, [])).toContain("Chaque déclencheur forme une tranche verticale : le déclencheur, l'événement qu'il produit, la vue que lit l'utilisateur.");
     // STRUCTURAL_DRIFT de skraft-plugin, sens « document → ADR » : jugé par la lentille, pas par le code.
     expect(a).toContain("Chaque agrégat introduit par les documents (modèle, contrats, diagrammes) est nommé par un ADR, nouveau ou existant, qui le justifie ; un dépôt, en tant que tel, n'en demande pas.");
   });

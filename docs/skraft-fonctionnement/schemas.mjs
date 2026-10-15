@@ -61,7 +61,7 @@ const SCHEMAS = {
     etapes: [
       { id: "model", type: "agent", titre: "skraft-architect-model", detail: "event-model, domain-model, context-map" },
       { id: "decide", type: "agent", titre: "skraft-architect-decide", detail: "contracts, diagrams ; ADR via render_adr" },
-      { id: "porte", type: "code", titre: "Porte cohérence", detail: "event-model présent, noms cités définis, commande → événement, patron par relation, matrice de cohérence, ADR bien formés, append-only" },
+      { id: "porte", type: "code", titre: "Porte cohérence", detail: "event-model présent, noms cités définis, commande → événement, contextes classés, contrats complets, matrice de cohérence, engagements ratifiés, ADR bien formés, append-only" },
       { id: "revue", type: "agent", titre: "Revue (sans quality-gates)", detail: "cold-reader, test-integrity, architecture" },
       { id: "rat", type: "humain", titre: "Ratification, une demande par ADR", detail: "architecte : accepter, rejeter, amender" },
       { id: "commit", type: "code", titre: "Commit : docs(skraft): design de <slug>" },

@@ -13,6 +13,8 @@ export interface DesignInput {
   supersessions: string;
   /** ADR qui existaient au début de la phase et ont été modifiés ou supprimés. */
   modifiedExistingAdrs: string[];
+  /** Sources de production du projet : engagements structurels déjà en place (docs/15 §4.6). */
+  sources?: { path: string; content: string }[];
 }
 
 /**
@@ -35,6 +37,9 @@ export function checkDesign(i: DesignInput): string[] {
     reasons.push(`Commande \`${x}\` : aucun événement dans event-model.md. Chaque commande produit au moins un événement : « Commande \`${x}\` → événement \`…\` ».`);
   for (const r of relationsSansPatron(i.docs["context-map.md"] ?? ""))
     reasons.push(`context-map.md : la relation « ${r} » ne nomme aucun patron (ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language, Partnership, Separate Ways).`);
+  for (const c of contextesNonClasses(i.docs["context-map.md"] ?? ""))
+    reasons.push(`context-map.md : le contexte \`${c}\` n'est classé ni Core, ni Supporting, ni Generic (une ligne « \`${c}\` : Core | Supporting | Generic »).`);
+  reasons.push(...contratsIncomplets(i), ...engagementsSansAdr(i));
 
   reasons.push(...matriceDeCoherence(i).incoherences);
   reasons.push(...conceptsAbsentsDuModele(i));
@@ -119,7 +124,7 @@ const PATRONS = /\bACL\b|anti-?corruption|conformist|conformiste|shared kernel|n
 export function relationsSansPatron(contextMap: string): string[] {
   const out: string[] = [];
   for (const l of contextMap.split("\n")) {
-    const m = /`([A-Z]\w*)`\s*(?:→|->|↔|<->)\s*`([A-Z]\w*)`/.exec(l);
+    const m = RELATION.exec(l);
     if (m && !PATRONS.test(l)) out.push(`\`${m[1]}\` → \`${m[2]}\``);
   }
   return out;
@@ -263,5 +268,94 @@ export function conceptsAbsentsDuModele(i: DesignInput): string[] {
     for (const [nom, cats] of classements(horsAlternatives(a.md)))
       if (!known.has(nom)) reasons.push(`\`${nom}\`, ${NOM_DE[cats[0]!]} dans ${id}, n'existe ni dans ${MODEL_DOCS.join(" ni dans ")}.`);
   }
+  return reasons;
+}
+
+const RELATION = /`([A-Z]\w*)`\s*(?:→|->|↔|<->)\s*`([A-Z]\w*)`/;
+const SOUS_DOMAINE = /\b(?:Core|Supporting|Generic)\b|c[œo]eur de métier|g[ée]n[ée]rique|de soutien/i;
+
+/** Contextes de la carte classés ni Core, ni Supporting, ni Generic (phase 5 de solution-architect). */
+export function contextesNonClasses(contextMap: string): string[] {
+  const lignes = contextMap.split("\n");
+  const contextes: string[] = [];
+  for (const l of lignes) {
+    const m = RELATION.exec(l);
+    if (m) for (const c of [m[1]!, m[2]!]) if (!contextes.includes(c)) contextes.push(c);
+  }
+  return contextes.filter((c) => !lignes.some((l) => l.includes(`\`${c}\``) && !RELATION.test(l) && SOUS_DOMAINE.test(l)));
+}
+
+const NE_RATIFIE_PLUS = ["Rejected", "Superseded", "Deprecated"];
+/** Texte des ADR encore valables, hors de leurs alternatives écartées. */
+const adrsValables = (i: DesignInput): string[] => i.adrs.filter((a) => !NE_RATIFIE_PLUS.includes(parseAdr(a.md).status)).map((a) => horsAlternatives(a.md));
+
+/**
+ * Engagements déjà présents dans le code (phase 7.0 de solution-architect, mêmes signatures) : le
+ * marqueur est le bus, pas un gestionnaire seul, qui peut n'être que la séparation CQS du projet.
+ */
+const ENGAGEMENTS: { nom: string; signature: RegExp; ratifie: RegExp }[] = [
+  { nom: "CQRS avec bus", signature: /\bI?(?:Command|Query)Bus\b/, ratifie: /\bCQRS\b|bus de (?:commandes|requêtes)|(?:command|query) bus/i },
+  { nom: "Event Sourcing", signature: /\b(?:IEventStore|EventStream)\b/, ratifie: /event[ -]sourcing|event store/i },
+  { nom: "saga", signature: /Saga|ProcessManager|ICorrelatedBy/, ratifie: /\bsagas?\b|process manager/i },
+];
+const ANTICORRUPTION = /\bACL\b|anti-?corruption/i;
+
+/**
+ * Engagements structurels sans ADR qui les ratifie (phases 7.0 et 7 de solution-architect) : ceux
+ * que le code du projet porte déjà, et la couche anticorruption de la carte des contextes. Les
+ * autres déclencheurs obligatoires d'ADR sont jugés par la lentille architecture : écrits en prose,
+ * « pas de CQRS » tromperait une simple recherche.
+ */
+export function engagementsSansAdr(i: DesignInput): string[] {
+  const reasons: string[] = [];
+  const valables = adrsValables(i);
+  for (const e of ENGAGEMENTS) {
+    const fichiers = (i.sources ?? []).filter((s) => e.signature.test(s.content)).map((s) => s.path);
+    if (fichiers.length && !valables.some((t) => e.ratifie.test(t)))
+      reasons.push(
+        `Le code du projet contient un engagement structurel sans ADR : ${e.nom} (${fichiers.slice(0, 3).join(", ")}${fichiers.length > 3 ? ", …" : ""}). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.`,
+      );
+  }
+  for (const l of (i.docs["context-map.md"] ?? "").split("\n")) {
+    const m = RELATION.exec(l);
+    if (m && ANTICORRUPTION.test(l) && !valables.some((t) => ANTICORRUPTION.test(t)))
+      reasons.push(`context-map.md : la relation « \`${m[1]}\` → \`${m[2]}\` » adopte une couche anticorruption, mais aucun ADR ne la ratifie.`);
+  }
+  return reasons;
+}
+
+const A_CONTRAT: Partial<Record<Categorie, [string, string]>> = {
+  command: ["la commande", "ses champs et leurs règles de validation"],
+  query: ["la requête", "ses paramètres et la forme de son retour"],
+  event: ["l'événement", "sa charge utile"],
+};
+
+/**
+ * Format des contrats (phase 8 de solution-architect) : chaque commande, requête et événement du
+ * modèle a sa section dans `contracts.md`, et chaque dépôt y déclare sa couche, domaine ou
+ * application, jamais l'infrastructure (phase 6).
+ */
+export function contratsIncomplets(i: DesignInput): string[] {
+  const reasons: string[] = [];
+  const contrats = i.docs["contracts.md"] ?? "";
+  const lignes = contrats.split("\n");
+  const titres = lignes.filter((l) => /^#{2,}\s/.test(l));
+  for (const [nom, cats] of classements(i.docs["event-model.md"] ?? "")) {
+    const c = cats.find((x) => A_CONTRAT[x]);
+    if (!c) continue;
+    if (!titres.some((t) => t.includes(`\`${nom}\``))) reasons.push(`contracts.md : ${A_CONTRAT[c]![0]} \`${nom}\` n'a pas de section « ## ${NOM_DE[c]} \`${nom}\` » (${A_CONTRAT[c]![1]}).`);
+  }
+  lignes.forEach((l, k) => {
+    if (!/^#{2,}\s/.test(l)) return;
+    for (const [nom, cats] of classements(l)) {
+      if (!cats.includes("repository")) continue;
+      const fin = lignes.findIndex((x, j) => j > k && /^#{1,}\s/.test(x));
+      const corps = lignes.slice(k + 1, fin < 0 ? undefined : fin).join("\n");
+      if (/Couche\s*:\s*Infra/i.test(corps))
+        reasons.push(`contracts.md : le dépôt \`${nom}\` est déclaré dans l'infrastructure. Une interface est un contrat : elle appartient au domaine ou à l'application, l'infrastructure ne fait que l'implémenter.`);
+      else if (!/Couche\s*:\s*(?:Domaine|Domain|Application)/i.test(corps))
+        reasons.push(`contracts.md : le dépôt \`${nom}\` ne déclare pas sa couche (« Couche : Domaine » ou « Couche : Application »).`);
+    }
+  });
   return reasons;
 }

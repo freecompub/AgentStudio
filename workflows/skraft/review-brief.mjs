@@ -29,14 +29,21 @@ const CONSIGNES_DE_PHASE = {
       // G7
       "Chaque critère d'acceptation a son déclencheur dans event-model.md : une commande s'il change l'état, une requête s'il ne fait que lire.",
       "Chaque résultat attendu par un critère est observable dans le modèle (événement ou vue) : on pourra l'écrire en test d'acceptance.",
+      // Phase 4 de solution-architect
+      "Chaque déclencheur forme une tranche verticale : le déclencheur, l'événement qu'il produit, la vue que lit l'utilisateur.",
     ],
     architecture: [
       // G1
       "Chaque engagement structurel visible dans les diagrammes (agrégat, contexte, CQRS, Event Sourcing, saga, couche anticorruption) est justifié par un ADR.",
-      // G3, G4
-      "Domaine et Application ne dépendent ni de l'infrastructure ni de l'API ; les interfaces de dépôt et de passerelle sont déclarées dans la couche Application.",
+      // G3, G4 ; couche des dépôts selon solution-architect, phase 6 (le relecteur, G4, ne cite que
+      // l'application : le plugin se contredit, l'architecte fait foi)
+      "Les interfaces de dépôt et de passerelle sont déclarées dans le domaine ou dans l'application, jamais dans l'infrastructure, et l'ADR de l'agrégat justifie ce choix ; domaine et application ne dépendent ni de l'infrastructure ni de l'API.",
       // G5
       "Chaque agrégat garantit ses propres invariants ; il n'en référence un autre que par son identifiant.",
+      // Phase 3 de solution-architect
+      "Les agrégats, contextes et cas d'usage existants relevés par la recherche sont réutilisés ou étendus, pas dupliqués.",
+      // Phase 7 : déclencheurs obligatoires d'ADR (le code ne vérifie que l'existant et la couche anticorruption)
+      "Chaque déclencheur obligatoire d'ADR présent dans la conception a son ADR : CQRS avec bus, Event Sourcing, saga, agrégat qui franchit une frontière existante, découpage ou fusion de contextes, couche anticorruption, changement transverse (erreurs, validation, transactions).",
       // STRUCTURAL_DRIFT, sens « document → ADR » (le sens « ADR → modèle » est vérifié par le code)
       "Chaque agrégat introduit par les documents (modèle, contrats, diagrammes) est nommé par un ADR, nouveau ou existant, qui le justifie ; un dépôt, en tant que tel, n'en demande pas.",
       // G9, G11

@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 14 octobre 2026, commit suivant `7cc4192` \
+      État du code : 15 octobre 2026, commit suivant `bf0affd` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -487,6 +487,14 @@ d'architecture (ADR), que l'architecte humain ratifie.
 - Un concept classé dans un nouvel ADR (« Agrégat `X` »…), hors de sa section « Alternatives »,
   existe dans `event-model.md` ou `domain-model.md`. L'inverse, un agrégat qu'aucun ADR ne justifie,
   est examiné par la lentille `architecture`.
+- Chaque contexte de `context-map.md` est classé par une ligne « `A` : Core », « Supporting » ou
+  « Generic ».
+- `contracts.md` porte une section par commande, requête et événement du modèle
+  (« `## Commande X` »…), et chaque dépôt déclare sa couche : « Couche : Domaine » ou
+  « Couche : Application », jamais l'infrastructure.
+- Un engagement structurel déjà présent dans les sources du projet (bus CQRS, event store, saga), ou
+  une couche anticorruption de la carte, doit être ratifié par un ADR encore valable, nouveau ou de
+  rattrapage.
 
 == La ratification
 Après une revue approuvée, le code envoie une demande par ADR proposé, réservée à l'architecte :

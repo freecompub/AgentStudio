@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Méthode de DESIGN reprise du plugin (docs/15 §4.6)
+
+- Code, porte « cohérence » (E et W) : contexte non classé Core/Supporting/Generic ; commande,
+  requête ou événement du modèle sans section dans `contracts.md` ; dépôt sans « Couche : Domaine /
+  Application » ou dans l'infrastructure ; engagement déjà dans le code (bus CQRS, event store,
+  saga : signatures de la phase 7.0 du plugin) ou couche anticorruption de la carte sans ADR
+  valable (ni Rejected, ni Superseded, ni Deprecated, hors Alternatives).
+- La porte lit maintenant les **sources de production** du projet (`DesignInput.sources`).
+- Prompts : démarche en quatre temps pour le modélisateur (réutilisation, Event Modeling, DDD
+  stratégique, DDD tactique) ; format des contrats et déclencheurs obligatoires d'ADR pour le
+  décideur. Lentilles : réutilisation et déclencheurs (architecture), tranches verticales
+  (test-integrity).
+- Piège : les fixtures écrivaient des contrats en prose ; elles portent maintenant les sections
+  (`SECTIONS` dans `design-gate.test.ts`, S3 de bout en bout). Le test D15 du workflow utilise le
+  modèle du harnais, dont le décideur par défaut écrit un contrat sans sections.
+- Reste : docs/15 §4.7 et §5 ; G7 en code (annotations `ac-N` dans le modèle), proposé.
+
 ## 14/10 — Revue de DESIGN et de DISTILL : portes en code, puis consignes de phase (docs/15 §4.5)
 
 - Option C (code), E et W :
@@ -28,7 +45,11 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - `STRUCTURAL_DRIFT` du plugin : sens « ADR → modèle » en code (`conceptsAbsentsDuModele`, hors
   section Alternatives) ; sens « agrégat → ADR » laissé à la lentille architecture (décision du
   responsable : un essai en code aurait demandé un ADR par agrégat, y compris existant).
-- Reste : docs/15 §4.6, 4.7 et §5.
+- Consigne de la lentille architecture corrigée : les interfaces de dépôt vont dans le domaine **ou**
+  l'application, jamais l'infrastructure (solution-architect, phase 6). Piège : le relecteur du
+  plugin (G4) ne cite que l'application ; le plugin se contredit, l'architecte fait foi.
+- Reste : docs/15 §4.6 (démarche dans le prompt, engagements existants sans ADR, déclencheurs
+  obligatoires d'ADR, format des contrats), 4.7 et §5.
 
 ## 14/10 — Lentilles : chacune reçoit ce que son prompt annonce ; cold-reader plafonnée (docs/15 §4.1 à 4.4)
 

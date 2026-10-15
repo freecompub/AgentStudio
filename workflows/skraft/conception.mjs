@@ -4,7 +4,7 @@
 * ratification des ADR. Reproduit le réducteur de skraft ; les écarts du §13 de `docs/09` ne sont
 * pas tranchés ici.
 */
-import { essayer, PanneEnvironnement } from "@agent-studio/workflow";
+import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { avecStory, parseAdr, setAdrStatus, storyDe } from "./adr.mjs";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
@@ -100,7 +100,12 @@ async function porteCoherence(w, d, s, cp, essai) {
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
   const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
-  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs };
+  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
+  const disp = await w.disposition();
+  const sources = [];
+  for (const path of (await w.listerFichiers()).filter((p) => matchesAny(disp.sources, p) && !matchesAny([...disp.acceptanceTests, ...disp.unitTests], p)))
+    sources.push({ path, content: (await lire(path)) ?? "" });
+  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs, sources };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `.skraft/${d.slug}/design/consistency-matrix.md`;

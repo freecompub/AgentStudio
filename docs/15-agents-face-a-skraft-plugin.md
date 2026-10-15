@@ -1,7 +1,7 @@
 # Nos agents face à ceux de skraft-plugin
 
 - Date : 2026-10-14, branche `feat/workflow-rejouable`.
-- Statut : **constat**. §4.1 à 4.5 corrigés le 2026-10-14 (extension et workflow) ; §4.6, 4.7 et §5 à décider.
+- Statut : **constat**. §4.1 à 4.5 corrigés le 2026-10-14, §4.6 le 2026-10-15 (extension et workflow) ; §4.7 et §5 à décider.
 - Question : nos agents font-ils la même chose que ceux de skraft-plugin
   (`github.com/SebastienDegodez/skraft-plugin`) ?
 - Versions comparées :
@@ -195,6 +195,26 @@ ni vérifiées par une porte :
 
 La skill `adr-eligibility-gate` n'en couvre qu'une partie.
 
+**Traité le 2026-10-15** (extension et workflow) :
+
+| Phase de `solution-architect` | Code (porte « cohérence ») | Prompt | Lentille |
+|---|---|---|---|
+| 3. Réutilisation | — | modélisateur : réutiliser, étendre ou créer, section « Réutilisation » | architecture |
+| 4. Command/Query, tranches verticales | commande → événement ; commande et requête cohérentes (matrice) | modélisateur | test-integrity |
+| 5. Sous-domaines, relations | chaque contexte classé Core, Supporting ou Generic (`contextesNonClasses`) ; patron par relation | modélisateur | — |
+| 6. Couche des dépôts | « Couche : Domaine / Application » exigée, infrastructure refusée (`contratsIncomplets`) | modélisateur et décideur | architecture (consigne corrigée : domaine **ou** application) |
+| 7.0 Engagements déjà dans le code | sources du projet : bus CQRS, event store, saga, mêmes signatures que le plugin, sans ADR valable → refus (`engagementsSansAdr`) | décideur : ADR de rattrapage | — |
+| 7. Déclencheurs obligatoires d'ADR | couche anticorruption de la carte sans ADR → refus | décideur : liste et exclusions | architecture : liste complète |
+| 7. Justification des patrons | — | décideur | architecture |
+| 8. Format des contrats | chaque commande, requête et événement du modèle a sa section « ## Commande `X` »… (`contratsIncomplets`) | décideur | — |
+
+- Les déclencheurs écrits en prose (« CQRS », « Event Sourcing » dans un document de conception)
+  restent à la lentille : une phrase comme « pas de CQRS » tromperait une recherche.
+- Un ADR « valable » n'est ni `Rejected`, ni `Superseded`, ni `Deprecated`, et sa section
+  « Alternatives » ne compte pas.
+- Non repris : `decisions-index.md` (index des verdicts) ; nos ADR et leur statut sont déjà dans
+  l'état de la tâche et le rapport final.
+
 **4.7 Plan de test de DISTILL.**
 - Les colonnes couche, doublure et walking skeleton ne sont pas nommées dans le prompt de
   `skraft-acceptance`, alors que SPEC-skraft les demande.
@@ -230,9 +250,8 @@ Présentes dans main (1.15.1), absentes chez nous :
    - Le prompt de `cold-reader` ne parle plus de faits ; il annonce son plafond.
    - Le plafond est appliqué par le code dans `numberDefects` (`review-thread.ts`, `.mjs`) :
      `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, écart tracé dans `severityNote`.
-2. ~~4.5~~ : **fait le 2026-10-14** (options C puis A, voir §4.5). **Décider** pour 4.6 et 4.7 :
-   la part de la méthode de DESIGN à vérifier par une porte plutôt qu'à confier au prompt, et le
-   contenu du plan de test.
+2. ~~4.5~~ : **fait le 2026-10-14** (options C puis A, voir §4.5) ; ~~4.6~~ : **fait le
+   2026-10-15** (voir §4.6). **Décider** pour 4.7 : le contenu du plan de test.
 3. **Décider** quelles évolutions du §5 reprendre (reprise depuis main, et non plus depuis la
    v1.6.1 : l'autorisation actuelle ne porte que sur la branche
    `refactor/v1.6.0-tracking-substrate` et le tag v1.6.1).

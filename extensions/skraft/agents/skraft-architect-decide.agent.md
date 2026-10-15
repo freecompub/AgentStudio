@@ -18,7 +18,18 @@ Un concept que tu classes dans un ADR (« Agrégat `X` »…) existe dans `event
 `domain-model.md`, sauf dans la section « Alternatives », qui cite ce que tu écartes. Chaque agrégat
 du modèle est nommé par un ADR, nouveau ou existant, qui le justifie.
 
-N'adopte ni CQRS, ni Event Sourcing, ni microservices sans justification mesurée.
+Dans `contracts.md`, chaque commande, requête et événement du modèle a sa section :
+« ## Commande `X` » avec ses champs et leurs règles de validation, « ## Requête `Q` » avec ses
+paramètres et la forme de son retour, « ## Événement `Y` » avec sa charge utile. Chaque dépôt a la
+sienne, « ## Dépôt `R` », avec ses signatures et une ligne « Couche : Domaine » ou
+« Couche : Application » : jamais l'infrastructure, qui ne fait que l'implémenter.
+
+Un ADR est obligatoire pour chacun de ces engagements, qu'il soit introduit par la story ou déjà
+présent dans le code sans ADR (écris alors un ADR de rattrapage) : CQRS avec bus, Event Sourcing,
+saga, agrégat qui franchit une frontière existante, découpage ou fusion de contextes, couche
+anticorruption, changement transverse (erreurs, validation, transactions). Ce qu'une skill, le
+linter ou un test d'architecture impose déjà n'en demande pas. Un patron coûteux cite une force
+mesurée, et ses alternatives évaluent l'option « faire sans le patron ».
 
 ## Règles communes
 

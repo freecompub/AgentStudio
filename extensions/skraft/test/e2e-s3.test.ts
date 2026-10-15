@@ -73,6 +73,35 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
+  // Phase 7.0 de solution-architect (docs/15 §4.6) : la porte lit les sources du projet.
+  it("un bus de commandes déjà dans le code, sans ADR : DESIGN refusée, puis acceptée avec l'ADR de rattrapage", async () => {
+    await put(root, "src/app/command-bus.ts", "export class CommandBus {}\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "bus");
+    const decidePrompts: string[] = [];
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await t.callTool("render_adr", decidePrompts.length === 1 ? ADR_ARGS : { ...ADR_ARGS, decision: `${ADR_ARGS.decision} Le bus de commandes existant (CQRS) est conservé.` });
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    await app.interactions.respond((await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!.id, "medium");
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "RATIFICATION", 60_000);
+    expect(decidePrompts).toHaveLength(2);
+    expect(decidePrompts[1]).toContain("Le code du projet contient un engagement structurel sans ADR : CQRS avec bus (src/app/command-bus.ts). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.");
+  }, 120_000);
+
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     let acceptanceRan = false;
@@ -86,7 +115,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
       const first = decidePrompts.length === 1;
       const amending = t.prompt.includes("Amendement demandé");
       // Premier essai : nom d'événement incohérent avec le modèle.
-      await put(root, ".skraft/us-12/design/contracts.md", first ? "`CapBolus` produit `BolusLimited`.\n" : "`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us-12/design/contracts.md", first ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusLimited`.\n" : "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       await t.callTool("render_adr", amending ? { ...ADR_ARGS, number: 1, consequences: "Plafond par prise ; l'interface affiche l'alerte." } : ADR_ARGS);
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
@@ -162,7 +191,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     const refus: string[] = [];
     let acceptanceRan = false;
     const decide: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       if (t.prompt.includes("Amendement demandé sur ADR-002")) {
         pendantAmendement = await readFile(join(root, ADR1), "utf8");
         probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ADR1 }));
@@ -218,7 +247,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
       let escalade = false;
       let acceptanceRan = false;
       const decide: ScriptedBehavior = async (t) => {
-        await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+        await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
         await t.callTool("render_adr", { ...ADR_ARGS, title: escalade ? "Plafond dans l'interface" : "Plafond dans le domaine" });
         await t.callTool("report_phase", { summary: "décisions", files: [] });
       };
@@ -281,7 +310,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
   // D8 (docs/12) : un amendement ne consomme pas d'essai ; sa revue ne doit pas écraser la précédente.
   it("amendement : la revue d'avant et celle d'après ont chacune leur rapport (D8)", async () => {
     const decide: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/contracts.md", "`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       const amende = t.prompt.includes("Amendement demandé sur ADR-001");
       await t.callTool("render_adr", amende ? { ...ADR_ARGS, number: 1, consequences: "Alerte par prise." } : ADR_ARGS);
       await t.callTool("report_phase", { summary: "décisions", files: [] });
@@ -315,7 +344,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     };
     const decide: ScriptedBehavior = async (t) => {
       decisions++;
-      await put(root, ".skraft/us-12/design/contracts.md", relance ? "`CapBolus` produit `BolusCapped` (v2).\n" : `\`CapBolus\` produit \`BolusCapped\` (essai ${decisions}).\n`);
+      await put(root, ".skraft/us-12/design/contracts.md", relance ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped` (v2).\n" : `## Commande \`CapBolus\`\n\n## Événement \`BolusCapped\`\n\n\`CapBolus\` produit \`BolusCapped\` (essai ${decisions}).\n`);
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     // Run 1 : revue 1 « changements demandés », revue 2 REJECTED (escalade). Run 2 : approuvée.

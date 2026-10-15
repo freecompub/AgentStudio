@@ -510,7 +510,8 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   const changed = await ctx.workspace.changedFiles(cp);
   const added = new Set(changed.filter((f) => f.status === "added").map((f) => f.path));
   const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && ADR_FILE.test(f.path)).map((f) => f.path);
-  const adrPaths = (await ctx.workspace.listFiles()).filter((p) => ADR_FILE.test(p));
+  const fichiers = await ctx.workspace.listFiles();
+  const adrPaths = fichiers.filter((p) => ADR_FILE.test(p));
   // Un ADR déjà décidé n'est plus « nouveau » : son statut n'est plus Proposed (D3 de docs/12).
   const decides = new Set(state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
   const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) && !decides.has(path) })));
@@ -520,7 +521,13 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   } catch {
     supersessions = "";
   }
-  const input = { docs, adrs, supersessions, modifiedExistingAdrs };
+  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
+  const sources = await Promise.all(
+    fichiers
+      .filter((p) => matchesAny(ctx.stack.layout.sources, p) && !ctx.stack.isTestFile(p))
+      .map(async (path) => ({ path, content: await ctx.workspace.readFile(path).catch(() => "") })),
+  );
+  const input = { docs, adrs, supersessions, modifiedExistingAdrs, sources };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `${dir}/consistency-matrix.md`;

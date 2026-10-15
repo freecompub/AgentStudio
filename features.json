@@ -214,6 +214,13 @@
       "notes": "STRUCTURAL_DRIFT de skraft-plugin v1.6.1, sens ADR → modèle, docs/15 §4.5. Le sens document → ADR est dans les consignes DESIGN de la lentille architecture."
     },
     {
+      "id": "methode-de-design-verifiee",
+      "title": "DESIGN refuse un contexte non classé Core/Supporting/Generic, une commande, requête ou un événement sans section dans contracts.md, un dépôt sans couche ou dans l'infrastructure, un engagement du code (bus CQRS, event store, saga) ou une couche anticorruption sans ADR valable",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"Méthode de DESIGN vérifiée par le code|bus de commandes\"",
+      "passes": true,
+      "notes": "docs/15 §4.6, phases 3 à 8 de solution-architect (skraft-plugin v1.6.1). Extension et workflow. Le reste de la méthode est dans les prompts des architectes et les consignes de la lentille architecture."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",
