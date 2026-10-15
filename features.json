@@ -277,6 +277,34 @@
       "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
     },
     {
+      "id": "mesures-revues-sur-runs-copilot",
+      "title": "Au moins deux runs Copilot, extension et workflow, d'une story qui va jusqu'à DELIVER, avec la section « Coût des revues et des corrections » dans leur rapport ; chiffres reportés dans docs/15 §5",
+      "verify": "test $(grep -l \"Coût des revues et des corrections\" docs/runs/*/rapport.md | wc -l) -ge 2",
+      "passes": false,
+      "notes": "À faire, avec l'accord du responsable du projet (runs réels, requêtes premium consommées). Lancer scripts/mesure-skraft.ts en mode extension puis en mode workflow ; pnpm banc:revues recalcule la section sur les runs du 10/10, mais ils sont antérieurs aux évolutions du 14 au 16/10."
+    },
+    {
+      "id": "re-revue-selective",
+      "title": "Re-revue sélective (skraft-plugin v1.15.1) : au tour suivant d'une revue, seules les lentilles qui ont relevé un défaut, ou dont les fichiers ont changé, sont relancées ; les autres gardent leur verdict",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"re-revue sélective\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures (critère mesures-revues-sur-runs-copilot) : économie au plus 8,4 requêtes premium sur 64,3 de revues pour le run extension du 10/10. Extension et workflow."
+    },
+    {
+      "id": "patch-partage-aux-lentilles",
+      "title": "Patch partagé (skraft-plugin v1.15.1) : le diff de la phase est calculé une fois par le code et donné à toutes les lentilles, qui n'ouvrent un fichier entier que si le patch manque de contexte",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"patch partagé\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures : lectures des lentilles (151 et 111 sur les runs du 10/10) et part de leurs tokens d'entrée (31 % et 21 %). Extension et workflow."
+    },
+    {
+      "id": "mode-rework",
+      "title": "Mode rework (skraft-plugin v1.15.1) : après une correction de DELIVER, seules les portes que la correction invalide sont relancées",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"mode rework\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures : après la 1re revue de DELIVER, 4 exécutions de tests (9 s) et 1 revue relancée (17,9 requêtes premium) sur le run extension du 10/10. Extension et workflow."
+    },
+    {
       "id": "escalade-de-scenario-lignes-non-couvertes",
       "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",

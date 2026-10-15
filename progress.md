@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 16/10 — À faire : mesurer sur des runs Copilot, puis décider de trois évolutions du plugin
+
+- **Runs réels** (avec l'accord du responsable du projet, requêtes premium consommées) : au moins
+  deux runs, extension et workflow, d'une story qui va jusqu'à DELIVER, par
+  `scripts/mesure-skraft.ts`. Leur rapport contient la section « Coût des revues et des
+  corrections » ; reporter les chiffres dans docs/15 §5. Les runs du 10/10 sont antérieurs aux
+  évolutions du 14 au 16/10 (portes de DESIGN et DISTILL, consignes de phase, inventaire de la
+  recherche, skill d'architecture, écarts au plan) : leurs chiffres ne valent plus pour décider.
+- **Puis décider**, critère par critère dans `features.json` (tous à `passes: false`) :
+  `re-revue-selective`, `patch-partage-aux-lentilles`, `mode-rework`. Chacun dans l'extension et
+  le workflow, en TDD.
+- Repères des runs du 10/10 : re-revue sélective, au plus 8,4 requêtes premium sur 64,3 de
+  revues ; lectures des lentilles 151 et 111, 31 % et 21 % des tokens d'entrée ; après la 1re revue
+  de DELIVER, 4 exécutions de tests et une revue relancée (17,9 requêtes premium).
+
 ## 16/10 — Mesures du coût des revues et des corrections (docs/15 §5)
 
 - Section « Coût des revues et des corrections » du rapport du banc (`scripts/banc/revues.ts`,
