@@ -76,4 +76,16 @@ describe("skraft — commit de phase en échec (D19)", () => {
     expect(rejets).toContainEqual(expect.objectContaining({ porte: "commit", motifs: [expect.stringMatching(/DESIGN.*index\.lock.*sans commit/)] }));
     expect(app.posted.at(-1)).toContain("Phases non commitées : DESIGN");
   }, 90_000);
+  // Défaut relevé le 13/10 (docs/skraft-fonctionnement) : la panne du commit de DISTILL levait le gel.
+  it("commit de DISTILL en échec, continuer : DELIVER garde le gel des tests d'acceptance", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const app = await assemble(root, runtime, tasksDir, { commitEchoue: (m) => m === "docs(skraft): distill de us-12", isolated: true });
+    answerQuestions(app);
+    const id = await lancer(app);
+    const q = await escaladeDuCommit(app);
+    await app.interactions.respond(q.id, "continue", undefined, { role: "architecte" });
+    await finie(app, id);
+    const testeur = runtime.history.find((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-test"))!;
+    expect(testeur.sent[0]).toContain("Les tests d'acceptance sont gelés : ne les modifie jamais.");
+  }, 90_000);
 });

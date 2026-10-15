@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `6a91773` \
+      État du code : 15 octobre 2026, commit suivant `37349d3` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -831,9 +831,6 @@ suivants ont été relevés dans le code à la date de ce document.
 
 == Écarts relevés en préparant ce document
 Ces points ont été vus en relisant le code ; ils ne sont pas encore corrigés.
-- *Extension* : si le commit de DISTILL échoue et que l'humain choisit « continuer sans commiter »,
-  l'empreinte du gel est effacée avant le traitement du commit. DELIVER démarre alors sans
-  vérification du gel, et sans avertissement. Le workflow garde l'empreinte.
 - *Extension* : le stade `VERDICT_GATE` est déclaré mais jamais atteint (écart S3 de l'audit).
 - *Workflow* : un défaut de travail de l'arbitre de mutation n'est pas rattrapé localement ; dans
   l'extension, il laisse le mutant à l'humain.

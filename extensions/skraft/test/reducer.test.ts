@@ -499,6 +499,18 @@ describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
     expect(play([...toReview(), evenement]).state).toMatchObject({ acceptanceHash: null, regressions: [] });
   });
 
+  // Défaut relevé en préparant docs/skraft-fonctionnement (13/10) : depuis D19, la panne du commit
+  // de DISTILL passait par leverGelDistill avant d'être reconnue comme une panne de commit. La phase
+  // est approuvée : rien ne sera refait, l'empreinte doit rester.
+  it.each(["retry", "continue"])("commit de DISTILL en échec, « %s » : l'empreinte et les non-régressions restent jusqu'à DELIVER", (choix) => {
+    const panne = [...toReview(), LENSES(lens("APPROVED")), { type: "ENV_FAILURE", reason: "index.lock" } as Ev];
+    expect(play(panne).state).toMatchObject({ stage: "ESCALATED", escalation: { from: "COMMIT" }, acceptanceHash: "avant", regressions: ["ancienne"] });
+    const suite = [...panne, DECIDE(choix), ...(choix === "retry" ? [COMMITTED] : []), CP("DELIVER"), PLANNED];
+    const s = play(suite).state;
+    expect(s).toMatchObject({ phase: "DELIVER", acceptanceHash: "avant", regressions: ["ancienne"] });
+    expect(s.deliver?.acceptanceHash).toBe("avant");
+  });
+
   it("un deuxième refus à budget épuisé lève le gel avant rembobinage", () => {
     const s = play([
       ...toReview(), LENSES(lens("CHANGES_REQUESTED", ["major"])), REPORTED,

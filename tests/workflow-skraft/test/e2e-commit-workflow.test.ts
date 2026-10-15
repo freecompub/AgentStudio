@@ -63,4 +63,16 @@ describe("skraft en workflow — commit de phase en échec (D19)", () => {
     expect(rejets).toContainEqual(expect.objectContaining({ porte: "commit", motifs: [expect.stringMatching(/DESIGN.*index\.lock.*sans commit/)] }));
     expect(app.posted.at(-1)).toContain("Phases non commitées : DESIGN");
   }, 90_000);
+  // Contrôle du défaut relevé le 13/10 dans l'extension : le workflow garde l'empreinte.
+  it("commit de DISTILL en échec, continuer : DELIVER garde le gel des tests d'acceptance", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const app = await assemble(root, runtime, tasksDir, { commitEchoue: (m) => m === "docs(skraft): distill de us-12" });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium");
+    const q = await escaladeDuCommit(app);
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("continuer"))!.id, undefined, { role: "architecte" });
+    await fin(app, id, 60_000);
+    const testeur = runtime.history.find((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-test"))!;
+    expect(testeur.sent[0]).toContain("Les tests d'acceptance sont gelés : ne les modifie jamais.");
+  }, 90_000);
 });

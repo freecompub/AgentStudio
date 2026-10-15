@@ -5,6 +5,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Gel gardé quand le commit de DISTILL échoue (extension)
+
+- Défaut introduit par D19 : `escalate` appelait `leverGelDistill` avant de reconnaître une panne de
+  commit. DISTILL approuvée perdait son empreinte et ses non-régressions, que l'humain relance le
+  commit **ou** continue sans : DELIVER ne vérifiait plus le gel, sans avertissement (`sansGel` ne
+  vise que DISTILL sautée), et le dossier de passation ne disait plus « gelés ».
+- Correctif : le stade COMMIT est testé avant de lever le gel (`reducer.ts`, `escalate`). Tests :
+  réducteur (relancer et continuer), bout en bout dans l'extension (échoue sans le correctif) et
+  contrôle dans le workflow, qui gardait déjà l'empreinte.
+- PDF : l'écart est retiré du chapitre 11.
+
 ## 15/10 — Autorisation de reprise étendue à toutes les versions < v2.0.0
 
 - Déclaration du responsable du projet, consignée dans `docs/licences/autorisation-skraft.md`

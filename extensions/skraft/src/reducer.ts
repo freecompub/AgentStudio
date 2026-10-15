@@ -596,13 +596,15 @@ function failure(etat: SkraftState, gate: string, reasons: string[], essaiGarant
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */
 function escalate(etat: SkraftState, reason: string): Out {
+  // Commit d'une phase approuvée : rien à rembobiner, le travail est bon (D19 de docs/12). Testé avant
+  // de lever le gel : DISTILL approuvée garde son empreinte et ses non-régressions, que l'humain
+  // relance le commit ou continue sans (défaut relevé le 13/10, docs/skraft-fonctionnement).
+  if (etat.stage === "COMMIT") return escalateFrom(etat, "COMMIT", `Commit impossible : ${reason}`, ["retry", "continue", "abort"]);
   const s = leverGelDistill(etat);
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
   // Hors de toute phase : rien à sauter ; « relancer » repose les questions (D17 de docs/12).
   if (s.stage === "ROUTE") return escalateFrom(s, "ROUTE", reason, ["retry", "abort"]);
-  // Commit d'une phase approuvée : rien à rembobiner, le travail est bon (D19 de docs/12).
-  if (s.stage === "COMMIT") return escalateFrom(s, "COMMIT", `Commit impossible : ${reason}`, ["retry", "continue", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   return {
     state: { ...oublierLaPhase(s), stage: "ESCALATED", escalation: { from: "PHASE", reason } },
