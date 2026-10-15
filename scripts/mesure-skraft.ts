@@ -68,6 +68,7 @@ import { activateInProcess, bundle, createNodeLauncher, type HostDeps } from "@a
 import { activerWorkflow, createJsonAccordStore, trouverWorkflows, type EtatWorkflow } from "@agent-studio/workflow";
 import { repondre as choisir, type Reponses } from "./banc/repondeur.js";
 import { resumerParEtape } from "./banc/etapes.js";
+import { mesurerRevues, sectionRevues } from "./banc/revues.js";
 import { verifierBrancheCampagneUs2 } from "./banc/branches-campagne.js";
 import { workflowLivre } from "./banc/livraison.js";
 import { lireModelesRoles, modelePourRole } from "./banc/modeles-roles.js";
@@ -538,6 +539,8 @@ const md = [
   "## Rejets et leurs motifs",
   "",
   ...resume.etapes.flatMap((et) => et.rejets.flatMap((r) => [`### ${et.phase} — porte « ${r.porte} »`, "", ...r.motifs.map((m) => `- ${m}`), ""])),
+  // Coût des revues et des corrections (docs/15 §5), sur la trace complète et les preuves du run.
+  ...sectionRevues(mesurerRevues(await traceBrute.list(taskId), await createJsonEvidenceStore(join(tasksDir, "evidence")).list(taskId)), requetes),
   "## Relevés de réserve",
   "",
   ...releves.map((r) => `- ${r.at} — ${r.etape} : ${r.restantes ?? "inconnue"}`),

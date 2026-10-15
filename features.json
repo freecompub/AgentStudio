@@ -263,6 +263,13 @@
       "notes": "ADR 0067 ; PLAN_DEVIATION de skraft-plugin v1.15.1. Extension et workflow ; champ planDeviations de report_phase (cœur)."
     },
     {
+      "id": "mesures-cout-des-revues",
+      "title": "Le rapport du banc mesure le coût des revues par tour et par lentille, l'économie possible d'une re-revue sélective, les lectures des lentilles et ce que relancent les corrections de DELIVER ; recalculable sur un run enregistré sans requête",
+      "verify": "pnpm vitest run --project banc -t \"Coût des revues et des corrections\"",
+      "passes": true,
+      "notes": "docs/15 §5 : mesures pour décider de la re-revue sélective, du patch partagé et du mode rework. scripts/banc/revues.ts, pnpm banc:revues docs/runs/<run>."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",

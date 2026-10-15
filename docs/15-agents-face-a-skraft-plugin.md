@@ -257,6 +257,18 @@ Présentes dans main (1.15.1), absentes chez nous :
 | Mode `rework` : seules les portes invalidées sont relancées | software-engineer, architecte, acceptance |
 | Mutation une seule fois en fin de story | **déjà fait chez nous** (ADR 0049) |
 
+**Mesures pour décider des trois dernières lignes (re-revue sélective, patch partagé, mode
+`rework`)**, en place depuis le 2026-10-16 : section « Coût des revues et des corrections » du
+rapport du banc (`scripts/banc/revues.ts`), recalculable sur un run enregistré, sans requête, par
+`pnpm banc:revues docs/runs/<run>`. Sur les deux runs US-2 du 10/10 qui ont atteint DELIVER :
+
+| Run | Revues (req. premium) | Re-revue sélective : économie au plus | Lectures des lentilles | Tokens d'entrée des lentilles / du run | Après la 1re revue de DELIVER |
+|---|---|---|---|---|---|
+| extension `c4433175` | 64,3 | 8,4 (3 lentilles) | 151 | 1 587 249 / 5 087 423 | 4 exécutions de tests (9 s), 1 revue relancée (17,9) |
+| workflow `0b3184b5` | 114,4 | 0 | 111 | 853 135 / 4 019 194 | aucune correction |
+
+Deux runs ne suffisent pas à trancher : à refaire sur les prochains runs Copilot.
+
 ---
 
 ## 6. Prochaines étapes proposées

@@ -17,7 +17,8 @@
     "apps/desktop/src/shared",
     "apps/desktop/test",
     "scripts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.global-setup.ts"
   ],
   "exclude": [
     "apps/desktop/test/renderer"

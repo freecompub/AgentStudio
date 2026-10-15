@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 16/10 — Mesures du coût des revues et des corrections (docs/15 §5)
+
+- Section « Coût des revues et des corrections » du rapport du banc (`scripts/banc/revues.ts`,
+  branchée dans `mesure-skraft.ts`, non lancé) : coût par tour et par lentille (appels, requêtes
+  premium, tokens, lectures, verdict, défauts) ; re-revue sélective (coût des lentilles relancées
+  après avoir approuvé sans défaut, borne haute) ; patch partagé (lectures, part des tokens) ; mode
+  rework (exécutions de tests du code et revues relancées après la 1re revue de DELIVER).
+- `pnpm banc:revues docs/runs/<run>` recalcule la section sur un run enregistré, sans requête.
+  Chiffres des runs du 10/10 dans docs/15 §5.
+- Piège : une lentille **garde sa session** d'une revue à l'autre ; mesurer par session écrasait
+  les revues précédentes. Chaque `tour-début` ouvre une mesure. Le verdict vient de la sortie du
+  `tour-fin`, pas des rapports de revue du projet.
+- `vitest.global-setup.ts` ajouté au typecheck.
+
 ## 15/10 — Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1)
 
 - `report_phase` (cœur) gagne `planDeviations` (critère, prévu, réel, règle). DISTILL garde la
