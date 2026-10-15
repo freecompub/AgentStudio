@@ -2,6 +2,7 @@
  * Modèle d'état unifié du pipeline skraft (SPEC-skraft §5.1) : un seul type, un seul validateur
  * (défaut C2 rendu impossible). Types purs, sérialisables, persistés par le moteur.
  */
+import type { EcartDeclare, LigneDuPlan } from "./distill.js";
 import { z } from "zod";
 import type { DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
@@ -66,6 +67,9 @@ export interface AdrRecord {
 export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate" | "mutation-arbitration";
 
 /** Sous-machine DELIVER (§7.4). Les champs après `scenarioCheckpoint` sont internes au réducteur. */
+/** Écart au plan de test validé : la déclaration, son auteur et son scénario (ADR 0067). */
+export type EcartAuPlan = EcartDeclare & { par: string; scenario: string };
+
 export interface DeliverState {
   scenarios: DeliverScenario[];
   current: number;
@@ -115,6 +119,8 @@ export interface DeliverState {
    * un pas refusé est annulé par rollback, ses « corrigé » avec lui.
    */
   pendingResponses?: DefectResponse[];
+  /** Écarts au plan déclarés par le pas en cours : gardés si sa porte le valide (ADR 0067). */
+  pendingDeviations?: EcartAuPlan[];
   /** Fils à l'entrée en correction : restaurés avec le code si la porte de fin de scénario échoue. */
   threadsAtFixStart?: DefectThread[];
   /**
@@ -175,6 +181,10 @@ export interface SkraftState {
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
   openQuestions: { id: string; text: string; answer?: string }[];
+  /** Matrice du plan de test gardée depuis DISTILL (ADR 0067). */
+  planDeTest?: Record<string, LigneDuPlan>;
+  /** Écarts au plan de test déclarés et validés en DELIVER, commités dans `ecarts-au-plan.md` (ADR 0067). */
+  ecartsAuPlan?: EcartAuPlan[];
   /** Skill d'architecture retenue au lancement, recopiée dans le dossier de DESIGN, DISTILL et DELIVER. */
   architecture?: string;
   /** Inventaire de la recherche validée (skraft-plugin v1.15.1) : recopié dans le dossier de DESIGN et DISTILL. */
@@ -254,7 +264,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[] }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
   | { type: "LENS_BLOCKED"; lens: LensName; question: string; choices: string[] }
@@ -263,6 +273,8 @@ export type SkraftEvent =
       artifacts: ArtifactRecord[];
       adrs?: AdrRecord[];
       openQuestions?: string[];
+      /** DISTILL : matrice du plan de test, par critère, pour vérifier les écarts déclarés en DELIVER (ADR 0067). */
+      planDeTest?: Record<string, LigneDuPlan>;
       /** RESEARCH : conventions et existant réutilisable, transmis à DESIGN et DISTILL. */
       recherche?: { conventions: string; existant: string };
       acceptanceHash?: string;
@@ -394,6 +406,8 @@ const stateSchema = z.object({
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
   recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
   architecture: z.string().optional(),
+  planDeTest: z.record(z.string(), z.object({ couche: z.string(), doublure: z.string() })).optional(),
+  ecartsAuPlan: z.array(z.object({ criterion: z.string(), planned: z.string(), actual: z.string(), rule: z.string(), par: z.string(), scenario: z.string() })).optional(),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),

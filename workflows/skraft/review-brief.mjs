@@ -74,8 +74,10 @@ const CONSIGNES_DE_PHASE = {
   DELIVER: {
     "test-integrity": [
       // docs/15 §4.7 : la matrice de couverture de DISTILL fait foi pour la couche et la doublure
-      "Chaque test respecte la couche et la doublure que la matrice de .skraft/<slug>/distill/test-plan.md prévoit pour son critère ; un écart non justifié est un défaut.",
+      "Chaque test respecte la couche et la doublure que la matrice de .skraft/<slug>/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.",
     ],
+    // ADR 0067 : un critère sans test fidèle à sa ligne, sauf écart déclaré (quality-gates-lens du plugin, v1.15.1)
+    "quality-gates": ["Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits."],
   },
 };
 

@@ -165,6 +165,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
           adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
           ...(p === "RESEARCH" && e.recherche ? { recherche: e.recherche } : {}),
+          ...(p === "DISTILL" && e.planDeTest ? { planDeTest: e.planDeTest } : {}),
           lastRejection: null,
           // Mutation de fin de DELIVER (ADR 0049) : ses faits et notes vont aux lentilles.
           ...(p === "DELIVER" && s.deliver && (e.facts?.length || e.notes?.length)
@@ -570,7 +571,7 @@ function oublierLaPhase(s: SkraftState): SkraftState {
     ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
     : s;
   // Le code effacé emporte les mutants exemptés (ADR 0065) ; les arbitrages, eux, restent tracés.
-  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [] } : sansLivrables;
+  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [], ecartsAuPlan: [] } : sansLivrables;
   return s.adrsAvantPhase ? { ...sansDerogations, adrs: s.adrsAvantPhase } : sansDerogations;
 }
 

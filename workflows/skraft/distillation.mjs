@@ -4,7 +4,7 @@
 * d'acceptance exécuté par le code (D20), puis gel des tests d'acceptance (D21) et revue.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { checkAcceptanceRed, checkPlans, checkValues } from "./distill.mjs";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.mjs";
 import { checkGherkin } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
@@ -106,5 +106,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   await enregistrerLivrables(w, s, (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted").map((f) => f.path), essai, sha256);
   d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
   d.regressions = red.regressions;
+  // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
+  d.planDeTest = planDeTest(testPlan);
   return { motifs: [], porte: "" };
 }

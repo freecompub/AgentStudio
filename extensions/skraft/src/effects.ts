@@ -10,7 +10,7 @@ import { preselectFiles } from "./preselect.js";
 import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
-import { checkAcceptanceRed, checkPlans, checkValues } from "./distill.js";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.js";
 import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
@@ -333,6 +333,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
       if (effect.phase === "DELIVER" && (state.derogations?.length || state.derogationsCouverture?.length))
         await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/derogations.md`, rapportDeDerogations(state));
+      // Écarts au plan de test commités avec la livraison (ADR 0067).
+      if (effect.phase === "DELIVER" && state.ecartsAuPlan?.length) await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/ecarts-au-plan.md`, rapportDEcarts(state));
       return { type: "COMMITTED", sha: await ctx.git.commit(effect.message) };
 
     case "arbitrateMutants": {
@@ -591,7 +593,8 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
-  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions };
+  // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
+  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, planDeTest: planDeTest(testPlan) };
 }
 
 /**
@@ -634,6 +637,21 @@ async function briefArbitre(ctx: ExtensionContext, state: SkraftState, threads: 
 }
 
 /** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
+/** Écarts au plan de test déclarés en DELIVER, vérifiés par le code et jugés par la revue (ADR 0067). */
+function rapportDEcarts(s: SkraftState): string {
+  const cellule = (x: string) => x.replace(/\|/g, "\\|");
+  return [
+    `# Écarts au plan de test — ${s.story?.id ?? s.slug}`,
+    "",
+    "Tests écrits à une autre couche, ou avec une autre doublure, que la matrice de `distill/test-plan.md`. Chaque écart a été déclaré par l'agent avec la règle qui l'impose, vérifié par le code contre la matrice, puis soumis à la revue.",
+    "",
+    "| Scénario | Critère | Déclaré par | Prévu | Réel | Règle |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...(s.ecartsAuPlan ?? []).map((x) => `| ${x.scenario} | ${x.criterion} | ${x.par} | ${cellule(x.planned)} | ${cellule(x.actual)} | ${cellule(x.rule)} |`),
+    "",
+  ].join("\n");
+}
+
 function rapportDeDerogations(s: SkraftState): string {
   const cellule = (x: string) => x.replace(/\|/g, "\\|");
   const mutants = s.derogations ?? [];
@@ -687,6 +705,12 @@ function finalReport(s: SkraftState): string {
       ? [
           `Dérogations de mutation : ${s.derogations.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`,
           ...s.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`),
+        ]
+      : []),
+    ...(s.ecartsAuPlan?.length
+      ? [
+          `Écarts au plan de test : ${s.ecartsAuPlan.length} (détail dans .skraft/${s.slug}/deliver/ecarts-au-plan.md).`,
+          ...s.ecartsAuPlan.map((x) => `- ${x.criterion} (${x.par}) : ${x.planned} → ${x.actual} — ${x.rule}`),
         ]
       : []),
     `Identifiant de suivi : ${randomUUID().slice(0, 8)}.`,

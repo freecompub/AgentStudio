@@ -91,7 +91,7 @@ export const meta = {
     },
     "skraft-test": {
       prompt: "agents/skraft-test.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nLe scénario en cours, son test d'acceptance et les tests déjà écrits sont dans le dossier de passation. Les tests d'acceptance\nsont gelés : toute écriture y est refusée.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nLe scénario en cours, son test d'acceptance et les tests déjà écrits sont dans le dossier de passation. Les tests d'acceptance\nsont gelés : toute écriture y est refusée.\nLe plan de test est `.skraft/<slug>/distill/test-plan.md`. Un écart à sa matrice se déclare dans le champ planDeviations de report_phase (ADR 0067) : le code le vérifie contre la matrice et refuse le pas s'il ne reprend pas la ligne du critère.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: ["@stack:unitTests"],
@@ -100,7 +100,7 @@ export const meta = {
     },
     "skraft-dev": {
       prompt: "agents/skraft-dev.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nLe test à faire passer est indiqué dans le dossier de passation. Tous les tests sont gelés pendant ton tour : une modification,\nmême hors des outils d'écriture, est détectée par empreinte et annule le tour.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nLe test à faire passer est indiqué dans le dossier de passation. Tous les tests sont gelés pendant ton tour : une modification,\nmême hors des outils d'écriture, est détectée par empreinte et annule le tour.\nLe plan de test est `.skraft/<slug>/distill/test-plan.md`. Un écart à sa matrice se déclare dans le champ planDeviations de report_phase (ADR 0067) : le code le vérifie contre la matrice et refuse le pas s'il ne reprend pas la ligne du critère.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: ["@stack:sources"],
@@ -213,6 +213,9 @@ export default async function skraft(w, entree) {
     derogationsCouverture: [],
     // Phases approuvées dont le commit a échoué, continuées sans commit (D19 de docs/12).
     nonCommitees: [],
+    // Matrice du plan de test (DISTILL) et écarts déclarés en DELIVER, vérifiés contre elle (ADR 0067).
+    planDeTest: null,
+    ecartsAuPlan: [],
   };
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
@@ -275,6 +278,9 @@ function bilan(d, confirmee) {
     ...(d.nonCommitees?.length ? [`Phases non commitées : ${d.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(d.derogations?.length
       ? [`Dérogations de mutation : ${d.derogations.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`, ...d.derogations.map((x) => `- ${x.file}:${x.line} (${x.operator}), par ${x.par} : ${x.raison}`)]
+      : []),
+    ...(d.ecartsAuPlan?.length
+      ? [`Écarts au plan de test : ${d.ecartsAuPlan.length} (détail dans .skraft/${d.slug}/deliver/ecarts-au-plan.md).`, ...d.ecartsAuPlan.map((x) => `- ${x.criterion} (${x.par}) : ${x.planned} → ${x.actual} — ${x.rule}`)]
       : []),
   ].join("\n");
 }

@@ -256,6 +256,13 @@
       "notes": "Skills reprises de skraft-plugin v1.15.1 (docs/licences/autorisation-skraft.md). Extension et workflow ; la plateforme accepte « --nom valeur » pour une entrée texte, et l'API des extensions expose l'identifiant de la pile (StackApi.id)."
     },
     {
+      "id": "ecarts-au-plan-de-test",
+      "title": "En DELIVER, un écart à la matrice du plan de test se déclare dans report_phase ; le code refuse une déclaration qui ne reprend pas la matrice, garde l'écart avec son pas, le donne à la revue, le commite dans ecarts-au-plan.md et le cite dans le rapport final",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project core -t \"Écarts au plan|écarts au plan|Écart déclaré|écart déclaré\"",
+      "passes": true,
+      "notes": "ADR 0067 ; PLAN_DEVIATION de skraft-plugin v1.15.1. Extension et workflow ; champ planDeviations de report_phase (cœur)."
+    },
+    {
       "id": "lentilles-consignes-de-phase",
       "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",

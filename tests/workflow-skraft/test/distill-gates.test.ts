@@ -1,7 +1,7 @@
 // Repris de extensions/skraft-workflow/test/distill-gates.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import { describe, expect, it } from "vitest";
-import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios } from "../../../workflows/skraft/distill.mjs";
+import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios, planDeTest, verifierEcarts } from "../../../workflows/skraft/distill.mjs";
 import { matchesAny } from "@agent-studio/extension-api";
 import { parseStory } from "../../../workflows/skraft/story.mjs";
 import { US12 } from "./story.test.js";
@@ -242,5 +242,31 @@ describe("Porte plan de test : plans de DISTILL (option C de docs/15 §4.5, §4.
       "test-plan.md : le critère 3 (ac-3) n'indique pas sa doublure (« aucune » si son test n'en utilise pas).",
     ]);
     expect(checkPlans({ criteria, testPlan: `${ENTETE}${ligne(1)}${ligne(3)}`, implPlan })).toEqual(["test-plan.md : aucune ligne de la matrice pour le critère 2 (ac-2)."]);
+  });
+});
+
+describe("Écarts au plan de test (PLAN_DEVIATION de skraft-plugin v1.15.1)", () => {
+  // Plugin, software-engineer : « Deviate only when a loaded skill forbids the planned choice, and
+  // record PLAN_DEVIATION: {row} — {planned} → {actual} — {rule} ». Ici, l'écart est déclaré dans
+  // report_phase et le code le vérifie contre la matrice gardée depuis DISTILL.
+  const ENTETE = "| Scénario | Cas d'usage | Couche | Doublure | Walking skeleton |\n|---|---|---|---|---|\n";
+  const plan = planDeTest(`${ENTETE}| @ac-1 | \`CapBolus\` | Application | dépôt en mémoire | oui |\n| @ac-2 | \`CapBolus\` | Domaine | aucune | non |\n`);
+
+  it("la matrice est lue par critère : couche et doublure", () => {
+    expect(plan).toEqual({ "ac-1": { couche: "Application", doublure: "dépôt en mémoire" }, "ac-2": { couche: "Domaine", doublure: "aucune" } });
+    expect(planDeTest("# Plan sans matrice\n")).toEqual({});
+  });
+
+  it("un écart conforme : critère de la matrice, prévu fidèle à sa ligne, règle donnée", () => {
+    expect(verifierEcarts([{ criterion: "ac-1", planned: "Application, dépôt en mémoire", actual: "Domaine, aucune", rule: "clean-architecture-testing : un invariant se teste dans le domaine" }], plan)).toEqual([]);
+  });
+
+  it("critère absent de la matrice, prévu infidèle : refus avec le motif", () => {
+    expect(verifierEcarts([{ criterion: "ac-9", planned: "Application", actual: "Domaine", rule: "r" }], plan)).toEqual([
+      "Écart au plan pour « ac-9 » : aucun critère de ce nom dans la matrice de test-plan.md.",
+    ]);
+    expect(verifierEcarts([{ criterion: "ac-1", planned: "Infrastructure, base réelle", actual: "Domaine", rule: "r" }], plan)).toEqual([
+      "Écart au plan pour ac-1 : le prévu « Infrastructure, base réelle » ne reprend pas la ligne de la matrice (Application, dépôt en mémoire).",
+    ]);
   });
 });

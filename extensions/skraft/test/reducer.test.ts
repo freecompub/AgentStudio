@@ -456,6 +456,44 @@ const FAIL = (reason = "motif"): Ev => ({ type: "STEP_FAIL", reason });
 const DISTILL_FROZEN: Ev[] = [CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc" } as Ev, LENSES(lens("APPROVED")), COMMITTED];
 const toDeliver = (level = "medium-hard") => [...toFirstPhase(level), ...researchPhase, ...designPhase, ...DISTILL_FROZEN, CP("DELIVER")];
 
+describe("Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1)", () => {
+  const plan = { "ac-1": { couche: "Application", doublure: "dépôt en mémoire" } };
+  const avecPlan = (): Ev[] => [
+    ...toFirstPhase(), ...researchPhase, ...designPhase,
+    CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc", planDeTest: plan } as Ev, LENSES(lens("APPROVED")), COMMITTED,
+    CP("DELIVER"), PLANNED, STARTED,
+  ];
+  const ecart = { criterion: "ac-1", planned: "Application, dépôt en mémoire", actual: "Domaine, aucune", rule: "clean-architecture-testing : un invariant se teste dans le domaine" };
+
+  it("DISTILL garde la matrice du plan de test", () => {
+    expect(play(avecPlan()).state.planDeTest).toEqual(plan);
+  });
+
+  it("écart conforme : gardé quand la porte valide le pas, avec son auteur et son scénario", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan).toEqual([{ ...ecart, par: "skraft-test", scenario: "ac-1" }]);
+  });
+
+  it("écart non conforme : le pas est refusé avec le motif, rien n'est gardé", () => {
+    const r = play([...avecPlan(), { ...REP_TEST, planDeviations: [{ ...ecart, criterion: "ac-9" }] } as Ev]);
+    expect(r.state.lastRejection).toEqual({ gate: "DELIVER", reasons: ["Écart au plan pour « ac-9 » : aucun critère de ce nom dans la matrice de test-plan.md."] });
+    expect(r.effects.map((e) => e.kind)).toContain("rollback");
+    expect(r.state.ecartsAuPlan ?? []).toEqual([]);
+  });
+
+  it("scénario repris depuis son début : ses écarts sont effacés avec ses tests", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan).toHaveLength(1);
+    const repris = transition({ ...s, deliver: { ...s.deliver!, attempts: 99 } }, { type: "STEP_FAIL", reason: "vert impossible" } as Ev).state;
+    expect(repris.ecartsAuPlan ?? []).toEqual([]);
+  });
+
+  it("écart d'un pas que sa porte refuse : oublié avec le pas", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, { type: "STEP_FAIL", reason: "pas de nouveau test" } as Ev, REP_TEST, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan ?? []).toEqual([]);
+  });
+});
+
 describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le retour qu'il avait", () => {
   const Q: Ev = { type: "BLOCKER_REPORTED", question: "Par prise ?", choices: [] };
 

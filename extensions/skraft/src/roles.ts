@@ -21,6 +21,8 @@
  */
 import { SKILLS_D_ARCHITECTURE } from "./architecture.js";
 
+// Écarts au plan de test (ADR 0067) : le contenu partagé dit la règle, la consigne dit l'outil.
+const ECARTS_AU_PLAN = "Le plan de test est `.skraft/<slug>/distill/test-plan.md`. Un écart à sa matrice se déclare dans le champ planDeviations de report_phase (ADR 0067) : le code le vérifie contre la matrice et refuse le pas s'il ne reprend pas la ligne du critère.";
 const PASSATION = "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.";
 
 /**
@@ -51,12 +53,14 @@ recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.`,
   test: `${PASSATION}
 ${SKILLS_ARBITRATION}
 Le scénario en cours, son test d'acceptance et les tests déjà écrits sont dans le dossier de passation. Les tests d'acceptance
-sont gelés : toute écriture y est refusée.`,
+sont gelés : toute écriture y est refusée.
+${ECARTS_AU_PLAN}`,
 
   dev: `${PASSATION}
 ${SKILLS_ARBITRATION}
 Le test à faire passer est indiqué dans le dossier de passation. Tous les tests sont gelés pendant ton tour : une modification,
-même hors des outils d'écriture, est détectée par empreinte et annule le tour.`,
+même hors des outils d'écriture, est détectée par empreinte et annule le tour.
+${ECARTS_AU_PLAN}`,
 
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
 Rends ton verdict avec l'outil submit_lens_verdict.

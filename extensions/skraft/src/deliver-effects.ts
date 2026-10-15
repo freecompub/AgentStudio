@@ -134,6 +134,7 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
     ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
     ...(e.step === "test" && r.output.coveredBy ? { coveredBy: r.output.coveredBy } : {}),
     ...(r.output.responses?.length ? { responses: r.output.responses } : {}),
+    ...(r.output.planDeviations?.length ? { planDeviations: r.output.planDeviations } : {}),
   };
 }
 

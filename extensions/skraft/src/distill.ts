@@ -182,3 +182,38 @@ function matriceDeCouverture(md: string): { lignes: string[][]; couche: number; 
   }
   return null;
 }
+
+/** Ligne de la matrice de couverture d'un critère : couche et doublure prévues (docs/15 §4.7). */
+export type LigneDuPlan = { couche: string; doublure: string };
+
+/** Matrice du plan de test, par critère (`ac-N`) ; vide si le plan n'en a pas. Gardée depuis DISTILL. */
+export function planDeTest(testPlan: string): Record<string, LigneDuPlan> {
+  const m = matriceDeCouverture(testPlan);
+  const plan: Record<string, LigneDuPlan> = {};
+  for (const l of m?.lignes ?? []) {
+    const ac = /\bac-(\d+)(?![0-9])/i.exec(l.join(" "));
+    if (ac) plan[`ac-${ac[1]}`] = { couche: l[m!.couche] ?? "", doublure: l[m!.doublure] ?? "" };
+  }
+  return plan;
+}
+
+/** Écart au plan déclaré par un agent dans `report_phase` (PLAN_DEVIATION de skraft-plugin v1.15.1). */
+export type EcartDeclare = { criterion: string; planned: string; actual: string; rule: string };
+
+/**
+ * Vérification d'un écart déclaré : le critère est dans la matrice, et le prévu reprend sa ligne
+ * (couche et doublure). Le code ne peut pas voir lui-même qu'un test change de couche : il vérifie la
+ * déclaration, la trace et la transmet ; la lentille test-integrity juge sa règle.
+ */
+export function verifierEcarts(ecarts: readonly EcartDeclare[], plan: Readonly<Record<string, LigneDuPlan>>): string[] {
+  const reasons: string[] = [];
+  const contient = (texte: string, attendu: string) => texte.toLowerCase().includes(attendu.toLowerCase().trim());
+  for (const e of ecarts) {
+    const cle = /^@?ac-(\d+)$/i.exec(e.criterion.trim());
+    const ligne = cle ? plan[`ac-${cle[1]}`] : undefined;
+    if (!ligne) reasons.push(`Écart au plan pour « ${e.criterion} » : aucun critère de ce nom dans la matrice de test-plan.md.`);
+    else if (!contient(e.planned, ligne.couche) || !contient(e.planned, ligne.doublure))
+      reasons.push(`Écart au plan pour ac-${cle![1]} : le prévu « ${e.planned} » ne reprend pas la ligne de la matrice (${ligne.couche}, ${ligne.doublure}).`);
+  }
+  return reasons;
+}

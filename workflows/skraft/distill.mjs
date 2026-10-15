@@ -168,3 +168,34 @@ function matriceDeCouverture(md) {
   }
   return null;
 }
+
+/** Matrice du plan de test, par critère (`ac-N`) ; vide si le plan n'en a pas. Gardée depuis DISTILL. */
+export function planDeTest(testPlan) {
+  const m = matriceDeCouverture(testPlan);
+  const plan = {};
+  for (const l of m?.lignes ?? []) {
+    const ac = /\bac-(\d+)(?![0-9])/i.exec(l.join(" "));
+    if (ac)
+      plan[`ac-${ac[1]}`] = { couche: l[m.couche] ?? "", doublure: l[m.doublure] ?? "" };
+  }
+  return plan;
+}
+
+/**
+* Vérification d'un écart déclaré : le critère est dans la matrice, et le prévu reprend sa ligne
+* (couche et doublure). Le code ne peut pas voir lui-même qu'un test change de couche : il vérifie la
+* déclaration, la trace et la transmet ; la lentille test-integrity juge sa règle.
+*/
+export function verifierEcarts(ecarts, plan) {
+  const reasons = [];
+  const contient = (texte, attendu) => texte.toLowerCase().includes(attendu.toLowerCase().trim());
+  for (const e of ecarts) {
+    const cle = /^@?ac-(\d+)$/i.exec(e.criterion.trim());
+    const ligne = cle ? plan[`ac-${cle[1]}`] : undefined;
+    if (!ligne)
+      reasons.push(`Écart au plan pour « ${e.criterion} » : aucun critère de ce nom dans la matrice de test-plan.md.`);
+    else if (!contient(e.planned, ligne.couche) || !contient(e.planned, ligne.doublure))
+      reasons.push(`Écart au plan pour ac-${cle[1]} : le prévu « ${e.planned} » ne reprend pas la ligne de la matrice (${ligne.couche}, ${ligne.doublure}).`);
+  }
+  return reasons;
+}

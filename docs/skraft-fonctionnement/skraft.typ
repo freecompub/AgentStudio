@@ -19,7 +19,7 @@
     #v(if mobile { 22pt } else { 40pt })
     #text(size: 9pt, fill: rgb("#5b6574"))[
       AgentStudio — extension `skraft` et workflow `workflows/skraft/` \
-      État du code : 15 octobre 2026, commit suivant `90cd1d2` \
+      État du code : 15 octobre 2026, commit suivant `951585e` \
       Édition #if mobile [smartphone] else [PC]
     ]
   ]
@@ -593,7 +593,7 @@ un test unitaire rouge, le code minimal qui le fait passer, un nettoyage, et rec
 #tableau(
   ("", "Contenu"),
   ([Entrées], [Les tests d'acceptance gelés et leur empreinte ; `impl-plan.md` ; les non-régressions ; les ADR décidés et le contrat (`contracts.md`) ; le dossier de passation.]),
-  ([Sorties], [Le code de production et les tests unitaires, commités pas à pas (`test(...)`, `feat(...)`, `refactor(...)`, `fix(...)`), puis le commit `feat(<slug>): livraison de la story` ; `.skraft/<slug>/deliver/derogations.md` s'il y a des dérogations ; le rapport final.]),
+  ([Sorties], [Le code de production et les tests unitaires, commités pas à pas (`test(...)`, `feat(...)`, `refactor(...)`, `fix(...)`), puis le commit `feat(<slug>): livraison de la story` ; `.skraft/<slug>/deliver/derogations.md` s'il y a des dérogations ; `ecarts-au-plan.md` s'il y a des écarts déclarés ; le rapport final.]),
 )
 
 == Qui exécute quoi
@@ -636,6 +636,15 @@ sessions séparées, et les scénarios suivants le restent.
 
 Après chaque pas validé : commit, puis checkpoint (le nouveau « dernier point sûr »). Si l'acceptance
 du scénario est verte, on passe à sa porte de fin ; sinon, un nouveau cycle commence, 20 au plus.
+
+=== Écarts au plan de test
+Le testeur et le développeur suivent la matrice du plan de test (couche et doublure par critère).
+S'ils s'en écartent, parce qu'une skill chargée interdit le choix prévu, ils le *déclarent* dans
+`report_phase` : critère, prévu, réel, règle. Le code vérifie la déclaration contre la matrice gardée
+depuis DISTILL et refuse le pas si elle ne la reprend pas. L'écart est gardé si la porte valide le
+pas, effacé avec ses tests si le scénario est repris ; il est donné à la revue, écrit dans
+`ecarts-au-plan.md` et cité dans le rapport final (ADR 0067). Un écart non déclaré est un défaut pour
+la lentille `test-integrity`.
 
 == La porte de fin de scénario
 Le code relance la suite et cumule les motifs :
@@ -732,6 +741,7 @@ passation, les portes et les faits de revue.
   ([Non-régressions], [DISTILL (code, d'après `test-plan.md`)], [DELIVER], [scénarios déjà faits]),
   ([Code, tests unitaires], [DELIVER (agents)], [portes de DELIVER, lentilles, rapport final], [commits pas à pas]),
   ([Dérogations], [DELIVER (arbitre ou humain)], [portes de mutation et de couverture, lentilles, rapport final], [`derogations.md` ; trace]),
+  ([Écarts au plan de test], [DELIVER (testeur, développeur ; vérifiés par le code)], [lentilles, rapport final], [`ecarts-au-plan.md` ; faits de revue]),
   ([Rapports de revue], [chaque revue (code)], [l'humain, la trace], [`.skraft/<slug>/reviews/`, commités avec la phase]),
   ([Motif du dernier rejet], [toute porte, toute revue], [l'agent relancé], [« Rejet précédent » du dossier ; pas transmis à la phase suivante]),
 )
@@ -857,4 +867,4 @@ Ces points ont été vus en relisant le code ; tous sont traités depuis le 15 o
 Extension : `extensions/skraft/src/` (`reducer.ts`, `deliver-machine.ts`, `effects.ts`,
 `deliver-effects.ts`, `review*.ts`, `gherkin.ts`, `distill.ts`, `design.ts`, `research.ts`).
 Workflow : `workflows/skraft/`. Décisions : `docs/adr/` (notamment 0040, 0042, 0046, 0047, 0049,
-0050, 0062 à 0066) et l'audit `docs/12-audit-portes-lentilles-skraft.md`.
+0050, 0062 à 0067) et l'audit `docs/12-audit-portes-lentilles-skraft.md`.

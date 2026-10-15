@@ -1,3 +1,4 @@
+import { verifierEcarts } from "./distill.js";
 import { phaseRoles } from "./config.js";
 import { levelEffects } from "./difficulty.js";
 import type { ArbitrageRecord, DeliverState, Derogation, SkraftEffect, SkraftState } from "./model.js";
@@ -77,8 +78,14 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
 
     case "AGENT_REPORTED": {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
+      // Écarts au plan de test (ADR 0067) : vérifiés contre la matrice gardée depuis DISTILL ; une
+      // déclaration fausse refuse le pas, une juste attend que la porte du pas le valide.
+      const ecarts = e.planDeviations ?? [];
+      const motifsEcarts = ecarts.length ? verifierEcarts(ecarts, s.planDeTest ?? {}) : [];
+      if (motifsEcarts.length) return stepFailure(s, d, motifsEcarts);
+      s = { ...s, deliver: { ...d, pendingDeviations: ecarts.map((x) => ({ ...x, par: e.role, scenario: scenario.id })) } };
       // Correction de revue : les réponses de l'agent (ADR 0046) attendent que sa porte valide le pas.
-      if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...d, pendingResponses: e.responses ?? [] } };
+      if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...s.deliver!, pendingResponses: e.responses ?? [] } };
       if (d.step === "fix-test")
         return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline, ...editable(s) }] };
       if (d.step === "test")
@@ -123,7 +130,9 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     }
 
     case "STEP_OK": {
-      const base: DeliverState = { ...d, baseline: { all: e.all, passed: e.passed }, stepCheckpoint: e.checkpointId, attempts: 0, feedback: [] };
+      // Le pas est validé : ses écarts au plan déclarés le sont avec lui (ADR 0067).
+      if (d.pendingDeviations?.length) s = { ...s, ecartsAuPlan: [...(s.ecartsAuPlan ?? []), ...d.pendingDeviations] };
+      const base: DeliverState = { ...d, pendingDeviations: [], baseline: { all: e.all, passed: e.passed }, stepCheckpoint: e.checkpointId, attempts: 0, feedback: [] };
       if (d.step === "test") {
         const newTest = e.newTest ?? null;
         const nd: DeliverState = {
@@ -296,8 +305,10 @@ function repriseDeLEmpreinte(d: DeliverState): { unitTestsHash?: string | null }
 
 /** Scénario repris depuis son début : en sessions séparées après un premier échec, puis selon le budget. */
 function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
-  const s = d.step === "scenario-gate" ? bumpRetries(s0, "DELIVER") : s0;
+  const s1 = d.step === "scenario-gate" ? bumpRetries(s0, "DELIVER") : s0;
   const sc = d.scenarios[d.current]!;
+  // Le scénario repart de son début : ses tests sont effacés, et les écarts au plan qu'ils portaient avec eux (ADR 0067).
+  const s = s1.ecartsAuPlan?.some((x) => x.scenario === sc.id) ? { ...s1, ecartsAuPlan: s1.ecartsAuPlan.filter((x) => x.scenario !== sc.id) } : s1;
   const failures = d.scenarioFailures + 1;
   const restart: DeliverState = {
     ...d,

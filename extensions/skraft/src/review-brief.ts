@@ -42,6 +42,9 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
       facts.push(`Dérogation de mutation (${x.par}) : ${x.file}:${x.line} (${x.operator}) — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
   if (phase === "DELIVER")
     for (const x of state.derogationsCouverture ?? []) facts.push(`Ligne exemptée de la couverture du diff (humain) : ${x.file}:${x.line} — ${x.raison}.`);
+  if (phase === "DELIVER")
+    for (const x of state.ecartsAuPlan ?? [])
+      facts.push(`Écart au plan déclaré par ${x.par} (scénario ${x.scenario}, critère ${x.criterion}) : prévu ${x.planned} → ${x.actual} — règle : ${x.rule}. Vérifié contre la matrice du plan de test ; à juger sur sa règle.`);
   const last = evidence.filter((e) => e.source === "gate" && e.phase?.startsWith(phase)).at(-1);
   if (last)
     facts.push(
@@ -131,8 +134,10 @@ const CONSIGNES_DE_PHASE: Partial<Record<Phase, Partial<Record<LensName, string[
   DELIVER: {
     "test-integrity": [
       // docs/15 §4.7 : la matrice de couverture de DISTILL fait foi pour la couche et la doublure
-      "Chaque test respecte la couche et la doublure que la matrice de .skraft/<slug>/distill/test-plan.md prévoit pour son critère ; un écart non justifié est un défaut.",
+      "Chaque test respecte la couche et la doublure que la matrice de .skraft/<slug>/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.",
     ],
+    // ADR 0067 : un critère sans test fidèle à sa ligne, sauf écart déclaré (quality-gates-lens du plugin, v1.15.1)
+    "quality-gates": ["Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits."],
   },
 };
 

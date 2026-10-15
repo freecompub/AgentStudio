@@ -51,10 +51,11 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     expect(t).toContain("Chaque cas limite ou négatif tranché par les critères a son scénario.");
   });
 
-  it("DELIVER : seule test-integrity a une consigne, la couche et la doublure prévues par le plan de test (docs/15 §4.7)", () => {
-    for (const lens of ["cold-reader", "architecture", "quality-gates"]) expect(lensBrief(lens, { ...c, slug: "us-12" }, "DELIVER", f, [])).not.toContain("Points à examiner");
+  it("DELIVER : test-integrity et quality-gates jugent le respect du plan de test et ses écarts déclarés (docs/15 §4.7, ADR 0067)", () => {
+    for (const lens of ["cold-reader", "architecture"]) expect(lensBrief(lens, { ...c, slug: "us-12" }, "DELIVER", f, [])).not.toContain("Points à examiner");
     const t = lensBrief("test-integrity", { ...c, slug: "us-12" }, "DELIVER", f, []);
     expect(t).toContain("Points à examiner en DELIVER :");
-    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non justifié est un défaut.");
+    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
+    expect(lensBrief("quality-gates", { ...c, slug: "us-12" }, "DELIVER", f, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
   });
 });

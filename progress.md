@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 15/10 — Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1)
+
+- `report_phase` (cœur) gagne `planDeviations` (critère, prévu, réel, règle). DISTILL garde la
+  matrice (`planDeTest`) ; en DELIVER, `verifierEcarts` refuse le pas si le critère n'est pas dans
+  la matrice ou si le prévu ne reprend pas sa ligne. L'écart est gardé avec la porte du pas, effacé
+  avec ses tests (scénario repris, DELIVER rembobinée), donné en fait à la revue, commité dans
+  `deliver/ecarts-au-plan.md`, cité dans le rapport final. E et W.
+- Lentilles DELIVER : `test-integrity` (écart non déclaré = défaut, écart déclaré jugé sur sa
+  règle), `quality-gates` (chaque critère a un test fidèle à sa ligne, sauf écart déclaré).
+- Piège (ADR 0024) : le contenu partagé des agents ne nomme ni `report_phase` ni un dossier
+  `.skraft/` hors de son périmètre ; la partie outil va dans la consigne d'orchestration
+  (`ECARTS_AU_PLAN` dans `roles.ts`, `consignes` dans `workflow.mjs`).
+- Reste au §5 de docs/15 : re-revue sélective, patch partagé, mode rework (à mesurer d'abord).
+
 ## 15/10 — Skill d'architecture transmise à l'appel, pile dans le dossier
 
 - Skills reprises de v1.15.1 : `clean-architecture-{dotnet,java,python,react}`, et mise à jour de

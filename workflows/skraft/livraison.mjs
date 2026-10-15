@@ -10,7 +10,7 @@ import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFil
 import { buildBrief, lignePile } from "./brief.mjs";
 import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
-import { acOf, featureScenarios } from "./distill.mjs";
+import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser } from "./revue.mjs";
@@ -47,6 +47,9 @@ export async function livrer(w, d, lentilles, max) {
     // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
     if (d.derogations.length || d.derogationsCouverture.length)
       await w.ecrireFichier(`.skraft/${d.slug}/deliver/derogations.md`, rapportDeDerogations(d));
+    // Écarts au plan de test commités avec la livraison (ADR 0067).
+    if (d.ecartsAuPlan.length)
+      await w.ecrireFichier(`.skraft/${d.slug}/deliver/ecarts-au-plan.md`, rapportDEcarts(d));
     return true;
   }, {
     commit: commitMessage("DELIVER", d.slug),
@@ -58,6 +61,7 @@ export async function livrer(w, d, lentilles, max) {
       // Le code effacé emporte les mutants qu'on avait exemptés (ADR 0065) ; la trace les garde.
       d.derogations = [];
       d.derogationsCouverture = [];
+      d.ecartsAuPlan = [];
       return creerDossiers(w, d.slug);
     },
   });
@@ -187,6 +191,8 @@ async function scenario(w, d, L, i, motifs, max) {
       // Scénario repris à son début : tracé avec sa cause (docs/10 §4.3).
       await w.rejet(panne ? `panne (${sc.id})` : `scénario ${sc.id}`, e instanceof ScenarioEchoue ? e.motifs : [e.message]);
       echecs++;
+      // Le scénario repart de son début : ses tests sont effacés, et les écarts qu'ils portaient avec eux (ADR 0067).
+      d.ecartsAuPlan = d.ecartsAuPlan.filter((x) => x.scenario !== sc.id);
       await w.rembobiner(cpScenario);
       await creerDossiers(w, d.slug);
       retour = e instanceof ScenarioEchoue ? e.motifs : [];
@@ -271,7 +277,16 @@ async function pas(w, d, L, i, etape, depuis, motifs, max, unitTests, nouveau, c
   for (let essais = 1;; essais++) {
     try {
       const sortie = await agentDuPas(w, d, L, i, etape, retour, unitTests, nouveau, correction);
-      return await porteDuPas(w, d, L, i, etape, depuis, sortie, nouveau, correction);
+      // Écarts au plan de test (ADR 0067) : vérifiés contre la matrice gardée depuis DISTILL ; une
+      // déclaration fausse refuse le pas, une juste n'est gardée que si la porte du pas le valide.
+      const ecarts = sortie.planDeviations ?? [];
+      const motifsEcarts = ecarts.length ? verifierEcarts(ecarts, d.planDeTest ?? {}) : [];
+      if (motifsEcarts.length)
+        throw new PasRefuse(motifsEcarts.join(" ; "));
+      const resultat = await porteDuPas(w, d, L, i, etape, depuis, sortie, nouveau, correction);
+      const par = etape === "test" || etape === "fix-test" ? "skraft-test" : "skraft-dev";
+      d.ecartsAuPlan = [...d.ecartsAuPlan, ...ecarts.map((x) => ({ ...x, par, scenario: L.scenarios[i].id }))];
+      return resultat;
     }
     catch (e) {
       const motif = e instanceof PasRefuse || e instanceof TourInterrompu ? e.message : null;
@@ -770,6 +785,8 @@ function faitsDeLivraison(d, s, L, execution) {
     faits.push(execution);
   for (const x of d.derogations)
     faits.push(`Dérogation de mutation (${x.par}) : ${elementDe(x)} — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);
+  for (const x of d.ecartsAuPlan)
+    faits.push(`Écart au plan déclaré par ${x.par} (scénario ${x.scenario}, critère ${x.criterion}) : prévu ${x.planned} → ${x.actual} — règle : ${x.rule}. Vérifié contre la matrice du plan de test ; à juger sur sa règle.`);
   for (const x of d.derogationsCouverture)
     faits.push(`Ligne exemptée de la couverture du diff (humain) : ${x.file}:${x.line} — ${x.raison}.`);
   for (const sc of L.scenarios.filter((x) => x.status === "done")) {
@@ -1006,6 +1023,20 @@ async function briefArbitre(w, d, fils) {
   ].join("\n");
 }
 /** Fichier des dérogations, commité avec DELIVER (ADR 0065). */
+/** Écarts au plan de test déclarés en DELIVER, vérifiés par le code et jugés par la revue (ADR 0067). */
+function rapportDEcarts(d) {
+  const cellule = (x) => x.replace(/\|/g, "\\|");
+  return [
+    `# Écarts au plan de test — ${d.story.id}`,
+    "",
+    "Tests écrits à une autre couche, ou avec une autre doublure, que la matrice de `distill/test-plan.md`. Chaque écart a été déclaré par l'agent avec la règle qui l'impose, vérifié par le code contre la matrice, puis soumis à la revue.",
+    "",
+    "| Scénario | Critère | Déclaré par | Prévu | Réel | Règle |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...d.ecartsAuPlan.map((x) => `| ${x.scenario} | ${x.criterion} | ${x.par} | ${cellule(x.planned)} | ${cellule(x.actual)} | ${cellule(x.rule)} |`),
+    "",
+  ].join("\n");
+}
 function rapportDeDerogations(d) {
   const cellule = (x) => x.replace(/\|/g, "\\|");
   return [
