@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 17/10 — Branche feat/mcp-skraft : ADR 0068 accepté (skraft en serveur MCP local)
+
+- Branche `feat/mcp-skraft`, partie de `feat/workflow-rejouable` (PR #12).
+- ADR 0068 **accepté** le 17/10. Décidé par le responsable : runtime **Copilot** pour l'instant (adaptateur
+  existant) ; Claude plus tard, par le port `AgentRuntime`. Aussi : le serveur orchestre le
+  **workflow** (option A de docs/14), transport **stdio** (le client lance le serveur), outils
+  courts, **verrou par projet** (deux instances de client = deux serveurs sur le même disque),
+  projet détecté (argument, roots MCP, dossier courant) et **borné** (dépôt Git, root du client ou
+  dossier autorisé).
+- Authentification (décidée) : jeton de `gh` s'il est connecté ; sinon outil `skraft_connexion`
+  (flux d'appareil, code et adresse rendus à l'hôte MCP). Jeton jamais rendu à l'hôte ni journalisé.
+- Pile (décidée) : profil `.agent-studio/stack.yaml`, sinon détection, sinon profil fourni par le
+  client dans `skraft_demarrer` (mêmes contrôles : schéma, liste de l'administrateur ; gardé avec le
+  run, pas écrit dans le dépôt). Aucune des trois : refus de démarrer.
+- À vérifier avant de s'y fier : dossier courant donné au serveur par Claude Code et Copilot CLI,
+  leur support des roots MCP, la reprise hors Electron, l'accord sur le workflow sans fenêtre.
+- Prochaine étape : un essai du serveur avec le `ScriptedRuntime`, sans Copilot réel (critère
+  `serveur-mcp-skraft`).
+
 ## 17/10 — Revue de la PR #12 : sept constats corrigés
 
 - **Lien symbolique d'un workflow** (sécurité) : la compilation vérifie le chemin **réel** de chaque

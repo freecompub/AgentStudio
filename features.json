@@ -277,6 +277,13 @@
       "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
     },
     {
+      "id": "serveur-mcp-skraft",
+      "title": "Un serveur MCP local (stdio) lance le workflow skraft sur le projet de l'appelant, avec des agents Copilot : démarrer, consulter l'état, répondre aux questions, reprendre, arrêter, lire le rapport ; un verrou par projet ; projets bornés",
+      "verify": "pnpm vitest run --project mcp-skraft",
+      "passes": false,
+      "notes": "ADR 0068 (accepté), docs/14. Branche feat/mcp-skraft. Premier essai avec le ScriptedRuntime, sans Copilot réel ; reprise hors Electron à vérifier."
+    },
+    {
       "id": "mesures-revues-sur-runs-copilot",
       "title": "Au moins deux runs Copilot, extension et workflow, d'une story qui va jusqu'à DELIVER, avec la section « Coût des revues et des corrections » dans leur rapport ; chiffres reportés dans docs/15 §5",
       "verify": "test $(grep -l \"Coût des revues et des corrections\" docs/runs/*/rapport.md | wc -l) -ge 2",
