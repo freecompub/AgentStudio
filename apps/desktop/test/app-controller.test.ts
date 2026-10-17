@@ -102,6 +102,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: Copi
         pendingInteractions: async () => [],
         respond: async (id, option, _c, by) => void serviceLog.push(`réponse:${id}:${option}${by ? `:${by.role}` : ""}`),
         dispose: async () => void serviceLog.push(`libérés:${args.workspace.root}`),
+        demarrer: async () => void serviceLog.push(`démarrés:${args.workspace.root}`),
       };
       return services;
     },
@@ -274,8 +275,18 @@ describe("AppController — espaces de travail", () => {
     await controller["workspace:open"]({ path: "/projets/demo" });
     await controller["workspace:close"]({});
 
-    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo"]);
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "libérés:/projets/demo"]);
     expect(await controller["workspace:current"]({})).toBeNull();
+  });
+
+  // Revue de la PR #12 : rouvrir le projet (installation d'une extension) démarrait les nouveaux
+  // services avant de libérer les anciens ; leur purge commune du registre des sessions supprimait
+  // alors les sessions que les nouveaux venaient d'ouvrir.
+  it("rouvrir le projet : les nouveaux services sont construits, les anciens libérés, puis seulement les nouveaux démarrés", async () => {
+    const { controller, serviceLog } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "créés:/projets/demo", "libérés:/projets/demo", "démarrés:/projets/demo"]);
   });
 
   it("clôturer ferme la session de conversation en cours", async () => {
@@ -354,7 +365,7 @@ describe("AppController — espaces de travail", () => {
     await controller["workspace:open"]({ path: "/projets/demo" });
     await controller["workspace:close"]({});
     expect(await controller["workspace:open"]({ path: "/projets/demo" })).toEqual({ root: "/projets/demo", name: "demo" });
-    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo", "créés:/projets/demo"]);
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "libérés:/projets/demo", "créés:/projets/demo", "démarrés:/projets/demo"]);
   });
 });
 
@@ -659,13 +670,16 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
     await controller["task:cancel"]({ taskId: "t1" });
     await controller["workspace:open"]({ path: "/projets/autre" });
     // Les services du nouveau projet sont construits d'abord : si leur création échoue, le
-    // projet en cours reste utilisable. Les anciens ne sont libérés qu'ensuite.
+    // projet en cours reste utilisable. Les anciens ne sont libérés qu'ensuite, et les nouveaux ne
+    // démarrent (purge des sessions, reprise des tâches) qu'après.
     expect(serviceLog).toEqual([
       "créés:/projets/demo",
+      "démarrés:/projets/demo",
       "réponse:int-1:approve:developpeur",
       "annule:t1",
       "créés:/projets/autre",
       "libérés:/projets/demo",
+      "démarrés:/projets/autre",
     ]);
   });
 });

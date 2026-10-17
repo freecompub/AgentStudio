@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -107,6 +107,17 @@ describe("trouverWorkflows : deux emplacements, priorité au projet", () => {
     await poser(join(racine, "projet/skraft"), COMPLET);
     const avant = (await trouverWorkflows({ projet: join(racine, "projet") })).workflows[0]!.empreinte;
     await poser(join(racine, "projet/skraft"), { "agents/skraft-test.agent.md": "Tu écris DEUX tests." });
+    const apres = (await trouverWorkflows({ projet: join(racine, "projet") })).workflows[0]!.empreinte;
+    expect(apres).not.toBe(avant);
+  });
+
+  // Revue de la PR #12 : un lien symbolique était ignoré par l'empreinte, alors que la compilation le suit.
+  it("l'empreinte change quand la cible d'un lien symbolique du dossier change", async () => {
+    await poser(join(racine, "projet/skraft"), { ...COMPLET, "lib/a.mjs": "export const a = 1;\n", "lib/b.mjs": "export const a = 2;\n" });
+    await symlink("a.mjs", join(racine, "projet/skraft/lib/actuel.mjs"));
+    const avant = (await trouverWorkflows({ projet: join(racine, "projet") })).workflows[0]!.empreinte;
+    await unlink(join(racine, "projet/skraft/lib/actuel.mjs"));
+    await symlink("b.mjs", join(racine, "projet/skraft/lib/actuel.mjs"));
     const apres = (await trouverWorkflows({ projet: join(racine, "projet") })).workflows[0]!.empreinte;
     expect(apres).not.toBe(avant);
   });

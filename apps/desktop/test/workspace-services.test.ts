@@ -58,6 +58,8 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     onPost: (ext, md) => posts.push(`${ext}: ${md}`),
     notify: (title, body) => notifications.push(`${title} | ${body}`),
   });
+  // Comme le contrôleur : purge des sessions et reprise des tâches une fois les services construits.
+  await services.demarrer?.();
   return { services, cards, pending, posts, notifications, getLoads: () => runtimeLoads, store };
 }
 

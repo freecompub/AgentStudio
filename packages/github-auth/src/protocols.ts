@@ -79,5 +79,6 @@ export interface InteractiveProcess {
 }
 
 export interface ProcessSpawner {
-  spawn(cmd: string, args: readonly string[]): InteractiveProcess;
+  /** `env` s'ajoute à l'environnement du processus courant. */
+  spawn(cmd: string, args: readonly string[], opts?: { env?: Record<string, string> }): InteractiveProcess;
 }

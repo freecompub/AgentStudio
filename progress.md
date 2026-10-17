@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 17/10 — Revue de la PR #12 : sept constats corrigés
+
+- **Lien symbolique d'un workflow** (sécurité) : la compilation vérifie le chemin **réel** de chaque
+  fichier chargé et refuse une cible hors du dossier ; l'empreinte du dossier compte chaque lien et
+  sa cible. Avant, un lien vers l'extérieur contournait l'accord « toujours » et le gel.
+- **Projet rouvert** (installation d'une extension) : `WorkspaceServices.demarrer()` sépare purge
+  des sessions et reprise des tâches de la construction ; le contrôleur l'appelle après avoir
+  libéré les anciens services. Avant, la purge des anciens supprimait les sessions des nouveaux.
+- `lireEntrees` : une entrée nommée répétée, ou déjà donnée par position, ne retire plus une autre
+  positionnelle (`indexOf` à -1).
+- `pour-les-scripts.ts` exporte `couvertureDuDiff` et `problemesTestsExistants` ; un test vérifie
+  que chaque nom importé de `@agent-studio/workflow` par le workflow est défini sous Vitest.
+- Connexion GitHub : `gh` reçoit `GH_BROWSER` sans effet ; seule l'application ouvre la page.
+- `proposer_workflow` : réponse fidèle (tâche créée ou « Rien n'a démarré ») et une seule demande
+  (l'accord du workflow tient lieu de confirmation tant qu'il n'est pas donné pour toujours).
+- `deleteSession` (adaptateur Copilot) : une session introuvable (`getSessionMetadata` →
+  `undefined`) est tenue pour supprimée ; elle ne reste plus au registre.
+
 ## 16/10 — À faire : mesurer sur des runs Copilot, puis décider de trois évolutions du plugin
 
 - **Runs réels** (avec l'accord du responsable du projet, requêtes premium consommées) : au moins

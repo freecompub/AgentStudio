@@ -125,10 +125,30 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     expect(outil!.description).toContain("demo (/demo <story>) : Démo.");
     expect((outil!.parameters as { properties: { nom: { enum: string[] } } }).properties.nom.enum).toEqual(["demo"]);
 
-    expect(await outil!.handler({ nom: "demo", arguments: "stories/us-2.md" })).toMatch(/accept/);
-    // Proposition confirmée, puis accord sur le workflow (première exécution).
-    expect(o.demandes).toEqual(["Lancer le workflow « demo » proposé par l'agent ?", "Exécuter le workflow « demo » (projet) ?"]);
+    expect(await outil!.handler({ nom: "demo", arguments: "stories/us-2.md" })).toMatch(/^Workflow lancé/);
+    // Revue de la PR #12 : une seule demande. Accord pas encore donné pour toujours : c'est lui qui
+    // confirme la proposition, l'outil ne demande rien de plus.
+    expect(o.demandes).toEqual(["Exécuter le workflow « demo » (projet) ?"]);
     await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    await o.services.dispose();
+  }, 30_000);
+
+  it("accord déjà donné pour toujours : une seule demande, celle de la proposition de l'agent", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-always" });
+    expect(await o.services.route("/demo stories/us-2.md")).toEqual({ kind: "handled" });
+    await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    o.demandes.length = 0;
+    const [outil] = o.services.outilsAgent();
+    expect(await outil!.handler({ nom: "demo", arguments: "stories/us-3.md" })).toMatch(/^Workflow lancé/);
+    expect(o.demandes).toEqual(["Lancer le workflow « demo » proposé par l'agent ?"]);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("arguments invalides : rien ne démarre, et l'agent l'apprend au lieu de l'annoncer comme lancé", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-once" });
+    const [outil] = o.services.outilsAgent();
+    expect(await outil!.handler({ nom: "demo", arguments: "" })).toMatch(/^Rien n'a démarré/);
+    expect(await o.services.tasks()).toEqual([]);
     await o.services.dispose();
   }, 30_000);
 

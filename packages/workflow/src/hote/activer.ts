@@ -88,7 +88,9 @@ export function lireEntrees(entrees: MetaWorkflow["entrees"], args: string, comm
       const valeur = jetons[++k];
       if (valeur === undefined || valeur.startsWith("--")) return { ok: false, usage: usage() };
       entree[n] = valeur;
-      restants.splice(restants.indexOf(n), 1);
+      // Plus attendue comme positionnelle ; répétée, ou déjà donnée par position : la dernière l'emporte.
+      const i = restants.indexOf(n);
+      if (i >= 0) restants.splice(i, 1);
       continue;
     }
     const n = restants.shift();

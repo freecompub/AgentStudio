@@ -63,6 +63,12 @@ export interface WorkspaceServices {
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;
   respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
+  /**
+   * Démarre ce qui touche aux sessions d'agent : purge des sessions orphelines, puis reprise des
+   * tâches. Appelé **après** la libération des services précédents du même projet : sinon leur
+   * purge commune du registre des sessions supprimerait celles que ces services ouvrent.
+   */
+  demarrer?(): Promise<void>;
   dispose(): Promise<void>;
 }
 

@@ -122,6 +122,13 @@ describe("lecture des arguments d'après meta.entrees", () => {
     expect(lireEntrees(A, "--archi java --auto stories/us-2.md")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: true, archi: "java" } });
     expect(lireEntrees(A, "stories/us-2.md --archi")).toMatchObject({ ok: false });
   });
+
+  // Revue de la PR #12 : `indexOf` à -1 retirait la dernière positionnelle attendue.
+  it("une entrée nommée répétée, ou déjà donnée par position : la dernière valeur l'emporte, aucune autre entrée n'est perdue", () => {
+    const A = { ...E, archi: { type: "texte" as const, aide: "Skill d'architecture." } };
+    expect(lireEntrees(A, "--archi java --archi python stories/us-2.md")).toEqual({ ok: true, entree: { story: "stories/us-2.md", auto: false, archi: "python" } });
+    expect(lireEntrees(A, "stories/us-2.md --story stories/us-3.md java")).toEqual({ ok: true, entree: { story: "stories/us-3.md", auto: false, archi: "java" } });
+  });
   it("obligatoire absent, option inconnue, argument en trop : refus avec l'usage", () => {
     for (const a of ["", "--vite x", "a b"]) expect(lireEntrees(E, a)).toMatchObject({ ok: false, usage: expect.stringMatching(/<story>.*\[--auto\]/) });
   });

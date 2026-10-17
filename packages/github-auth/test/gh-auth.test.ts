@@ -89,9 +89,11 @@ describe("GhAuth", () => {
       exited: new Promise((r) => (exit = r)),
     };
     const spawned: string[] = [];
+    const envs: (Record<string, string> | undefined)[] = [];
     const spawner: ProcessSpawner = {
-      spawn: (cmd, args) => {
+      spawn: (cmd, args, opts) => {
         spawned.push([cmd, ...args].join(" "));
+        envs.push(opts?.env);
         return proc;
       },
     };
@@ -107,6 +109,9 @@ describe("GhAuth", () => {
     expect(spawned[0]).toBe("gh auth login --hostname github.com --git-protocol https --web");
     expect(codes).toEqual([{ code: "AB12-CD34", verificationUrl: "https://github.com/login/device" }]);
     expect(written).toEqual(entree);
+    // Revue de la PR #12 : l'application ouvre elle-même la page de connexion ; l'Entrée que gh
+    // attend lui ferait l'ouvrir une seconde fois. Son navigateur est une commande sans effet.
+    expect(envs[0]?.GH_BROWSER).toBe(process.platform === "win32" ? "cmd /c exit 0" : "true");
   });
 
   it("le statut indique l'hôte auquel on est connecté", async () => {

@@ -172,6 +172,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
     workspace = ws;
     services = prets;
     await anciens?.dispose();
+    // Les sessions ne se purgent et les tâches ne reprennent qu'une fois les anciens services
+    // libérés : les deux partagent le registre des sessions du projet (revue de la PR #12).
+    await prets.demarrer?.();
   }
 
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {

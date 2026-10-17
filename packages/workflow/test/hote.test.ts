@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { bundle, createNodeLauncher } from "@agent-studio/extension-host";
@@ -74,6 +74,17 @@ describe("compilation : seuls les fichiers du dossier et @agent-studio/workflow"
     const c = await compilerWorkflow(d);
     expect(c.ok).toBe(false);
     expect(!c.ok && c.motifs.join(" ")).toMatch(motif);
+  });
+
+  // Revue de la PR #12 : le chemin était vérifié avant résolution du lien ; esbuild charge la cible.
+  it("un lien symbolique du dossier vers un fichier extérieur : refusé", async () => {
+    const d = await poserWorkflow("lien", { "workflow.mjs": `${META}import { x } from "./lib.mjs";\nexport default async function () { return x; }\n` });
+    const dehors = join(dirname(d), "dehors-lien.mjs");
+    await writeFile(dehors, "export const x = 1;\n");
+    await symlink(dehors, join(d, "lib.mjs"));
+    const c = await compilerWorkflow(d);
+    expect(c.ok).toBe(false);
+    expect(!c.ok && c.motifs.join(" ")).toMatch(/hors du dossier/);
   });
 
   it("import dynamique d'un module Node : refusé aussi", async () => {

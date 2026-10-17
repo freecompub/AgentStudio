@@ -50,8 +50,16 @@ class FakeClient implements CopilotClientPort {
     this.resumed.push({ id, config });
     return (this.last = new FakeSdkSession(id));
   }
+  /** Sessions que le runtime ne connaît plus (dossier de données effacé) ; leur suppression échoue. */
+  disparues = new Set<string>();
+  /** Sessions existantes dont la suppression échoue quand même (panne). */
+  enPanne = new Set<string>();
   async deleteSession(id: string) {
+    if (this.disparues.has(id) || this.enPanne.has(id)) throw new Error(`Failed to delete session ${id}: Unknown error`);
     this.deleted.push(id);
+  }
+  async getSessionMetadata(id: string) {
+    return this.disparues.has(id) ? undefined : { sessionId: id };
   }
   modelsError: Error | null = null;
   models: ModelInfo[] = [];
@@ -245,5 +253,16 @@ describe("CopilotRuntime", () => {
     expect(client.last!.aborted).toBe(true);
     expect(client.last!.disconnected).toBe(true);
     expect(client.deleted).toEqual(["sdk-1"]);
+  });
+
+  // Revue de la PR #12 : une session que le runtime ne connaît plus restait au registre, retentée
+  // à chaque démarrage. Supprimer ce qui n'existe plus est un succès ; une vraie panne reste une erreur.
+  it("deleteSession : une session introuvable côté runtime est tenue pour supprimée ; une panne reste une erreur", async () => {
+    const client = new FakeClient();
+    const rt = createCopilotRuntime({ client });
+    client.disparues.add("perdue");
+    await expect(rt.deleteSession("perdue")).resolves.toBeUndefined();
+    client.enPanne.add("vivante");
+    await expect(rt.deleteSession("vivante")).rejects.toThrow(/Failed to delete session vivante/);
   });
 });

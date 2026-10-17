@@ -20,4 +20,7 @@ export const {
   lireBarreDeQualite,
   couchesManquantes,
   coucheDe,
+  // Revue de la PR #12 : absents, ils valaient `undefined` dans les tests du workflow.
+  couvertureDuDiff,
+  problemesTestsExistants,
 } = bibliotheque;

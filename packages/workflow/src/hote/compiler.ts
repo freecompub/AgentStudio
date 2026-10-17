@@ -3,6 +3,7 @@
  * des fichiers de son dossier et `@agent-studio/workflow`. Tout autre import — module Node, paquet,
  * fichier hors du dossier, y compris par `import()` — est refusé avant toute exécution.
  */
+import { realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { build, type Message } from "esbuild";
 
@@ -11,6 +12,10 @@ export type Compilation = { ok: true; code: string } | { ok: false; motifs: stri
 export async function compilerWorkflow(dossier: string): Promise<Compilation> {
   const racine = resolve(dossier);
   const dedans = (p: string) => p === racine || p.startsWith(racine + sep);
+  // Chemin réel, liens symboliques résolus : un lien du dossier vers un fichier extérieur ferait
+  // entrer dans le script un code que l'empreinte du dossier ne couvre pas (revue de la PR #12).
+  const racineReelle = realpathSync(racine);
+  const dedansReel = (p: string) => p === racineReelle || p.startsWith(racineReelle + sep);
   try {
     const r = await build({
       entryPoints: [resolve(racine, "workflow.mjs")],
@@ -32,6 +37,16 @@ export async function compilerWorkflow(dossier: string): Promise<Compilation> {
                 return undefined;
               }
               return { errors: [{ text: `import interdit : ${args.path} (seuls les fichiers du dossier et @agent-studio/workflow)` }] };
+            });
+            b.onLoad({ filter: /.*/ }, (args) => {
+              let reel: string;
+              try {
+                reel = realpathSync(args.path);
+              } catch {
+                return undefined;
+              }
+              if (!dedansReel(reel)) return { errors: [{ text: `import hors du dossier du workflow : ${relative(racine, args.path)} (lien vers ${reel})` }] };
+              return undefined;
             });
           },
         },

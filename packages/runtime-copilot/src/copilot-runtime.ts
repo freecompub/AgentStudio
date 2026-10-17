@@ -123,6 +123,16 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       logger?.info("session reprise", { sessionId: sdk.sessionId, role: cfg.role });
       return wrap(sdk, listeners);
     },
-    deleteSession: (id) => client.deleteSession(id),
+    // Une session que le runtime ne connaît plus (dossier de données effacé) ne peut pas être
+    // supprimée : c'est un succès, sinon le registre la retenterait à chaque démarrage (revue de la
+    // PR #12). Le SDK ne distingue pas ce cas dans son erreur ; ses métadonnées, si.
+    async deleteSession(id) {
+      try {
+        await client.deleteSession(id);
+      } catch (err) {
+        if ((await client.getSessionMetadata(id).catch(() => null)) === undefined) return;
+        throw err;
+      }
+    },
   };
 }

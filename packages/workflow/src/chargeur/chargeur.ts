@@ -5,7 +5,7 @@
  * empêcher les autres.
  */
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, readlink } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { extraireMeta } from "./meta.js";
 import { verifierMeta, type MetaWorkflow } from "./schema.js";
@@ -42,21 +42,27 @@ async function sousDossiers(racine: string): Promise<string[]> {
   }
 }
 
-async function fichiers(dossier: string): Promise<string[]> {
-  const out: string[] = [];
+async function fichiers(dossier: string): Promise<{ p: string; lien: boolean }[]> {
+  const out: { p: string; lien: boolean }[] = [];
   for (const e of await readdir(dossier, { withFileTypes: true })) {
     const p = join(dossier, e.name);
     if (e.isDirectory()) out.push(...(await fichiers(p)));
-    else if (e.isFile()) out.push(p);
+    else if (e.isFile()) out.push({ p, lien: false });
+    // Un lien symbolique compte aussi, par sa cible : la compilation le suit (revue de la PR #12).
+    else if (e.isSymbolicLink()) out.push({ p, lien: true });
   }
   return out;
 }
 
-/** Empreinte du dossier : chemins relatifs triés et contenus. Ne dépend ni de l'ordre ni de la machine. */
+/** Empreinte du dossier : chemins relatifs triés, contenus, et cible de chaque lien symbolique. Ne dépend ni de l'ordre ni de la machine. */
 export async function empreinteDossier(dossier: string): Promise<string> {
   const h = createHash("sha256");
-  const tous = (await fichiers(dossier)).map((p) => ({ p, rel: relative(dossier, p).split(sep).join("/") })).sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
-  for (const { p, rel } of tous) {
+  const tous = (await fichiers(dossier)).map((f) => ({ ...f, rel: relative(dossier, f.p).split(sep).join("/") })).sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+  for (const { p, rel, lien } of tous) {
+    if (lien) {
+      h.update(`${rel}\0lien\0${await readlink(p)}\0`);
+      continue;
+    }
     const contenu = await readFile(p);
     h.update(`${rel}\0${contenu.length}\0`);
     h.update(contenu);

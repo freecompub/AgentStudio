@@ -114,7 +114,11 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
       // L'hôte visé ne devient l'hôte courant qu'une fois la connexion réussie : un échec
       // laisserait sinon toute la session pointée sur la mauvaise instance.
       const cible = opts?.hostname !== undefined ? verifierHote(opts.hostname) : host;
-      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"]);
+      // L'application ouvre elle-même la page de connexion (écran d'authentification) : l'Entrée que
+      // gh attend lui ferait l'ouvrir une seconde fois. Son navigateur devient une commande sans
+      // effet, sans toucher à son attente ni à son sondage (revue de la PR #12).
+      const sansNavigateur = process.platform === "win32" ? "cmd /c exit 0" : "true";
+      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"], { env: { GH_BROWSER: sansNavigateur } });
       let buffer = "";
       let sent = false;
       let inviteValidee = false;
