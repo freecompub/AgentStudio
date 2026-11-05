@@ -87,7 +87,7 @@ async function projet() {
 type Projet = Awaited<ReturnType<typeof projet>>;
 
 /** Un serveur MCP (un client = un serveur), relié à un client en mémoire. */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur" }) {
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean }) {
   const factory = workspaceServicesFactory({
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
@@ -107,6 +107,10 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     role: o.role ?? "architecte",
     autorises: [],
     cwd: p.root,
+    connexion: {
+      verifier: async () => (o.nonConnecte ? { ok: false as const, motif: "Non connecté à GitHub (github.com) : appelle skraft_connexion." } : { ok: true as const }),
+      connecter: async () => ({ ok: true, texte: "Connexion à GitHub lancée. Ouvre https://github.com/login/device et saisis le code ABCD-1234." }),
+    },
   });
   const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { roots: {} } });
   client.setRequestHandler(ListRootsRequestSchema, async () => ({ roots: (o.roots ?? [p.root]).map((r) => ({ uri: pathToFileURL(r).href })) }));
@@ -140,7 +144,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const { tools } = await s.client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_demarrer", "skraft_etat", "skraft_repondre", "skraft_reprendre"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_repondre", "skraft_reprendre"]);
     await s.fermer();
   }, 30_000);
 
@@ -221,6 +225,16 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect((await s.appel("skraft_arreter", { tache: id })).erreur).toBe(false);
     await until(async () => (await s.etat()).taches[0]?.status === "finished");
     expect((await s.etat()).questions).toEqual([]);
+    await s.fermer();
+  }, 30_000);
+
+  it("non connecté à GitHub : démarrer, répondre et reprendre renvoient vers skraft_connexion ; l'état reste lisible", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), nonConnecte: true });
+    for (const [outil, args] of [["skraft_demarrer", { story: "x.md", accord: "une-fois" }], ["skraft_repondre", { question: "q", option: "o" }], ["skraft_reprendre", {}]] as const)
+      expect(await s.appel(outil, args)).toEqual({ erreur: true, texte: expect.stringMatching(/skraft_connexion/) });
+    expect((await s.etat()).taches).toEqual([]);
+    expect(await s.appel("skraft_connexion")).toEqual({ erreur: false, texte: expect.stringContaining("ABCD-1234") });
     await s.fermer();
   }, 30_000);
 

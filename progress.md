@@ -5,6 +5,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, brique 4 : connexion à GitHub sans fenêtre (point 7)
+
+- `apps/mcp-skraft/src/connexion.ts`, sur `GitHubAuth` (`gh`, comme l'application) :
+  - `verifier()` : connecté, et jeton accepté par Copilot (pas de jeton personnel classique) ;
+  - `connecter()` (outil `skraft_connexion`) : lance le flux d'appareil et rend **aussitôt** le code
+    et l'adresse ; pendant l'attente, le même code (pas de second flux) ; ensuite « Connecté » ; un
+    échec est dit une fois, puis l'appel suivant relance ;
+  - `runtime(fabrique)` : runtime démarré une fois, au premier besoin, avec le jeton ; un échec
+    n'est pas retenu.
+- `skraft_demarrer`, `skraft_repondre`, `skraft_reprendre` exigent la connexion (ils font travailler
+  les agents) et renvoient vers `skraft_connexion` ; `skraft_etat` et `skraft_arreter`, non.
+- Le jeton ne va qu'à la fabrique du runtime : testé absent de toutes les réponses.
+
 ## 05/11 — Serveur MCP, briques 2 et 3 : paquet apps/mcp-skraft, projet, verrou, outils
 
 - Nouveau paquet `apps/mcp-skraft` (projet Vitest `mcp-skraft`), SDK `@modelcontextprotocol/sdk` 1.32.2.
@@ -33,7 +46,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
   consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
   `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
-- Reste : `skraft_rapport`, `skraft_connexion` (authentification), pile fournie par le client
+- Reste : `skraft_rapport`, pile fournie par le client
   (point 8), point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
   reprise hors Electron.
 

@@ -153,6 +153,9 @@ importers:
       '@agent-studio/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@agent-studio/github-auth':
+        specifier: workspace:*
+        version: link:../../packages/github-auth
       '@agent-studio/project-services':
         specifier: workspace:*
         version: link:../../packages/project-services

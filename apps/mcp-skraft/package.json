@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@agent-studio/core": "workspace:*",
+    "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/project-services": "workspace:*",
     "@agent-studio/workflow": "workspace:*",
     "@agent-studio/workspace": "workspace:*",

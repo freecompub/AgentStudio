@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Role } from "@agent-studio/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { Connexion } from "./connexion.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet } from "./projet.js";
 
@@ -19,6 +20,8 @@ export interface OptionsServeur {
   /** Dossiers autorisés par la configuration du serveur, en plus des roots du client. */
   autorises: readonly string[];
   cwd: string;
+  /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
+  connexion: Pick<Connexion, "verifier" | "connecter">;
   version?: string;
 }
 
@@ -44,10 +47,17 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     }
   }
 
-  /** Résout et ouvre le projet, puis exécute ; toute exception devient une erreur de l'outil. */
-  function outil<A extends { projet?: string | undefined }>(fn: (p: ProjetOuvert, a: A) => Promise<Resultat>) {
+  /**
+   * Résout et ouvre le projet, puis exécute ; toute exception devient une erreur de l'outil.
+   * `agents` : l'outil peut faire travailler les agents, il exige une connexion utilisable par Copilot.
+   */
+  function outil<A extends { projet?: string | undefined }>(fn: (p: ProjetOuvert, a: A) => Promise<Resultat>, o2: { agents?: boolean } = {}) {
     return async (a: A): Promise<Resultat> => {
       try {
+        if (o2.agents) {
+          const c = await o.connexion.verifier();
+          if (!c.ok) return erreur(c.motif);
+        }
         const r = await resoudreProjet({ ...(a.projet !== undefined ? { argument: a.projet } : {}), roots: await roots(), cwd: o.cwd, autorises: o.autorises });
         if (!r.ok) return erreur(r.motif);
         return await fn(await o.projets.ouvrir(r.root), a);
@@ -94,7 +104,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       const r = await p.services.lancerWorkflow(w.nom, args, a.accord ? { accord: a.accord } : {});
       if (!r.ok) return erreur(r.motif);
       return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.`);
-    }),
+    }, { agents: true }),
   );
 
   mcp.registerTool(
@@ -147,7 +157,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       if (refus) return refus;
       await p.services.respond(a.question, a.option, a.texte, { role: o.role });
       return texte("Réponse enregistrée : le run reprend. Suis-le avec skraft_etat.");
-    }),
+    }, { agents: true }),
   );
 
   mcp.registerTool(
@@ -159,7 +169,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     outil(async (p) => {
       const m = await p.prendreLaMain();
       return m.pilote ? texte("Ce serveur pilote le projet : les runs interrompus ont repris.") : erreur(`Le projet est piloté par un autre serveur skraft (PID ${m.detenteur}), toujours en vie.`);
-    }),
+    }, { agents: true }),
   );
 
   mcp.registerTool(
@@ -174,6 +184,23 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       await p.services.cancelTask(a.tache);
       return texte(`Run ${a.tache} abandonné.`);
     }),
+  );
+
+  mcp.registerTool(
+    "skraft_connexion",
+    {
+      description:
+        "Connecte skraft à GitHub (Copilot fait travailler ses agents). Rend un code et une adresse à montrer à l'utilisateur, qui valide dans son navigateur ; rappelle l'outil pour vérifier.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const r = await o.connexion.connecter();
+        return r.ok ? texte(r.texte) : erreur(r.texte);
+      } catch (e) {
+        return erreur(e instanceof Error ? e.message : String(e));
+      }
+    },
   );
 
   return mcp;
