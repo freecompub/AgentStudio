@@ -5,6 +5,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, brique 1 : lancer un workflow avec un accord donné d'avance
+
+- ADR 0068 complété (point 9) : sans fenêtre, l'accord sur le workflow se donne **dans l'appel**.
+  `skraft_demarrer` rendra « accord requis » et le résumé, puis l'hôte rappelle avec
+  `accord: "une-fois" | "toujours"`. SDK retenu : `@modelcontextprotocol/sdk` (1.32.2, compatible zod 4).
+- `WorkspaceServices` gagne `workflows()` (nom, syntaxe, `accordRetenu`, résumé de l'accord) et
+  `lancerWorkflow(nom, args, { accord? })`, qui valide les arguments (`lireEntrees`), lance la
+  commande et dit ce qui a **réellement** démarré (identifiant de tâche, ou motif). `proposer_workflow`
+  s'appuie dessus : un seul chemin de lancement pour l'agent principal et le serveur MCP.
+- L'accord donné d'avance passe par un confirmeur enveloppé : il répond à la seule demande d'accord
+  du lancement, puis tombe dans tous les cas (`finally`) ; un appel refusé (arguments invalides) ne
+  le laisse pas au suivant. Testé dans `packages/project-services/test/workflows.test.ts`.
+
 ## 17/10 — Paquet project-services : les services d'un projet hors de l'application de bureau
 
 - Pour que le serveur MCP (ADR 0068) ne duplique pas l'assemblage des services d'un projet, il est

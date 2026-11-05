@@ -161,6 +161,49 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     await o.services.dispose();
   }, 30_000);
 
+  it("les workflows actifs sont listés, avec l'accord à montrer et s'il est déjà retenu (ADR 0068)", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-always" });
+    const [w] = await o.services.workflows();
+    expect(w).toMatchObject({ nom: "demo", commande: "demo", syntaxe: "/demo <story>", description: "Démo.", accordRetenu: false });
+    expect(w!.accord.title).toBe("Exécuter le workflow « demo » (projet) ?");
+    expect(w!.accord.detail).toContain("Écrire : .skraft/**");
+    await o.services.route("/demo x.md");
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(true);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("accord donné d'avance « une fois » : le workflow démarre sans rien demander, et l'accord n'est pas retenu", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "deny" });
+    const r = await o.services.lancerWorkflow("demo", "stories/us-2.md", { accord: "une-fois" });
+    expect(r).toEqual({ ok: true, taskId: expect.any(String) });
+    expect(o.demandes).toEqual([]);
+    await until(async () => (await o.services.tasks()).some((t) => t.id === (r as { taskId: string }).taskId && t.status === "finished"));
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(false);
+    // L'accord ponctuel est consommé : le lancement suivant redemande.
+    expect(await o.services.lancerWorkflow("demo", "stories/us-3.md")).toEqual({ ok: false, motif: expect.stringMatching(/accord refusé/) });
+    expect(o.demandes).toEqual(["Exécuter le workflow « demo » (projet) ?"]);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("accord donné d'avance « toujours » : retenu pour l'empreinte du workflow", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "deny" });
+    expect(await o.services.lancerWorkflow("demo", "stories/us-2.md", { accord: "toujours" })).toMatchObject({ ok: true });
+    expect(o.demandes).toEqual([]);
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(true);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("arguments invalides : rien ne démarre, le motif est la syntaxe de la commande ; workflow inconnu : refusé", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-once" });
+    expect(await o.services.lancerWorkflow("demo", "", { accord: "une-fois" })).toEqual({ ok: false, motif: expect.stringContaining("/demo <story>") });
+    expect(await o.services.tasks()).toEqual([]);
+    // L'accord ponctuel d'un appel refusé ne profite pas au suivant.
+    await o.services.lancerWorkflow("demo", "x.md");
+    expect(o.demandes).toEqual(["Exécuter le workflow « demo » (projet) ?"]);
+    expect(await o.services.lancerWorkflow("autre", "x.md")).toEqual({ ok: false, motif: "Workflow inconnu : autre" });
+    await o.services.dispose();
+  }, 30_000);
+
   it("sans workflow actif, l'agent principal n'a pas l'outil", async () => {
     const o = await ouvrir({});
     expect(o.services.outilsAgent()).toEqual([]);

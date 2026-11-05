@@ -7,6 +7,21 @@ import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, Too
 import type { Workspace } from "@agent-studio/workspace";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
 
+/** Accord sur un workflow donné d'avance : pour ce lancement, ou retenu pour son empreinte. */
+export type AccordDonne = "une-fois" | "toujours";
+
+export interface WorkflowActif {
+  nom: string;
+  commande: string;
+  description: string;
+  /** `/demo <story> [--auto]`. */
+  syntaxe: string;
+  /** Accord déjà retenu (« toujours ») pour l'empreinte actuelle du dossier. */
+  accordRetenu: boolean;
+  /** Ce que l'utilisateur doit voir avant d'accepter (`resumeAccord`). */
+  accord: { title: string; detail: string };
+}
+
 /** Résultat du routage d'un message tapé dans le chat. */
 export type RouteOutcome = { kind: "chat" } | { kind: "handled" } | { kind: "unknown-command"; name: string };
 
@@ -19,6 +34,14 @@ export interface WorkspaceServices {
   hookGuards(): ToolCallGuard[];
   /** Outils donnés à l'agent principal (`proposer_workflow` si un workflow est actif, ADR 0055). */
   outilsAgent(): ToolSpec[];
+  /** Workflows en dossier activés pour ce projet (ADR 0055). */
+  workflows(): Promise<WorkflowActif[]>;
+  /**
+   * Lance un workflow comme sa commande, et dit ce qui a réellement démarré. Sans `accord`, celui
+   * du workflow est demandé au confirmeur s'il n'est pas retenu ; avec, il vaut réponse pour ce
+   * seul lancement (ADR 0068 : un client sans fenêtre le donne dans son appel).
+   */
+  lancerWorkflow(nom: string, args: string, o?: { accord?: AccordDonne }): Promise<{ ok: true; taskId: string } | { ok: false; motif: string }>;
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;
