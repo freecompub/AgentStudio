@@ -15,14 +15,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   `esbuild` en import externe ; sous `--permission`, Node refuse de lire `node_modules`. Mes tests
   ne rejouaient aucun workflow avec l'enfant **construit**. Corrigé (`external: []` pour l'enfant,
   comme `build-extensions.mjs`) et testé (`stdio.test.ts` : l'enfant construit rejoue skraft).
-- Second essai sur `exemple-dotnet-tdd` / US-2 : **fini**, 19 min 24 s, **20 requêtes**, toutes les
+- Second essai sur `exemple-dotnet-tdd` / US-2 : **fini**, 19 min 24 s, **≈ 374 requêtes premium** (trace : 373,8 unités, 128 appels
+  `claude-sonnet-5` ; réserve : 0 → 373), toutes les
   phases, livrable vérifié à part (`dotnet test` : 10/10). Compte rendu :
   `docs/runs/2026-11-05-us-2-mcp/`. Accord en deux appels, questions et réponses par MCP, rapport :
   tout le parcours de l'hôte a fonctionné en réel.
 - Constat à suivre dans le **workflow** (pas le serveur) : la même question ouverte a été posée deux
   fois (avec et sans guillemets) — doublon à l'extraction des questions.
-- Coût sans commune mesure avec le run du 10/10 (264 requêtes) : un seul run, à ne pas prendre pour
-  une mesure.
+- **Piège** : `usage.requests` de la carte (et de `skraft_etat`) compte les **tours d'agent** (20 ici),
+  pas les requêtes facturées ; je l'ai d'abord annoncé comme le coût. Le coût réel se lit dans la
+  trace (`nanoAiu` des événements `usage`) ou dans la réserve. Plus rapide que le run du 10/10
+  (55 min), mais plus cher (264,3) : un seul run, pas une mesure.
 - `serveur-mcp-skraft` passe à `true`. Reste hors critère : la distribution (registre, licence).
 
 ## 05/11 — Serveur MCP, brique 7 : point d'entrée stdio, bundle, reprise hors Electron

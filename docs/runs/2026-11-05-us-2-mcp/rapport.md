@@ -7,7 +7,10 @@
 - Réponses humaines : `docs/runs/reponses-us-2.json`, par le répondeur commun du banc ; profil
   `architecte` (`admin.json` de l'essai).
 - État final : **fini / DONE** ; phases RESEARCH, DESIGN, DISTILL, DELIVER, aucune sautée.
-- Durée : 19 min 24 s ; **20 requêtes premium** (usage du serveur).
+- Durée : 19 min 24 s ; **≈ 374 requêtes premium** : 373,8 unités dans la trace (128 appels au
+  modèle, tous `claude-sonnet-5`, 5,0 M tokens d'entrée), et réserve Copilot passée de 0 à 373
+  utilisées. 20 **tours** d'agent : c'est ce que compte `requests` dans l'usage du serveur (un par
+  tour), pas les requêtes facturées.
 - Livrable vérifié à part : `dotnet test` dans le clone, **10/10 verts**. Scénarios ac-1 à ac-5
   `done` (ac-2 et ac-3 moteurs, les autres de régression). ADR : aucun. Arbitrages : aucun.
 - Dernier rejet : porte de cohérence en DESIGN (`ArgumentOutOfRangeException` cité dans
@@ -30,5 +33,9 @@
 - **Question ouverte posée deux fois** (« Les paliers sont-ils les mêmes pour toutes les
   références… », avec et sans guillemets) : doublon de l'extraction des questions par skraft, pas
   du serveur. La même réponse a été donnée aux deux. À regarder dans le workflow.
-- Coût très inférieur au run workflow du 10/10 sur la même story (264 requêtes, 55 min) : une seule
-  revue par phase, une livraison sans fin anormale. Un seul run : pas une mesure, un constat.
+- Par rapport au run workflow du 10/10 sur la même story (264,3 requêtes, 55 min, modèles gpt-6 et
+  claude) : **plus rapide (19 min), plus cher (≈ 374)**, avec `claude-sonnet-5` partout. Un seul run :
+  pas une mesure, un constat.
+- Piège de lecture : le `usage.requests` de la carte de tâche (et de `skraft_etat`) compte les tours,
+  pas les requêtes premium ; l'hôte d'essai l'affichait en « req. ». Le coût se lit dans la trace
+  (`nanoAiu`) ou dans la réserve.
