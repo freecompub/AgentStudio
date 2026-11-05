@@ -57,7 +57,7 @@ par rôle, et le serveur ne voit pas les écritures de l'hôte.
    à l'hôte MCP ni écrit dans un journal.
 
 8. **Pile du projet.** Le serveur reprend le
-   choix de l'application (`apps/desktop/src/main/workspace-services.ts`), dans cet ordre :
+   choix de l'application (`packages/project-services/src/workspace-services.ts`), dans cet ordre :
    - le **profil du projet** `.agent-studio/stack.yaml`, versionné avec le dépôt ;
    - sinon la **détection automatique** par les adaptateurs (TypeScript aujourd'hui) ;
    - sinon le **profil fourni par le client** dans son appel (argument `pile` de `skraft_demarrer`),
@@ -71,14 +71,22 @@ par rôle, et le serveur ne voit pas les écritures de l'hôte.
    une autre pile ferait échouer toutes les portes pour une mauvaise raison. La pile retenue, et sa
    source, figurent dans la réponse de `skraft_etat`.
 
+9. **Accord sur le workflow, sans fenêtre** (décidé le 2026-11-05). Même règle que l'application
+   (`verifierAccord`, ADR 0055), en deux appels : si aucun accord n'est retenu pour l'empreinte du
+   workflow, `skraft_demarrer` ne lance rien et rend « accord requis » avec le résumé de
+   `resumeAccord` (origine, écritures, Git, tests, agents). L'hôte le montre à l'utilisateur, puis
+   rappelle `skraft_demarrer` avec `accord: "une-fois"` ou `accord: "toujours"` ; « toujours »
+   retient l'accord pour cette empreinte, un workflow modifié est redemandé. Écartés : l'accord
+   préalable en configuration (l'utilisateur ne voit pas le résumé, l'accord ne suit plus
+   l'empreinte) et l'*elicitation* MCP (support par Copilot CLI non vérifié).
+
 ## Conséquences
 
 - Un nouveau point d'entrée Node (paquet `apps/mcp-skraft`), qui assemble les services d'un projet
   sans Electron : moteur de tâches, Workspace, adaptateur de pile, interactions, preuves, trace,
   runtime Copilot, workflow activé. L'IPC, les confirmations et le chat de l'application de bureau
   sont remplacés par les outils et les notifications MCP.
-- L'accord sur le workflow (ADR 0055) doit être obtenu sans fenêtre : à préciser au moment de
-  l'implémenter (accord donné par un outil MCP, ou accord préalable en configuration).
+- SDK MCP : `@modelcontextprotocol/sdk` (1.32.2 au 2026-11-05, Node ≥ 18, compatible zod 4).
 - La reprise hors Electron reste à vérifier (docs/14 §5, point 4).
 - Pendant un run, l'hôte ne doit pas modifier le dépôt : skraft travaille sur `skraft/<slug>` et ses
   checkpoints supposent d'être seuls.
