@@ -5,6 +5,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, brique 5 : rapport d'un run (skraft_rapport)
+
+- `packages/workflow/src/rapport.ts` : `rapportDuWorkflow(etat)`, fonction pure sur l'état persisté
+  de la tâche — statut (`en-cours`, `fini` avec la valeur rendue par le script, `echec` avec le motif,
+  `annule`), messages du script (`w.informer` déjà exécutés, dont le bilan final de skraft, relus du
+  magasin de contenus), dernier rejet, arbitrages. Rien n'est relancé ni relu sur le disque du projet.
+- `WorkspaceServices.rapportWorkflow(taskId)` : `null` pour une tâche inconnue ou qui n'est pas un
+  workflow (nom `workflow.<nom>/…`). Outil `skraft_rapport` : le rapport en JSON.
+- Pourquoi pas les seuls messages de `skraft_etat` : ils sont en mémoire, par projet, et limités aux
+  20 derniers ; le journal de la tâche est durable et propre au run.
+
 ## 05/11 — Serveur MCP, brique 4 : connexion à GitHub sans fenêtre (point 7)
 
 - `apps/mcp-skraft/src/connexion.ts`, sur `GitHubAuth` (`gh`, comme l'application) :
@@ -46,7 +57,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
   consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
   `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
-- Reste : `skraft_rapport`, pile fournie par le client
+- Reste : pile fournie par le client
   (point 8), point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
   reprise hors Electron.
 

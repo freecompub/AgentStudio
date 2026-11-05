@@ -204,6 +204,16 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     await o.services.dispose();
   }, 30_000);
 
+  it("rapport d'un run de workflow : messages du script et fin, lus dans l'état de la tâche ; autre tâche : aucun", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-once" });
+    const r = await o.services.lancerWorkflow("demo", "stories/us-2.md");
+    const id = (r as { taskId: string }).taskId;
+    await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    expect(await o.services.rapportWorkflow(id)).toMatchObject({ statut: "fini", messages: [] });
+    expect(await o.services.rapportWorkflow("inconnue")).toBeNull();
+    await o.services.dispose();
+  }, 30_000);
+
   it("sans workflow actif, l'agent principal n'a pas l'outil", async () => {
     const o = await ouvrir({});
     expect(o.services.outilsAgent()).toEqual([]);

@@ -4,6 +4,7 @@
  * (ADR 0068).
  */
 import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
+import type { RapportWorkflow } from "@agent-studio/workflow";
 import type { Workspace } from "@agent-studio/workspace";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
 
@@ -42,6 +43,8 @@ export interface WorkspaceServices {
    * seul lancement (ADR 0068 : un client sans fenêtre le donne dans son appel).
    */
   lancerWorkflow(nom: string, args: string, o?: { accord?: AccordDonne }): Promise<{ ok: true; taskId: string } | { ok: false; motif: string }>;
+  /** Rapport d'un run de workflow, lu dans l'état de sa tâche ; `null` : tâche inconnue, ou pas un workflow. */
+  rapportWorkflow(taskId: string): Promise<RapportWorkflow | null>;
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;

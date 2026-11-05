@@ -53,6 +53,8 @@ export default async function (w, entree) {
     await w.ecrireFichier(".skraft/resume.md", a.sortie.summary + " " + d.decision);
     return true;
   });
+  await w.informer("Bilan : terminé.");
+  return { slug: "demo" };
 }
 `;
 
@@ -144,7 +146,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const { tools } = await s.client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_repondre", "skraft_reprendre"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
     await s.fermer();
   }, 30_000);
 
@@ -178,6 +180,10 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(rep.erreur).toBe(false);
     await until(async () => (await s.etat()).taches[0]?.status === "finished");
     expect(p.ecrits).toEqual([".skraft/resume.md"]);
+
+    const rapport = await s.appel("skraft_rapport", { tache: id });
+    expect(JSON.parse(rapport.texte)).toMatchObject({ statut: "fini", valeur: { slug: "demo" }, messages: ["Bilan : terminé."] });
+    expect(await s.appel("skraft_rapport", { tache: "inconnue" })).toEqual({ erreur: true, texte: expect.stringMatching(/inconnue/) });
     await s.fermer();
   }, 30_000);
 

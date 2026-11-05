@@ -187,6 +187,18 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
   );
 
   mcp.registerTool(
+    "skraft_rapport",
+    {
+      description: "Rapport d'un run, en JSON : statut (en-cours, fini, echec, annule), valeur rendue ou motif, messages du run (dont le bilan final), dernier rejet d'une porte, arbitrages.",
+      inputSchema: { tache: z.string().min(1), projet },
+    },
+    outil(async (p, a) => {
+      const r = await p.services.rapportWorkflow(a.tache);
+      return r ? texte(JSON.stringify(r, null, 2)) : erreur(`Run inconnu dans ce projet : ${a.tache}.`);
+    }),
+  );
+
+  mcp.registerTool(
     "skraft_connexion",
     {
       description:

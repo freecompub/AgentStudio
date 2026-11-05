@@ -51,7 +51,7 @@ import type { Workspace } from "@agent-studio/workspace";
 import type { UserConfirmer } from "@agent-studio/core";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
 import type { WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
-import { activerWorkflow, createJsonAccordStore, lireEntrees, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type WorkflowTrouve } from "@agent-studio/workflow";
+import { activerWorkflow, createJsonAccordStore, lireEntrees, rapportDuWorkflow, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type EtatWorkflow, type WorkflowTrouve } from "@agent-studio/workflow";
 import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 
 /** Extension à activer : dans le principal (tests, J2) ou dans son propre processus (J4). */
@@ -456,6 +456,11 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           })),
         ),
       lancerWorkflow,
+      async rapportWorkflow(taskId) {
+        const r = (await engine.list()).find((t) => t.id === taskId);
+        // Les tâches de workflow sont celles des déclarations `workflow.<nom>` (manifesteDuWorkflow).
+        return r && r.name.startsWith("workflow.") ? rapportDuWorkflow(r.state as EtatWorkflow) : null;
+      },
       tasks: async () =>
         (await engine.list())
           .map((r) => toTaskCard(r, manifests, usageRows.has(r.id) ? { unit, rows: usageRows.get(r.id)! } : undefined))
