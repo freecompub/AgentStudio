@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Analyse de skraft-plugin v2 (docs/16)
+
+- `docs/16-skraft-plugin-v2.md` : agents, skills, lentilles, revue et portes de la branche
+  `integration/v2-next` (commit `0425f031`, 2.0.0-alpha.63) face à v1.15.1 et à AgentStudio. Lu en
+  lecture seule dans `~/Projets/skraft-plugin` (seule la branche a été récupérée).
+- Constat principal : la v2 passe d'un orchestrateur-prompt à un **moteur** qui parcourt un graphe
+  DOT ; revue en code avec un **réfutateur** de findings et un verdict calculé ; portes exécutées par
+  le moteur ; agents et skills fortement réduits. Même direction qu'AgentStudio.
+- Vérifié moi-même dans le code v2 : findings `low` qui renvoient le travail (`verdict.mjs`, en
+  contradiction avec le message du commit 27c2e656) ; `MUTATION_BARS` figé à 100/80 ; aucune porte
+  de gel des tests d'acceptance trouvée.
+- **Licence** : la v2 n'est pas couverte par l'autorisation (versions < v2.0.0). Le responsable est
+  contributeur de skraft-plugin depuis le 05/11 ; extension de l'autorisation **non** demandée ni
+  consignée à ce jour.
+- Décisions proposées (§9.1) : autorisation v2, réfutateur à mesurer dans le workflow, re-revue
+  incrémentale, défauts mineurs, lentilles par phase. Contributions possibles en amont (§9.3).
+
 ## 05/11 — Les rejets des workflows manquaient à la trace (project-services)
 
 - Constat sur le run MCP d'US-2 : un rejet de cohérence en DESIGN (journal : `rejections: 1`), mais
