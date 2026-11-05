@@ -1,0 +1,85 @@
+/**
+ * Assemblage réel du serveur MCP (ADR 0068) : mêmes briques que l'application de bureau
+ * (`apps/desktop/src/main/index.ts`), sans Electron. Tout ce que le serveur garde est dans son
+ * dossier de données (`~/.agent-studio/mcp-skraft/`) : tâches, piles fournies, verrous, état du
+ * CLI Copilot, journal. Le journal va dans un fichier : stdout est le canal du protocole MCP.
+ */
+import { createHash, randomUUID } from "node:crypto";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { createJsonLogger } from "@agent-studio/core";
+import { createNodeLauncher } from "@agent-studio/extension-host";
+import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
+import { defaultAdminConfigPath, loadAdminConfig, workspaceServicesFactory } from "@agent-studio/project-services";
+import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
+import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
+import { cliGitRunnerFactory, openWorkspace } from "@agent-studio/workspace";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { cheminConfiguration, lireConfiguration } from "./config.js";
+import { createConnexion } from "./connexion.js";
+import { createPilesFichiers } from "./piles.js";
+import { createProjets, type Projets } from "./projets.js";
+import { createServeurSkraft } from "./serveur.js";
+import { ouvrirServicesSansFenetre } from "./services.js";
+import { prendreVerrou, processusVivant } from "./verrou.js";
+
+/** Nom du workflow livré avec le serveur (`workflows/skraft/`, `meta.name`). */
+export const WORKFLOW_SKRAFT = "skraft-workflow";
+
+export interface OptionsAssemblage {
+  home: string;
+  env: NodeJS.ProcessEnv;
+  cwd: string;
+  /** Dossier du paquet construit : `workflows/` et `workflow-child.mjs`. */
+  racinePaquet: string;
+  version: string;
+}
+
+export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true; mcp: McpServer; projets: Projets } | { ok: false; motif: string }> {
+  const donnees = join(o.home, ".agent-studio", "mcp-skraft");
+  mkdirSync(join(donnees, "logs"), { recursive: true });
+  const fichierJournal = join(donnees, "logs", "mcp-skraft.log");
+  const logger = createJsonLogger({ write: (ligne) => appendFileSync(fichierJournal, `${ligne}\n`), level: "info" }, { pid: process.pid });
+
+  const lue = await lireConfiguration(cheminConfiguration(o.env, o.home), { home: o.home });
+  if (!lue.ok) return lue;
+  const config = lue.config;
+  const admin = await loadAdminConfig(defaultAdminConfigPath(process.platform, o.env));
+  if (admin.error) logger.error("configuration administrateur invalide : profil restreint appliqué", { source: admin.source, error: admin.error });
+
+  const auth = createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner(), hostname: config.hostname });
+  const connexion = createConnexion(auth);
+  const runtime = connexion.runtime((jeton, hostname) =>
+    createCopilotRuntime({
+      client: createCopilotClient({ gitHubToken: jeton, hostname, baseDirectory: join(donnees, "copilot") }),
+      logger: logger.child({ component: "runtime" }),
+    }),
+  );
+  const git = cliGitRunnerFactory({ config: { [`credential.https://${config.hostname}.helper`]: "!gh auth git-credential" } });
+  const surSortieDErreur = (c: string) => logger.warn("sortie d'erreur d'un workflow", { output: c.slice(0, 2_000) });
+
+  const factory = workspaceServicesFactory({
+    extensions: [],
+    stacks: [createTypeScriptAdapter()],
+    allowedPrograms: admin.allowedPrograms,
+    // Sans pile, refus qui dit quoi fournir (point 8) : un repli ferait échouer les portes.
+    sansRepli: true,
+    tasksDir: join(donnees, "tasks"),
+    clock: { now: () => new Date() },
+    ids: { next: () => randomUUID() },
+    logger,
+    // Le workflow livré avec le serveur ; un workflow du même nom dans le projet le remplace, et
+    // son accord est demandé à part (origine « projet »).
+    workflows: { machine: join(o.racinePaquet, "workflows"), launcher: createNodeLauncher({ onStderr: surSortieDErreur }), runtimeEntry: join(o.racinePaquet, "workflow-child.mjs") },
+  });
+  const cle = (root: string) => createHash("sha256").update(root).digest("hex").slice(0, 16);
+  const projets = createProjets({
+    ouvrir: (root, journal, pileFournie) => ouvrirServicesSansFenetre({ factory, workspace: (r) => openWorkspace(r, { git }), runtime, journal })(root, pileFournie),
+    // Hors du dépôt : les checkpoints capturent les fichiers non suivis (ADR 0068, point 5).
+    verrou: (root) => prendreVerrou(join(donnees, "verrous", `${cle(root)}.lock`), { pid: process.pid, estVivant: processusVivant }),
+    piles: createPilesFichiers(join(donnees, "piles")),
+  });
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, cwd: o.cwd, connexion, version: o.version });
+  logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length });
+  return { ok: true, mcp, projets };
+}

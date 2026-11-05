@@ -5,6 +5,35 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, brique 7 : point d'entrée stdio, bundle, reprise hors Electron
+
+- `config.ts` : `~/.agent-studio/mcp-skraft.json` (ou `SKRAFT_MCP_CONFIG`) — `autorises` (chemins
+  absolus, `~` développé) et `hostname` ; absent : valeurs prudentes ; invalide : le serveur s'arrête,
+  raison sur stderr. Profil et programmes autorisés : `admin.json`, comme l'application.
+- `assemblage.ts` : la composition réelle (gh, Copilot, Workspace, adaptateur TypeScript,
+  `sansRepli`, lanceur Node isolé, workflow livré dans le paquet). Données dans
+  `~/.agent-studio/mcp-skraft/` : `tasks/`, `piles/`, `verrous/`, `copilot/`, `logs/`.
+  **Le journal va dans un fichier** : stdout est le canal du protocole.
+- **Verrou hors du dépôt** (ADR 0068 précisé) : les checkpoints font `git add -A` et le rollback
+  `clean -fdq` ; dans `.agent-studio/`, le verrou entrerait dans les checkpoints et les diffs que
+  contrôlent les portes. Il est dans `verrous/<empreinte du chemin>.lock`.
+- `main.ts` : transport stdio ; fermeture (stdin fermé, SIGINT, SIGTERM) libère services et verrous.
+- `scripts/build.mjs` (`pnpm --filter @agent-studio/mcp-skraft build`) : `dist/main.mjs` (paquets
+  internes intégrés), `dist/workflow-child.mjs`, `dist/workflows/skraft/` (sources et LICENSE) ;
+  externes : `@github/copilot-sdk` (CLI Copilot, binaires par plateforme) et `esbuild` (natif,
+  compile le workflow à l'activation), déclarés en dépendances. `dist/` n'est pas versionné.
+- `skraft_etat` donne aussi le workflow et son accord (`accordRetenu`).
+- Tests : `stdio.test.ts` construit le paquet et le lance en vrai processus (outils, workflow
+  skraft activé, pile détectée, projet hors des dossiers autorisés refusé, configuration invalide,
+  journal hors de stdout) — sans GitHub ni Copilot ; écrit après le code (composition), pas vu rouge.
+  « Reprise hors Electron » (`serveur.test.ts`) : stockages JSON réels, serveur fermé pendant une
+  question, un autre relit le disque et mène le run au bout, sans relancer l'agent : **le point 4
+  de docs/14 §5 est levé**.
+- `apps/mcp-skraft/README.md` : construire, prérequis, inscription, configuration, outils, données.
+- Suite complète : 2061 tests, typecheck.
+- **Reste** : un run avec des agents Copilot réels (accord du responsable) ; l'écart « réponse en
+  consultation » à trancher ; la distribution (registre, licence du paquet hors skraft).
+
 ## 05/11 — Serveur MCP, brique 6 : pile fournie par le client (point 8)
 
 - `project-services` : le choix de la pile gagne une troisième source. Ordre : profil du projet, puis
@@ -73,8 +102,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
   consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
   `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
-- Reste : point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
-  reprise hors Electron.
+- Reste : voir la brique 7.
 
 ## 05/11 — Serveur MCP, brique 1 : lancer un workflow avec un accord donné d'avance
 

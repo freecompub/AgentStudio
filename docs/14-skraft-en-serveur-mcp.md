@@ -2,6 +2,7 @@
 
 - Date : 2026-10-13, branche `feat/workflow-rejouable`.
 - Statut : **étude**, suivie de l'ADR 0068 (accepté le 2026-10-17, branche `feat/mcp-skraft`) : option A, workflow, transport stdio, verrou par projet, projet borné, runtime Copilot.
+- Implémenté le 2026-11-05 : `apps/mcp-skraft` (README). Le point 4 du §5 (reprise hors Electron) est vérifié.
 - Question : peut-on utiliser skraft depuis Claude Code ou Copilot CLI, sous la forme d'un serveur
   MCP exécuté en local ?
 

@@ -119,11 +119,12 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
   mcp.registerTool(
     "skraft_etat",
     {
-      description: "État des runs du projet (phase, étape, dernier rejet), questions en attente d'une réponse humaine, derniers messages ; en JSON.",
+      description: "État du projet : mode du serveur (pilote ou consultation), workflow et son accord, pile retenue, runs (phase, étape, dernier rejet), questions en attente d'une réponse humaine, derniers messages ; en JSON.",
       inputSchema: { projet },
     },
     outil(async (p) => {
       const m = p.mode();
+      const w = (await p.services.workflows()).find((x) => x.nom === o.workflow);
       const taches = (await p.services.tasks()).map((t) => ({
         id: t.id,
         titre: t.title,
@@ -144,7 +145,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         ...(q.freeText ? { texteLibre: true } : {}),
       }));
       return texte(
-        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", ...(m.pilote ? {} : { detenteur: m.detenteur }), pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
+        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", ...(m.pilote ? {} : { detenteur: m.detenteur }), workflow: w ? { nom: w.nom, accordRetenu: w.accordRetenu } : null, pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
       );
     }),
   );

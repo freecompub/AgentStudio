@@ -78,7 +78,7 @@ async function poser(base: string, fichiers: Record<string, string>) {
 }
 
 /** Projet partagé par les serveurs d'un même test : mêmes stockages, comme sur le disque. */
-async function projet() {
+async function projet(o: { surDisque?: boolean } = {}) {
   const root = await mkdtemp(join(racine, "projet-"));
   await mkdir(join(root, ".git"));
   const ecrits: string[] = [];
@@ -88,7 +88,8 @@ async function projet() {
     consignes.push(t.prompt);
     await t.callTool("report_phase", { summary: "résumé", files: [] });
   });
-  const stockages = { taskStore: new MemoryTaskStore(), evidenceStore: new MemoryEvidenceStore(), taskSessionStore: new MemoryTaskSessionStore() };
+  // Sur disque : les stockages JSON de production (tâches, preuves, interactions, sessions).
+  const stockages = o.surDisque ? {} : { taskStore: new MemoryTaskStore(), evidenceStore: new MemoryEvidenceStore(), taskSessionStore: new MemoryTaskSessionStore() };
   const workspace = {
     root,
     files: { read: async () => "", write: async (p: string) => void ecrits.push(p), ensureDir: async () => {}, list: async () => [] },
@@ -140,6 +141,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
   };
   const etat = async () => JSON.parse((await appel("skraft_etat")).texte) as {
     mode: string;
+    workflow: { nom: string; accordRetenu: boolean } | null;
     pile: { id: string; source: string };
     taches: { id: string; status: string; phase: string }[];
     questions: { id: string; title: string; detail?: string; options: { id: string; label: string }[] }[];
@@ -238,6 +240,27 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     await premier.fermer();
   }, 30_000);
 
+  it("reprise hors Electron : le serveur s'arrête pendant une question ; le suivant relit le disque, et le run va au bout", async () => {
+    const p = await projet({ surDisque: true });
+    const premier = await serveur(p, { pid: 1, vivants: new Set([1]) });
+    const id = /tâche (\S+)\./.exec((await premier.appel("skraft_demarrer", { story: "x.md", accord: "une-fois" })).texte)![1]!;
+    await until(async () => (await premier.etat()).questions.length === 1);
+    await premier.fermer();
+
+    // Nouveau processus : autres services, mêmes fichiers. Le rejeu du journal ne relance pas l'agent.
+    const appelsAvant = p.consignes.length;
+    const second = await serveur(p, { pid: 2, vivants: new Set([2]) });
+    const e = await second.etat();
+    expect(e.mode).toBe("pilote");
+    expect(e.taches).toMatchObject([{ id, status: "waiting" }]);
+    expect(e.questions).toHaveLength(1);
+    await second.appel("skraft_repondre", { question: e.questions[0]!.id, option: e.questions[0]!.options[0]!.id });
+    await until(async () => (await second.etat()).taches[0]?.status === "finished");
+    expect(JSON.parse((await second.appel("skraft_rapport", { tache: id })).texte)).toMatchObject({ statut: "fini", messages: ["Bilan : terminé."] });
+    expect(p.consignes.length).toBe(appelsAvant);
+    await second.fermer();
+  }, 60_000);
+
   it("arrêter un run l'abandonne", async () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
@@ -260,10 +283,13 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     await s.fermer();
   }, 30_000);
 
-  it("la pile retenue et sa source figurent dans l'état", async () => {
+  it("la pile retenue et sa source, le workflow et son accord figurent dans l'état", async () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     expect((await s.etat()).pile).toEqual({ id: "typescript", source: "detection" });
+    expect((await s.etat()).workflow).toEqual({ nom: "demo", accordRetenu: false });
+    await s.appel("skraft_demarrer", { story: "x.md", accord: "toujours" });
+    expect((await s.etat()).workflow).toEqual({ nom: "demo", accordRetenu: true });
     await s.fermer();
   }, 30_000);
 

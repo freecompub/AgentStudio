@@ -281,7 +281,7 @@
       "title": "Un serveur MCP local (stdio) lance le workflow skraft sur le projet de l'appelant, avec des agents Copilot : démarrer, consulter l'état, répondre aux questions, reprendre, arrêter, lire le rapport ; un verrou par projet ; projets bornés",
       "verify": "pnpm vitest run --project mcp-skraft",
       "passes": false,
-      "notes": "ADR 0068 (accepté), docs/14. Branche feat/mcp-skraft. Premier essai avec le ScriptedRuntime, sans Copilot réel ; reprise hors Electron à vérifier."
+      "notes": "ADR 0068 (accepté), docs/14. Branche feat/mcp-skraft. Fait le 05/11 et vérifié par `verify` (36 tests) : outils, accord dans l'appel, verrou, projet borné, connexion gh, pile fournie, rapport, reprise hors Electron sur les stockages JSON, bundle lancé en stdio. Reste false : aucun run avec des agents Copilot réels (à faire avec l'accord du responsable) ; écart à trancher sur la réponse en mode consultation (progress.md, 05/11)."
     },
     {
       "id": "mesures-revues-sur-runs-copilot",
