@@ -206,6 +206,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const usageRows = new Map<string, UsageRow[]>();
     const engine = createTaskEngine({
       usage,
+      // Transitions, effets, rejets et arbitrages (ADR 0032) : sans elle, la trace n'avait que les
+      // tours d'agent, et un rejet ne se lisait nulle part (run réel du 05/11).
+      trace: traceStore,
       store: cfg.taskStore ?? createJsonTaskStore(join(cfg.tasksDir, projectKey)),
       checkpoints: workspace.checkpoints,
       clock: cfg.clock,

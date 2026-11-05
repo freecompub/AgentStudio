@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSessionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import { bundle, createNodeLauncher } from "@agent-studio/extension-host";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
+import type { TraceEntry, TraceStore } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { workspaceServicesFactory } from "../src/workspace-services.js";
@@ -46,7 +47,7 @@ async function poser(base: string, fichiers: Record<string, string>) {
   }
 }
 
-async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<string, string>; reponse?: "allow-once" | "allow-always" | "deny"; sansConfirmeur?: boolean }) {
+async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<string, string>; reponse?: "allow-once" | "allow-always" | "deny"; sansConfirmeur?: boolean; trace?: TraceStore }) {
   const projet = await mkdtemp(join(racine, "projet-"));
   const machine = await mkdtemp(join(racine, "machine-"));
   await poser(projet, opts.projet ?? {});
@@ -73,6 +74,7 @@ async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<
     clock: fixedClock(),
     ids: sequentialIds("id-"),
     workflows: { machine, launcher: createNodeLauncher(), runtimeEntry: enfant },
+    ...(opts.trace ? { traceStore: opts.trace } : {}),
   })({
     workspace,
     runtime: async () => runtime,
@@ -211,6 +213,20 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
     expect(await o.services.rapportWorkflow(id)).toMatchObject({ statut: "fini", messages: [] });
     expect(await o.services.rapportWorkflow("inconnue")).toBeNull();
+    await o.services.dispose();
+  }, 30_000);
+
+  it("les rejets d'un workflow sont dans la trace de la tâche, avec leur porte et leurs motifs (ADR 0032)", async () => {
+    // Run réel du 05/11 par le serveur MCP : un rejet en DESIGN, absent de la trace, parce que le
+    // moteur des services ne recevait pas la trace (seul l'exécuteur d'agents l'avait).
+    const entrees: TraceEntry[] = [];
+    const trace: TraceStore = { append: async (e) => void entrees.push(e), list: async () => entrees, archive: async () => {} };
+    const REJET = DEMO.replace(`await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`, `await w.rejet("cohérence", ["motif d'essai"]);\n    await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`);
+    const o = await ouvrir({ projet: { ...WF, ".agent-studio/workflows/demo/workflow.mjs": REJET }, reponse: "allow-once", trace });
+    await o.services.lancerWorkflow("demo", "x.md");
+    await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    expect(entrees.filter((e) => e.kind === "rejet")).toEqual([expect.objectContaining({ kind: "rejet", porte: "cohérence", motifs: ["motif d'essai"] })]);
+    expect(entrees.some((e) => e.kind === "transition")).toBe(true);
     await o.services.dispose();
   }, 30_000);
 

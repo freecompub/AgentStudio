@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Les rejets des workflows manquaient à la trace (project-services)
+
+- Constat sur le run MCP d'US-2 : un rejet de cohérence en DESIGN (journal : `rejections: 1`), mais
+  aucune entrée `rejet` dans la trace — ni transition, ni effet : seulement les tours d'agent.
+- Cause : `workspace-services.ts` créait le moteur **sans** `trace` ; seul l'exécuteur d'agents la
+  recevait. Le moteur n'écrit transitions, effets, rejets et arbitrages (ADR 0032, 0065) que s'il
+  l'a. Touchait aussi l'**application de bureau** (même assemblage). `mesure-skraft.ts` passe la
+  trace à son propre moteur : les rapports du banc ne le montraient pas.
+- Corrigé : `trace: traceStore` au moteur. Test vu rouge puis vert : un workflow qui rejette laisse
+  une entrée `rejet` (porte, motifs) et des transitions dans la trace
+  (`packages/project-services/test/workflows.test.ts`).
+- Suite complète : 2064 tests. **Probable test instable, à surveiller** :
+  `apps/desktop/test/app-controller.test.ts` › « installation depuis un fichier : accord demandé
+  dans la fenêtre, puis services rechargés » — un échec dans une suite complète chargée (plus de
+  600 s), puis vert quatre fois (trois seul, une dans la suite). Il utilise des doublures de
+  services, pas `project-services`. Détail de l'échec non conservé.
+
 ## 05/11 — Serveur MCP : run réel avec Copilot sur US-2 (critère serveur-mcp-skraft passé)
 
 - Hôte d'essai `scripts/essai-mcp-skraft.ts` (hors CI, consomme des requêtes) : lance le serveur
