@@ -5,6 +5,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP : run réel avec Copilot sur US-2 (critère serveur-mcp-skraft passé)
+
+- Hôte d'essai `scripts/essai-mcp-skraft.ts` (hors CI, consomme des requêtes) : lance le serveur
+  construit en stdio sur un **clone** du projet, donne l'accord, suit `skraft_etat`, répond avec le
+  répondeur commun du banc (`scripts/banc/repondeur.ts`, pas de copie), lit `skraft_rapport`. Config
+  propre à l'essai : seul le clone autorisé, profil `architecte`, `PATH` avec `~/.dotnet`.
+- **Premier essai échoué avant tout agent** (aucune requête) : l'enfant des workflows gardait
+  `esbuild` en import externe ; sous `--permission`, Node refuse de lire `node_modules`. Mes tests
+  ne rejouaient aucun workflow avec l'enfant **construit**. Corrigé (`external: []` pour l'enfant,
+  comme `build-extensions.mjs`) et testé (`stdio.test.ts` : l'enfant construit rejoue skraft).
+- Second essai sur `exemple-dotnet-tdd` / US-2 : **fini**, 19 min 24 s, **20 requêtes**, toutes les
+  phases, livrable vérifié à part (`dotnet test` : 10/10). Compte rendu :
+  `docs/runs/2026-11-05-us-2-mcp/`. Accord en deux appels, questions et réponses par MCP, rapport :
+  tout le parcours de l'hôte a fonctionné en réel.
+- Constat à suivre dans le **workflow** (pas le serveur) : la même question ouverte a été posée deux
+  fois (avec et sans guillemets) — doublon à l'extraction des questions.
+- Coût sans commune mesure avec le run du 10/10 (264 requêtes) : un seul run, à ne pas prendre pour
+  une mesure.
+- `serveur-mcp-skraft` passe à `true`. Reste hors critère : la distribution (registre, licence).
+
 ## 05/11 — Serveur MCP, brique 7 : point d'entrée stdio, bundle, reprise hors Electron
 
 - `config.ts` : `~/.agent-studio/mcp-skraft.json` (ou `SKRAFT_MCP_CONFIG`) — `autorises` (chemins
