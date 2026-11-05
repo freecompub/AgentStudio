@@ -23,6 +23,9 @@ export interface WorkflowActif {
   accord: { title: string; detail: string };
 }
 
+/** D'où vient la pile retenue (ADR 0068, point 8) ; `repli` : aucune, premier adaptateur, averti. */
+export type SourcePile = "projet" | "detection" | "client" | "repli";
+
 /** Résultat du routage d'un message tapé dans le chat. */
 export type RouteOutcome = { kind: "chat" } | { kind: "handled" } | { kind: "unknown-command"; name: string };
 
@@ -35,6 +38,8 @@ export interface WorkspaceServices {
   hookGuards(): ToolCallGuard[];
   /** Outils donnés à l'agent principal (`proposer_workflow` si un workflow est actif, ADR 0055). */
   outilsAgent(): ToolSpec[];
+  /** Pile retenue pour le projet, et sa source. */
+  pile(): { id: string; source: SourcePile };
   /** Workflows en dossier activés pour ce projet (ADR 0055). */
   workflows(): Promise<WorkflowActif[]>;
   /**
@@ -60,6 +65,12 @@ export interface WorkspaceServices {
 
 export interface WorkspaceServicesArgs {
   workspace: Workspace;
+  /**
+   * Profil de pile fourni par l'appelant, au format de `.agent-studio/stack.yaml` (ADR 0068, point
+   * 8) : retenu seulement si le projet n'a ni profil ni adaptateur qui le reconnaisse, et soumis à
+   * la même liste de programmes. Jamais écrit dans le dépôt.
+   */
+  pileFournie?: string;
   /** Runtime d'agent obtenu à la demande (authentification au premier besoin). */
   runtime: () => Promise<AgentRuntime>;
   onTask(card: TaskCardDto): void;

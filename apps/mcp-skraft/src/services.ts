@@ -19,9 +19,10 @@ export function ouvrirServicesSansFenetre(o: {
   runtime(): Promise<AgentRuntime>;
   journal(markdown: string): void;
   modelFor?(cls: ModelClass | undefined): Promise<string | undefined>;
-}): (root: string) => Promise<WorkspaceServices> {
-  return async (root) =>
+}): (root: string, pileFournie?: string) => Promise<WorkspaceServices> {
+  return async (root, pileFournie) =>
     o.factory({
+      ...(pileFournie !== undefined ? { pileFournie } : {}),
       workspace: await o.workspace(root),
       runtime: o.runtime,
       onTask: () => {},

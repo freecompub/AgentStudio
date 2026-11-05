@@ -15,6 +15,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createPilesFichiers } from "../src/piles.js";
 import { createProjets } from "../src/projets.js";
 import { createServeurSkraft } from "../src/serveur.js";
 import { ouvrirServicesSansFenetre } from "../src/services.js";
@@ -58,6 +59,17 @@ export default async function (w, entree) {
 }
 `;
 
+const PILE = `
+id: python
+detect: [pyproject.toml]
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+  report: junit-xml
+layout:
+  unitTests: ["tests/**"]
+  sources: ["src/**"]
+`;
+
 async function poser(base: string, fichiers: Record<string, string>) {
   for (const [rel, c] of Object.entries(fichiers)) {
     await mkdir(dirname(join(base, rel)), { recursive: true });
@@ -89,10 +101,12 @@ async function projet() {
 type Projet = Awaited<ReturnType<typeof projet>>;
 
 /** Un serveur MCP (un client = un serveur), relié à un client en mémoire. */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean }) {
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean }) {
   const factory = workspaceServicesFactory({
     extensions: [],
-    stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+    stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+    allowedPrograms: ["pytest"],
+    sansRepli: true,
     tasksDir: join(p.root, ".taches"),
     ...p.stockages,
     clock: fixedClock(),
@@ -100,7 +114,8 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     workflows: { machine, launcher: createNodeLauncher(), runtimeEntry: enfant },
   });
   const projets = createProjets({
-    ouvrir: (root, journal) => ouvrirServicesSansFenetre({ factory, workspace: async () => p.workspace, runtime: async () => p.runtime, journal })(root),
+    ouvrir: (root, journal, pileFournie) => ouvrirServicesSansFenetre({ factory, workspace: async () => p.workspace, runtime: async () => p.runtime, journal })(root, pileFournie),
+    piles: createPilesFichiers(join(p.root, ".donnees-du-serveur", "piles")),
     verrou: (root) => prendreVerrou(join(root, ".agent-studio", "mcp-skraft.lock"), { pid: o.pid, estVivant: (x) => o.vivants.has(x) }),
   });
   const mcp = createServeurSkraft({
@@ -125,6 +140,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
   };
   const etat = async () => JSON.parse((await appel("skraft_etat")).texte) as {
     mode: string;
+    pile: { id: string; source: string };
     taches: { id: string; status: string; phase: string }[];
     questions: { id: string; title: string; detail?: string; options: { id: string; label: string }[] }[];
     messages: string[];
@@ -241,6 +257,50 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
       expect(await s.appel(outil, args)).toEqual({ erreur: true, texte: expect.stringMatching(/skraft_connexion/) });
     expect((await s.etat()).taches).toEqual([]);
     expect(await s.appel("skraft_connexion")).toEqual({ erreur: false, texte: expect.stringContaining("ABCD-1234") });
+    await s.fermer();
+  }, 30_000);
+
+  it("la pile retenue et sa source figurent dans l'état", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
+    expect((await s.etat()).pile).toEqual({ id: "typescript", source: "detection" });
+    await s.fermer();
+  }, 30_000);
+
+  it("projet sans pile reconnue : refus qui demande l'argument pile ; fournie, elle est gardée pour les reprises, hors du dépôt", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false });
+    expect(await s.appel("skraft_etat")).toEqual({ erreur: true, texte: expect.stringMatching(/Aucune pile.*argument « pile » de skraft_demarrer/s) });
+    const r = await s.appel("skraft_demarrer", { story: "x.md", accord: "une-fois", pile: PILE });
+    expect(r.erreur).toBe(false);
+    expect((await s.etat()).pile).toEqual({ id: "python", source: "client" });
+    await s.fermer();
+    // Un autre serveur, plus tard (reprise) : même pile, sans la redonner.
+    const t = await serveur(p, { pid: 2, vivants: new Set([2]), detecte: false });
+    expect((await t.etat()).pile).toEqual({ id: "python", source: "client" });
+    await t.fermer();
+    expect(p.ecrits.some((f) => f.includes("stack.yaml"))).toBe(false);
+  }, 30_000);
+
+  it("une autre pile fournie pendant un run est refusée ; après la fin du run, elle remplace la précédente", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false });
+    await s.appel("skraft_demarrer", { story: "x.md", accord: "une-fois", pile: PILE });
+    await until(async () => (await s.etat()).questions.length === 1);
+    const autre = PILE.replace("id: python", "id: python-bis");
+    expect(await s.appel("skraft_demarrer", { story: "y.md", accord: "une-fois", pile: autre })).toEqual({ erreur: true, texte: expect.stringMatching(/run en cours/) });
+    const q = (await s.etat()).questions[0]!;
+    await s.appel("skraft_repondre", { question: q.id, option: q.options[0]!.id });
+    await until(async () => (await s.etat()).taches.every((t) => t.status === "finished"));
+    expect((await s.appel("skraft_demarrer", { story: "y.md", accord: "une-fois", pile: autre })).erreur).toBe(false);
+    expect((await s.etat()).pile).toEqual({ id: "python-bis", source: "client" });
+    await s.fermer();
+  }, 30_000);
+
+  it("pile fournie qui nomme un programme interdit : refusée, avec le programme ; rien ne démarre", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false });
+    expect(await s.appel("skraft_demarrer", { story: "x.md", accord: "une-fois", pile: PILE.replace("pytest", "curl") })).toEqual({ erreur: true, texte: expect.stringContaining("curl") });
     await s.fermer();
   }, 30_000);
 

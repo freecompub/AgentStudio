@@ -5,6 +5,7 @@
  */
 import { fileURLToPath } from "node:url";
 import type { Role } from "@agent-studio/core";
+import { AucunePile } from "@agent-studio/project-services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Connexion } from "./connexion.js";
@@ -51,7 +52,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
    * Résout et ouvre le projet, puis exécute ; toute exception devient une erreur de l'outil.
    * `agents` : l'outil peut faire travailler les agents, il exige une connexion utilisable par Copilot.
    */
-  function outil<A extends { projet?: string | undefined }>(fn: (p: ProjetOuvert, a: A) => Promise<Resultat>, o2: { agents?: boolean } = {}) {
+  function outil<A extends { projet?: string | undefined; pile?: string | undefined }>(fn: (p: ProjetOuvert, a: A) => Promise<Resultat>, o2: { agents?: boolean } = {}) {
     return async (a: A): Promise<Resultat> => {
       try {
         if (o2.agents) {
@@ -60,8 +61,9 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         }
         const r = await resoudreProjet({ ...(a.projet !== undefined ? { argument: a.projet } : {}), roots: await roots(), cwd: o.cwd, autorises: o.autorises });
         if (!r.ok) return erreur(r.motif);
-        return await fn(await o.projets.ouvrir(r.root), a);
+        return await fn(await o.projets.ouvrir(r.root, a.pile !== undefined ? { pile: a.pile } : {}), a);
       } catch (e) {
+        if (e instanceof AucunePile) return erreur(`${e.message} Donne-la dans l'argument « pile » de skraft_demarrer (YAML, même format).`);
         return erreur(e instanceof Error ? e.message : String(e));
       }
     };
@@ -83,6 +85,11 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         story: sansEspace("Le chemin de la story").describe("Fichier de la user story, relatif au projet."),
         auto: z.boolean().optional().describe("Retenir la difficulté proposée sans la faire confirmer."),
         archi: sansEspace("Le nom du skill d'architecture").optional().describe("Skill d'architecture (par son nom ou son langage, ex. java) ; par défaut la clean architecture."),
+        pile: z
+          .string()
+          .max(20_000)
+          .optional()
+          .describe("Profil de pile en YAML, au format de .agent-studio/stack.yaml, si le projet n'en a pas et qu'aucun adaptateur ne le reconnaît. Ses programmes doivent être autorisés par l'administrateur."),
         accord: z.enum(["une-fois", "toujours"]).optional().describe("Accord de l'utilisateur sur le workflow, après lui avoir montré le résumé rendu par un premier appel."),
         projet,
       },
@@ -103,7 +110,9 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       const args = [a.story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
       const r = await p.services.lancerWorkflow(w.nom, args, a.accord ? { accord: a.accord } : {});
       if (!r.ok) return erreur(r.motif);
-      return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.`);
+      const pile = p.services.pile();
+      const ignoree = a.pile !== undefined && pile.source !== "client" ? ` La pile fournie est ignorée : le projet a la sienne (${pile.id}, ${pile.source === "projet" ? "profil du projet" : "détection"}).` : "";
+      return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
     }, { agents: true }),
   );
 
@@ -135,7 +144,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         ...(q.freeText ? { texteLibre: true } : {}),
       }));
       return texte(
-        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", ...(m.pilote ? {} : { detenteur: m.detenteur }), taches, questions, messages: p.messages() }, null, 2),
+        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", ...(m.pilote ? {} : { detenteur: m.detenteur }), pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
       );
     }),
   );

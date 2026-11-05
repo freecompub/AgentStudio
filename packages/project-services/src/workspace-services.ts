@@ -50,7 +50,7 @@ import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore 
 import type { Workspace } from "@agent-studio/workspace";
 import type { UserConfirmer } from "@agent-studio/core";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
-import type { WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
+import type { SourcePile, WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
 import { activerWorkflow, createJsonAccordStore, lireEntrees, rapportDuWorkflow, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type EtatWorkflow, type WorkflowTrouve } from "@agent-studio/workflow";
 import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 
@@ -64,6 +64,12 @@ export interface WorkspaceServicesConfig {
   stacks: StackAdapter[];
   /** Programmes qu'un profil de stack peut lancer (D47, O12) ; vide = aucun profil n'est accepté. */
   allowedPrograms?: readonly string[];
+  /**
+   * Aucune pile (ni profil, ni détection, ni pile fournie) est une erreur, au lieu du repli averti
+   * sur le premier adaptateur : un repli ferait échouer toutes les portes pour une mauvaise raison
+   * (serveur MCP, ADR 0068, point 8).
+   */
+  sansRepli?: boolean;
   /** Obligatoire dès qu'une extension est isolée. */
   isolation?: { launcher: ProcessLauncher; runtimeEntry: string };
   /** Dossier des tâches ; un sous-dossier par projet. */
@@ -149,18 +155,41 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
   return { unit, rows: merged, total: { phase: "total", label: "Total", requests: t.requests, inputTokens: t.inputTokens, outputTokens: t.outputTokens, retries: t.retries, durationMs: t.durationMs } };
 }
 
+/** Aucune pile pour le projet, et pas de repli permis (`sansRepli`). */
+export class AucunePile extends Error {
+  override name = "AucunePile";
+}
+
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor }) => {
-    const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
-    const manifests = sources.map((e) => e.manifest);
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
     const declare = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
-    const stack = detected ?? cfg.stacks[0];
+    let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
+    let choisie = detected;
+    if (pileFournie !== undefined) {
+      if (choisie)
+        onPost("agent-studio", `La pile fournie par l'appelant est ignorée : le projet a la sienne, **${choisie.id}** (${declare ? `profil \`${PROFIL_PROJET}\`` : "détection automatique"}).`);
+      else {
+        // Même contrôle qu'un profil du projet : schéma, et programmes de la liste de l'administrateur.
+        const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
+        if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
+        choisie = createProfileAdapter(lu.profile);
+        source = "client";
+        onPost("agent-studio", `Stack du projet : **${choisie.id}**, fournie par l'appelant.`);
+      }
+    }
+    if (!choisie && cfg.sansRepli)
+      throw new AucunePile(
+        `Aucune pile pour ce projet : ni profil \`${PROFIL_PROJET}\`, ni adaptateur qui le reconnaisse (${cfg.stacks.map((s) => s.id).join(", ") || "aucun"}). Fournis une pile au format de \`${PROFIL_PROJET}\`.`,
+      );
+    const stack = choisie ?? cfg.stacks[0];
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
+    const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
+    const manifests = sources.map((e) => e.manifest);
     if (declare) onPost("agent-studio", `Stack du projet : **${declare.id}**, d'après le profil \`${PROFIL_PROJET}\`.`);
-    if (!detected) {
+    if (source === "repli") {
       cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
       // Dit dans la conversation, pas seulement dans le journal : le repli change ce que font
       // les portes et les commandes, et l'utilisateur doit savoir pourquoi.
@@ -168,7 +197,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         "agent-studio",
         `**Ce projet n'est reconnu par aucun adaptateur.** L'application se rabat sur \`${stack.id}\`, dont les commandes de test et les emplacements de fichiers ne correspondent probablement pas. Les commandes qui exécutent des tests risquent d'échouer.`,
       );
-    } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
+    } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id, source });
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const usage = cfg.usageRecorder ?? createUsageRecorder(join(cfg.tasksDir, projectKey, "usage"));
     // Une seule trace pour la tâche : l'exécuteur d'agents y écrit les tours, l'extension y archive
@@ -455,6 +484,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
             accord: resumeAccord(a.workflow),
           })),
         ),
+      pile: () => ({ id: stack.id, source }),
       lancerWorkflow,
       async rapportWorkflow(taskId) {
         const r = (await engine.list()).find((t) => t.id === taskId);

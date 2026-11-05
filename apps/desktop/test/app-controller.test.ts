@@ -100,6 +100,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: Copi
         workflows: async () => [],
         lancerWorkflow: async () => ({ ok: false, motif: "" }),
         rapportWorkflow: async () => null,
+        pile: () => ({ id: "typescript", source: "detection" as const }),
         tasks: async () => [],
         cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
         pendingInteractions: async () => [],
@@ -253,7 +254,7 @@ describe("AppController — espaces de travail", () => {
           return {
             route: async () => ({ kind: "chat" as const }),
             commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
-            hookGuards: () => [], outilsAgent: () => [], workflows: async () => [], lancerWorkflow: async () => ({ ok: false as const, motif: "" }), rapportWorkflow: async () => null,
+            hookGuards: () => [], outilsAgent: () => [], workflows: async () => [], lancerWorkflow: async () => ({ ok: false as const, motif: "" }), rapportWorkflow: async () => null, pile: () => ({ id: "typescript", source: "detection" as const }),
             tasks: async () => [],
             cancelTask: async () => {},
             pendingInteractions: async () => [],
@@ -336,7 +337,7 @@ describe("AppController — espaces de travail", () => {
           return {
             route: async () => ({ kind: "chat" as const }),
             commands: () => [],
-            hookGuards: () => [], outilsAgent: () => [], workflows: async () => [], lancerWorkflow: async () => ({ ok: false as const, motif: "" }), rapportWorkflow: async () => null,
+            hookGuards: () => [], outilsAgent: () => [], workflows: async () => [], lancerWorkflow: async () => ({ ok: false as const, motif: "" }), rapportWorkflow: async () => null, pile: () => ({ id: "typescript", source: "detection" as const }),
             tasks: async () => [],
             cancelTask: async () => {},
             pendingInteractions: async () => [],

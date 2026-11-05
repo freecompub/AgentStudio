@@ -4,6 +4,6 @@
  */
 export type * from "./protocols.js";
 export * from "./dto.js";
-export { workspaceServicesFactory, toTaskCard, type ExtensionSource, type WorkspaceServicesConfig } from "./workspace-services.js";
+export { AucunePile, workspaceServicesFactory, toTaskCard, type ExtensionSource, type WorkspaceServicesConfig } from "./workspace-services.js";
 export { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 export { DEFAULT_ALLOWED_PROGRAMS, defaultAdminConfigPath, loadAdminConfig, type AdminConfig } from "./admin-config.js";

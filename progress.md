@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, brique 6 : pile fournie par le client (point 8)
+
+- `project-services` : le choix de la pile gagne une troisième source. Ordre : profil du projet, puis
+  détection, puis `pileFournie` (argument des services, YAML au format de `stack.yaml`, mêmes
+  contrôles : schéma et `allowedPrograms`). Fournie alors que le projet a la sienne : ignorée, et
+  c'est dit. `sansRepli` (config) : aucune pile lève `AucunePile` au lieu du repli averti sur le
+  premier adaptateur ; l'application de bureau garde son repli. `services.pile()` : `{ id, source }`
+  (`projet`, `detection`, `client`, `repli`). Tests : `packages/project-services/test/pile.test.ts`.
+- `apps/mcp-skraft` : argument `pile` de `skraft_demarrer` ; pile retenue gardée par le serveur dans
+  son dossier de données (`piles.ts`, un fichier par projet, hors du dépôt), relue à l'ouverture
+  suivante — une reprise par un autre serveur retrouve la même pile. Une autre pile remplace la
+  précédente, sauf pendant un run. Sans pile : `AucunePile`, avec l'indication de l'argument `pile`.
+  La pile et sa source figurent dans `skraft_etat`.
+- Ouverture d'un projet qui échoue (pas de pile) : le verrou est libéré, rien n'est gardé.
+- Le test du remplacement de pile a été écrit après le code : il n'a pas été vu rouge.
+
 ## 05/11 — Serveur MCP, brique 5 : rapport d'un run (skraft_rapport)
 
 - `packages/workflow/src/rapport.ts` : `rapportDuWorkflow(etat)`, fonction pure sur l'état persisté
@@ -57,8 +73,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
   consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
   `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
-- Reste : pile fournie par le client
-  (point 8), point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
+- Reste : point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
   reprise hors Electron.
 
 ## 05/11 — Serveur MCP, brique 1 : lancer un workflow avec un accord donné d'avance
