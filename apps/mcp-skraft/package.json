@@ -1,0 +1,22 @@
+{
+  "name": "@agent-studio/mcp-skraft",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/project-services": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*"
+  }
+}

@@ -16,6 +16,8 @@
     "apps/desktop/src/preload",
     "apps/desktop/src/shared",
     "apps/desktop/test",
+    "apps/mcp-skraft/src",
+    "apps/mcp-skraft/test",
     "scripts",
     "vitest.config.ts",
     "vitest.global-setup.ts"

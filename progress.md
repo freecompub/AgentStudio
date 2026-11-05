@@ -5,6 +5,38 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 05/11 — Serveur MCP, briques 2 et 3 : paquet apps/mcp-skraft, projet, verrou, outils
+
+- Nouveau paquet `apps/mcp-skraft` (projet Vitest `mcp-skraft`), SDK `@modelcontextprotocol/sdk` 1.32.2.
+  - `projet.ts` : projet de l'appelant (argument, puis premier root du client, puis dossier courant),
+    jugé sur sa cible réelle (liens résolus) ; refusé s'il n'est pas un dépôt Git ou s'il est hors
+    des roots du client et des dossiers autorisés de la configuration.
+  - `verrou.ts` : `.agent-studio/mcp-skraft.lock`, création exclusive (`wx`), PID du détenteur ;
+    repris si le détenteur est mort ou le fichier illisible ; libéré seulement s'il est encore à nous.
+  - `projets.ts` : un jeu de services par projet ; le verrou **avant** les services, et `demarrer()`
+    (purge des sessions, reprise des tâches) seulement en mode pilote.
+  - `services.ts` : les services de `project-services`, sans fenêtre (confirmeur qui refuse tout ;
+    l'accord du workflow vient de l'appel, point 9), messages du chat vers le journal du projet.
+  - `serveur.ts` : `skraft_demarrer`, `skraft_etat` (JSON : mode, tâches, questions, messages),
+    `skraft_repondre` (profil de `admin.json`), `skraft_reprendre`, `skraft_arreter`.
+- Testé de bout en bout par un vrai client MCP en mémoire (`InMemoryTransport`), vrais services,
+  workflow isolé, `ScriptedRuntime` : accord requis puis lancé, question puis réponse jusqu'au bout,
+  refus de profil, deux serveurs (consultation, reprise de la main à la mort du premier), arrêt,
+  projet hors des roots.
+- Piège trouvé par les tests : les entrées deviennent une ligne de commande découpée aux espaces.
+  `story: "deux mots.md"` faisait de `mots.md` le skill d'architecture (entrée positionnelle) et le
+  run partait sur `deux`. `story` et `archi` refusent donc tout espace.
+- Piège : les options d'une question de workflow sont préfixées du numéro d'appel (`3:oui`) ; l'hôte
+  doit reprendre l'identifiant rendu par `skraft_etat`.
+- **Écart à l'ADR 0068, point 5, à trancher** : l'ADR dit qu'un serveur en consultation « peut
+  répondre aux questions enregistrées ». Or répondre passe la décision au moteur du serveur qui
+  répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
+  consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
+  `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
+- Reste : `skraft_rapport`, `skraft_connexion` (authentification), pile fournie par le client
+  (point 8), point d'entrée stdio réel (Copilot, `gh`, `admin.json`), bundle, vérification de la
+  reprise hors Electron.
+
 ## 05/11 — Serveur MCP, brique 1 : lancer un workflow avec un accord donné d'avance
 
 - ADR 0068 complété (point 9) : sans fenêtre, l'accord sur le workflow se donne **dans l'appel**.
