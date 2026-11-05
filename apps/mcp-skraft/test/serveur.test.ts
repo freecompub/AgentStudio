@@ -125,6 +125,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     role: o.role ?? "architecte",
     autorises: [],
     cwd: p.root,
+    pid: o.pid,
     connexion: {
       verifier: async () => (o.nonConnecte ? { ok: false as const, motif: "Non connecté à GitHub (github.com) : appelle skraft_connexion." } : { ok: true as const }),
       connecter: async () => ({ ok: true, texte: "Connexion à GitHub lancée. Ouvre https://github.com/login/device et saisis le code ABCD-1234." }),
@@ -141,6 +142,8 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
   };
   const etat = async () => JSON.parse((await appel("skraft_etat")).texte) as {
     mode: string;
+    pid: number;
+    detenteur?: number;
     workflow: { nom: string; accordRetenu: boolean } | null;
     pile: { id: string; source: string };
     taches: { id: string; status: string; phase: string }[];
@@ -226,9 +229,12 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const second = await serveur(p, { pid: 2, vivants });
     const e = await second.etat();
     expect(e.mode).toBe("consultation");
+    // Chaque serveur dit son PID et celui du pilote : l'utilisateur sait dans quelle fenêtre répondre.
+    expect(e).toMatchObject({ pid: 2, detenteur: 1 });
+    expect(await premier.etat()).toMatchObject({ mode: "pilote", pid: 1 });
     expect(e.taches).toHaveLength(1);
     expect(e.questions).toHaveLength(1);
-    expect(await second.appel("skraft_demarrer", { story: "y.md", accord: "une-fois" })).toEqual({ erreur: true, texte: expect.stringMatching(/consultation.*PID 1/s) });
+    expect(await second.appel("skraft_demarrer", { story: "y.md", accord: "une-fois" })).toEqual({ erreur: true, texte: expect.stringMatching(/Ce serveur \(PID 2\) est en consultation.*serveur skraft PID 1/s) });
     expect(await second.appel("skraft_repondre", { question: e.questions[0]!.id, option: e.questions[0]!.options[0]!.id })).toMatchObject({ erreur: true, texte: expect.stringMatching(/consultation/) });
     expect(await second.appel("skraft_reprendre")).toMatchObject({ erreur: true, texte: expect.stringMatching(/PID 1/) });
 

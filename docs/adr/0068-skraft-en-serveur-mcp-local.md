@@ -39,8 +39,12 @@ par rôle, et le serveur ne voit pas les écritures de l'hôte.
    les checkpoints capturent les fichiers non suivis (`git add -A`) et le rollback les restaure ;
    dans le dépôt, le verrou entrerait dans les checkpoints et dans les diffs que contrôlent les
    portes. Un autre serveur reste en
-   **consultation** : il lit l'état et peut répondre aux questions enregistrées, mais refuse de lancer
-   ou de reprendre un run, avec un message clair.
+   **consultation** : il lit l'état, mais refuse de lancer, de reprendre, d'arrêter un run et de
+   répondre à ses questions, avec un message clair. *Décidé le 2026-11-05* (au lieu de « peut
+   répondre aux questions ») : répondre relance le run dans le serveur qui répond
+   (`interactions.respond` → `engine.dispatch`), il tournerait alors en parallèle du pilote. Chaque
+   serveur donne son PID et celui du pilote (`skraft_etat`, messages de refus), pour que
+   l'utilisateur sache depuis quelle fenêtre répondre.
 6. **Projet de l'appelant.** Détecté, dans l'ordre : l'argument `projet` d'un outil, les *roots*
    déclarés par le client MCP, le dossier courant du processus. Le serveur tourne sous le compte de
    l'utilisateur, sans bac à sable, et les demandes de permission du client ne couvrent pas ses

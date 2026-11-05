@@ -21,6 +21,8 @@ export interface OptionsServeur {
   /** Dossiers autorisés par la configuration du serveur, en plus des roots du client. */
   autorises: readonly string[];
   cwd: string;
+  /** PID de ce serveur, donné dans l'état et les refus : il désigne la fenêtre du client. */
+  pid?: number;
   /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
   connexion: Pick<Connexion, "verifier" | "connecter">;
   version?: string;
@@ -36,6 +38,7 @@ const sansEspace = (quoi: string) => z.string().min(1).regex(/^\S+$/, `${quoi} n
 const projet = z.string().optional().describe("Dossier du projet ; par défaut le premier root du client, sinon le dossier courant du serveur.");
 
 export function createServeurSkraft(o: OptionsServeur): McpServer {
+  const pid = o.pid ?? process.pid;
   const mcp = new McpServer({ name: "skraft", version: o.version ?? "0.0.0" });
 
   async function roots(): Promise<string[]> {
@@ -73,7 +76,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     m.pilote
       ? null
       : erreur(
-          `Ce serveur est en consultation : le projet est piloté par un autre serveur skraft (PID ${m.detenteur}). ${action} depuis celui-ci, ou appelle skraft_reprendre une fois qu'il sera arrêté.`,
+          `Ce serveur (PID ${pid}) est en consultation : le projet est piloté par le serveur skraft PID ${m.detenteur}. ${action} depuis la fenêtre de celui-ci, ou appelle skraft_reprendre une fois qu'il sera arrêté.`,
         );
 
   mcp.registerTool(
@@ -145,7 +148,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         ...(q.freeText ? { texteLibre: true } : {}),
       }));
       return texte(
-        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", ...(m.pilote ? {} : { detenteur: m.detenteur }), workflow: w ? { nom: w.nom, accordRetenu: w.accordRetenu } : null, pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
+        JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", pid, ...(m.pilote ? {} : { detenteur: m.detenteur }), workflow: w ? { nom: w.nom, accordRetenu: w.accordRetenu } : null, pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
       );
     }),
   );

@@ -31,8 +31,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   de docs/14 §5 est levé**.
 - `apps/mcp-skraft/README.md` : construire, prérequis, inscription, configuration, outils, données.
 - Suite complète : 2061 tests, typecheck.
-- **Reste** : un run avec des agents Copilot réels (accord du responsable) ; l'écart « réponse en
-  consultation » à trancher ; la distribution (registre, licence du paquet hors skraft).
+- **Reste** : un run avec des agents Copilot réels (accord du responsable) ; la distribution (registre, licence du paquet hors skraft).
 
 ## 05/11 — Serveur MCP, brique 6 : pile fournie par le client (point 8)
 
@@ -97,7 +96,9 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   run partait sur `deux`. `story` et `archi` refusent donc tout espace.
 - Piège : les options d'une question de workflow sont préfixées du numéro d'appel (`3:oui`) ; l'hôte
   doit reprendre l'identifiant rendu par `skraft_etat`.
-- **Écart à l'ADR 0068, point 5, à trancher** : l'ADR dit qu'un serveur en consultation « peut
+- **Écart à l'ADR 0068, point 5 — tranché le 05/11 par le responsable : le refus est gardé**, ADR
+  corrigé ; chaque serveur donne son PID et celui du pilote (`skraft_etat` : `pid`, `detenteur` ;
+  messages de refus), pour savoir depuis quelle fenêtre répondre. Constat d'origine : l'ADR dit qu'un serveur en consultation « peut
   répondre aux questions enregistrées ». Or répondre passe la décision au moteur du serveur qui
   répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
   consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
