@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { defaultAdminConfigPath, loadAdminConfig } from "../src/main/admin-config.js";
+import { defaultAdminConfigPath, loadAdminConfig } from "../src/admin-config.js";
 
 describe("Configuration administrateur (D6, O5)", () => {
   let dir: string;

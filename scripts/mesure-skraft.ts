@@ -78,10 +78,8 @@ import { openWorkspace } from "@agent-studio/workspace";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 const execFileAsync = promisify(execFile);
-import { DEFAULT_ALLOWED_PROGRAMS } from "../apps/desktop/src/main/admin-config.js";
+import { DEFAULT_ALLOWED_PROGRAMS } from "@agent-studio/project-services";
 import { manifest, skraftExtension, type SkraftState } from "../extensions/skraft/src/index.js";
-// `scripts/` n'est pas couvert par `pnpm typecheck` (tsconfig.json n'inclut que packages, extensions
-// et apps) : cet import profond ne serait pas signalé s'il était faux. Vérifié à l'exécution.
 import { PHASE_ORDER } from "../extensions/skraft/src/config.js";
 
 const args = process.argv.slice(2);

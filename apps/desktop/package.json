@@ -21,6 +21,7 @@
     "@agent-studio/extension-manifest": "workspace:*",
     "@agent-studio/extension-packaging": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
+    "@agent-studio/project-services": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/task-engine": "workspace:*",

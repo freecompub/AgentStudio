@@ -44,7 +44,8 @@ pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
 pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
-                                #            extension-packaging, ext-tdd, ext-skraft, workflow-skraft, desktop
+                                #            extension-packaging, project-services, ext-tdd, ext-skraft, workflow-skraft,
+                                #            banc, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)
@@ -118,7 +119,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 - **Workspace** est le seul service à toucher le disque et Git.
 - Humain : jamais d'attente bloquante ; décisions longues = demandes d'interaction persistées, réinjectées comme `HUMAN_DECISION`.
 
-Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters}`, `extensions/{tdd,skraft}`, `docs/adr/`.
+Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters,workflow,project-services}`, `extensions/{tdd,skraft}`, `docs/adr/`.
 
 ## Conventions (§17)
 

@@ -20,6 +20,9 @@ importers:
       '@agent-studio/github-auth':
         specifier: workspace:*
         version: link:packages/github-auth
+      '@agent-studio/project-services':
+        specifier: workspace:*
+        version: link:packages/project-services
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:packages/runtime-copilot
@@ -77,6 +80,9 @@ importers:
       '@agent-studio/github-auth':
         specifier: workspace:*
         version: link:../../packages/github-auth
+      '@agent-studio/project-services':
+        specifier: workspace:*
+        version: link:../../packages/project-services
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:../../packages/runtime-copilot
@@ -279,6 +285,43 @@ importers:
         version: 4.6.5
 
   packages/github-auth: {}
+
+  packages/project-services:
+    dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../extension-host
+      '@agent-studio/extension-packaging':
+        specifier: workspace:*
+        version: link:../extension-packaging
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../task-engine
+      '@agent-studio/workflow':
+        specifier: workspace:*
+        version: link:../workflow
+      '@agent-studio/workspace':
+        specifier: workspace:*
+        version: link:../workspace
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@agent-studio/ext-tdd':
+        specifier: workspace:*
+        version: link:../../extensions/tdd
+      '@agent-studio/extension-installer':
+        specifier: workspace:*
+        version: link:../extension-installer
 
   packages/runtime-copilot:
     dependencies:

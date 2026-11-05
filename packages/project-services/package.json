@@ -1,0 +1,26 @@
+{
+  "name": "@agent-studio/project-services",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./dto": "./src/dto.ts"
+  },
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/extension-packaging": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@agent-studio/ext-tdd": "workspace:*",
+    "@agent-studio/extension-installer": "workspace:*"
+  }
+}

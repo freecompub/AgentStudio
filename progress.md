@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 17/10 — Paquet project-services : les services d'un projet hors de l'application de bureau
+
+- Pour que le serveur MCP (ADR 0068) ne duplique pas l'assemblage des services d'un projet, il est
+  sorti de `apps/desktop/src/main` vers `packages/project-services` (`@agent-studio/project-services`),
+  par `git mv` : `workspace-services.ts`, `stack-command.ts`, `admin-config.ts`, les interfaces
+  `WorkspaceServices*` et `RouteOutcome` (`protocols.ts`), et les schémas des cartes de tâche et des
+  interactions (`dto.ts`, exporté aussi en `@agent-studio/project-services/dto`, zod seul).
+- L'application importe le paquet ; `ipc-contract.ts` réexporte les schémas, `protocols.ts` les
+  interfaces : aucun autre fichier de l'application n'a changé. Les tests (et leur fixture
+  d'extension tierce) suivent le code, dans le projet Vitest `project-services`.
+- Vérifié : suite complète identique (2012 tests), typecheck, `pnpm build` (paquet intégré au bundle
+  du main et du renderer, pas externalisé).
+- Piège : le preload n'importe que des **types** du contrat IPC ; s'il en importait des valeurs, le
+  paquet devrait être intégré au bundle du preload, qui ne l'exclut pas de l'externalisation.
+- `scripts/mesure-skraft.ts` importait `admin-config` par un chemin profond dans l'application : il
+  importe le paquet. Il assemble encore lui-même ses services : à rapprocher plus tard.
+
 ## 17/10 — Branche feat/mcp-skraft : ADR 0068 accepté (skraft en serveur MCP local)
 
 - Branche `feat/mcp-skraft`, partie de `feat/workflow-rejouable` (PR #12).

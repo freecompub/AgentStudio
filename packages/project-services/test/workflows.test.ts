@@ -10,7 +10,7 @@ import { bundle, createNodeLauncher } from "@agent-studio/extension-host";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { workspaceServicesFactory } from "../src/main/workspace-services.js";
+import { workspaceServicesFactory } from "../src/workspace-services.js";
 
 let racine: string;
 let enfant: string;

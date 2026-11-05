@@ -49,7 +49,7 @@ import {
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import type { UserConfirmer } from "@agent-studio/core";
-import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
+import type { InteractionDto, TaskCardDto } from "./dto.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
 import { activerWorkflow, createJsonAccordStore, syntaxeCommande, trouverWorkflows, type AccordStore } from "@agent-studio/workflow";
 import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
