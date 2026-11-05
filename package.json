@@ -29,6 +29,7 @@
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/workflow": "workspace:*",
     "@agent-studio/workspace": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.19.0",
     "eslint": "^10.11.0",

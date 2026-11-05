@@ -9,6 +9,8 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { createNodeLauncher } from "@agent-studio/extension-host";
+import { compilerWorkflow, createRejoueurIsole, type EtatWorkflow } from "@agent-studio/workflow";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -60,6 +62,22 @@ describe("Serveur MCP construit, en stdio (ADR 0068)", () => {
     }
     // Le journal va dans le dossier de données, pas sur stdout (qui casserait le protocole).
     expect(await readFile(join(home, ".agent-studio", "mcp-skraft", "logs", "mcp-skraft.log"), "utf8")).toMatch(/serveur MCP skraft prêt/);
+  }, 60_000);
+
+  it("le processus enfant construit rejoue le workflow skraft livré, isolé (--permission), sans rien lire hors de lui", async () => {
+    // Essai réel du 05/11 : l'enfant gardait `esbuild` en import externe, et Node refusait de lire
+    // node_modules sous --permission ; le run échouait avant le premier agent.
+    const c = await compilerWorkflow(join(paquet, "dist/workflows/skraft"));
+    expect(c.ok).toBe(true);
+    const r = createRejoueurIsole({ code: (c as { code: string }).code, launcher: createNodeLauncher(), runtimeEntry: join(paquet, "dist/workflow-child.mjs") });
+    try {
+      const etat: EtatWorkflow = { script: { nom: "skraft-workflow", empreinte: "e" }, entree: { story: "stories/US-2.md", auto: false }, journal: [], contenus: {} };
+      const { etat: suite, nouveaux } = await r.rejouer(etat);
+      expect(suite.fin).toBeUndefined();
+      expect(nouveaux.length).toBeGreaterThan(0);
+    } finally {
+      r.arreter();
+    }
   }, 60_000);
 
   it("projet hors des dossiers autorisés par la configuration : refusé", async () => {
