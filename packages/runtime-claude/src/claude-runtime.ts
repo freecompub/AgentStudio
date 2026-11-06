@@ -18,7 +18,10 @@ export interface ClaudeRuntimeDeps {
   logger?: Logger;
   /** Plafond de coût d'un tour, en dollars (`--max-budget-usd`). */
   budgetUsdParTour?: number;
-  /** Après un outil terminal réussi, délai laissé au CLI pour finir avant de l'arrêter (D18). */
+  /**
+   * Après un outil terminal réussi, délai laissé au CLI pour écrire sa ligne finale (qui porte le
+   * coût) avant de l'arrêter (D18). Run US-2 du 06/11 : 5 s ne suffisaient pas avec opus.
+   */
   delaiApresTerminalMs?: number;
 }
 
@@ -64,6 +67,10 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
     await writeFile(fichierPrompt, `${cfg.systemPrompt}${noms ? `\n\nNoms des outils d'agent-studio dans cette session : ${noms}.` : ""}`, { mode: 0o600 });
     await writeFile(fichierMcp, JSON.stringify(relais.configuration(SERVEUR)), { mode: 0o600 });
     let tours = dejaCreee ? 1 : 0;
+    // `total_cost_usd` est le cumul de la session, tours repris compris (run US-2 du 06/11) : on
+    // n'émet que l'écart avec ce qui a déjà été compté. Une session reprise après un redémarrage du
+    // serveur compte une fois le cumul de ses tours d'avant : on ne le connaît pas.
+    let coutDejaCompte = 0;
 
     const s: AgentSession = {
       id,
@@ -100,7 +107,7 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
           attente = setTimeout(() => {
             finir({ type: "idle" });
             p.tuer();
-          }, deps.delaiApresTerminalMs ?? 5_000);
+          }, deps.delaiApresTerminalMs ?? 60_000);
           attente.unref?.();
         };
         p.surLigne((ligne) => {
@@ -110,7 +117,13 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
           } catch {
             /* ligne non JSON : simple signe de vie */
           }
-          for (const e of traduire(brut)) {
+          for (const brutEv of traduire(brut)) {
+            let e = brutEv;
+            if (e.type === "usage" && e.costUsd !== undefined) {
+              const cumul = e.costUsd;
+              e = { ...e, costUsd: Math.max(0, cumul - coutDejaCompte) };
+              coutDejaCompte = Math.max(coutDejaCompte, cumul);
+            }
             if (e.type === "idle" || e.type === "error") {
               resultat = true;
               finir(e);

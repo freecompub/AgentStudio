@@ -172,6 +172,36 @@ describe("Runtime Claude par le CLI (ADR 0070)", () => {
     await s.close();
   });
 
+  it("coût d'un tour repris : le CLI rend le cumul de la session ; seul l'écart avec le tour précédent est émis", async () => {
+    let n = 0;
+    const f = fauxClaude(async ({ ecrire }) => ecrire({ type: "result", subtype: "success", total_cost_usd: [0.1, 0.25, 0.4][n++] }));
+    const rt = createClaudeRuntime({ lanceur: f.lanceur });
+    const s = await rt.openSession(config());
+    const couts: (number | undefined)[] = [];
+    for (const p of ["un", "deux", "trois"]) {
+      const evs = await tour(rt, s, p);
+      couts.push(evs.filter((e): e is Extract<AgentEvent, { type: "usage" }> => e.type === "usage").at(-1)?.costUsd);
+    }
+    expect(couts.map((c) => Math.round(c! * 1000) / 1000)).toEqual([0.1, 0.15, 0.15]);
+    await s.close();
+  });
+
+  it("outil terminal : sa réponse dit au modèle que le tour est fini ; on attend sa ligne finale (et son coût) jusqu'à 60 s par défaut", async () => {
+    let reponse = "";
+    const f = fauxClaude(async ({ outil, ecrire }) => {
+      reponse = await outil("report_phase", { summary: "fait" });
+      await new Promise((r) => setTimeout(r, 6_000));
+      ecrire({ type: "result", subtype: "success", total_cost_usd: 0.05 });
+    });
+    const rt = createClaudeRuntime({ lanceur: f.lanceur });
+    const s = await rt.openSession(config());
+    const evs = await tour(rt, s, "x");
+    expect(reponse).toMatch(/Tour terminé : n'écris plus rien/);
+    expect(evs.filter((e) => e.type === "usage").at(-1)).toMatchObject({ costUsd: 0.05 });
+    expect(f.tues()).toBe(0);
+    await s.close();
+  }, 15_000);
+
   it("processus qui s'arrête sans résultat : error, avec le code ; abort : processus arrêté", async () => {
     const f = fauxClaude(async () => {});
     const rt = createClaudeRuntime({ lanceur: f.lanceur });

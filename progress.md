@@ -5,6 +5,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude : les deux défauts de mesure du coût corrigés
+
+- **Cumul à la reprise** : le runtime retient, par session, le cumul déjà compté et n'émet que
+  l'écart (`coutDejaCompte`). Limite assumée : une session reprise après un redémarrage du serveur
+  compte une fois le cumul de ses tours d'avant, qu'on ne connaît pas.
+- **Ligne finale perdue** : attente par défaut portée de 5 s à **60 s** après l'outil terminal ; la
+  réponse de l'outil terminal ajoute « Tour terminé : n'écris plus rien. » pour que le CLI rende
+  vite sa ligne finale.
+- Tests vus rouges puis verts (24 dans `runtime-claude`) ; `scripts/smoke-claude.ts` fait désormais
+  deux tours sur la même session : 0,0016 $ puis 0,0003 $ (l'écart, pas le cumul), les deux clos.
+
 ## 06/11 — Run réel US-2 avec Claude par le serveur MCP (`docs/runs/2026-11-06-us-2-mcp-claude/`)
 
 - `scripts/essai-mcp-skraft.ts` : `--runtime=claude`, `--base=<commit>`, source par adresse Git ;

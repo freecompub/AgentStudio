@@ -64,8 +64,11 @@ export async function createRelais(o: OptionsRelais): Promise<Relais> {
       if (!t) return texte(`Outil inconnu : ${name}`, true);
       try {
         const r = await t.handler(args);
-        if (t.terminal) o.surTerminal?.(t.name);
-        return texte(typeof r === "string" ? r : JSON.stringify(r ?? null));
+        const corps = typeof r === "string" ? r : JSON.stringify(r ?? null);
+        if (!t.terminal) return texte(corps);
+        o.surTerminal?.(t.name);
+        // Le tour est fini (D18) : sans réponse à écrire, le CLI rend vite sa ligne finale (et le coût).
+        return texte(`${corps}\n\nTour terminé : n'écris plus rien.`);
       } catch (e) {
         return texte(e instanceof Error ? e.message : String(e), true);
       }

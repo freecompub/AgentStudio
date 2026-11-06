@@ -72,6 +72,11 @@ Le total affiché par le pilote (2,27 $) **n'est pas fiable**, pour deux raisons
 2. **Coût perdu** : chercheur, architectes (opus), réfutateur et un tour d'acceptance n'ont remonté
    aucun coût — le CLI écrit sa ligne finale plus de 5 s après l'outil terminal, et il est arrêté avant.
 
+**Corrigé le 06/11 après ce run** (`runtime-claude`) : seul l'écart avec le cumul déjà compté de la
+session est émis ; la ligne finale est attendue jusqu'à 60 s, et la réponse de l'outil terminal dit
+au modèle de ne plus rien écrire. Vérifié par `pnpm smoke:claude` (deux tours : 0,0016 $ puis
+0,0003 $). Le coût de **ce** run reste inconnu.
+
 Borne basse, en prenant le dernier cumul de chaque session qui en a un : **≈ 1,26 $**, hors chercheur,
 architectes et réfutateur. Le coût réel n'est donc pas connu pour ce run.
 
