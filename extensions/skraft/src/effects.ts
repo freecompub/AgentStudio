@@ -14,13 +14,13 @@ import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./disti
 import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
-import { artifactsDuRun, latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
+import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees } from "./deliver.js";
-import { lensHistory, numberDefects } from "./review-thread.js";
+import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects } from "./review-thread.js";
 import type { LensVerdict } from "./review.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
@@ -213,7 +213,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const raw = runs.map((r) => ("verdict" in r ? r.verdict : null)).filter((v): v is LensVerdict => v !== null);
       // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
       const round = state.reviews[effect.phase].length + 1;
-      const verdicts = numberDefects(raw, round, defectTargetOf(ctx));
+      const verdicts = await refuter(ctx, state, effect.phase, numberDefects(raw, round, defectTargetOf(ctx)), files, allFacts, signal);
       const reportPath = await writeReview(ctx, state.slug, effect.phase, round, effect.attempt, verdicts);
       // DELIVER : référence de la garde du contrat ratifié, relevée sur le code que la revue a jugé.
       const contractSymbols = effect.phase === "DELIVER" ? await contractSymbolsPresent(ctx, state.slug) : [];
@@ -595,6 +595,29 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, planDeTest: planDeTest(testPlan) };
+}
+
+/**
+ * Réfutateur (ADR 0069) : un appel par lentille qui a des défauts blocker ou major, en parallèle, avec
+ * les entrées de cette lentille. Le code décide de ce qui tombe (`appliquerRefutations`). Un
+ * réfutateur muet ou interrompu ne réfute rien : les défauts restent, comme dans le doute.
+ */
+async function refuter(ctx: ExtensionContext, state: SkraftState, phase: Phase, verdicts: LensVerdict[], files: LensFiles, facts: string[], signal: AbortSignal): Promise<LensVerdict[]> {
+  const lots = defautsARefuter(verdicts);
+  if (!lots.length) return verdicts;
+  const existants = new Set(await ctx.workspace.listFiles());
+  const reponses = await Promise.all(
+    lots.map(async (x) => {
+      try {
+        const r = await ctx.agents.run<"submit_lens_verdict">("skraft-finding-refuter", refuterBrief(x.lens as LensName, state, phase, files, facts, x.defects), { signal });
+        return { lens: x.lens, rulings: r.output?.rulings ?? [] };
+      } catch (err) {
+        if (signal.aborted) throw err;
+        return { lens: x.lens, rulings: [] };
+      }
+    }),
+  );
+  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, (p) => existants.has(p), r.lens), verdicts);
 }
 
 /**

@@ -196,6 +196,12 @@ export function simulatedAgents(
         (async (t) => void (await t.callTool("submit_lens_verdict", { lens: l, verdict: "APPROVED", defects: [] }))) as ScriptedBehavior,
       ]),
     ),
+    // Réfutateur (ADR 0069) : par défaut, il maintient chaque défaut soumis — le déroulé d'une revue
+    // reste celui d'avant le réfutateur.
+    "skraft-finding-refuter": async (t) => {
+      const ids = [...new Set([...t.prompt.matchAll(/\[([a-z-]+#\d+\.\d+)\]/g)].map((m) => m[1]!))];
+      await t.callTool("submit_lens_verdict", { lens: "finding-refuter", verdict: "APPROVED", defects: [], rulings: ids.map((defect) => ({ defect, decision: "maintained", reason: "défaut établi" })) });
+    },
   };
   for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) {
     if (!behavior) continue;

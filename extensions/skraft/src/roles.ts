@@ -74,6 +74,10 @@ report_blocker au lieu de deviner. Une question déjà tranchée te sera renvoy�
 
   mutationArbiter: `Rends ta décision avec l'outil submit_lens_verdict : lens « mutation-arbiter », verdict APPROVED, aucun défaut, et pour
 chaque défaut de mutation listé un arbitrage (rulings) : accepted si le mutant est équivalent, maintained sinon, avec ta raison.`,
+
+  findingRefuter: `Rends ta décision avec l'outil submit_lens_verdict : lens « finding-refuter », verdict APPROVED, aucun défaut, et pour
+chaque défaut listé un arbitrage (rulings) : accepted s'il est réfuté, avec le passage \`chemin:ligne\` qui le montre dans ta raison ;
+maintained sinon, avec ta raison.`,
 };
 
 /**
@@ -104,6 +108,8 @@ export const ROLE_MODEL_CLASS = {
   test: "standard",
   dev: "standard",
   mutationArbiter: "standard",
+  // Juger un défaut demande au moins la capacité de la lentille qui l'a trouvé (ADR 0069).
+  findingRefuter: "strong",
 } as const;
 
 /** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */

@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 import type { LensVerdict } from "../../../workflows/skraft/review.mjs";
 import {
   agentFeedback,
+  appliquerRefutations,
+  defautsARefuter,
   allDisputed,
   applyArbitration,
   applyResponses,
@@ -246,5 +248,62 @@ describe("allDisputed (D7 de docs/12)", () => {
   it("un défaut maintenu par l'humain ne se conteste plus ; aucun défaut actif : faux", () => {
     expect(allDisputed([fil("a", { status: "humanMaintained" })], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
     expect(allDisputed([fil("a", { status: "contested" })], [], dev)).toBe(false);
+  });
+});
+
+describe("Réfutation des défauts avant la synthèse (ADR 0069)", () => {
+  const existe = (p: string) => ["src/Remise.cs", "tests/RemiseTests.cs"].includes(p);
+  const blocker = (description: string, o: Partial<LensVerdict["defects"][number]> = {}) => ({ severity: "blocker" as const, description, target: "code" as const, ...o });
+  const minor = (description: string) => ({ severity: "minor" as const, description, target: "code" as const });
+  const numerotes = (lenses: LensVerdict[]) => numberDefects(lenses, 1, () => null);
+
+  it("à soumettre : les défauts blocker et major, par lentille ; ni les mineurs, ni une lentille REJECTED, ni une lentille sans défaut sérieux", () => {
+    const lenses = numerotes([
+      verdict("cold-reader", [major("nom flou"), minor("virgule")]),
+      verdict("architecture", [blocker("dépendance inversée")], "REJECTED"),
+      verdict("test-integrity", [minor("titre")]),
+      verdict("quality-gates", [], "APPROVED"),
+    ]);
+    expect(defautsARefuter(lenses)).toEqual([{ lens: "cold-reader", defects: [expect.objectContaining({ id: "cold-reader#1.1", description: "nom flou" })] }]);
+  });
+
+  it("réfuté avec une citation d'un fichier qui existe : le défaut tombe, gardé dans le rapport avec la raison ; la lentille n'avait que lui à réclamer, elle approuve", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("le montant n'est pas arrondi"), minor("virgule")])]);
+    const [l] = appliquerRefutations(lenses, [{ defect: "cold-reader#1.1", decision: "accepted", reason: "L'arrondi est fait en `src/Remise.cs:12` (Math.Round)." }], existe);
+    expect(l!.verdict).toBe("APPROVED");
+    expect(l!.defects.map((d) => d.description)).toEqual(["virgule"]);
+    expect(l!.refuted).toEqual([expect.objectContaining({ id: "cold-reader#1.1", refutation: "L'arrondi est fait en `src/Remise.cs:12` (Math.Round)." })]);
+  });
+
+  it("réfutation sans citation, ou citant un fichier absent : le défaut est maintenu — le code décide, pas le réfutateur", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("a"), major("b")])]);
+    const [l] = appliquerRefutations(lenses, [
+      { defect: "cold-reader#1.1", decision: "accepted", reason: "C'est faux, le code arrondit déjà." },
+      { defect: "cold-reader#1.2", decision: "accepted", reason: "Voir src/Inexistant.cs:3." },
+    ], existe);
+    expect(l!.verdict).toBe("CHANGES_REQUESTED");
+    expect(l!.defects.map((d) => d.id)).toEqual(["cold-reader#1.1", "cold-reader#1.2"]);
+    expect(l!.refuted ?? []).toEqual([]);
+  });
+
+  it("maintenu, ou sans arbitrage : le défaut reste ; une lentille à qui il reste un défaut sérieux garde son verdict", () => {
+    const lenses = numerotes([verdict("test-integrity", [major("a"), major("b"), major("c")])]);
+    const [l] = appliquerRefutations(lenses, [
+      { defect: "test-integrity#1.1", decision: "accepted", reason: "tests/RemiseTests.cs:40 vérifie déjà ce cas." },
+      { defect: "test-integrity#1.2", decision: "maintained", reason: "Les entrées ne permettent pas de trancher." },
+    ], existe);
+    expect(l!.verdict).toBe("CHANGES_REQUESTED");
+    expect(l!.defects.map((d) => d.id)).toEqual(["test-integrity#1.2", "test-integrity#1.3"]);
+    expect(l!.refuted!.map((d) => d.id)).toEqual(["test-integrity#1.1"]);
+  });
+
+  it("une réfutation qui vise un défaut d'une autre lentille, ou un mineur, est sans effet", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("a"), minor("b")]), verdict("architecture", [major("c")])]);
+    const out = appliquerRefutations(lenses, [
+      { defect: "architecture#1.1", decision: "accepted", reason: "src/Remise.cs:1" },
+      { defect: "cold-reader#1.2", decision: "accepted", reason: "src/Remise.cs:1" },
+    ], existe, "cold-reader");
+    expect(out[0]!.defects.map((d) => d.id)).toEqual(["cold-reader#1.1", "cold-reader#1.2"]);
+    expect(out[1]!.defects.map((d) => d.id)).toEqual(["architecture#1.1"]);
   });
 });

@@ -277,6 +277,20 @@
       "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
     },
     {
+      "id": "refutateur-de-revue",
+      "title": "Avant la synthèse d'une revue, chaque défaut blocker ou major est soumis à un réfutateur ; seul un défaut réfuté par une citation chemin:ligne d'un fichier existant tombe, gardé dans le rapport ; extension et workflow",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-refutation-workflow.test.ts test/review-thread.test.ts test/review-brief.test.ts && pnpm vitest run --project ext-skraft test/e2e-refutation.test.ts test/review-thread.test.ts test/review-brief.test.ts",
+      "passes": true,
+      "notes": "ADR 0069 (06/11), idée de skraft-plugin v2 réimplémentée sans copie (docs/16 §5.3). Agent skraft-finding-refuter, classe strong ; lentilles REJECTED et défauts minor non soumis."
+    },
+    {
+      "id": "refutateur-mesure-us2",
+      "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
+      "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",
+      "passes": false,
+      "notes": "À faire avec l'accord du responsable (requêtes premium). Référence : docs/runs/2026-11-05-us-2-mcp (≈ 374 requêtes, 20 tours dont 11 de lentilles, aucun défaut sérieux en revue sur ce run)."
+    },
+    {
       "id": "serveur-mcp-skraft",
       "title": "Un serveur MCP local (stdio) lance le workflow skraft sur le projet de l'appelant, avec des agents Copilot : démarrer, consulter l'état, répondre aux questions, reprendre, arrêter, lire le rapport ; un verrou par projet ; projets bornés",
       "verify": "pnpm vitest run --project mcp-skraft",

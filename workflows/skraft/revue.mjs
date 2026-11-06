@@ -6,9 +6,9 @@
 */
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
-import { lensBrief, latestArtifacts } from "./review-brief.mjs";
+import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
-import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
+import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
 /**
 * `revues` ne fait que grandir : son rang numérote les rapports, qui ne reculent donc jamais, même
@@ -69,7 +69,7 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
     const issues = await Promise.all(lentilles.map((l) => lentille(w, l, lensBrief(l, contexte, phase, fichiers, tousFaits, lensHistory(s.fils, l)), reponses)));
     const q = issues.find((x) => x.question);
     if (!q)
-      return juger(w, d, s, phase, essai, issues.map((x) => x.sortie), disp);
+      return juger(w, d, s, phase, essai, issues.map((x) => x.sortie), disp, { contexte, fichiers, faits: tousFaits });
     const motif = await questionDeRevue(w, d, s, phase, q);
     if (phase !== "DELIVER")
       return { motifs: [motif], porte: "question de revue", nonCompte: true };
@@ -120,10 +120,10 @@ async function questionDeRevue(w, d, s, phase, q) {
   return motif;
 }
 /** Verdicts rendus : rapports, fils de défauts, arbitrages, synthèse. */
-async function juger(w, d, s, phase, essai, bruts, disp) {
+async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
   const tour = s.revues.length + 1;
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
-  const verdicts = numberDefects(bruts, tour, classer);
+  const verdicts = await refuter(w, phase, numberDefects(bruts, tour, classer), entrees);
   await ecrireRapport(w, d.slug, phase, tour, essai, verdicts);
   const r = reviewRound(s.fils, verdicts, tour);
   s.fils = r.threads;
@@ -154,6 +154,29 @@ async function juger(w, d, s, phase, essai, bruts, disp) {
     // Première revue de la phase (ADR 0042), ou défaut maintenu par l'humain (§13, écart 9).
     garanti: s.revues.length === 1 || parHumain,
   };
+}
+/**
+* Réfutateur (ADR 0069) : un appel par lentille qui a des défauts blocker ou major, en parallèle, avec
+* les entrées de cette lentille. Le code décide de ce qui tombe (`appliquerRefutations`). Un
+* réfutateur muet ou interrompu ne réfute rien : les défauts restent, comme dans le doute.
+*/
+async function refuter(w, phase, verdicts, entrees) {
+  const lots = defautsARefuter(verdicts);
+  if (!lots.length)
+    return verdicts;
+  const existants = new Set(await w.listerFichiers());
+  const reponses = await Promise.all(lots.map(async (x) => {
+    try {
+      const r = await w.agent("skraft-finding-refuter", refuterBrief(x.lens, entrees.contexte, phase, entrees.fichiers, entrees.faits, x.defects));
+      return { lens: x.lens, rulings: r.sortie?.rulings ?? [] };
+    }
+    catch (e) {
+      if (!(e instanceof TourInterrompu))
+        throw e;
+      return { lens: x.lens, rulings: [] };
+    }
+  }));
+  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, (p) => existants.has(p), r.lens), verdicts);
 }
 /** Une ligne par lentille qui rejette, avec ses défauts. */
 function motifsDeRejet(lenses) {

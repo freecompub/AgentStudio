@@ -5,6 +5,99 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Réfutateur des défauts de revue (ADR 0069), extension et workflow
+
+- Décidé par le responsable (« on l'intègre chez nous ») ; idée de skraft-plugin v2, réimplémentée
+  sans copie (prompt écrit à neuf). ADR 0069.
+- **Règle pure**, dans les deux copies de `review-thread` : `defautsARefuter` (blocker et major, par
+  lentille ; ni les minor, ni une lentille REJECTED) et `appliquerRefutations` (le code décide : une
+  réfutation `accepted` ne compte que si sa raison cite `chemin:ligne` d'un fichier **qui existe** ;
+  sinon, ou sans arbitrage, le défaut reste ; une lentille CHANGES_REQUESTED sans blocker ni major
+  restant approuve ; les réfutés vont dans `refuted`, avec la raison).
+- **Dossier** : `refuterBrief` (deux copies de `review-brief`) — défauts numérotés, puis les **mêmes
+  entrées** que la lentille (cold-reader sans faits, quality-gates sans code ni tests), sans ses
+  consignes.
+- **Câblage** : workflow `revue.mjs` (`juger` → `refuter`, un appel par lentille en parallèle) ;
+  extension `effects.ts` (`runReview` → `refuter`) : le **réducteur ne change pas**, il reçoit des
+  verdicts filtrés. Réfutateur muet ou interrompu : rien n'est réfuté.
+- **Agent** `skraft-finding-refuter` (classe `strong`, sortie `submit_lens_verdict` avec `rulings`,
+  comme l'arbitre de mutants) : déclaré dans le `meta` du workflow et le manifeste de l'extension ;
+  même fichier `.agent.md` des deux côtés (aucun nom d'outil, ADR 0024).
+- **Rapports** : les réfutés figurent dans le JSON et le `.md` de la revue (« - réfuté : … — raison »),
+  et survivent au rejeu depuis le JSON (`replayReview`, schéma zod et `lireVerdicts`).
+- **Harnais** des deux côtés : un réfutateur par défaut qui **maintient** tout, pour que les tests
+  existants gardent leur déroulé.
+- Tests vus rouges puis verts : règle pure (5 × 2), dossier (2 × 2), rapport (extension), bout en bout
+  (workflow en DESIGN, extension en DELIVER : réfuté avec citation → aucun tour de plus ; sans
+  citation → le défaut part au producteur). Un test du manifeste figeait la liste des agents : mis à
+  jour.
+- **Mesure à faire** (`refutateur-mesure-us2`, accord du responsable) : attention, le run MCP d'US-2
+  du 05/11 n'a eu **aucun défaut sérieux en revue** ; le réfutateur n'y aurait pas été appelé. Pour
+  mesurer, il faut une story ou un run où les lentilles signalent des défauts.
+- Écartés pour l'instant (ADR 0069) : réfuter les minor, désaccord isolé, ne pas rejuger un défaut
+  déjà réfuté au même endroit.
+
+## 06/11 — skraft-plugin v2 et AgentStudio : comparatif lentilles, portes, revue (plan, rien d'implémenté)
+
+Suite de `docs/16` (v2 = `integration/v2-next`, commit `0425f031`, 2.0.0-alpha.63 ; nous = workflow
+`workflows/skraft/` et extension `extensions/skraft/`, mêmes agents et skills). Colonne « Mieux » :
+qui fait mieux, `v2`, `nous` ou `=`. Colonne « Suite » : lot de priorité — [1] simple, code pur ;
+[2] coût des revues, ADR puis mesure sur US-2 (run Copilot avec l'accord du responsable) ;
+[3] utile, moins urgent ; `garder` : on garde le nôtre ; `non` : on ne reprend pas. Reprises **à
+partir des idées**, sans copie (la v2 n'est pas couverte par l'autorisation, versions < v2.0.0),
+valables pour **l'extension et le workflow**, en TDD.
+
+### Lentilles
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Nombre et spécialisation | 11 lentilles spécialisées par phase (DESIGN 3, DISTILL 4, DELIVER 3) + 2 conditionnelles (mocks, contrats) | 4 généralistes (cold-reader, test-integrity, architecture, quality-gates) avec des « points à examiner » par phase | v2 (critères nets) ; nous (moins de tours) | [3] après mesure du réfutateur |
+| Sélection | Par le graphe ; lentilles `when=` déclenchées par le contenu du patch | Par le niveau de difficulté (2 ou 4 lentilles) et la phase (`quality-gates` retirée en DESIGN) | = | — |
+| Entrées par lentille | Fixées par le code (`blind`, portée, patchs par portée) | Fixées par le code (`lensBrief` : cold-reader sans faits, etc.) | = | — |
+| Contrat de sortie | YAML validé ; `severityReason`, `drift`, `occurrences` obligatoires ; 20 défauts au plus ; `pass` avec un défaut grave refusé | `submit_lens_verdict` à schéma ; identifiants et cibles fixés par le code ; pas de raison de gravité ni d'occurrences | v2 | [1] contrat enrichi, regroupement par ligne |
+| Ce que le code a déjà vérifié | Dit aux lentilles (« Not yours to report », findings du moteur à ne pas répéter) | Non dit : une lentille peut reprocher ce qu'une porte a déjà jugé | v2 | [1] lister les portes jugées dans le dossier de chaque lentille |
+| Plafond de gravité de cold-reader | `medium` au plus (consigne) | `major` au plus, **appliqué par le code** | nous | garder |
+| Confronter aux mesures | Supprimé (`quality-gates-lens`) : les portes sont exécutées par le moteur | `quality-gates` confronte les livrables aux faits mesurés | nous | garder |
+| Question d'une lentille | Interdite ; `inconclusive` → run BLOCKED, question à l'humain | Question de revue à l'humain, 2 par phase au plus, sans coût pour le producteur (ADR 0063) | nous | garder |
+| Modèle | Palier `economy` par défaut, configurable | Classe par lentille (`standard`, `light` pour quality-gates), ADR 0048 | = | — |
+
+### Portes
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Exécution | Le moteur lance les commandes de `skraft-config.json` (build, format, lint, test, architecture, coverage), par composant touché | Le code lance les tests et le linter par l'adaptateur de pile ; preuves produites par notre handler `run_tests` | = | — |
+| Format | Porte à part | Absente | v2 | [3] si le profil déclare `format` |
+| Gel des tests d'acceptance | **Aucune porte** : brief et lentille seulement ; l'ingénieur écrit dans `tests` | Empreinte au commit de DISTILL ; tests unitaires gelés dès leur rouge | nous | garder ; à proposer en amont |
+| RED / GREEN | Convention de commits + **rejeu de chaque commit rouge** dans un worktree | Un seul nouveau test rouge par pas, rouge pour une bonne raison, suite verte, vérifiés au moment du pas | v2 (preuve après coup) ; nous (au pas) | non pour l'instant (nos preuves viennent du handler) |
+| Couverture | Ce que dit la commande de l'équipe, aucun seuil dans le code | Couverture **du diff** avec seuil, lignes exemptées tracées | nous | garder ; à proposer en amont |
+| Mutation | 100 % core / 80 % boundary **figés** ; « core » reconnu au nom du dossier ; survivants par fichier, plan validé par l'humain, arrêt sans progrès | Seuils de `quality.yaml` ; arbitre de mutants plafonné à 2 dérogations, humain au-delà (ADR 0065) | v2 (boucle par fichier, arrêt) ; nous (seuils, dérogations) | [3] boucle par fichier et arrêt sans progrès, en plus de l'arbitre |
+| Cohérence DESIGN | Matrice **déclarée** par l'architecte (`consistency-gate: PASS`), présence vérifiée | Matrice **calculée** par le code (G10) et porte de cohérence (G6, G8, STRUCTURAL_DRIFT…) | nous | garder ; à proposer en amont |
+| Plan de test, écarts | C12 « Every test is planned » (skill), jugé par test-integrity | Matrice couche/doublure, walking skeleton, écarts vérifiés par le code (ADR 0067) | nous | garder |
+| Scans du patch | En code : `skip`/`only` ajoutés, test supprimé, assertions retirées ; placement des tests | Gel et règles de modification des tests (ajouts seulement) | v2 (en complément) | [3] pour les tests modifiés pendant un correctif |
+| Périmètre d'écriture | Contrôlé **après** l'étape | Bloqué **avant** l'écriture (`onPreToolUse`) | nous | garder |
+| Réessais | `max_attempts` + **disjoncteur** (deux échecs identiques → arrêt) | Budget `essayer({max})`, consommé jusqu'au bout | v2 | [1] disjoncteur |
+| Panne d'environnement | Code 127/9009 → question à l'humain | `ENV_FAILURE` → escalade immédiate | = | — |
+
+### Revue
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Qui calcule le verdict | Le moteur (`verdict.mjs`) | Le code (`synthesize`, repris de v1) | = | — |
+| Faux positifs | **Réfutateur** sur chaque défaut avant le verdict (`confirmed`, `refuted` avec `path:line`, `unverifiable` qui compte) | Le producteur conteste, la lentille arbitre, puis l'humain : un tour du producteur par faux positif | v2 | **fait le 06/11** (ADR 0069), blocker et major seulement |
+| Désaccord isolé | Une seule lentille contre les autres → le réfutateur reçoit toutes les entrées | Aucune règle | v2 | [2] avec le réfutateur |
+| Relances entre rondes | Seules les lentilles dont les entrées ont changé ou qui avaient un défaut ; un défaut réfuté au même endroit n'est pas rejugé | Toutes les lentilles, à chaque ronde | v2 | [2] re-revue incrémentale |
+| Défaut hors du changement | Devient une **note** : rapporté, ne renvoie pas le travail | Renvoie le travail comme les autres | v2 | [1] notes |
+| Défaut mineur | Renvoie le travail (même `low`) | N'empêche pas l'approbation ; corrigé en fin de DELIVER (ADR 0062) | nous | garder |
+| Rejet net | Supprimé | REJECTED (2 lentilles) → escalade | nous | garder |
+| Plafond | `max_visits=3` par arête, puis question : ACCEPT (défauts acceptés dans le rapport) si seulement medium/low, sinon instruction ou STOP | Budget de 2 ou 3 essais, revue garantie à sa première ronde, puis escalade | v2 (sortie ACCEPT) | [3] « accepter les défauts restants », refusé s'il reste un blocker |
+| Arbitrage humain | Au plafond seulement | Fil de défauts : contesté, recontesté, persistant → ARBITRATION, tous à la fois | nous (plus fin) | garder |
+| Coût | Journalisé, aucun plafond | Journalisé (trace, usage), aucun plafond | = | — |
+| Doc et code | Décalage (message du commit 27c2e656 contre `verdict.mjs` ; skill qui décrit une synthèse pondérée abandonnée) | Skills v1 qui décrivent encore de la procédure faite par le code | = | [1] mentions « le code le vérifie déjà » dans nos skills |
+
+**Pourquoi cet ordre** : sur le run MCP d'US-2, 11 des 20 tours d'agent étaient des lentilles ; les
+lots [1] et [2] visent ce coût. À ne pas reprendre en bloc : journal signé, multi-composants,
+publication. Prochaine étape : le lot [1], ou directement le réfutateur, au choix du responsable.
+
 ## 05/11 — Analyse de skraft-plugin v2 (docs/16)
 
 - `docs/16-skraft-plugin-v2.md` : agents, skills, lentilles, revue et portes de la branche

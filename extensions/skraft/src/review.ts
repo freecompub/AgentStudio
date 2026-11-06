@@ -45,6 +45,8 @@ export interface LensVerdict {
   verdict: Verdict;
   defects: LensDefect[];
   rulings?: LensRuling[] | undefined;
+  /** Défauts réfutés avant la synthèse (ADR 0069), gardés pour le rapport avec la raison. */
+  refuted?: (LensDefect & { refutation: string })[] | undefined;
 }
 
 /**
@@ -149,28 +151,31 @@ export function reviewReport(phase: string, attempt: number, lenses: LensVerdict
     for (const d of v.defects)
       lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
     for (const r of v.rulings ?? []) lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
+    for (const d of v.refuted ?? []) lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
     lines.push("");
   }
   return lines.join("\n");
 }
 
+const defectSchema = z.object({
+  severity: z.enum(["blocker", "major", "minor"]),
+  description: z.string(),
+  file: z.string().optional(),
+  line: z.number().optional(),
+  target: z.enum(["test", "code", "deliverable"]).optional(),
+  id: z.string().optional(),
+  targetNote: z.string().optional(),
+  severityNote: z.string().optional(),
+});
 const lensesSchema = z.array(
   z.object({
     lens: z.string(),
     verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
-    defects: z.array(
-      z.object({
-        severity: z.enum(["blocker", "major", "minor"]),
-        description: z.string(),
-        file: z.string().optional(),
-        line: z.number().optional(),
-        target: z.enum(["test", "code", "deliverable"]).optional(),
-        id: z.string().optional(),
-        targetNote: z.string().optional(),
-        severityNote: z.string().optional(),
-      }),
-    ),
+    defects: z.array(defectSchema),
     rulings: z.array(z.object({ defect: z.string(), decision: z.enum(["accepted", "maintained"]), reason: z.string().optional() })).optional(),
+    // Défauts réfutés avant la synthèse (ADR 0069).
+    refuted: z.array(defectSchema.extend({ refutation: z.string() })).optional(),
   }),
 );
 

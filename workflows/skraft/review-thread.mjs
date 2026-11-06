@@ -238,3 +238,38 @@ export function lensesAfterThreads(lenses, threads) {
     return { ...l, defects, verdict: serious ? "CHANGES_REQUESTED" : removed ? "APPROVED" : l.verdict };
   });
 }
+/** Gravités soumises au réfutateur : un mineur n'empêche pas l'approbation (ADR 0069). */
+const A_REFUTER = ["blocker", "major"];
+/**
+* Défauts à soumettre au réfutateur (ADR 0069), par lentille : ses blocker et major. Une lentille
+* REJECTED n'est pas soumise : son rejet escalade à l'humain de toute façon.
+*/
+export function defautsARefuter(lenses) {
+  return lenses
+    .filter((l) => l.verdict !== "REJECTED")
+    .map((l) => ({ lens: l.lens, defects: l.defects.filter((d) => A_REFUTER.includes(d.severity)) }))
+    .filter((x) => x.defects.length > 0);
+}
+/** Passages `chemin:ligne` cités dans une raison (guillemets inversés acceptés). */
+const CITATION = /([\w./-]+\.[\w]+):(\d+)/g;
+/**
+* Arbitrages du réfutateur appliqués aux verdicts (ADR 0069). Le code décide de ce qui tombe : une
+* réfutation (`accepted`) n'est retenue que si sa raison cite un passage `chemin:ligne` d'un fichier
+* qui existe ; sinon, ou sans arbitrage, le défaut est maintenu. Les défauts réfutés restent dans
+* `refuted`, avec la raison, pour le rapport. Une lentille CHANGES_REQUESTED à qui il ne reste ni
+* blocker ni major n'avait réclamé qu'eux : elle approuve. `lens` borne les arbitrages à une lentille.
+*/
+export function appliquerRefutations(lenses, rulings, existe, lens) {
+  const cite = (raison) => [...(raison ?? "").matchAll(CITATION)].some((m) => existe(m[1]));
+  return lenses.map((l) => {
+    if (l.verdict === "REJECTED" || (lens !== undefined && l.lens !== lens))
+      return l;
+    const tombe = (d) => A_REFUTER.includes(d.severity) && rulings.some((r) => r.defect === d.id && r.decision === "accepted" && cite(r.reason));
+    const refutes = l.defects.filter(tombe).map((d) => ({ ...d, refutation: rulings.find((r) => r.defect === d.id).reason }));
+    if (!refutes.length)
+      return l;
+    const defects = l.defects.filter((d) => !tombe(d));
+    const serieux = defects.some((d) => A_REFUTER.includes(d.severity));
+    return { ...l, defects, refuted: [...(l.refuted ?? []), ...refutes], verdict: l.verdict === "CHANGES_REQUESTED" && !serieux ? "APPROVED" : l.verdict };
+  });
+}

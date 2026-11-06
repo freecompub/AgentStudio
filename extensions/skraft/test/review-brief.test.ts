@@ -2,7 +2,7 @@ import type { Evidence } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
 import { initialState } from "../src/reducer.js";
 import type { SkraftState } from "../src/model.js";
-import { latestArtifacts, lensBrief, reviewFacts } from "../src/review-brief.js";
+import { latestArtifacts, lensBrief, refuterBrief, reviewFacts } from "../src/review-brief.js";
 import { replayReview, reviewReport, synthesize, type LensVerdict } from "../src/review.js";
 import { parseStory } from "../src/story.js";
 import { US12 } from "./story.test.js";
@@ -186,5 +186,37 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     expect(t).toContain("Points à examiner en DELIVER :");
     expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
     expect(lensBrief("quality-gates", state, "DELIVER", files, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
+  });
+});
+
+describe("Dossier du réfutateur (ADR 0069)", () => {
+  const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/BolusCapTests.swift"] };
+  const defauts = [{ id: "cold-reader#1.1", severity: "major" as const, description: "Nom flou.", file: "Sources/Domain/BolusCapPolicy.swift", line: 3 }];
+  it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
+    const b = refuterBrief("cold-reader", state, "DELIVER", files, ["Fait A."], defauts);
+    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (Sources/Domain/BolusCapPolicy.swift:3)");
+    for (const vu of ["Tests/BolusCapTests.swift", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
+    for (const cache of ["Fait A.", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);
+  });
+  it("test-integrity : critères et faits ; architecture : ADR ratifiés et faits ; quality-gates : faits et livrables seulement", () => {
+    expect(refuterBrief("test-integrity", state, "DELIVER", files, ["Fait A."], defauts)).toContain(`1. ${story.criteria[0]!.text}`);
+    const a = refuterBrief("architecture", state, "DELIVER", files, ["Fait A."], defauts);
+    expect(a).toContain("ADR-001 : docs/adr/adr-001-plafond.md");
+    expect(a).not.toContain("ADR-002");
+    const q = refuterBrief("quality-gates", state, "DELIVER", files, ["Fait A."], defauts);
+    expect(q).toContain("Fait A.");
+    expect(q).not.toContain("Tests/BolusCapTests.swift");
+  });
+});
+
+describe("Rapport de revue et réfutations (ADR 0069)", () => {
+  it("les défauts réfutés figurent dans le rapport, avec la raison, et survivent au rejeu depuis le JSON", () => {
+    const lenses: LensVerdict[] = [
+      { lens: "cold-reader", verdict: "APPROVED", defects: [], refuted: [{ id: "cold-reader#1.1", severity: "major", description: "Nom flou.", refutation: "src/a.ts:3 nomme déjà l'intention." }] },
+    ];
+    const md = reviewReport("DELIVER", 1, lenses);
+    expect(md).toContain("- réfuté : `cold-reader#1.1` **major** Nom flou. — src/a.ts:3 nomme déjà l'intention.");
+    const replay = replayReview("DELIVER", 1, JSON.stringify(lenses));
+    expect(replay.markdown).toBe(md);
   });
 });

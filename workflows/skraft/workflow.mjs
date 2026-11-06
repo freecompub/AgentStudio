@@ -113,6 +113,12 @@ export const meta = {
       classe: "standard",
       sortie: "submit_lens_verdict",
     },
+    "skraft-finding-refuter": {
+      prompt: "agents/skraft-finding-refuter.agent.md",
+      consignes: "Rends ta décision avec l'outil submit_lens_verdict : lens « finding-refuter », verdict APPROVED, aucun défaut, et pour\nchaque défaut listé un arbitrage (rulings) : accepted s'il est réfuté, avec le passage `chemin:ligne` qui le montre dans ta raison ;\nmaintained sinon, avec ta raison.",
+      classe: "strong",
+      sortie: "submit_lens_verdict",
+    },
     "skraft-lens-cold-reader": {
       prompt: "agents/skraft-lens-cold-reader.agent.md",
       consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",

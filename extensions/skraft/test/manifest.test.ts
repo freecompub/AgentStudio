@@ -16,6 +16,7 @@ describe("Manifeste et commande skraft", () => {
       "skraft-architect-model",
       "skraft-classifier",
       "skraft-dev",
+      "skraft-finding-refuter",
       "skraft-lens-architecture",
       "skraft-lens-cold-reader",
       "skraft-lens-quality-gates",

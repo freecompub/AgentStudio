@@ -102,6 +102,9 @@ export function reviewReport(phase, attempt, lenses) {
       lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
     for (const r of v.rulings ?? [])
       lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
+    for (const d of v.refuted ?? [])
+      lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
     lines.push("");
   }
   return lines.join("\n");
@@ -117,9 +120,21 @@ function lireVerdicts(brut) {
     return v;
   };
   if (!Array.isArray(brut)) throw new Error("Rapport de revue illisible : liste attendue");
+  const defaut = (d) => ({
+      severity: parmi(d.severity, ["blocker", "major", "minor"], "severity"),
+      description: texte(d.description, "description"),
+      ...(typeof d.file === "string" ? { file: d.file } : {}),
+      ...(typeof d.line === "number" ? { line: d.line } : {}),
+      ...(d.target !== undefined ? { target: parmi(d.target, ["test", "code", "deliverable"], "target") } : {}),
+      ...(typeof d.id === "string" ? { id: d.id } : {}),
+      ...(typeof d.targetNote === "string" ? { targetNote: d.targetNote } : {}),
+      ...(typeof d.severityNote === "string" ? { severityNote: d.severityNote } : {}),
+  });
   return brut.map((l) => ({
     lens: texte(l.lens, "lens"),
     verdict: parmi(l.verdict, ["APPROVED", "CHANGES_REQUESTED", "REJECTED"], "verdict"),
+    // Défauts réfutés avant la synthèse (ADR 0069).
+    ...(Array.isArray(l.refuted) ? { refuted: l.refuted.map((d) => ({ ...defaut(d), refutation: texte(d.refutation, "refutation") })) } : {}),
     defects: (Array.isArray(l.defects) ? l.defects : []).map((d) => ({
       severity: parmi(d.severity, ["blocker", "major", "minor"], "severity"),
       description: texte(d.description, "description"),
