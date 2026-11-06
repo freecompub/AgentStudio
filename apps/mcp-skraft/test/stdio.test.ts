@@ -80,6 +80,19 @@ describe("Serveur MCP construit, en stdio (ADR 0068)", () => {
     }
   }, 60_000);
 
+  it("runtime Claude choisi par la configuration (ADR 0070) : le serveur démarre et répond, le journal le dit", async () => {
+    const f = join(home, "claude.json");
+    await writeFile(f, JSON.stringify({ autorises: [base], runtime: "claude" }));
+    const client = await connecter({ SKRAFT_MCP_CONFIG: f });
+    try {
+      const etat = JSON.parse(texte(await client.callTool({ name: "skraft_etat", arguments: {} })));
+      expect(etat).toMatchObject({ mode: "pilote", workflow: { nom: "skraft-workflow" } });
+    } finally {
+      await client.close();
+    }
+    expect(await readFile(join(home, ".agent-studio", "mcp-skraft", "logs", "mcp-skraft.log"), "utf8")).toMatch(/"runtime":"claude"/);
+  }, 60_000);
+
   it("projet hors des dossiers autorisés par la configuration : refusé", async () => {
     const client = await connecter({ SKRAFT_MCP_CONFIG: join(home, "vide.json") });
     try {

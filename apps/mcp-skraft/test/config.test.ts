@@ -17,13 +17,22 @@ afterAll(() => rm(d, { recursive: true, force: true }));
 
 describe("Configuration du serveur MCP", () => {
   it("absente : aucun dossier autorisé en plus des roots, github.com", async () => {
-    expect(await lireConfiguration(join(d, "absente.json"))).toEqual({ ok: true, config: { autorises: [], hostname: "github.com" } });
+    expect(await lireConfiguration(join(d, "absente.json"))).toEqual({ ok: true, config: { autorises: [], hostname: "github.com", runtime: "copilot", modeles: {} } });
   });
 
   it("lue : dossiers autorisés (avec ~ développé) et hôte Enterprise", async () => {
     const f = join(d, "ok.json");
     await writeFile(f, JSON.stringify({ autorises: ["~/Projets", "/srv/depots"], hostname: "github.exemple.fr" }));
-    expect(await lireConfiguration(f, { home: "/home/moi" })).toEqual({ ok: true, config: { autorises: ["/home/moi/Projets", "/srv/depots"], hostname: "github.exemple.fr" } });
+    expect(await lireConfiguration(f, { home: "/home/moi" })).toEqual({ ok: true, config: { autorises: ["/home/moi/Projets", "/srv/depots"], hostname: "github.exemple.fr", runtime: "copilot", modeles: {} } });
+  });
+
+  it("runtime au choix (ADR 0070) : Copilot par défaut, ou Claude, avec ses modèles par classe ; un runtime inconnu est refusé", async () => {
+    const f = join(d, "claude.json");
+    await writeFile(f, JSON.stringify({ runtime: "claude", modeles: { strong: "opus", light: "haiku" } }));
+    expect(await lireConfiguration(f)).toMatchObject({ ok: true, config: { runtime: "claude", modeles: { strong: "opus", light: "haiku" } } });
+    const g = join(d, "inconnu-runtime.json");
+    await writeFile(g, JSON.stringify({ runtime: "gemini" }));
+    expect(await lireConfiguration(g)).toMatchObject({ ok: false, motif: expect.stringContaining("runtime") });
   });
 
   it("invalide (JSON, champ inconnu, chemin relatif) : refusée, avec le fichier et la raison", async () => {

@@ -77,22 +77,30 @@ export function createConnexion(auth: GitHubAuth): Connexion {
       }
       return lancer();
     },
-    runtime(fabrique) {
-      let demarrage: Promise<AgentRuntime> | null = null;
-      return () => {
-        demarrage ??= (async () => {
-          const v = await verifier();
-          if (!v.ok) throw new Error(v.motif);
-          const rt = fabrique(await auth.token(), auth.hostname());
-          await rt.start();
-          return rt;
-        })().catch((e: unknown) => {
-          // Un échec n'est pas retenu : l'appel suivant, après connexion, réessaie.
-          demarrage = null;
-          throw e;
-        });
-        return demarrage;
-      };
-    },
+    runtime: (fabrique) =>
+      runtimeParesseux(verifier, async () => {
+        const rt = fabrique(await auth.token(), auth.hostname());
+        await rt.start();
+        return rt;
+      }),
+  };
+}
+
+/**
+ * Runtime démarré une fois, au premier besoin, après vérification de la connexion ; un échec n'est
+ * pas retenu : l'appel suivant, après connexion, réessaie. Commun aux runtimes Copilot et Claude.
+ */
+export function runtimeParesseux(verifier: () => Promise<{ ok: true } | { ok: false; motif: string }>, creer: () => Promise<AgentRuntime>): () => Promise<AgentRuntime> {
+  let demarrage: Promise<AgentRuntime> | null = null;
+  return () => {
+    demarrage ??= (async () => {
+      const v = await verifier();
+      if (!v.ok) throw new Error(v.motif);
+      return creer();
+    })().catch((e: unknown) => {
+      demarrage = null;
+      throw e;
+    });
+    return demarrage;
   };
 }

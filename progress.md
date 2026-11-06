@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude (ADR 0070), brique 4b : choix du runtime dans le serveur MCP
+
+- `mcp-skraft.json` : `runtime: "copilot" | "claude"` (Copilot par défaut) et `modeles` par classe
+  (`strong`, `standard`, `light`) ; runtime inconnu refusé.
+- `connexion-claude.ts` : connexion lue par `claude auth status` (JSON `loggedIn`) ; interactive, donc
+  `skraft_connexion` dit de lancer `claude auth login` ; CLI absent : dit de l'installer. Modèles par
+  défaut avec Claude : `strong` → opus, `standard` → sonnet, `light` → haiku (surchargés par la
+  configuration).
+- Sans duplication : `runtimeParesseux` (démarrer une fois, après vérification, échec non retenu),
+  commun à la connexion Copilot (refaite dessus) et Claude.
+- `assemblage.ts` choisit connexion et runtime selon la configuration ; `modelFor` passé aux services
+  (avec Copilot, seulement les modèles que la configuration nomme).
+- Essai stdio du paquet construit avec `runtime: "claude"` : démarre, répond, journal
+  `"runtime":"claude"` — écrit après le code (composition), pas vu rouge.
+- Reste : l'application de bureau (réglage, connexion, interface) ; un run réel sur US-2 avec Claude
+  (accord du responsable).
+
 ## 06/11 — Runtime Claude (ADR 0070), brique 4a : coût en dollars dans la trace et les rapports
 
 - L'événement `usage` du port porte `costUsd` (runtime Claude) ; l'exécuteur d'agents le trace

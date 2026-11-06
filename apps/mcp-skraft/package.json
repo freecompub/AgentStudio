@@ -9,6 +9,7 @@
     "@agent-studio/extension-host": "workspace:*",
     "@agent-studio/github-auth": "workspace:*",
     "@agent-studio/project-services": "workspace:*",
+    "@agent-studio/runtime-claude": "workspace:*",
     "@agent-studio/runtime-copilot": "workspace:*",
     "@agent-studio/stack-adapters": "workspace:*",
     "@agent-studio/workflow": "workspace:*",

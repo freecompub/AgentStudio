@@ -9,15 +9,24 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
 
+/** Classes de rôle des agents (ADR 0048) et modèle choisi pour chacune. */
+export type ModelesParClasse = Partial<Record<"strong" | "standard" | "light", string>>;
+
 export interface ConfigurationServeur {
   autorises: string[];
   hostname: string;
+  /** Runtime des agents (ADR 0070) : Copilot par défaut. */
+  runtime: "copilot" | "claude";
+  /** Modèle par classe de rôle ; absent : le défaut du runtime. */
+  modeles: ModelesParClasse;
 }
 
 const schema = z
   .object({
     autorises: z.array(z.string().min(1)).default([]),
     hostname: z.string().min(1).max(253).default("github.com"),
+    runtime: z.enum(["copilot", "claude"]).default("copilot"),
+    modeles: z.object({ strong: z.string().min(1), standard: z.string().min(1), light: z.string().min(1) }).partial().strict().default({}),
   })
   .strict();
 
@@ -31,7 +40,7 @@ export async function lireConfiguration(fichier: string, o: { home?: string } = 
   try {
     brut = await readFile(fichier, "utf8");
   } catch {
-    return { ok: true, config: { autorises: [], hostname: "github.com" } };
+    return { ok: true, config: { autorises: [], hostname: "github.com", runtime: "copilot", modeles: {} } };
   }
   let json: unknown;
   try {
@@ -44,5 +53,6 @@ export async function lireConfiguration(fichier: string, o: { home?: string } = 
   const autorises = r.data.autorises.map((a) => (a === "~" ? home : a.startsWith("~/") ? join(home, a.slice(2)) : a));
   const relatif = autorises.find((a) => !isAbsolute(a));
   if (relatif) return { ok: false, motif: `Configuration refusée (${fichier}) : « ${relatif} » n'est pas un chemin absolu.` };
-  return { ok: true, config: { autorises, hostname: r.data.hostname } };
+  const modeles = Object.fromEntries(Object.entries(r.data.modeles).filter(([, v]) => v !== undefined)) as ModelesParClasse;
+  return { ok: true, config: { autorises, hostname: r.data.hostname, runtime: r.data.runtime, modeles } };
 }
