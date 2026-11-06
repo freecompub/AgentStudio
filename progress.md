@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Essais de `claude -p` comme runtime (ADR 0070 accepté)
+
+Question du responsable : donner le choix entre Copilot et Claude. Voie étudiée : le CLI de Claude
+Code en mode non interactif plutôt que le Claude Agent SDK (aucune authentification nouvelle, aucun
+SDK, plafond de coût par tour). Essais dans le dossier temporaire de la session, projet Git jetable,
+mini serveur MCP (SDK du dépôt) qui journalise ses appels ; 5 appels `--model haiku`, ≈ 0,005 $.
+
+| Vérifié (Claude Code 2.1.319) | Résultat |
+|---|---|
+| `CLAUDE.md` du projet | Chargé par défaut ; **`--system-prompt` ne l'écarte pas** (mot-témoin ressorti) ; **`--setting-sources ""` l'écarte**, sans `--bare` (qui imposerait une clé API) |
+| Nos outils par MCP | `--mcp-config` + `--strict-mcp-config` : `report_phase` appelé avec les bons arguments, vu par le modèle sous `mcp__spike__report_phase` |
+| Isolement | `--disable-slash-commands` : aucune skill ni commande ; `--tools` : seuls les outils donnés ; agents intégrés listés mais sans outil pour les lancer |
+| Périmètre fixé d'avance | `--allowedTools "Write(allowed/**)"` + `--permission-prompts none` : écriture permise dans `allowed/`, **refusée avant l'écriture** ailleurs |
+| Garde dynamique | **`--permission-prompt-tool mcp__…`** (absent de la liste des options de l'aide, mais accepté) : le CLI demande l'accord à notre outil pour chaque écriture non couverte, avec `tool_name` et `input` ; notre refus bloque, son message revient au modèle. `--disallowedTools` cache l'outil au modèle, le CLI s'en sert toujours |
+| Flux `stream-json --verbose` | init (outils, serveurs MCP, modèle, session), appels et résultats d'outils, usage par étape ; résultat : `total_cost_usd`, `modelUsage`, `permission_denials` |
+
+- Piège : sans `< /dev/null`, `claude -p` attend 3 s sur l'entrée standard (« no stdin data received »).
+- Non vérifié : reprise (`--session-id`, `--resume`), interruption, `--json-schema`, relais réel du
+  serveur MCP vers notre processus (dans l'essai, le serveur décidait seul).
+- ADR 0070 **accepté** le 06/11 par le responsable ; critère `runtime-claude-cli` (false). Effort estimé :
+  1,5 à 2 semaines. Rien ne change pour Copilot (adaptateur séparé, défaut inchangé).
+
 ## 06/11 — Temps par rejeu : une étape par phase et par essai (resumerTrace, skraft_rapport)
 
 - Question du responsable : a-t-on, pour chaque phase et chaque rejeu, le début et la fin ? Avant :

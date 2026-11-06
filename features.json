@@ -305,6 +305,13 @@
       "notes": "06/11. Fait dans resumerTrace (packages/core), donc commun à l'extension, au workflow, au banc et au serveur MCP ; pas besoin de tracer le numéro d'essai côté workflow."
     },
     {
+      "id": "runtime-claude-cli",
+      "title": "Un runtime Claude par le CLI (claude -p), au choix avec Copilot qui reste le défaut : isolement, prompt composé, outils par relais MCP, gardes avant l'écriture, usage et coût ; un run réel sur US-2",
+      "verify": "pnpm vitest run --project runtime-claude",
+      "passes": false,
+      "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). À faire : relais MCP vers notre processus, reprise de session, interruption, choix du runtime, usage en dollars."
+    },
+    {
       "id": "refutateur-mesure-us2",
       "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
       "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",
