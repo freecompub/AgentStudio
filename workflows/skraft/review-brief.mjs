@@ -1,4 +1,5 @@
 // Converti en JavaScript le 2026-10-10 depuis extensions/skraft-workflow/src/review-brief.ts (ADR 0055).
+import { precisions } from "./review-thread.mjs";
 const short = (h) => h.slice(0, 12);
 /** Livrables du dernier essai validé, dernière empreinte par chemin. */
 export function latestArtifacts(records) {
@@ -116,7 +117,7 @@ export function lensBrief(lens, c, phase, files, facts, history = []) {
 export function refuterBrief(lens, c, phase, files, facts, defects) {
   const ou = (d) => (d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : "");
   const lines = [
-    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}`)),
+    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}${precisions(d)}`)),
     "Entrées de la lentille :",
   ];
   const faits = list("Faits établis par le code :", facts);

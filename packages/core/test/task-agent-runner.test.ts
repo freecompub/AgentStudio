@@ -157,13 +157,13 @@ describe("Exécuteur d'agent de tâche", () => {
     runtime.behave("lens", async (t) => {
       await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "NEEDS_REWORK", defects: [] }).catch((e: Error) => errors.push(e.message));
       // ADR 0046 : un défaut sans cible est refusé — c'est elle qui dit quel agent corrige.
-      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "sans cible" }] }).catch((e: Error) => errors.push(e.message));
-      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "sans cible" }] }).catch((e: Error) => errors.push(e.message));
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
     });
     const r = await runner.run({ role: "lens", systemPrompt: "Relis.", writable: [], output: "submit_lens_verdict" }, "x");
     expect(errors[0]).toMatch(/invalides/);
     expect(errors[1]).toMatch(/invalides.*target/);
-    expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+    expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
   });
 });
 

@@ -193,8 +193,8 @@ describe("Dossier du réfutateur (ADR 0069)", () => {
   const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/BolusCapTests.swift"] };
   const defauts = [{ id: "cold-reader#1.1", severity: "major" as const, description: "Nom flou.", file: "Sources/Domain/BolusCapPolicy.swift", line: 3 }];
   it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
-    const b = refuterBrief("cold-reader", state, "DELIVER", files, ["Fait A."], defauts);
-    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (Sources/Domain/BolusCapPolicy.swift:3)");
+    const b = refuterBrief("cold-reader", state, "DELIVER", files, ["Fait A."], [{ ...defauts[0]!, severityReason: "Le nom cache la règle.", occurrences: ["src/b.ts:12"] }]);
+    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (Sources/Domain/BolusCapPolicy.swift:3) — gravité : Le nom cache la règle. — aussi : src/b.ts:12");
     for (const vu of ["Tests/BolusCapTests.swift", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
     for (const cache of ["Fait A.", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);
   });
@@ -213,9 +213,11 @@ describe("Rapport de revue et réfutations (ADR 0069)", () => {
   it("les défauts réfutés figurent dans le rapport, avec la raison, et survivent au rejeu depuis le JSON", () => {
     const lenses: LensVerdict[] = [
       { lens: "cold-reader", verdict: "APPROVED", defects: [], refuted: [{ id: "cold-reader#1.1", severity: "major", description: "Nom flou.", refutation: "src/a.ts:3 nomme déjà l'intention." }] },
+      { lens: "architecture", verdict: "CHANGES_REQUESTED", defects: [{ id: "architecture#1.1", severity: "major", target: "code", description: "Dépendance inversée.", file: "src/a.ts", line: 2, severityReason: "Le domaine dépend de l'infrastructure.", occurrences: ["src/b.ts:7"] }] },
     ];
     const md = reviewReport("DELIVER", 1, lenses);
     expect(md).toContain("- réfuté : `cold-reader#1.1` **major** Nom flou. — src/a.ts:3 nomme déjà l'intention.");
+    expect(md).toContain("- `architecture#1.1` **major** (code) Dépendance inversée. (src/a.ts:2) — gravité : Le domaine dépend de l'infrastructure. — aussi : src/b.ts:7");
     const replay = replayReview("DELIVER", 1, JSON.stringify(lenses));
     expect(replay.markdown).toBe(md);
   });

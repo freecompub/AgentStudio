@@ -52,7 +52,7 @@ describe("skraft en workflow — reprise d'une correction ciblée (D12, D15)", (
       "skraft-lens-cold-reader": async (t) => {
         const premiere = t.prompt.includes("phase DELIVER") && revues++ === 0;
         await t.callTool("submit_lens_verdict", premiere
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "dose négative non gérée", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "dose négative non gérée", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
       },
     });
@@ -93,7 +93,7 @@ describe("skraft en workflow — reprise d'une correction ciblée (D12, D15)", (
         const premiere = t.prompt.includes("phase DELIVER") && revues++ === 0;
         if (premiere) enCorrection = true;
         await t.callTool("submit_lens_verdict", premiere
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "dose négative non gérée", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "dose négative non gérée", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
       },
     });

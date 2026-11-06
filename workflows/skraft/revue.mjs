@@ -8,7 +8,7 @@ import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studi
 import { buildBrief, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
-import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
+import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, verifierOccurrences, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
 /**
 * `revues` ne fait que grandir : son rang numérote les rapports, qui ne reculent donc jamais, même
@@ -123,7 +123,9 @@ async function questionDeRevue(w, d, s, phase, q) {
 async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
   const tour = s.revues.length + 1;
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
-  const verdicts = await refuter(w, phase, numberDefects(bruts, tour, classer), entrees);
+  const existants = new Set(await w.listerFichiers());
+  const existe = (p) => existants.has(p);
+  const verdicts = await refuter(w, phase, verifierOccurrences(numberDefects(bruts, tour, classer), existe), entrees, existe);
   await ecrireRapport(w, d.slug, phase, tour, essai, verdicts);
   const r = reviewRound(s.fils, verdicts, tour);
   s.fils = r.threads;
@@ -160,11 +162,10 @@ async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
 * les entrées de cette lentille. Le code décide de ce qui tombe (`appliquerRefutations`). Un
 * réfutateur muet ou interrompu ne réfute rien : les défauts restent, comme dans le doute.
 */
-async function refuter(w, phase, verdicts, entrees) {
+async function refuter(w, phase, verdicts, entrees, existe) {
   const lots = defautsARefuter(verdicts);
   if (!lots.length)
     return verdicts;
-  const existants = new Set(await w.listerFichiers());
   const reponses = await Promise.all(lots.map(async (x) => {
     try {
       const r = await w.agent("skraft-finding-refuter", refuterBrief(x.lens, entrees.contexte, phase, entrees.fichiers, entrees.faits, x.defects));
@@ -176,7 +177,7 @@ async function refuter(w, phase, verdicts, entrees) {
       return { lens: x.lens, rulings: [] };
     }
   }));
-  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, (p) => existants.has(p), r.lens), verdicts);
+  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, existe, r.lens), verdicts);
 }
 /** Une ligne par lentille qui rejette, avec ses défauts. */
 function motifsDeRejet(lenses) {

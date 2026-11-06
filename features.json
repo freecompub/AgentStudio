@@ -284,6 +284,13 @@
       "notes": "ADR 0069 (06/11), idée de skraft-plugin v2 réimplémentée sans copie (docs/16 §5.3). Agent skraft-finding-refuter, classe strong ; lentilles REJECTED et défauts minor non soumis."
     },
     {
+      "id": "contrat-defaut-enrichi",
+      "title": "Chaque défaut de revue dit pourquoi il a sa gravité (severityReason, obligatoire) et peut lister ses autres endroits (occurrences, chemin:ligne) ; le code retire les occurrences vers un fichier absent ; raison et occurrences vont au producteur, au réfutateur et au rapport ; extension et workflow",
+      "verify": "pnpm vitest run --project core test/terminal-tools.test.ts && pnpm vitest run --project workflow-skraft test/review-thread.test.ts test/review-brief.test.ts test/e2e-refutation-workflow.test.ts && pnpm vitest run --project ext-skraft test/review-thread.test.ts test/review-brief.test.ts test/e2e-refutation.test.ts",
+      "passes": true,
+      "notes": "06/11, idée de skraft-plugin v2 (finding severityReason, occurrences), réimplémentée. Non fait : fusion en un fil de défauts de lentilles différentes au même endroit (l'arbitrage d'un fil appartient à sa lentille)."
+    },
+    {
       "id": "refutateur-mesure-us2",
       "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
       "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",

@@ -98,7 +98,7 @@ describe("skraft en workflow — critères de S4 (DISTILL)", () => {
         revuesDistill++;
         await t.callTool("submit_lens_verdict", {
           lens: "test-integrity", verdict: revuesDistill === 1 ? "CHANGES_REQUESTED" : "APPROVED",
-          defects: revuesDistill === 1 ? [{ severity: "major", target: "test", description: "Ajouter le cas complémentaire.", file: "tests/acceptance/plafond.test.ts" }] : [],
+          defects: revuesDistill === 1 ? [{ severity: "major", severityReason: "raison d’essai", target: "test", description: "Ajouter le cas complémentaire.", file: "tests/acceptance/plafond.test.ts" }] : [],
         });
       },
       // Arrêt au premier pas de DELIVER : le test d'origine s'arrête à la fin de DISTILL.

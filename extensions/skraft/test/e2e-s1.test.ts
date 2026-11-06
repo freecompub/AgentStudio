@@ -167,7 +167,7 @@ describe("skraft — critères de sortie de S1", () => {
       "skraft-lens-cold-reader": async (t) => {
         const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
         await t.callTool("submit_lens_verdict", premiere
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague : BolusCap", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", severityReason: "raison d’essai", description: "nom vague : BolusCap", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
       },
     });
@@ -196,7 +196,7 @@ describe("skraft — critères de sortie de S1", () => {
         if (!t.prompt.includes("phase DELIVER")) return void (await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "APPROVED", defects: [] }));
         lensPrompts.push(t.prompt);
         await t.callTool("submit_lens_verdict", lensPrompts.length === 1
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague : BolusCap", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "nom vague : BolusCap", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [], rulings: [{ defect: "cold-reader#1.1", decision: "accepted", reason: "Le contrat fait foi." }] });
       },
     });

@@ -18,6 +18,7 @@ import {
   lensesAfterThreads,
   numberDefects,
   reviewRound,
+  verifierOccurrences,
   type DefectThread,
 } from "../src/review-thread.js";
 
@@ -303,5 +304,23 @@ describe("Réfutation des défauts avant la synthèse (ADR 0069)", () => {
     ], existe, "cold-reader");
     expect(out[0]!.defects.map((d) => d.id)).toEqual(["cold-reader#1.1", "cold-reader#1.2"]);
     expect(out[1]!.defects.map((d) => d.id)).toEqual(["architecture#1.1"]);
+  });
+});
+
+describe("Contrat de défaut enrichi : raison de la gravité et occurrences", () => {
+  const avec = { severity: "major" as const, description: "Nom flou.", target: "code" as const, file: "src/a.ts", line: 3, severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/b.ts:12", "src/absent.ts:4"] };
+
+  it("les occurrences qui visent un fichier absent sont retirées par le code, et c'est noté", () => {
+    const [l] = verifierOccurrences(numberDefects([verdict("cold-reader", [avec])], 1, () => null), (p) => p !== "src/absent.ts");
+    expect(l!.defects[0]!.occurrences).toEqual(["src/b.ts:12"]);
+    expect(l!.defects[0]!.occurrencesNote).toBe("occurrence retirée, fichier introuvable : src/absent.ts:4");
+  });
+
+  it("le fil garde la raison de la gravité et les occurrences ; le retour au producteur les montre", () => {
+    const lenses = numberDefects([verdict("cold-reader", [{ ...avec, occurrences: ["src/b.ts:12"] }])], 1, () => null);
+    const { threads } = reviewRound([], lenses, 1);
+    expect(threads[0]).toMatchObject({ severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/b.ts:12"] });
+    const [ligne] = agentFeedback(threads, () => true);
+    expect(ligne).toBe("[cold-reader#1.1, major, code] Nom flou. (src/a.ts:3) — gravité : Le nom cache la règle du plafond. — aussi : src/b.ts:12");
   });
 });

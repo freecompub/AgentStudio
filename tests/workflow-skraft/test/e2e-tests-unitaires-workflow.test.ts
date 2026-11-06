@@ -69,7 +69,7 @@ describe("skraft en workflow — tests unitaires existants (D10)", () => {
       "skraft-lens-cold-reader": async (t) => {
         const premiere = t.prompt.includes("phase DELIVER") && revues++ === 0;
         await t.callTool("submit_lens_verdict", premiere
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "assertion trop faible : toBe sur un nombre", target: "test", ...(citeLeFichier ? { file: UNIT } : {}) }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "assertion trop faible : toBe sur un nombre", target: "test", ...(citeLeFichier ? { file: UNIT } : {}) }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
       },
     });

@@ -296,7 +296,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     };
     const lentille = (lens: string): ScriptedBehavior => async (t) => {
       const rejette = t.prompt.includes("phase DESIGN") && !relance;
-      await t.callTool("submit_lens_verdict", { lens, verdict: rejette ? "REJECTED" : "APPROVED", defects: rejette ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] });
+      await t.callTool("submit_lens_verdict", { lens, verdict: rejette ? "REJECTED" : "APPROVED", defects: rejette ? [{ severity: "blocker", severityReason: "raison d’essai", description: "conception hors sujet", target: "deliverable" }] : [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-architect-model": model,
@@ -342,7 +342,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
         revues = n;
       }
       const verdict = relance ? "APPROVED" : n === 1 && lens === "architecture" ? "CHANGES_REQUESTED" : n === 2 && (lens === "architecture" || lens === "test-integrity") ? "REJECTED" : "APPROVED";
-      const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", description: "contrat incomplet", target: "deliverable" }] : [];
+      const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", severityReason: "raison d’essai", description: "contrat incomplet", target: "deliverable" }] : [];
       await t.callTool("submit_lens_verdict", { lens, verdict, defects });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {

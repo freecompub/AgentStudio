@@ -38,7 +38,7 @@ describe("skraft — réfutateur des défauts de revue (ADR 0069)", () => {
     const coldReader: ScriptedBehavior = async (t) => {
       const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
       await t.callTool("submit_lens_verdict", premiere
-        ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague : BolusCap", file: "src/domain/bolus-cap.ts", line: 1, target: "code" }] }
+        ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/domain/bolus-cap.ts:2", "src/absent.ts:4"], description: "nom vague : BolusCap", file: "src/domain/bolus-cap.ts", line: 1, target: "code" }] }
         : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
     };
     const refuter: ScriptedBehavior = async (t) => {
@@ -62,7 +62,7 @@ describe("skraft — réfutateur des défauts de revue (ADR 0069)", () => {
     const { app, id, devPrompts, refuterPrompts } = await run(raison);
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
     expect(refuterPrompts).toHaveLength(1);
-    expect(refuterPrompts[0]).toContain(`[${DEFAUT}] (major) nom vague : BolusCap (src/domain/bolus-cap.ts:1)`);
+    expect(refuterPrompts[0]).toContain(`[${DEFAUT}] (major) nom vague : BolusCap (src/domain/bolus-cap.ts:1) — gravité : Le nom cache la règle du plafond.`);
     expect(devPrompts.some((p) => p.includes(`[${DEFAUT}`))).toBe(false);
     const dossier = join(root, ".skraft/us-12/reviews");
     const fichier = (await readdir(dossier)).find((f) => f.startsWith("deliver-review-") && f.endsWith(".md"))!;
@@ -71,6 +71,9 @@ describe("skraft — réfutateur des défauts de revue (ADR 0069)", () => {
 
   it("réfutation sans citation : le code ne la retient pas, le défaut part au développeur", async () => {
     const { devPrompts } = await run("C'est faux, le nom est clair.");
-    expect(devPrompts.some((p) => p.includes(`[${DEFAUT}, major, code] nom vague : BolusCap`))).toBe(true);
+    const correction = devPrompts.find((p) => p.includes(`[${DEFAUT}, major, code] nom vague : BolusCap`))!;
+    expect(correction).toContain("— gravité : Le nom cache la règle du plafond. — aussi : src/domain/bolus-cap.ts:2");
+    // L'occurrence qui vise un fichier absent est retirée par le code.
+    expect(correction).not.toContain("src/absent.ts");
   }, 90_000);
 });

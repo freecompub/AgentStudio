@@ -63,8 +63,8 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
 describe("Dossier du réfutateur (ADR 0069)", () => {
   const defauts = [{ id: "cold-reader#1.1", severity: "major", description: "Nom flou.", file: "src/domain/plafond.ts", line: 3 }];
   it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
-    const b = refuterBrief("cold-reader", c, "DELIVER", files, facts, defauts);
-    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (src/domain/plafond.ts:3)");
+    const b = refuterBrief("cold-reader", c, "DELIVER", files, facts, [{ ...defauts[0], severityReason: "Le nom cache la règle.", occurrences: ["src/b.ts:12"] }]);
+    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (src/domain/plafond.ts:3) — gravité : Le nom cache la règle. — aussi : src/b.ts:12");
     for (const vu of ["src/domain/plafond.ts", "test/domain/plafond.test.ts", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
     // Pas plus que la lentille : cold-reader ne reçoit ni faits, ni critères, ni ADR.
     for (const cache of ["Fait A.", "Plafond de 10 U", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);

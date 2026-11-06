@@ -4,6 +4,7 @@
  * - `cold-reader` ne reçoit aucun contexte du producteur ; `test-integrity` reçoit critères, tests,
  *   code et faits ; `architecture` reçoit les ADR ratifiés, le code, les tests et les faits.
  */
+import { precisions } from "./review-thread.js";
 import type { Evidence } from "@agent-studio/extension-api";
 import type { LensName } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftState } from "./model.js";
@@ -197,7 +198,7 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
 export function refuterBrief(lens: LensName, state: SkraftState, phase: Phase, files: LensFiles, facts: string[], defects: LensDefect[]): string {
   const ou = (d: LensDefect) => (d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : "");
   const lines = [
-    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}`)),
+    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}${precisions(d)}`)),
     "Entrées de la lentille :",
   ];
   const faits = list("Faits établis par le code :", facts);

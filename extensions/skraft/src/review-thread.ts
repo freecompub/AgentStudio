@@ -50,6 +50,10 @@ export interface DefectThread {
   ruling?: string;
   /** Tour de revue où le défaut a été signalé. */
   round: number;
+  /** Pourquoi cette gravité, selon la lentille. */
+  severityReason?: string;
+  /** Autres endroits où le même défaut se répète (`chemin:ligne`). */
+  occurrences?: string[];
   /** Déjà renvoyé une fois à l'autre agent (« hors de mon périmètre », ADR 0047). */
   rerouted?: boolean;
   /** Défaut de la porte de mutation : le mutant exact, que l'arbitrage peut exempter (ADR 0065). */
@@ -153,7 +157,9 @@ export function reviewRound(prev: DefectThread[], lenses: LensVerdict[], round: 
         description: d.description,
         ...(d.file ? { file: d.file } : {}),
         ...(d.line ? { line: d.line } : {}),
-        target: d.target ?? "code",
+        ...(d.severityReason ? { severityReason: d.severityReason } : {}),
+          ...(d.occurrences?.length ? { occurrences: d.occurrences } : {}),
+          target: d.target ?? "code",
         status: "open" as const,
         round,
       })),
@@ -261,7 +267,7 @@ export function agentFeedback(threads: DefectThread[], concerns: (t: DefectThrea
   const mine = threads.filter(concerns);
   const active = mine.filter(isActive);
   const lines = active.map((t) => {
-    const head = `[${t.id}, ${t.severity}, ${t.target}] ${t.description}${where(t)}`;
+    const head = `[${t.id}, ${t.severity}, ${t.target}] ${t.description}${where(t)}${precisions(t)}`;
     if (t.status === "maintained") return `${head} — maintenu par la lentille après ta contestation (${t.ruling ?? "sans raison donnée"}) : à corriger.`;
     if (t.status === "humanMaintained") return `${head} — tranché par l'humain en faveur de la lentille : à corriger, sans recours.`;
     return head;
@@ -353,4 +359,26 @@ export function appliquerRefutations(lenses: LensVerdict[], rulings: LensRuling[
     const serieux = defects.some((d) => A_REFUTER.includes(d.severity));
     return { ...l, defects, refuted: [...(l.refuted ?? []), ...refutes], verdict: l.verdict === "CHANGES_REQUESTED" && !serieux ? "APPROVED" : l.verdict };
   });
+}
+
+/** Raison de la gravité et autres endroits du même défaut, quand la lentille les donne. */
+export const precisions = (d: { severityReason?: string | undefined; occurrences?: string[] | undefined }): string =>
+  `${d.severityReason ? ` — gravité : ${d.severityReason}` : ""}${d.occurrences?.length ? ` — aussi : ${d.occurrences.join(", ")}` : ""}`;
+
+/**
+ * Occurrences vérifiées par le code : un endroit qui vise un fichier absent du dépôt est retiré,
+ * et le retrait est noté. Un défaut ne doit pas renvoyer le producteur vers un fichier qui n'existe pas.
+ */
+export function verifierOccurrences(lenses: LensVerdict[], existe: (path: string) => boolean): LensVerdict[] {
+  return lenses.map((l) => ({
+    ...l,
+    defects: l.defects.map((d) => {
+      if (!d.occurrences?.length) return d;
+      const absentes = d.occurrences.filter((o) => !existe(o.slice(0, o.lastIndexOf(":"))));
+      if (!absentes.length) return d;
+      const { occurrences: _, ...reste } = d;
+      const gardees = d.occurrences.filter((o) => !absentes.includes(o));
+      return { ...reste, ...(gardees.length ? { occurrences: gardees } : {}), occurrencesNote: `occurrence retirée, fichier introuvable : ${absentes.join(", ")}` };
+    }),
+  }));
 }

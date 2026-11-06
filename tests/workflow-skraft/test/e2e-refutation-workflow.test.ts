@@ -40,7 +40,7 @@ describe("skraft en workflow — réfutateur des défauts de revue (ADR 0069)", 
         return void (await t.callTool("submit_lens_verdict", {
           lens: "architecture",
           verdict: "CHANGES_REQUESTED",
-          defects: [{ severity: "major", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
+          defects: [{ severity: "major", severityReason: "Un contrat doit se lire seul.", occurrences: [".skraft/us-12/design/event-model.md:1", "absent/inexistant.md:3"], description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
         }));
       await t.callTool("submit_lens_verdict", { lens: "architecture", verdict: "APPROVED", defects: [] });
     };
@@ -77,6 +77,8 @@ describe("skraft en workflow — réfutateur des défauts de revue (ADR 0069)", 
   it("réfutation sans citation : le code ne la retient pas, le défaut part à l'architecte", async () => {
     const { decidePrompts } = await run("C'est faux, l'agrégat est nommé.");
     await until(async () => decidePrompts.length >= 2, 60_000);
-    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat.`);
+    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat. (.skraft/us-12/design/contracts.md) — gravité : Un contrat doit se lire seul. — aussi : .skraft/us-12/design/event-model.md:1`);
+    // L'occurrence qui vise un fichier absent est retirée par le code.
+    expect(decidePrompts[1]).not.toContain("absent/inexistant.md");
   }, 90_000);
 });

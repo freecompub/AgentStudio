@@ -5,6 +5,29 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Contrat de défaut enrichi (raison de la gravité, occurrences), extension et workflow
+
+- `submit_lens_verdict` (`packages/core/src/agents/terminal-tools.ts`) : chaque défaut porte
+  `severityReason` (**obligatoire**, 1 à 600 caractères) et `occurrences` (facultatif, `chemin:ligne`,
+  20 au plus). Noms anglais, comme les champs voisins (`severity`, `target`). Un seul changement pour
+  l'extension et le workflow (même outil).
+- `verifierOccurrences` (deux copies de `review-thread`) : une occurrence vers un fichier absent est
+  retirée, et c'est noté (`occurrencesNote`). Appelée dans la revue **avant** le réfutateur ; la
+  liste des fichiers n'est lue qu'une fois (`juger`, `runReview`).
+- La raison et les occurrences suivent le défaut : fil (`reviewRound`), retour au producteur
+  (« — gravité : … — aussi : … », `precisions`), dossier du réfutateur, rapport `.md` ; conservées au
+  rejeu (`lireVerdicts`, schéma zod).
+- Consigne ajoutée aux quatre lentilles (`meta` du workflow, `roles.ts`) ; les `.agent.md` ne
+  changent pas (ADR 0024).
+- Piège : le champ obligatoire a cassé 23 tests de 14 fichiers dont les lentilles scriptées signalent
+  des défauts ; complétés (`severityReason: "raison d'essai"`). Le schéma refuse désormais tout défaut
+  sans raison : c'est voulu.
+- Pièges d'édition : `review.mjs` et `review-brief.mjs` du workflow n'avaient **aucun** import ;
+  l'import de `precisions` est en ligne 2.
+- **Non fait**, dit au responsable : fusionner en un fil les défauts de lentilles différentes au même
+  endroit — l'arbitrage d'un fil appartient à sa lentille (ADR 0046) ; à reprendre avec la re-revue
+  incrémentale si besoin.
+
 ## 06/11 — Réfutateur des défauts de revue (ADR 0069), extension et workflow
 
 - Décidé par le responsable (« on l'intègre chez nous ») ; idée de skraft-plugin v2, réimplémentée

@@ -158,7 +158,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       "skraft-lens-cold-reader": async (t) => {
         const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
         await t.callTool("submit_lens_verdict", premiere
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague : BolusCap", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", severityReason: "raison d’essai", description: "nom vague : BolusCap", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
       },
     });
@@ -188,7 +188,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
         if (!t.prompt.includes("phase DELIVER")) return void (await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "APPROVED", defects: [] }));
         lensPrompts.push(t.prompt);
         await t.callTool("submit_lens_verdict", lensPrompts.length === 1
-          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague : BolusCap", target: "code" }] }
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "nom vague : BolusCap", target: "code" }] }
           : { lens: "cold-reader", verdict: "APPROVED", defects: [], rulings: [{ defect: "cold-reader#1.1", decision: "accepted", reason: "Le contrat fait foi." }] });
       },
     });
@@ -379,7 +379,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
   it("verdict REJECTED : rejet tracé sous la porte « revue », avec les lentilles qui rejettent (D11)", async () => {
     const rejette = (lens: string) => async (t: { prompt: string; callTool: (n: string, a: unknown) => Promise<unknown> }) => {
       await t.callTool("submit_lens_verdict", t.prompt.includes("phase DESIGN")
-        ? { lens, verdict: "REJECTED", defects: lens === "test-integrity" ? [{ severity: "blocker", description: "conception hors sujet", target: "deliverable" }] : [] }
+        ? { lens, verdict: "REJECTED", defects: lens === "test-integrity" ? [{ severity: "blocker", severityReason: "raison d’essai", description: "conception hors sujet", target: "deliverable" }] : [] }
         : { lens, verdict: "APPROVED", defects: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-lens-test-integrity": rejette("test-integrity"), "skraft-lens-architecture": rejette("architecture") });

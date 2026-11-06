@@ -73,6 +73,14 @@ export const terminalSchemas = {
           file: z.string().max(1_000).optional(),
           line: z.number().int().min(1).optional(),
           description: z.string().min(1).max(2_000),
+          // Pourquoi cette gravité : une gravité gonflée se voit, et se réfute.
+          severityReason: z.string().min(1).max(600).describe("Pourquoi ce défaut a cette gravité, en une phrase"),
+          // Un défaut qui se répète : un seul défaut, une seule correction.
+          occurrences: z
+            .array(z.string().regex(/^.+:\d+$/, "chemin:ligne attendu"))
+            .max(20)
+            .optional()
+            .describe("Autres endroits où le même défaut se répète, sous la forme chemin:ligne"),
         }),
       )
       .max(100),

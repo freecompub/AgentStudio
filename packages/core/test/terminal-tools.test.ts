@@ -15,3 +15,21 @@ describe("report_phase : écarts au plan de test", () => {
     expect(terminalSchemas.report_phase.safeParse({ ...base, planDeviations: [{ ...ecart, rule: "" }] }).success).toBe(false);
   });
 });
+
+describe("submit_lens_verdict : contrat de défaut enrichi", () => {
+  const defaut = { severity: "major", target: "code", file: "src/a.ts", line: 3, description: "Nom flou.", severityReason: "Le nom cache la règle métier du plafond." };
+  const verdict = (d: object) => ({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [d] });
+
+  it("chaque défaut dit pourquoi il a cette gravité ; sans raison, le verdict est refusé", () => {
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict(defaut)).success).toBe(true);
+    const { severityReason: _, ...sansRaison } = defaut;
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict(sansRaison)).success).toBe(false);
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict({ ...defaut, severityReason: "" })).success).toBe(false);
+  });
+
+  it("occurrences : les autres endroits du même défaut, en chemin:ligne, 20 au plus", () => {
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict({ ...defaut, occurrences: ["src/b.ts:12", "src/c.ts:4"] })).success).toBe(true);
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict({ ...defaut, occurrences: ["src/b.ts"] })).success).toBe(false);
+    expect(terminalSchemas.submit_lens_verdict.safeParse(verdict({ ...defaut, occurrences: Array.from({ length: 21 }, (_, i) => `src/x.ts:${i + 1}`) })).success).toBe(false);
+  });
+});
