@@ -203,7 +203,10 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(p.ecrits).toEqual([".skraft/resume.md"]);
 
     const rapport = await s.appel("skraft_rapport", { tache: id });
-    expect(JSON.parse(rapport.texte)).toMatchObject({ statut: "fini", valeur: { slug: "demo" }, messages: ["Bilan : terminé."] });
+    const lu = JSON.parse(rapport.texte) as { etapes: { phase: string; essai: number; debut: string; fin: string; dureeMs: number; tours: number }[] };
+    expect(lu).toMatchObject({ statut: "fini", valeur: { slug: "demo" }, messages: ["Bilan : terminé."] });
+    // Étapes du run lues dans sa trace : phase, essai, début, fin, durée, tours.
+    expect(lu.etapes.find((e) => e.phase === "REDACTION")).toMatchObject({ essai: 1, tours: 1, debut: expect.any(String), fin: expect.any(String), dureeMs: expect.any(Number) });
     expect(await s.appel("skraft_rapport", { tache: "inconnue" })).toEqual({ erreur: true, texte: expect.stringMatching(/inconnue/) });
     await s.fermer();
   }, 30_000);

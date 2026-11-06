@@ -3,7 +3,11 @@ import type { TraceEntry, TurnEnd } from "../protocols/trace.js";
 /** Ce qu'une étape d'un run a coûté et rencontré. */
 export interface ResumeEtape {
   phase: string;
+  /** Rang de l'étape parmi celles de la même phase : 1, puis 2 au premier rejeu, etc. */
+  essai: number;
   début: string;
+  /** Début de l'étape suivante, ou dernier événement de la trace. */
+  fin: string;
   duréeMs: number;
   /** Tours d'agent commencés : chacun est au moins un message envoyé au modèle. */
   tours: number;
@@ -33,14 +37,16 @@ export interface ResumeRun {
   etapes: ResumeEtape[];
   /** Les mêmes, additionnées par nom de phase, dans l'ordre de première apparition. */
   parPhase: ResumeEtape[];
-  total: Omit<ResumeEtape, "phase" | "début" | "essaisMax" | "rejets" | "finsAnormales" | "modèles"> & { rejets: number };
+  total: Omit<ResumeEtape, "phase" | "essai" | "début" | "fin" | "essaisMax" | "rejets" | "finsAnormales" | "modèles"> & { rejets: number };
 }
 
 const NORMALES: readonly TurnEnd[] = ["output", "blocker"];
 
-const vide = (phase: string, début: string): ResumeEtape => ({
+const vide = (phase: string, essai: number, début: string): ResumeEtape => ({
   phase,
+  essai,
   début,
+  fin: début,
   duréeMs: 0,
   tours: 0,
   essaisMax: 0,
@@ -60,10 +66,11 @@ const vide = (phase: string, début: string): ResumeEtape => ({
 /**
  * Résume une trace par étape (ADR 0032). PURE.
  *
- * Une étape commence quand la phase annoncée par une transition ou un début de tour change, et
- * dure jusqu'au début de la suivante. Un rejet ne porte pas de phase : il est compté dans l'étape
- * en cours, c'est-à-dire celle qu'on va rejouer. L'usage, lui, ne porte que sa session : il est
- * rattaché à l'étape où la session a commencé, même s'il arrive après un changement de phase.
+ * Une étape commence quand la phase annoncée par une transition ou un début de tour change, ou
+ * quand la phase reprend après un rejet, et dure jusqu'au début de la suivante : **chaque rejeu est
+ * une étape**, numérotée par phase (`essai`). Un rejet ne porte pas de phase : il appartient à
+ * l'étape en cours, l'essai qui a échoué. L'usage, lui, ne porte que sa session : il est rattaché à
+ * l'étape où la session a commencé, même s'il arrive après un changement de phase.
  */
 export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
   const etapes: ResumeEtape[] = [];
@@ -72,9 +79,12 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
   let courante: ResumeEtape | undefined;
   let dernier = "";
 
+  // Après un rejet, la prochaine activité de la phase ouvre un nouvel essai.
+  let rejouer = false;
   const entrer = (phase: string, at: string): ResumeEtape => {
-    if (courante?.phase === phase) return courante;
-    courante = vide(phase, at);
+    if (courante?.phase === phase && !rejouer) return courante;
+    rejouer = false;
+    courante = vide(phase, etapes.filter((x) => x.phase === phase).length + 1, at);
     etapes.push(courante);
     return courante;
   };
@@ -93,7 +103,8 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
         debutDeSession.set(e.sessionId, Date.parse(e.at));
       }
     } else if (e.kind === "rejet") {
-      entrer(courante?.phase ?? "?", e.at).rejets.push({ porte: e.porte, motifs: e.motifs });
+      (courante ?? entrer("?", e.at)).rejets.push({ porte: e.porte, motifs: e.motifs });
+      rejouer = true;
     } else if (e.kind === "effet") {
       entrer(e.phase ?? courante?.phase ?? "?", e.at).effetsMs += e.duréeMs;
     } else if (e.kind === "tour-fin") {
@@ -119,6 +130,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
 
   etapes.forEach((et, i) => {
     const fin = etapes[i + 1]?.début ?? dernier;
+    et.fin = fin;
     et.duréeMs = Math.max(0, Date.parse(fin) - Date.parse(et.début));
     et.codeMs = Math.max(0, et.effetsMs - et.agentsMs);
   });
@@ -131,6 +143,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
       continue;
     }
     p.duréeMs += et.duréeMs;
+    p.fin = et.fin;
     p.tours += et.tours;
     p.essaisMax = Math.max(p.essaisMax, et.essaisMax);
     p.rejets.push(...et.rejets);

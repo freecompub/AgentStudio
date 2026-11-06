@@ -202,12 +202,25 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
   mcp.registerTool(
     "skraft_rapport",
     {
-      description: "Rapport d'un run, en JSON : statut (en-cours, fini, echec, annule), valeur rendue ou motif, messages du run (dont le bilan final), dernier rejet d'une porte, arbitrages.",
+      description: "Rapport d'un run, en JSON : statut (en-cours, fini, echec, annule), valeur rendue ou motif, messages du run (dont le bilan final), dernier rejet d'une porte, arbitrages, et étapes (une par phase et par rejeu : début, fin, durée, tours, rejets, unités facturées).",
       inputSchema: { tache: z.string().min(1), projet },
     },
     outil(async (p, a) => {
       const r = await p.services.rapportWorkflow(a.tache);
-      return r ? texte(JSON.stringify(r, null, 2)) : erreur(`Run inconnu dans ce projet : ${a.tache}.`);
+      if (!r) return erreur(`Run inconnu dans ce projet : ${a.tache}.`);
+      // Une étape par phase et par rejeu (ADR 0032) ; `aiu` : unités facturées, lues dans la trace.
+      const etapes = (await p.services.etapesDuRun(a.tache)).map((e) => ({
+        phase: e.phase,
+        essai: e.essai,
+        debut: e.début,
+        fin: e.fin,
+        dureeMs: e.duréeMs,
+        tours: e.tours,
+        rejets: e.rejets,
+        aiu: Math.round(e.nanoAiu / 1e8) / 10,
+        modeles: e.modèles,
+      }));
+      return texte(JSON.stringify({ ...r, etapes }, null, 2));
     }),
   );
 

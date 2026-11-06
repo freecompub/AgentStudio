@@ -3,7 +3,7 @@
  * indépendants de l'application qui les héberge : l'application de bureau et le serveur MCP
  * (ADR 0068).
  */
-import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ModelClass, ResumeEtape, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
 import type { RapportWorkflow } from "@agent-studio/workflow";
 import type { Workspace } from "@agent-studio/workspace";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
@@ -50,6 +50,8 @@ export interface WorkspaceServices {
   lancerWorkflow(nom: string, args: string, o?: { accord?: AccordDonne }): Promise<{ ok: true; taskId: string } | { ok: false; motif: string }>;
   /** Rapport d'un run de workflow, lu dans l'état de sa tâche ; `null` : tâche inconnue, ou pas un workflow. */
   rapportWorkflow(taskId: string): Promise<RapportWorkflow | null>;
+  /** Étapes d'un run lues dans sa trace (ADR 0032) : une par phase et par rejeu, avec début et fin ; vide si inconnue. */
+  etapesDuRun(taskId: string): Promise<ResumeEtape[]>;
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;

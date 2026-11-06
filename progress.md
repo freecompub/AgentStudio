@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Temps par rejeu : une étape par phase et par essai (resumerTrace, skraft_rapport)
+
+- Question du responsable : a-t-on, pour chaque phase et chaque rejeu, le début et la fin ? Avant :
+  par phase oui (étapes de `resumerTrace`), par rejeu seulement quand la phase reprenait après une
+  revue ; un rejeu après un rejet de porte restait **dans la même étape**.
+- `resumerTrace` (`packages/core/src/trace/run-summary.ts`) : après un `rejet`, la prochaine activité
+  de la même phase ouvre une **nouvelle étape** ; chaque étape porte `essai` (rang parmi les étapes de
+  sa phase) et `fin` (début de la suivante, ou dernier événement). Le rejet appartient à l'essai qui a
+  échoué (avant : à l'étape « qu'on va rejouer »). `parPhase` cumule et garde la fin du dernier essai.
+- Choix : fait dans le résumé, commun à tout (extension, workflow, banc, MCP), plutôt que tracer un
+  numéro d'essai que l'état d'un workflow n'a pas (`essaisMax` reste à 0 pour un workflow).
+- Un test existant attendait l'ancien comportement (deux tours dans une étape après un rejet) : mis à
+  jour, c'est le changement demandé. Le test du banc qui construit des étapes reçoit `essai` et `fin`.
+- `WorkspaceServices.etapesDuRun(taskId)` (project-services) ; `skraft_rapport` ajoute `etapes`
+  (`phase, essai, debut, fin, dureeMs, tours, rejets, aiu, modeles` ; `aiu` = `nanoAiu / 1e9`, qui a
+  concordé avec la réserve sur le run du 05/11).
+- Non fait : une colonne « Essai » dans le tableau des rapports du banc (`mesure-skraft.ts`) ; les
+  lignes y sont déjà une par étape, donc une par rejeu désormais.
+
 ## 06/11 — Défauts hors du changement rangés en notes, extension et workflow
 
 - Décidé par le responsable : un défaut hors du changement de la story ne renvoie pas le travail ;

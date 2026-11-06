@@ -16,6 +16,7 @@ import {
   type UsageRecorder,
   type UsageRow,
   createLazyRuntime,
+  resumerTrace,
   createRegistry,
   createTaskAgentRunner,
   routeIntent,
@@ -494,6 +495,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         // Les tâches de workflow sont celles des déclarations `workflow.<nom>` (manifesteDuWorkflow).
         return r && r.name.startsWith("workflow.") ? rapportDuWorkflow(r.state as EtatWorkflow) : null;
       },
+      etapesDuRun: async (taskId) => resumerTrace(await traceStore.list(taskId).catch(() => [])).etapes,
       tasks: async () =>
         (await engine.list())
           .map((r) => toTaskCard(r, manifests, usageRows.has(r.id) ? { unit, rows: usageRows.get(r.id)! } : undefined))

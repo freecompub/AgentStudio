@@ -220,13 +220,20 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     // Run réel du 05/11 par le serveur MCP : un rejet en DESIGN, absent de la trace, parce que le
     // moteur des services ne recevait pas la trace (seul l'exécuteur d'agents l'avait).
     const entrees: TraceEntry[] = [];
-    const trace: TraceStore = { append: async (e) => void entrees.push(e), list: async () => entrees, archive: async () => {} };
+    const trace: TraceStore = { append: async (e) => void entrees.push(e), list: async (id) => entrees.filter((e) => e.taskId === id), archive: async () => {} };
     const REJET = DEMO.replace(`await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`, `await w.rejet("cohérence", ["motif d'essai"]);\n    await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`);
     const o = await ouvrir({ projet: { ...WF, ".agent-studio/workflows/demo/workflow.mjs": REJET }, reponse: "allow-once", trace });
     await o.services.lancerWorkflow("demo", "x.md");
     await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
     expect(entrees.filter((e) => e.kind === "rejet")).toEqual([expect.objectContaining({ kind: "rejet", porte: "cohérence", motifs: ["motif d'essai"] })]);
     expect(entrees.some((e) => e.kind === "transition")).toBe(true);
+    // Étapes du run, lues dans la même trace : chaque rejeu est une étape, avec son début et sa fin.
+    const id = (await o.services.tasks())[0]!.id;
+    const etapes = await o.services.etapesDuRun(id);
+    expect(etapes.filter((e) => e.phase === "REDACTION").map((e) => e.essai)).toEqual([1, 2]);
+    expect(etapes[0]!.rejets).toEqual([{ porte: "cohérence", motifs: ["motif d'essai"] }]);
+    expect(etapes.every((e) => typeof e.début === "string" && typeof e.fin === "string")).toBe(true);
+    expect(await o.services.etapesDuRun("inconnue")).toEqual([]);
     await o.services.dispose();
   }, 30_000);
 
