@@ -128,6 +128,19 @@ describe("resumerTrace", () => {
     expect(r.total).toMatchObject({ agentsMs: 40_000, effetsMs: 60_000, codeMs: 20_000, moteurMs: 10 });
   });
 
+  it("coût en dollars (runtime Claude, ADR 0070) : additionné par étape, par phase et au total", () => {
+    const { etapes, parPhase, total } = resumerTrace([
+      e({ kind: "tour-début", sessionId: "s1", phase: "DESIGN", prompt: "", repris: false }, 0),
+      e({ kind: "usage", sessionId: "s1", modèle: "claude-sonnet-5", entrée: 100, sortie: 10 }, 1),
+      e({ kind: "usage", sessionId: "s1", modèle: "claude-sonnet-5", coûtUsd: 0.25 }, 2),
+      e({ kind: "tour-début", sessionId: "s2", phase: "DISTILL", prompt: "", repris: false }, 3),
+      e({ kind: "usage", sessionId: "s2", coûtUsd: 0.5 }, 4),
+    ]);
+    expect(etapes.map((x) => x.coûtUsd)).toEqual([0.25, 0.5]);
+    expect(parPhase.map((x) => x.coûtUsd)).toEqual([0.25, 0.5]);
+    expect(total.coûtUsd).toBe(0.75);
+  });
+
   it("une trace vide rend un résumé vide, pas une erreur", () => {
     expect(resumerTrace([])).toMatchObject({ etapes: [], parPhase: [], total: { duréeMs: 0, tours: 0 } });
   });

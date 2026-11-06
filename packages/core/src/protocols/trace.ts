@@ -29,7 +29,7 @@ export type TraceEntry = {
   | { kind: "outil-fin"; appel: string; succès: boolean; erreur?: string }
   /** Décision de la garde : **tout** appel soumis à permission, autorisé comme refusé. */
   | { kind: "permission"; sorte: string; outil: string; cible?: string; décision: "allow" | "deny"; raison?: string }
-  | { kind: "usage"; modèle?: string; entrée?: number; sortie?: number; nanoAiu?: number }
+  | { kind: "usage"; modèle?: string; entrée?: number; sortie?: number; nanoAiu?: number; /** Coût en dollars (runtime Claude, ADR 0070). */ coûtUsd?: number }
   | { kind: "contexte"; occupés: number; limite: number; système?: number; conversation?: number; outils?: number; messages?: number }
   /** Transition de la machine à états : l'événement reçu, l'état obtenu, les effets déclenchés. */
   | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[]; /** Calcul de la transition : coût du moteur (rejeu compris). */ duréeMs?: number }

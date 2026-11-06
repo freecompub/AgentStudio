@@ -20,6 +20,8 @@ export interface ResumeEtape {
   entrée: number;
   sortie: number;
   nanoAiu: number;
+  /** Coût en dollars, quand le runtime le rend (Claude, ADR 0070) ; 0 sinon. */
+  coûtUsd: number;
   /** Modèles réellement utilisés par les appels de l'étape (ADR 0048). */
   modèles: string[];
   /** Temps des tours d'agent commencés dans l'étape (du début à la fin de chaque tour). */
@@ -56,6 +58,7 @@ const vide = (phase: string, essai: number, début: string): ResumeEtape => ({
   entrée: 0,
   sortie: 0,
   nanoAiu: 0,
+  coûtUsd: 0,
   modèles: [],
   agentsMs: 0,
   effetsMs: 0,
@@ -124,6 +127,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
       et.entrée += e.entrée ?? 0;
       et.sortie += e.sortie ?? 0;
       et.nanoAiu += e.nanoAiu ?? 0;
+      et.coûtUsd += e.coûtUsd ?? 0;
       if (e.modèle && !et.modèles.includes(e.modèle)) et.modèles.push(e.modèle);
     }
   }
@@ -152,6 +156,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
     p.entrée += et.entrée;
     p.sortie += et.sortie;
     p.nanoAiu += et.nanoAiu;
+    p.coûtUsd += et.coûtUsd;
     p.agentsMs += et.agentsMs;
     p.effetsMs += et.effetsMs;
     p.codeMs += et.codeMs;
@@ -159,7 +164,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
     for (const m of et.modèles) if (!p.modèles.includes(m)) p.modèles.push(m);
   }
 
-  const somme = (k: "duréeMs" | "tours" | "appels" | "entrée" | "sortie" | "nanoAiu" | "agentsMs" | "effetsMs" | "codeMs" | "moteurMs") => etapes.reduce((n, et) => n + et[k], 0);
+  const somme = (k: "duréeMs" | "tours" | "appels" | "entrée" | "sortie" | "nanoAiu" | "coûtUsd" | "agentsMs" | "effetsMs" | "codeMs" | "moteurMs") => etapes.reduce((n, et) => n + et[k], 0);
   return {
     etapes,
     parPhase,
@@ -170,6 +175,7 @@ export function resumerTrace(entries: readonly TraceEntry[]): ResumeRun {
       entrée: somme("entrée"),
       sortie: somme("sortie"),
       nanoAiu: somme("nanoAiu"),
+      coûtUsd: somme("coûtUsd"),
       agentsMs: somme("agentsMs"),
       effetsMs: somme("effetsMs"),
       codeMs: somme("codeMs"),

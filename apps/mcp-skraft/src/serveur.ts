@@ -218,6 +218,8 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         tours: e.tours,
         rejets: e.rejets,
         aiu: Math.round(e.nanoAiu / 1e8) / 10,
+        // Runtime Claude (ADR 0070) : coût en dollars ; 0 avec Copilot.
+        coutUsd: Math.round(e.coûtUsd * 10_000) / 10_000,
         modeles: e.modèles,
       }));
       return texte(JSON.stringify({ ...r, etapes }, null, 2));

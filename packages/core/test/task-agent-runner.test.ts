@@ -497,3 +497,22 @@ describe("Libération des sessions d'une phase rembobinée", () => {
     expect(runtime.deleted).toEqual([]);
   });
 });
+
+describe("Exécuteur d'agent de tâche — trace de l'usage", () => {
+  it("le coût en dollars d'un runtime qui le rend (Claude, ADR 0070) est tracé avec l'usage", async () => {
+    const runtime = new ScriptedRuntime();
+    const entrees: { kind: string }[] = [];
+    const trace = { append: async (e: { kind: string }) => void entrees.push(e), list: async () => [], archive: async () => {} };
+    const runner = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 1_000, trace: trace as never });
+    runtime.behave("tdd-test", async (t) => {
+      t.session.emit({ type: "usage", model: "claude-sonnet-5", inputTokens: 100, outputTokens: 10 });
+      t.session.emit({ type: "usage", model: "claude-sonnet-5", costUsd: 0.25 });
+      await t.callTool("report_phase", { summary: "ok", files: [] });
+    });
+    await runner.run(TEST_AGENT, "x", { trace: { taskId: "t1", phase: "DELIVER" } });
+    expect(entrees.filter((e) => e.kind === "usage")).toEqual([
+      expect.objectContaining({ modèle: "claude-sonnet-5", entrée: 100, sortie: 10 }),
+      expect.objectContaining({ modèle: "claude-sonnet-5", coûtUsd: 0.25 }),
+    ]);
+  });
+});

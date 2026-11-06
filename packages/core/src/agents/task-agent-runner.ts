@@ -239,6 +239,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
                   ...(e.inputTokens !== undefined ? { entrée: e.inputTokens } : {}),
                   ...(e.outputTokens !== undefined ? { sortie: e.outputTokens } : {}),
                   ...(e.nanoAiu !== undefined ? { nanoAiu: e.nanoAiu } : {}),
+                  ...(e.costUsd !== undefined ? { coûtUsd: e.costUsd } : {}),
                 });
               else if (e.type === "context")
                 tracer({

@@ -40,6 +40,7 @@ const et = (phase: string, début: string, duréeMs: number, x: Partial<ResumeEt
   entrée: 0,
   sortie: 0,
   nanoAiu: 0,
+  coûtUsd: 0,
   modèles: [],
   agentsMs: 0,
   effetsMs: 0,

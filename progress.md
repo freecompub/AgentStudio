@@ -5,6 +5,15 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude (ADR 0070), brique 4a : coût en dollars dans la trace et les rapports
+
+- L'événement `usage` du port porte `costUsd` (runtime Claude) ; l'exécuteur d'agents le trace
+  (`coûtUsd` de l'entrée `usage`) ; `resumerTrace` l'additionne par étape, par phase et au total ;
+  `skraft_rapport` le donne par étape (`coutUsd`, 0 avec Copilot, qui garde `aiu`).
+- Le test de l'exécuteur a d'abord été mal écrit (option `trace` passée dans la spécification au
+  lieu des options de `run`) : il échouait **avec et sans** le correctif — revu, vu rouge sans,
+  vert avec. Aucun test ne couvrait jusque-là la trace d'usage écrite par l'exécuteur.
+
 ## 06/11 — Runtime Claude (ADR 0070), brique 3 : le runtime, et un essai réel réussi
 
 - `createClaudeRuntime` (`packages/runtime-claude/src/claude-runtime.ts`), port `AgentRuntime` :
