@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Run réel US-2 avec Claude par le serveur MCP (`docs/runs/2026-11-06-us-2-mcp-claude/`)
+
+- `scripts/essai-mcp-skraft.ts` : `--runtime=claude`, `--base=<commit>`, source par adresse Git ;
+  tableau des étapes en fin de run (une par phase et par rejeu : début, fin, durée, tours, rejets avec
+  porte et motifs, coût, modèles).
+- Le `main` GitHub d'`exemple-dotnet-tdd` n'a plus de `.agent-studio/stack.yaml` ni de
+  `.skraft/quality.json` (converti à skraft-plugin v2 : `skraft-config.json`, BDD) : le serveur
+  **refuse de démarrer sans pile** (ADR 0068, point 8) — vu en réel, rien consommé. Run refait depuis
+  `a7cf6db`, le commit du run Copilot, décidé par le responsable.
+- Résultat : **fini**, 18 min 24 s, 34 tours, **4 rejets** (citations en RESEARCH, cohérence en DESIGN,
+  revue en DISTILL, correction ciblée en DELIVER), ADR-003 ratifié, `dotnet test` 10/10. Le
+  **réfutateur** a réfuté un défaut major ; des défauts de DELIVER ont été rangés en **notes**.
+- Branches poussées sur `freecompub/exemple-dotnet-tdd` (demandé par le responsable) :
+  `tests/us-2/mcp-copilot-1` (run Copilot du 05/11) et `tests/us-2/mcp-claude-1`.
+- **Deux défauts de mesure du coût** dans `runtime-claude`, vus dans la trace : (1) avec `--resume`,
+  `total_cost_usd` est **cumulé** sur la session → additionné, il compte plusieurs fois ; (2) après
+  l'outil terminal, le CLI met **plus de 5 s** à écrire sa ligne finale (opus) → arrêté avant, coût
+  perdu (chercheur, architectes, réfutateur). Le total de 2,27 $ n'est pas fiable ; borne basse ≈ 1,26 $.
+  À corriger : coût par différence avec le cumul précédent de la session, et attente plus longue (ou
+  sans arrêt) de la ligne finale.
+
 ## 06/11 — Runtime Claude : stratégie de suppression des sessions (décidée, pas implémentée)
 
 - Constat (vérifié sur les sessions des essais) : une session `claude -p` tient dans **un seul

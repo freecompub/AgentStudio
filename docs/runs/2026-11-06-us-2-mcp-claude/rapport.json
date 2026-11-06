@@ -1,0 +1,393 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "01ddea1233245cfd01f401d816e04b3a6516c427d6d31555fa341f37c113e151",
+    "adrs": [
+      {
+        "id": "ADR-003",
+        "path": "docs/adr/adr-003-frontiere-du-panier-et-grille-de-remise.md",
+        "status": "Accepted"
+      }
+    ],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/quality.yaml` (ADR 0049).",
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-4",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-5",
+          "driver",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Précontrôle skraft — avertissement non bloquant sur le code existant :\n- Couverture : src/Tarification.Application/CalculDuPanier.cs à 66.7 % (minimum 90 %), 2 ligne(s) couverte(s) sur 3.\n- Couverture : src/Tarification.Domaine/Montant.cs à 75 % (minimum 90 %), 6 ligne(s) couverte(s) sur 8.\n- Couverture : src/Tarification.Domaine/Panier.cs à 85.7 % (minimum 90 %), 6 ligne(s) couverte(s) sur 7.\n- Couverture : src/Tarification.Domaine/Quantite.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.\n- Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/quality.yaml` (ADR 0049).\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.",
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : ADR-003 (Accepted).\nRemarques hors du changement de la story :\n- src/Tarification.Domaine/Pourcentage.cs:10 (quality-gates, minor) : Pas dans la liste des livrables de cette phase, noté pour l'humain. Le pas 5 du plan d'implémentation prévoit les invariants de Pourcentage (0 à 100) et de PalierDeQuantite (seuil < 1, lève ArgumentOutOfRangeException). Aucun de ces invariants n'est implémenté, et aucun test unitaire n'a été ajouté (faits DELIVER). L'écart n'est pas déclaré. Les critères d'acceptance ne l'exigent pas, mais le plan le promettait.\n- .skraft/us-2/distill/impl-plan.md:7 (quality-gates, minor) : Pas dans la liste des livrables de cette phase, noté pour l'humain. Le pas 1 nomme Pourcentage.Applique et PalierDeQuantite.EstAtteintPar, qui n'existent pas dans le code. La logique est en réalité dans GrilleDeRemise, et l'écart n'est pas déclaré.\n- .skraft/quality.json:1 (quality-gates, minor) : Pas dans la liste des livrables de cette phase, noté pour l'humain. Les faits indiquent que la barre de qualité est lue à l'ancien emplacement et doit être déplacée vers .agent-studio/quality.yaml (ADR 0049). Ce déplacement n'est pas fait ni mentionné.\n- tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs:50 (test-integrity, minor) : Aucun test n'a deux lignes qui obtiennent chacune une remise non nulle. Un mutant qui ne garderait que la remise d'une seule ligne, au lieu de les additionner dans RemisePour(Panier), survivrait : ac-4 attend 0 des deux côtés. Les autres mutants de GrilleDeRemise (seuil ≤, Max, calcul par ligne) sont tués par ac-1, ac-2, ac-3 et ac-4.\n- .skraft/us-2/distill/test-plan.md:16 (quality-gates, minor) : Les cas de contrat notés dans le plan de test pour la boucle interne (« Pourcentage.De hors [0 ; 100] et PalierDeQuantite à seuil < 1 lèvent ArgumentOutOfRangeException ») ne sont écrits nulle part : aucun test unitaire n'a été ajouté (faits : « aucun »). Le plan les signale comme « non écrits », donc l'écart est connu et déclaré, mais il reste une garantie de contrat non mesurée."
+  ],
+  "dernierRejet": {
+    "gate": "revue (correction ciblée)",
+    "reasons": [
+      "[quality-gates#1.1, major, code] Montant.Fraction construit un Montant sans garde de signe, contrairement à De et Multiplie. Avec un taux négatif (Pourcentage.De accepte n'importe quel decimal, cf. Pourcentage.cs:10, hors livrables de cette phase), la remise devient négative. Or la doc de Montant (lignes 4-5) affirme qu'un montant négatif n'existe pas dans ce domaine. Le prix final augmente alors sans erreur. (src/Tarification.Domaine/Montant.cs:24) — gravité : Une remise négative passe silencieusement et fausse le montant à payer, ce qui est un défaut majeur sur un chemin de calcul de prix. — aussi : src/Tarification.Domaine/Pourcentage.cs:10",
+      "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+    ]
+  },
+  "arbitrages": [],
+  "etapes": [
+    {
+      "phase": "INIT",
+      "essai": 1,
+      "debut": "2026-11-06T23:16:20.919Z",
+      "fin": "2026-11-06T23:16:32.296Z",
+      "dureeMs": 11377,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "CLASSIFY",
+      "essai": 1,
+      "debut": "2026-11-06T23:16:32.296Z",
+      "fin": "2026-11-06T23:16:38.637Z",
+      "dureeMs": 6341,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.0015,
+      "modeles": [
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "essai": 1,
+      "debut": "2026-11-06T23:16:38.637Z",
+      "fin": "2026-11-06T23:16:51.352Z",
+      "dureeMs": 12715,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "RESEARCH",
+      "essai": 1,
+      "debut": "2026-11-06T23:16:51.352Z",
+      "fin": "2026-11-06T23:17:52.379Z",
+      "dureeMs": 61027,
+      "tours": 1,
+      "rejets": [
+        {
+          "porte": "citations",
+          "motifs": [
+            "`tests/Dosage.Tests` : fichier inexistant dans le dépôt."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "RESEARCH",
+      "essai": 2,
+      "debut": "2026-11-06T23:17:52.379Z",
+      "fin": "2026-11-06T23:18:05.577Z",
+      "dureeMs": 13198,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "ROUTE",
+      "essai": 1,
+      "debut": "2026-11-06T23:18:05.577Z",
+      "fin": "2026-11-06T23:18:08.032Z",
+      "dureeMs": 2455,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 1,
+      "debut": "2026-11-06T23:18:08.032Z",
+      "fin": "2026-11-06T23:21:30.478Z",
+      "dureeMs": 202446,
+      "tours": 2,
+      "rejets": [
+        {
+          "porte": "cohérence",
+          "motifs": [
+            "`PrixUnitaire` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`SommeDesArticles` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`FraisDePort` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`Panier`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 2,
+      "debut": "2026-11-06T23:21:30.478Z",
+      "fin": "2026-11-06T23:23:31.433Z",
+      "dureeMs": 120955,
+      "tours": 2,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 1,
+      "debut": "2026-11-06T23:23:31.433Z",
+      "fin": "2026-11-06T23:24:19.884Z",
+      "dureeMs": 48451,
+      "tours": 3,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.1572,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "RATIFICATION",
+      "essai": 1,
+      "debut": "2026-11-06T23:24:19.884Z",
+      "fin": "2026-11-06T23:24:24.489Z",
+      "dureeMs": 4605,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DISTILL",
+      "essai": 1,
+      "debut": "2026-11-06T23:24:24.489Z",
+      "fin": "2026-11-06T23:25:32.792Z",
+      "dureeMs": 68303,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 2,
+      "debut": "2026-11-06T23:25:32.792Z",
+      "fin": "2026-11-06T23:27:25.171Z",
+      "dureeMs": 112379,
+      "tours": 5,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[quality-gates#1.1, major, deliverable] La ligne « Mandat 4 : GrilleDeRemise.RemisePour — M4 negative — saturated by AC (toutes les branches atteintes par ac-1..5) » présente une saturation de mutation et une couverture de branches comme acquises. Aucun outil de mutation ni de couverture n'a été exécuté, et aucun de leurs résultats ne figure dans les faits. De plus, RemisePour est un retour constant (Montant.Zero) : il n'a aucune branche, donc « toutes les branches atteintes » n'a pas de sens sur ce code. (.skraft/us-2/distill/test-plan.md:18) — gravité : Un livrable qui se prévaut d'une qualité non mesurée induit en erreur sur la solidité de la suite, ce qui est un défaut majeur.",
+            "[quality-gates#1.2, major, test] Ac4 (et de même Ac1 ligne 17 et Ac5 ligne 62) passe déjà contre le bouchon GrilleDeRemise.RemisePour, qui renvoie zéro. Le test-plan (lignes 14 à 16) affirme qu'il « garde le calcul par ligne contre un cumul des quantités » ou « garde la frontière du seuil », mais rien n'établit que ces tests échouent sur une implémentation fautive. Trois critères sur cinq ne pilotent donc pas la phase RED. Le gel de l'empreinte limite la correction : l'arbitrage revient à l'humain. (tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs:50) — gravité : Une protection de non-régression affirmée sans démonstration laisse trois critères d'acceptation sans valeur de détection vérifiée. — aussi : tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs:17, tests/Tarification.Tests/RemiseParPalierAcceptanceTests.cs:62",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0.2861,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 3,
+      "debut": "2026-11-06T23:27:25.171Z",
+      "fin": "2026-11-06T23:27:25.226Z",
+      "dureeMs": 55,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DISTILL",
+      "essai": 2,
+      "debut": "2026-11-06T23:27:25.226Z",
+      "fin": "2026-11-06T23:28:02.495Z",
+      "dureeMs": 37269,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.316,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 4,
+      "debut": "2026-11-06T23:28:02.495Z",
+      "fin": "2026-11-06T23:29:18.903Z",
+      "dureeMs": 76408,
+      "tours": 5,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.461,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DELIVER",
+      "essai": 1,
+      "debut": "2026-11-06T23:29:18.903Z",
+      "fin": "2026-11-06T23:31:08.980Z",
+      "dureeMs": 110077,
+      "tours": 2,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.2052,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 5,
+      "debut": "2026-11-06T23:31:08.980Z",
+      "fin": "2026-11-06T23:32:54.097Z",
+      "dureeMs": 105117,
+      "tours": 5,
+      "rejets": [
+        {
+          "porte": "revue (correction ciblée)",
+          "motifs": [
+            "[quality-gates#1.1, major, code] Montant.Fraction construit un Montant sans garde de signe, contrairement à De et Multiplie. Avec un taux négatif (Pourcentage.De accepte n'importe quel decimal, cf. Pourcentage.cs:10, hors livrables de cette phase), la remise devient négative. Or la doc de Montant (lignes 4-5) affirme qu'un montant négatif n'existe pas dans ce domaine. Le prix final augmente alors sans erreur. (src/Tarification.Domaine/Montant.cs:24) — gravité : Une remise négative passe silencieusement et fausse le montant à payer, ce qui est un défaut majeur sur un chemin de calcul de prix. — aussi : src/Tarification.Domaine/Pourcentage.cs:10",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0.5826,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 6,
+      "debut": "2026-11-06T23:32:54.097Z",
+      "fin": "2026-11-06T23:32:54.963Z",
+      "dureeMs": 866,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DELIVER",
+      "essai": 2,
+      "debut": "2026-11-06T23:32:54.963Z",
+      "fin": "2026-11-06T23:33:37.845Z",
+      "dureeMs": 42882,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.1411,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 7,
+      "debut": "2026-11-06T23:33:37.845Z",
+      "fin": "2026-11-06T23:34:44.477Z",
+      "dureeMs": 66632,
+      "tours": 4,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.122,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "DONE",
+      "essai": 1,
+      "debut": "2026-11-06T23:34:44.477Z",
+      "fin": "2026-11-06T23:34:44.584Z",
+      "dureeMs": 107,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    }
+  ]
+}

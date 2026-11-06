@@ -6,7 +6,7 @@
  * Travaille sur un **clone** du projet, jamais sur le dépôt donné.
  *
  *   pnpm --filter @agent-studio/mcp-skraft build
- *   pnpm tsx scripts/essai-mcp-skraft.ts <projet> <story> <reponses.json> [--auto]
+ *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>]
  */
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
@@ -18,15 +18,20 @@ import { repondre, type Reponses } from "./banc/repondeur.js";
 
 const args = process.argv.slice(2);
 const auto = args.includes("--auto");
+// Runtime des agents (ADR 0070) : Copilot par défaut.
+const runtime = args.find((a) => a.startsWith("--runtime="))?.slice("--runtime=".length) ?? "copilot";
+// Commit de départ (par défaut, la branche par défaut du dépôt cloné).
+const baseRun = args.find((a) => a.startsWith("--base="))?.slice("--base=".length);
 const [source, story, fichierReponses] = args.filter((a) => !a.startsWith("--"));
 if (!source || !story || !fichierReponses) throw new Error("Utilisation : essai-mcp-skraft.ts <projet> <story> <reponses.json> [--auto]");
 
 const base = await realpath(await mkdtemp(join(tmpdir(), "essai-mcp-skraft-")));
 const projet = join(base, "projet");
-execFileSync("git", ["clone", "-q", "--no-hardlinks", resolve(source), projet]);
+execFileSync("git", ["clone", "-q", "--no-hardlinks", /^[a-z]+:\/\//.test(source) ? source : resolve(source), projet]);
+if (baseRun) execFileSync("git", ["checkout", "-q", "-b", `base-${baseRun.slice(0, 7)}`, baseRun], { cwd: projet });
 // Configuration propre à l'essai : seul le clone est autorisé ; profil architecte (ratification
 // d'ADR), programmes par défaut.
-await writeFile(join(base, "mcp-skraft.json"), JSON.stringify({ autorises: [base] }));
+await writeFile(join(base, "mcp-skraft.json"), JSON.stringify({ autorises: [base], runtime }));
 await writeFile(join(base, "admin.json"), JSON.stringify({ profile: { role: "architecte" } }));
 
 const reponses = JSON.parse(await readFile(fichierReponses, "utf8")) as Reponses;
@@ -88,5 +93,14 @@ for (;;) {
 }
 const rapport = await appel("skraft_rapport", { tache });
 await writeFile(join(base, "rapport.json"), rapport.texte);
+// Étapes du run : une par phase et par rejeu, avec début, fin, durée, rejets (porte et motifs), coût.
+type Etape = { phase: string; essai: number; debut: string; fin: string; dureeMs: number; tours: number; rejets: { porte: string; motifs: string[] }[]; aiu: number; coutUsd: number; modeles: string[] };
+const etapes = (JSON.parse(rapport.texte) as { etapes?: Etape[] }).etapes ?? [];
+const mn = (ms: number) => `${Math.floor(ms / 60_000)}m${String(Math.round((ms % 60_000) / 1000)).padStart(2, "0")}`;
+console.log(`\nRuntime : ${runtime}\n\n| Étape | Essai | Début | Fin | Durée | Tours | Rejets | Coût | Modèles |\n|---|---|---|---|---|---|---|---|---|`);
+for (const e of etapes)
+  console.log(`| ${e.phase} | ${e.essai} | ${e.debut.slice(11, 19)} | ${e.fin.slice(11, 19)} | ${mn(e.dureeMs)} | ${e.tours} | ${e.rejets.map((r) => `${r.porte} : ${r.motifs.join(" ; ")}`).join(" / ").replace(/\|/g, "\\|") || "—"} | ${runtime === "claude" ? `${e.coutUsd.toFixed(4)} $` : `${e.aiu} AIU`} | ${e.modeles.join(", ")} |`);
+const total = etapes.reduce((n, e) => ({ ms: n.ms + e.dureeMs, rejets: n.rejets + e.rejets.length, usd: n.usd + e.coutUsd, aiu: n.aiu + e.aiu }), { ms: 0, rejets: 0, usd: 0, aiu: 0 });
+console.log(`\nTotal : ${mn(total.ms)}, ${total.rejets} rejet(s), ${runtime === "claude" ? `${total.usd.toFixed(4)} $` : `${total.aiu} AIU`}`);
 console.log(`\n${h()} Rapport :\n${rapport.texte.slice(0, 4000)}\n\nRapport complet : ${join(base, "rapport.json")}\nClone : ${projet}`);
 await client.close();
