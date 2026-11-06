@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude : stratégie de suppression des sessions (décidée, pas implémentée)
+
+- Constat (vérifié sur les sessions des essais) : une session `claude -p` tient dans **un seul
+  fichier**, `<projectsDirectory>/<dossier de travail encodé>/<id>.jsonl` ; aucune autre trace dans
+  `~/.claude` ni `~/.claude.json`. `projectsDirectory` est donné par `claude auth status`. Le nom du
+  dossier vient du dossier de travail (`/home/moi/Projets/x` → `-home-moi-Projets-x`).
+- **Ce dossier n'est pas à nous** : en run réel, le dossier de travail est le dépôt de l'utilisateur,
+  donc nos sessions sont rangées avec **ses** sessions Claude Code et la mémoire automatique du
+  projet (`memory/`). Dans les essais, il n'était qu'à nous parce que le projet était jetable.
+- **Stratégie retenue** : `deleteSession(id)` supprime `<projectsDirectory>/*/<id>.jsonl` (et un
+  dossier `<id>/` s'il existe), **jamais le dossier du projet ni `memory/`** ; l'identifiant doit
+  être un UUID (pas de chemin détourné) ; on ne touche qu'aux sessions que nous avons créées
+  (identifiants tirés par nous, `--session-id`) ; une session absente compte comme supprimée (comme
+  Copilot). Le nettoyage vient du registre des sessions, qui purge les orphelines au démarrage
+  (ADR 0053) en appelant `deleteSession`.
+- Écartés : `--no-session-persistence` (plus de reprise, dont on a besoin : réessai dans la même
+  session, continuité des lentilles) ; `claude purge` (efface toutes les données Claude Code du
+  projet, conversations de l'utilisateur comprises).
+- À vérifier au run US-2 : la mémoire automatique du projet, partagée avec l'utilisateur, est-elle
+  **lue** par nos agents ? (L'écriture y est refusée par la garde : hors du projet.)
+
 ## 06/11 — Runtime Claude (ADR 0070), brique 4b : choix du runtime dans le serveur MCP
 
 - `mcp-skraft.json` : `runtime: "copilot" | "claude"` (Copilot par défaut) et `modeles` par classe
