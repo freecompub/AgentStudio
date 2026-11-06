@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude (ADR 0070), brique 2 : relais MCP HTTP local
+
+- `packages/runtime-claude/src/relais.ts` : un serveur MCP HTTP par session sur `127.0.0.1` (port
+  libre), protégé par un jeton `Bearer` tiré au hasard ; sert nos `ToolSpec` (schéma JSON tel quel,
+  serveur MCP bas niveau `Server`) et l'outil `permission` (demande normalisée → garde →
+  `{behavior: allow|deny}`) ; signale chaque décision (ADR 0032) et la réussite d'un outil terminal
+  (pour clore le tour, D18) ; une exception d'outil devient une erreur de l'outil. `configuration()`
+  rend le JSON à donner à `--mcp-config`.
+- Sans duplication : `decideSafely` (refus si la garde lève ou dépasse son délai, D28) déplacé de
+  `runtime-copilot` vers le cœur (`packages/core/src/guards/decide-safely.ts`), utilisé par les deux
+  adaptateurs ; tests Copilot inchangés (43).
+- Piège : `http.close` attend les connexions gardées ouvertes par le client MCP — fermer avec
+  `closeAllConnections()` d'abord, sinon les tests restent bloqués au nettoyage.
+
 ## 06/11 — Runtime Claude (ADR 0070), brique 1 : arguments, flux, permissions
 
 - Nouveau paquet `packages/runtime-claude` (projet Vitest `runtime-claude`). Briques pures, testées
