@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude (ADR 0070), brique 3 : le runtime, et un essai réel réussi
+
+- `createClaudeRuntime` (`packages/runtime-claude/src/claude-runtime.ts`), port `AgentRuntime` :
+  une session = un relais MCP + deux fichiers privés (prompt système, configuration MCP avec le
+  jeton) ; un tour = un processus `claude -p` (`--session-id` au premier, `--resume` ensuite ;
+  `resumeSession` reprend d'emblée) ; le prompt système rappelle les noms MCP de nos outils
+  (`report_phase` → `mcp__agent-studio__report_phase`) ; permissions → événements `permission` et
+  `tool-denied` ; `start` vérifie le CLI (message qui dit quoi faire) ; `deleteSession` sans effet
+  (les sessions restent dans le dossier du CLI). Lanceur réel : `createLanceurClaude` (processus
+  enfant, sortie ligne par ligne, entrée fermée aussitôt).
+- **Outil terminal (D18)** : le tour est clos à la ligne finale du CLI, ou au plus tard
+  `delaiApresTerminalMs` (5 s) après la réussite de l'outil, et le CLI arrêté. **Piège vu à l'essai
+  réel** : clos aussitôt, le CLI n'écrivait jamais sa ligne finale, qui porte le **coût** (0 $
+  rapporté) ; corrigé, et testé.
+- Tests (22) avec un faux `claude -p` qui appelle vraiment le relais (permission, outil terminal).
+- **Essai réel** `scripts/smoke-claude.ts` (`pnpm smoke:claude`, hors CI, `haiku`) avec la **vraie
+  garde** des agents de tâche (`createTaskAgentGuard`, périmètre `src/**`) : écriture dans `src/`
+  faite, `interdit/non.ts` refusé avec le message de la garde, `CLAUDE.md` du projet ignoré, rapport
+  reçu par `report_phase`, tour clos ; ≈ 0,0009 $, 6 s.
+- Reste : choix du runtime (application, serveur MCP), connexion Claude, modèles par classe,
+  coût en dollars dans l'usage et les rapports ; puis un run réel sur US-2.
+
 ## 06/11 — Runtime Claude (ADR 0070), brique 2 : relais MCP HTTP local
 
 - `packages/runtime-claude/src/relais.ts` : un serveur MCP HTTP par session sur `127.0.0.1` (port

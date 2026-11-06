@@ -23,6 +23,9 @@ importers:
       '@agent-studio/project-services':
         specifier: workspace:*
         version: link:packages/project-services
+      '@agent-studio/runtime-claude':
+        specifier: workspace:*
+        version: link:packages/runtime-claude
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:packages/runtime-copilot
