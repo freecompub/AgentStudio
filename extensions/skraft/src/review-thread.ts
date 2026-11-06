@@ -382,3 +382,36 @@ export function verifierOccurrences(lenses: LensVerdict[], existe: (path: string
     }),
   }));
 }
+
+/** Autour d'une ligne modifiée, ce qui compte encore comme le changement : le contexte d'un diff. */
+export const TOLERANCE_HORS_CHANGEMENT = 3;
+
+/**
+ * Défauts hors du changement de la phase, rangés en notes (06/11, idée de skraft-plugin v2). Un
+ * défaut dont aucun emplacement (sa ligne, ses occurrences) n'est à `tolerance` lignes d'une ligne
+ * modifiée n'est pas dû à la story : noté, il ne renvoie pas le travail. Un défaut sans fichier ne se
+ * situe pas : il reste. `changements` : fichiers modifiés depuis le checkpoint de la phase, et leurs
+ * lignes ; sans lignes connues, tout le fichier compte. Une lentille REJECTED n'est pas touchée ;
+ * une lentille CHANGES_REQUESTED à qui il ne reste ni blocker ni major approuve.
+ */
+export function rangerHorsChangement(lenses: LensVerdict[], changements: readonly { path: string; lines?: number[] | undefined }[], tolerance = TOLERANCE_HORS_CHANGEMENT): LensVerdict[] {
+  const parFichier = new Map(changements.map((c) => [c.path, c.lines]));
+  const dans = (file: string, line: number | undefined) => {
+    if (!parFichier.has(file)) return false;
+    const lignes = parFichier.get(file);
+    return line === undefined || !lignes || lignes.some((l) => Math.abs(l - line) <= tolerance);
+  };
+  const situe = (d: LensDefect) => [
+    { file: d.file!, line: d.line },
+    ...(d.occurrences ?? []).map((o) => ({ file: o.slice(0, o.lastIndexOf(":")), line: Number(o.slice(o.lastIndexOf(":") + 1)) })),
+  ];
+  const horsChangement = (d: LensDefect) => d.file !== undefined && !situe(d).some((x) => dans(x.file, x.line));
+  return lenses.map((l) => {
+    if (l.verdict === "REJECTED") return l;
+    const notes = l.defects.filter(horsChangement);
+    if (!notes.length) return l;
+    const defects = l.defects.filter((d) => !horsChangement(d));
+    const serieux = defects.some((d) => d.severity === "blocker" || d.severity === "major");
+    return { ...l, defects, notes: [...(l.notes ?? []), ...notes], verdict: l.verdict === "CHANGES_REQUESTED" && !serieux ? "APPROVED" : l.verdict };
+  });
+}

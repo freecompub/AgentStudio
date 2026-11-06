@@ -291,6 +291,13 @@
       "notes": "06/11, idée de skraft-plugin v2 (finding severityReason, occurrences), réimplémentée. Non fait : fusion en un fil de défauts de lentilles différentes au même endroit (l'arbitrage d'un fil appartient à sa lentille)."
     },
     {
+      "id": "notes-hors-changement",
+      "title": "Un défaut de revue dont aucun emplacement n'est à 3 lignes d'une ligne modifiée depuis le checkpoint de la phase devient une note : sans fil ni réfutateur, dans le rapport et le bilan ; un blocker hors du changement est signalé tout de suite, à corriger après le cycle ; extension et workflow",
+      "verify": "pnpm vitest run --project workflow-skraft test/review-thread.test.ts test/e2e-notes-workflow.test.ts && pnpm vitest run --project ext-skraft test/review-thread.test.ts test/e2e-notes.test.ts",
+      "passes": true,
+      "notes": "06/11, idée de skraft-plugin v2 (notes sur ligne inchangée), réimplémentée. Décidé par le responsable : un blocker hors du changement est notifié (message immédiat et bilan « À corriger après le cycle »), sans question ni blocage ; tolérance de 3 lignes."
+    },
+    {
       "id": "refutateur-mesure-us2",
       "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
       "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",

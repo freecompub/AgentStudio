@@ -17,6 +17,7 @@ import {
   lensHistory,
   lensesAfterThreads,
   numberDefects,
+  rangerHorsChangement,
   reviewRound,
   verifierOccurrences,
   type DefectThread,
@@ -322,5 +323,43 @@ describe("Contrat de défaut enrichi : raison de la gravité et occurrences", ()
     expect(threads[0]).toMatchObject({ severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/b.ts:12"] });
     const [ligne] = agentFeedback(threads, () => true);
     expect(ligne).toBe("[cold-reader#1.1, major, code] Nom flou. (src/a.ts:3) — gravité : Le nom cache la règle du plafond. — aussi : src/b.ts:12");
+  });
+});
+
+describe("Défauts hors du changement rangés en notes", () => {
+  const changements = [{ path: "src/a.ts", lines: [40, 41] }, { path: "src/nouveau.ts" }];
+  const d = (file: string | undefined, line: number | undefined, o: Partial<LensVerdict["defects"][number]> = {}) =>
+    ({ severity: "major" as const, description: `défaut ${file ?? "sans fichier"}:${line ?? "-"}`, target: "code" as const, severityReason: "r", ...(file ? { file } : {}), ...(line ? { line } : {}), ...o });
+  const ranges = (defects: LensVerdict["defects"], v: LensVerdict["verdict"] = "CHANGES_REQUESTED") =>
+    rangerHorsChangement(numberDefects([verdict("architecture", defects, v)], 1, () => null), changements)[0]!;
+
+  it("ligne modifiée, ou à 3 lignes au plus d'une ligne modifiée : un défaut ; au-delà : une note", () => {
+    const l = ranges([d("src/a.ts", 41), d("src/a.ts", 44), d("src/a.ts", 45)]);
+    expect(l.defects.map((x) => x.line)).toEqual([41, 44]);
+    expect(l.notes!.map((x) => x.line)).toEqual([45]);
+  });
+
+  it("fichier que la phase n'a pas touché : une note ; fichier ajouté (lignes inconnues) : un défaut", () => {
+    const l = ranges([d("src/ancien.ts", 3), d("src/nouveau.ts", 900)]);
+    expect(l.defects.map((x) => x.file)).toEqual(["src/nouveau.ts"]);
+    expect(l.notes!.map((x) => x.file)).toEqual(["src/ancien.ts"]);
+  });
+
+  it("sans fichier : on ne peut pas le situer, il reste un défaut ; fichier modifié sans ligne : un défaut", () => {
+    const l = ranges([d(undefined, undefined), d("src/a.ts", undefined)]);
+    expect(l.defects).toHaveLength(2);
+    expect(l.notes ?? []).toEqual([]);
+  });
+
+  it("une seule occurrence dans le changement suffit à garder le défaut", () => {
+    const l = ranges([d("src/ancien.ts", 3, { occurrences: ["src/a.ts:40"] })]);
+    expect(l.defects).toHaveLength(1);
+  });
+
+  it("une lentille à qui il ne reste ni blocker ni major approuve ; une lentille REJECTED n'est pas touchée", () => {
+    expect(ranges([d("src/ancien.ts", 3)]).verdict).toBe("APPROVED");
+    const r = ranges([d("src/ancien.ts", 3)], "REJECTED");
+    expect(r.verdict).toBe("REJECTED");
+    expect(r.defects).toHaveLength(1);
   });
 });

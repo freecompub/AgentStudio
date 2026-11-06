@@ -103,6 +103,9 @@ export function reviewReport(phase, attempt, lenses) {
       lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}${precisions(d)}`);
     for (const r of v.rulings ?? [])
       lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Hors du changement de la phase : notés, sans fil ouvert.
+    for (const d of v.notes ?? [])
+      lines.push(`- note (hors du changement) : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
     // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
     for (const d of v.refuted ?? [])
       lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
@@ -137,6 +140,7 @@ function lireVerdicts(brut) {
   return brut.map((l) => ({
     lens: texte(l.lens, "lens"),
     verdict: parmi(l.verdict, ["APPROVED", "CHANGES_REQUESTED", "REJECTED"], "verdict"),
+    ...(Array.isArray(l.notes) ? { notes: l.notes.map(defaut) } : {}),
     // Défauts réfutés avant la synthèse (ADR 0069).
     ...(Array.isArray(l.refuted) ? { refuted: l.refuted.map((d) => ({ ...defaut(d), refutation: texte(d.refutation, "refutation") })) } : {}),
     defects: (Array.isArray(l.defects) ? l.defects : []).map(defaut),

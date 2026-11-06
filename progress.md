@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Défauts hors du changement rangés en notes, extension et workflow
+
+- Décidé par le responsable : un défaut hors du changement de la story ne renvoie pas le travail ;
+  un **blocker** hors du changement est **notifié** — message immédiat, puis rappel dans le bilan
+  sous « **À corriger après le cycle** » —, sans question ni blocage : sa correction se fait après la
+  fin du cycle skraft (le run travaille sur sa branche, ses checkpoints supposent d'être seuls).
+- `rangerHorsChangement` (deux copies de `review-thread`) : un défaut est une note si **aucun** de ses
+  emplacements (ligne, occurrences) n'est à **3 lignes** (`TOLERANCE_HORS_CHANGEMENT`) d'une ligne
+  modifiée depuis le checkpoint de la phase ; fichier non touché → note ; fichier sans lignes connues
+  → tout le fichier compte ; défaut sans fichier → reste. Lentille REJECTED non touchée ;
+  CHANGES_REQUESTED sans blocker ni major restant → APPROVED.
+- Câblage : workflow `revue.mjs` (`fichiersDePhase` rend aussi `changements` ; `juger` range **avant
+  le réfutateur**, `noterHorsChangement` accumule dans `d.notesHorsChangement` et informe pour un
+  blocker, une fois) ; extension `effects.ts` (`runReview`, `changedFiles` du checkpoint de la
+  phase ; les notes voyagent dans les verdicts gardés par l'état, `finalReport` les relit — le
+  réducteur ne change pas). Rapports : « - note (hors du changement) : … » ; relecture JSON.
+- Consigne des lentilles complétée (le défaut hors du changement est noté pour l'humain).
+- En DESIGN et DISTILL, les livrables sont nouveaux : presque tout y est « dans le changement » ; la
+  règle sert surtout en DELIVER et pour les fichiers existants cités.
+- **Tests instables sous charge**, vus pendant ce travail, verts seuls (3 et 4 fois) :
+  `extensions/skraft/test/e2e-s2.test.ts` › « recherche sans document : rejet explicite » et
+  `e2e-s3.test.ts` › « incohérence rejetée… » (déjà à surveiller). Un test différent à chaque suite
+  complète de l'extension : à surveiller, pas lié aux revues pour e2e-s2 (RESEARCH n'a pas de revue).
+
 ## 06/11 — Contrat de défaut enrichi (raison de la gravité, occurrences), extension et workflow
 
 - `submit_lens_verdict` (`packages/core/src/agents/terminal-tools.ts`) : chaque défaut porte

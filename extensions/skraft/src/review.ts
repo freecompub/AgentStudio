@@ -54,6 +54,8 @@ export interface LensVerdict {
   rulings?: LensRuling[] | undefined;
   /** Défauts réfutés avant la synthèse (ADR 0069), gardés pour le rapport avec la raison. */
   refuted?: (LensDefect & { refutation: string })[] | undefined;
+  /** Défauts hors du changement de la phase, rangés en notes : rapportés, sans fil. */
+  notes?: LensDefect[] | undefined;
 }
 
 /**
@@ -158,6 +160,8 @@ export function reviewReport(phase: string, attempt: number, lenses: LensVerdict
     for (const d of v.defects)
       lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}${precisions(d)}`);
     for (const r of v.rulings ?? []) lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Hors du changement de la phase : notés, sans fil ouvert.
+    for (const d of v.notes ?? []) lines.push(`- note (hors du changement) : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
     // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
     for (const d of v.refuted ?? []) lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
     lines.push("");
@@ -186,6 +190,8 @@ const lensesSchema = z.array(
     rulings: z.array(z.object({ defect: z.string(), decision: z.enum(["accepted", "maintained"]), reason: z.string().optional() })).optional(),
     // Défauts réfutés avant la synthèse (ADR 0069).
     refuted: z.array(defectSchema.extend({ refutation: z.string() })).optional(),
+    // Défauts hors du changement, rangés en notes.
+    notes: z.array(defectSchema).optional(),
   }),
 );
 
