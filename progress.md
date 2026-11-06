@@ -5,6 +5,30 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 06/11 — Runtime Claude (ADR 0070), brique 1 : arguments, flux, permissions
+
+- Nouveau paquet `packages/runtime-claude` (projet Vitest `runtime-claude`). Briques pures, testées
+  sur deux **vrais flux** `stream-json` enregistrés pendant les essais (chemins anonymisés, dont le
+  dossier de mémoire automatique de Claude Code) :
+  - `argumentsDuTour` : isolement (`--setting-sources ""`, `--disable-slash-commands`,
+    `--strict-mcp-config`), prompt système **par fichier** (`--system-prompt-file`) et prompt du tour
+    par l'entrée standard (limite de 32 767 caractères d'une ligne de commande sous Windows),
+    `--tools` sans Bash, nos outils autorisés, outil de permission caché et chargé des demandes,
+    `--session-id` puis `--resume`, modèle et `--max-budget-usd` facultatifs.
+  - `createTraducteur` : appels et résultats d'outils (refus compris, avec le message), messages,
+    raisonnement, **usage compté une fois par message** (le flux le répète pour chaque bloc), coût en
+    dollars au résultat, `idle` ou `error` (plafond de coût, etc.) ; toute autre ligne = activité.
+  - `versDemande` / `reponsePermission` : demandes normalisées comme Copilot (la garde ne lit que
+    `kind` et le chemin ; une demande `mcp` est refusée par défaut — nos outils, autorisés d'avance,
+    n'en posent pas).
+- Changé pour la conception : **toute** demande de permission passe par notre garde (comme Copilot),
+  sans règles par chemin à côté ; et le relais devient un **serveur MCP HTTP local** servi par notre
+  processus (`127.0.0.1`, port libre, jeton `Authorization: Bearer`), vérifié par un essai : plus de
+  script relais en stdio.
+- Port `AgentRuntime` : `costUsd` facultatif sur l'événement `usage`.
+- Mémoire automatique de Claude Code toujours active sans `--bare` (dossier listé à l'init) : ses
+  écritures passeraient par `Write`, donc par notre garde, qui refuse hors du projet.
+
 ## 06/11 — Essais de `claude -p` comme runtime (ADR 0070 accepté)
 
 Question du responsable : donner le choix entre Copilot et Claude. Voie étudiée : le CLI de Claude
