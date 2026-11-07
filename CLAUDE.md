@@ -42,7 +42,7 @@ abandonnée.
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
+pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, runtime-claude, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
                                 #            extension-packaging, project-services, ext-tdd, ext-skraft, workflow-skraft,
                                 #            banc, desktop, mcp-skraft
@@ -110,7 +110,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 
 - **Electron, quatre processus** : renderer (sandboxé, aucun accès Node) ↔ IPC validé ↔ **processus principal** (seul de confiance : registre, routeur, sessions, moteur de tâches, arbitre de permissions, Workspace, bus d'événements, client SDK) ↔ un **`utilityProcess` par extension** (confiance nulle, RPC bridé via MessagePort) ; le runtime d'agent (Copilot CLI) est piloté par le SDK en JSON-RPC.
 - **Règle de sécurité n°1** : aucun objet du SDK n'est jamais exposé à une extension. Les extensions ne voient que l'API `ctx` ; `ctx.agents.run()` renvoie un résultat sérialisé, jamais une session.
-- **Port `AgentRuntime`** (§4.3) : le cœur ne dépend jamais directement d'un SDK. Seul l'adaptateur Copilot SDK est dans le périmètre initial ; Claude Agent SDK et ACP restent des interfaces documentées.
+- **Port `AgentRuntime`** (§4.3) : le cœur ne dépend jamais directement d'un SDK. Deux adaptateurs : Copilot SDK (par défaut) et Claude par le CLI `claude -p` (`packages/runtime-claude`, ADR 0070), au choix dans l'application et le serveur MCP ; Claude Agent SDK et ACP restent des interfaces documentées.
 - **Moteur de tâches** (§6) : `transition(state, event) → { state, effects }` pur ; `runEffect` fait les I/O. État persisté après chaque transition ; checkpoint Git avant chaque effet ; un effet interrompu est rejoué depuis son checkpoint (rollback + `RESUMED`), jamais récupéré. Le réducteur applique le budget de réessais ; `TIMEOUT` = réessai, `ENV_FAILURE` = escalade immédiate.
 - **Tours d'agent** : `send()` non bloquant + watchdog d'inactivité réarmé par chaque événement ; jamais de `sendAndWait` à délai fixe.
 - **Contrat LLM ↔ code** : sorties via outils terminaux à schéma (`report_phase`, `submit_plan`, `submit_verdict`, `submit_difficulty`, `report_blocker`). Les preuves (tests) sont produites par notre handler `run_tests`, jamais par l'agent. Les portes entre états sont exécutées par le code (tests, diff, empreintes des tests gelés, périmètres d'écriture).
@@ -119,7 +119,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 - **Workspace** est le seul service à toucher le disque et Git.
 - Humain : jamais d'attente bloquante ; décisions longues = demandes d'interaction persistées, réinjectées comme `HUMAN_DECISION`.
 
-Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `apps/mcp-skraft` (serveur MCP local, ADR 0068), `packages/{core,task-engine,workspace,runtime-copilot,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters,workflow,project-services}`, `extensions/{tdd,skraft}`, `docs/adr/`.
+Arborescence prévue (monorepo pnpm, §4.4) : `apps/desktop` (main/preload/renderer), `apps/mcp-skraft` (serveur MCP local, ADR 0068), `packages/{core,task-engine,workspace,runtime-copilot,runtime-claude,github-auth,extension-api,extension-host,extension-manifest,extension-installer,extension-packaging,stack-adapters,workflow,project-services}`, `extensions/{tdd,skraft}`, `docs/adr/`.
 
 ## Conventions (§17)
 

@@ -5,6 +5,16 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude, brique D : documentation ; critère rempli
+
+- ADR 0070 : section « Mise en œuvre dans l'application » (réglage, connexion sans GitHub,
+  modèles, suppression des sessions, mode d'essai). `CLAUDE.md` : deux adaptateurs, projet Vitest
+  `runtime-claude`, arborescence.
+- Critère `runtime-claude-cli` passé à `true` après son `verify` (runtime, contrôleur, réglages,
+  interface, connexion du serveur MCP).
+- Prochaine étape : essayer l'application **à l'écran** avec un vrai Claude (choisir Claude, ouvrir
+  un projet, un tour de conversation, puis une tâche) ; ce n'est couvert que par les doubles.
+
 ## 07/11 — Runtime Claude, brique C : choix du runtime dans l'interface
 
 - L'application lit `runtime:status` au démarrage. Avec Claude, elle n'attend que la connexion de
