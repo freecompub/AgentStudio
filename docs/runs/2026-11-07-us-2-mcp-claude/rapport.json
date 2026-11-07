@@ -1,0 +1,504 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "9bd9dc013850eae7d858f8d4ea6372438f87bc2acc1e05cf874c5c1f242c642b",
+    "adrs": [],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/projet.yaml`, section qualite (ADR 0071).",
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.Tests.RemiseParPalierAcceptanceTests.Ac5_Sans_aucun_palier_configure_la_remise_est_de_0_00_euros",
+      "Tarification.Tests.RemiseParPalierAcceptanceTests.Ac4_Deux_lignes_de_6_articles_de_references_differentes_ne_declenchent_pas_le_palier_de_10",
+      "Tarification.Tests.RemiseParPalierAcceptanceTests.Ac1_Une_ligne_de_9_articles_a_2_00_euros_n_obtient_aucune_remise_0_00_euros"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Précontrôle skraft — avertissement non bloquant sur le code existant :\n- Couverture : src/Tarification.Application/CalculDuPanier.cs à 66.7 % (minimum 90 %), 2 ligne(s) couverte(s) sur 3.\n- Couverture : src/Tarification.Domaine/Montant.cs à 75 % (minimum 90 %), 6 ligne(s) couverte(s) sur 8.\n- Couverture : src/Tarification.Domaine/Panier.cs à 85.7 % (minimum 90 %), 6 ligne(s) couverte(s) sur 7.\n- Couverture : src/Tarification.Domaine/Quantite.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.\n- Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/projet.yaml`, section qualite (ADR 0071).\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.",
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : aucun.\nRemarques hors du changement de la story :\n- src/Tarification.Application/CalculDuPanier.cs:6 (cold-reader, minor) : Le commentaire de `Facture` dit que les remises restent à zéro tant que les stories ne sont pas livrées, alors que `Chiffrer` calcule maintenant la remise par palier. Seuls les frais de port restent à zéro. Le commentaire induit en erreur.\n- src/Tarification.Application/CalculDuPanier.cs:12 (quality-gates, minor) : Facture.ATPayer vaut SommeDesArticles + FraisDePort et ne déduit pas la Remise. Depuis cette phase, la remise est calculée (ligne 29), donc ATPayer surestime ce que le client doit payer lorsqu'un palier s'applique. Aucun test d'acceptance ne lit ATPayer, et les critères 1 à 5 ne le visent pas. La ligne 12 n'est pas modifiée par la phase : signalement à l'humain pour la prochaine story (ou pour trancher si ATPayer est hors US-2), sans renvoyer le travail.\n- src/Tarification.Application/CalculDuPanier.cs:6 (quality-gates, minor) : La doc de Facture affirme que les remises restent à zéro tant que les stories ne sont pas livrées. Ce n'est plus vrai : la remise est désormais calculée par RemiseDe. Commentaire périmé (lignes 6 à 8, non modifiées par la phase : signalement à l'humain).\n- src/Tarification.Application/CalculDuPanier.cs:12 (cold-reader, major) : `ATPayer` est un nom illisible (on dirait une coquille de « À payer »). Son calcul (SommeDesArticles + FraisDePort) ignore `Remise` sans que rien ne dise si c'est voulu. Le commentaire de la ligne 6 dit que les remises restent à zéro, alors que `Chiffrer` (ligne 29) calcule une remise réelle avec la grille. Le lecteur ne sait pas si la remise doit être déduite.\n- src/Tarification.Application/CalculDuPanier.cs:6 (quality-gates, minor) : Le commentaire de la classe Facture affirme que « les remises et les frais de port restent à zéro tant que les stories correspondantes ne sont pas livrées ». Or US-2 est livrée : Chiffrer calcule désormais la remise (Panier.SommeDesRemises via la grille). Le commentaire est donc faux pour la remise. Les frais de port restent bien à zéro."
+  ],
+  "dernierRejet": {
+    "gate": "revue (correction ciblée)",
+    "reasons": [
+      "[architecture#1.1, major, code] La règle « la remise du panier est la somme des remises calculées ligne par ligne » (ac-4) est implémentée dans le cas d'usage `CalculDuPanier.RemiseDe` (Application), par un `Aggregate` sur `panier.Lignes`. Le design ratifié prévoit `Panier.SommeDesRemises(GrilleDePaliers)` dans l'agrégat, sur le patron de `SommeDesLignes` ; l'invariant du panier doit vivre dans le domaine. `Panier.cs` n'a pas été étendu. ADR-001 range les règles commerciales dans le domaine et laisse à l'application l'orchestration. Déplacer la somme dans `Panier.SommeDesRemises(grille)` et faire appeler cette méthode par `Chiffrer`. Écarts de nommage mineurs par rapport aux contrats : `RemiseDe` au lieu de `RemisePour`, `Montant.Pour` au lieu de `Applique`. (src/Tarification.Application/CalculDuPanier.cs:31) — gravité : Une règle commerciale d'agrégat fuit dans la couche application, contre ADR-001 et le modèle de DESIGN ; le comportement reste correct, et un refactoring le corrige.",
+      "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+    ]
+  },
+  "arbitrages": [],
+  "etapes": [
+    {
+      "phase": "INIT",
+      "essai": 1,
+      "debut": "2026-11-07T21:42:57.004Z",
+      "fin": "2026-11-07T21:43:08.849Z",
+      "dureeMs": 11845,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "CLASSIFY",
+      "essai": 1,
+      "debut": "2026-11-07T21:43:08.849Z",
+      "fin": "2026-11-07T21:43:17.348Z",
+      "dureeMs": 8499,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.002,
+      "modeles": [
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "essai": 1,
+      "debut": "2026-11-07T21:43:17.348Z",
+      "fin": "2026-11-07T21:43:27.401Z",
+      "dureeMs": 10053,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "RESEARCH",
+      "essai": 1,
+      "debut": "2026-11-07T21:43:27.401Z",
+      "fin": "2026-11-07T21:43:45.879Z",
+      "dureeMs": 18478,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.0838,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "BLOCKED",
+      "essai": 1,
+      "debut": "2026-11-07T21:43:45.879Z",
+      "fin": "2026-11-07T21:43:57.781Z",
+      "dureeMs": 11902,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "RESEARCH",
+      "essai": 2,
+      "debut": "2026-11-07T21:43:57.781Z",
+      "fin": "2026-11-07T21:44:49.580Z",
+      "dureeMs": 51799,
+      "tours": 1,
+      "rejets": [
+        {
+          "porte": "citations",
+          "motifs": [
+            "`tests/Dosage.Tests` : fichier inexistant dans le dépôt."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0.2007,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "RESEARCH",
+      "essai": 3,
+      "debut": "2026-11-07T21:44:49.580Z",
+      "fin": "2026-11-07T21:45:02.086Z",
+      "dureeMs": 12506,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.2255,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "ROUTE",
+      "essai": 1,
+      "debut": "2026-11-07T21:45:02.086Z",
+      "fin": "2026-11-07T21:45:14.220Z",
+      "dureeMs": 12134,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 1,
+      "debut": "2026-11-07T21:45:14.220Z",
+      "fin": "2026-11-07T21:49:05.468Z",
+      "dureeMs": 231248,
+      "tours": 2,
+      "rejets": [
+        {
+          "porte": "cohérence",
+          "motifs": [
+            "`SommeDesArticles` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`FraisDePort` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "contracts.md : la commande `ConfigurerGrille` n'a pas de section « ## Commande `ConfigurerGrille` » (ses champs et leurs règles de validation).",
+            "`Panier`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 1.3763,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 2,
+      "debut": "2026-11-07T21:49:05.468Z",
+      "fin": "2026-11-07T21:50:56.330Z",
+      "dureeMs": 110862,
+      "tours": 2,
+      "rejets": [
+        {
+          "porte": "cohérence",
+          "motifs": [
+            "`Panier`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 2.0582,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 3,
+      "debut": "2026-11-07T21:50:56.330Z",
+      "fin": "2026-11-07T21:52:10.915Z",
+      "dureeMs": 74585,
+      "tours": 2,
+      "rejets": [
+        {
+          "porte": "cohérence",
+          "motifs": [
+            "`Panier`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 2.5593,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 4,
+      "debut": "2026-11-07T21:52:10.915Z",
+      "fin": "2026-11-07T21:52:11.500Z",
+      "dureeMs": 585,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "ESCALATED",
+      "essai": 1,
+      "debut": "2026-11-07T21:52:11.500Z",
+      "fin": "2026-11-07T21:52:15.218Z",
+      "dureeMs": 3718,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 5,
+      "debut": "2026-11-07T21:52:15.218Z",
+      "fin": "2026-11-07T21:56:09.989Z",
+      "dureeMs": 234771,
+      "tours": 2,
+      "rejets": [
+        {
+          "porte": "cohérence",
+          "motifs": [
+            "`PrixUnitaire` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`SommeDesArticles` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.",
+            "`FraisDePort` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 1.099,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 6,
+      "debut": "2026-11-07T21:56:09.989Z",
+      "fin": "2026-11-07T21:57:27.247Z",
+      "dureeMs": 77258,
+      "tours": 2,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 1.4759,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 1,
+      "debut": "2026-11-07T21:57:27.247Z",
+      "fin": "2026-11-07T21:58:38.389Z",
+      "dureeMs": 71142,
+      "tours": 4,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.3724,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 7,
+      "debut": "2026-11-07T21:58:38.389Z",
+      "fin": "2026-11-07T21:58:38.400Z",
+      "dureeMs": 11,
+      "tours": 0,
+      "rejets": [
+        {
+          "porte": "revue",
+          "motifs": [
+            "[architecture#1.1, major, deliverable] Le design déclare une interface de dépôt `IDepotDePaniers` (couche Domaine, `Enregistre(Panier)`) qu'aucun critère d'US-2 ne demande. Aucun cas d'usage ne l'appelle et il n'y a ni implémentation ni fichier. Elle figure pourtant dans le diagramme de dépendances. ADR-001 écarte tout stockage (« ce projet n'a encore ni stockage ») et ne justifie pas la présence d'une interface de dépôt dans le domaine. Elle est spéculative. Elle invente aussi une signature (`Enregistre`) tout en admettant que `Panier` n'a pas d'identifiant. À retirer du modèle, des contrats et des diagrammes. Sinon, un ADR existant ou nouveau doit justifier sa place et le critère de la story qui la demande. (.skraft/us-2/design/domain-model.md:95) — gravité : Un patron sans critère de story qui le justifie, déclaré dans le domaine sans ADR qui motive ce choix, contredit le point de revue « aucun patron sans critère ». — aussi : .skraft/us-2/design/contracts.md:92, .skraft/us-2/design/diagrams.md:25",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DESIGN",
+      "essai": 8,
+      "debut": "2026-11-07T21:58:38.400Z",
+      "fin": "2026-11-07T21:59:40.607Z",
+      "dureeMs": 62207,
+      "tours": 2,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 1.87,
+      "modeles": [
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 2,
+      "debut": "2026-11-07T21:59:40.607Z",
+      "fin": "2026-11-07T22:00:25.658Z",
+      "dureeMs": 45051,
+      "tours": 3,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.3568,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "RATIFICATION",
+      "essai": 1,
+      "debut": "2026-11-07T22:00:25.658Z",
+      "fin": "2026-11-07T22:00:26.490Z",
+      "dureeMs": 832,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DISTILL",
+      "essai": 1,
+      "debut": "2026-11-07T22:00:26.490Z",
+      "fin": "2026-11-07T22:01:40.310Z",
+      "dureeMs": 73820,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.231,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 3,
+      "debut": "2026-11-07T22:01:40.310Z",
+      "fin": "2026-11-07T22:02:58.421Z",
+      "dureeMs": 78111,
+      "tours": 4,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.5121,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "DELIVER",
+      "essai": 1,
+      "debut": "2026-11-07T22:02:58.421Z",
+      "fin": "2026-11-07T22:05:04.894Z",
+      "dureeMs": 126473,
+      "tours": 2,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.2096,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 4,
+      "debut": "2026-11-07T22:05:04.894Z",
+      "fin": "2026-11-07T22:06:41.664Z",
+      "dureeMs": 96770,
+      "tours": 5,
+      "rejets": [
+        {
+          "porte": "revue (correction ciblée)",
+          "motifs": [
+            "[architecture#1.1, major, code] La règle « la remise du panier est la somme des remises calculées ligne par ligne » (ac-4) est implémentée dans le cas d'usage `CalculDuPanier.RemiseDe` (Application), par un `Aggregate` sur `panier.Lignes`. Le design ratifié prévoit `Panier.SommeDesRemises(GrilleDePaliers)` dans l'agrégat, sur le patron de `SommeDesLignes` ; l'invariant du panier doit vivre dans le domaine. `Panier.cs` n'a pas été étendu. ADR-001 range les règles commerciales dans le domaine et laisse à l'application l'orchestration. Déplacer la somme dans `Panier.SommeDesRemises(grille)` et faire appeler cette méthode par `Chiffrer`. Écarts de nommage mineurs par rapport aux contrats : `RemiseDe` au lieu de `RemisePour`, `Montant.Pour` au lieu de `Applique`. (src/Tarification.Application/CalculDuPanier.cs:31) — gravité : Une règle commerciale d'agrégat fuit dans la couche application, contre ADR-001 et le modèle de DESIGN ; le comportement reste correct, et un refactoring le corrige.",
+            "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+          ]
+        }
+      ],
+      "aiu": 0,
+      "coutUsd": 0.8849,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-opus-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 5,
+      "debut": "2026-11-07T22:06:41.664Z",
+      "fin": "2026-11-07T22:06:42.799Z",
+      "dureeMs": 1135,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "DELIVER",
+      "essai": 2,
+      "debut": "2026-11-07T22:06:42.799Z",
+      "fin": "2026-11-07T22:07:55.871Z",
+      "dureeMs": 73072,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.1747,
+      "modeles": [
+        "claude-sonnet-5-5"
+      ]
+    },
+    {
+      "phase": "REVIEW",
+      "essai": 6,
+      "debut": "2026-11-07T22:07:55.871Z",
+      "fin": "2026-11-07T22:09:07.251Z",
+      "dureeMs": 71380,
+      "tours": 4,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.1357,
+      "modeles": [
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "DONE",
+      "essai": 1,
+      "debut": "2026-11-07T22:09:07.251Z",
+      "fin": "2026-11-07T22:09:07.396Z",
+      "dureeMs": 145,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    }
+  ]
+}
