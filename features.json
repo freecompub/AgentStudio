@@ -179,6 +179,20 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "composants-d-un-projet",
+      "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port, et les portes ne lancent que les composants touchés (ADR 0074)",
+      "verify": "",
+      "passes": false,
+      "notes": "ADR 0074 PROPOSÉ le 07/11, à valider avant toute implémentation. Aujourd'hui une seule pile par projet : un dépôt mixte n'est jugé qu'en partie."
+    },
+    {
+      "id": "bdd-par-composant",
+      "title": "Le BDD se décide par composant (`bdd: false` ou couples lanceur, features, étapes) : DISTILL écrit les .feature exécutés et leurs étapes, gelés, reliés à leur test par @ac-<n> (ADR 0074)",
+      "verify": "",
+      "passes": false,
+      "notes": "ADR 0074 PROPOSÉ le 07/11, après les composants. Idée reprise de skraft-plugin v2 (rien de copié). Lien scénario-test à vérifier sur la version installée de chaque lanceur (Reqnroll d'abord)."
+    },
+    {
       "id": "lentilles-informees-des-portes-jugees",
       "title": "Le dossier de chaque lentille dit ce que les portes du code ont déjà jugé (tests, couverture, lint, format, dépendances…), pour qu'elle ne le reproche pas ; extension et workflow",
       "verify": "",

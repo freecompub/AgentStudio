@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — ADR 0074 proposé : composants d'un projet, BDD par composant (rien d'implémenté)
+
+- Question du responsable : donner le choix TDD ou BDD, et traiter les dépôts qui mélangent les
+  technologies. Vérifié dans le code : une seule pile par projet (`selectStackAdapter`, une section
+  `pile`) ; le Gherkin de DISTILL n'est jamais exécuté ; `/stack init` ne lit que la racine.
+- Lu dans skraft-plugin v2 (`integration/v2-next`, 07/11) : composants (racine, pile, commandes),
+  portes par composant touché, `bdd` par composant (`false`, couples `{ runner, features, steps }`,
+  non décidé → run refusé), détection du lanceur dans les manifestes des sous-projets.
+- ADR 0074 **proposé** : section `composants` dans `projet.yaml` (`pile` seule reste valable),
+  adaptateur composé derrière le port `StackAdapter`, portes par composant touché ; puis `bdd` par
+  composant, `.feature` et étapes écrits en DISTILL et gelés, scénario relié à son test par `@ac-<n>`.
+  Différence voulue avec la v2 : `bdd` absent ne bloque pas les projets existants.
+- Critères `composants-d-un-projet` et `bdd-par-composant` (false). Prochaine étape : validation de
+  l'ADR par le responsable.
+
 ## 07/11 — Run de mesure US-2 avec Claude (`docs/runs/2026-11-07-us-2-mcp-claude/`)
 
 - But : mesurer le réfutateur (ADR 0069), le disjoncteur (ADR 0073) et `passation.md`. Même départ que
