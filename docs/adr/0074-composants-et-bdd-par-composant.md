@@ -60,6 +60,10 @@ ne cherche aucun dossier.
 
 ### 2. Le BDD, décidé par composant
 
+**Principe, décidé par le responsable le 07/11 : le TDD toujours, le BDD au choix.** DELIVER mène
+toujours sa boucle TDD (test unitaire rouge, puis code) ; le BDD ne change que la forme des tests
+d'acceptance, et seulement pour un composant qui le choisit.
+
 1. La `pile` d'un composant accepte **`bdd`** :
    - `false` ou absent : comme aujourd'hui (Gherkin en spécification dans `.skraft/`, tests
      d'acceptance ordinaires). **Absent ne bloque pas** les projets existants, contrairement à la v2 ;
@@ -99,5 +103,7 @@ ne cherche aucun dossier.
 - Les identifiants de tests d'un dépôt à plusieurs composants changent (préfixe) : les preuves et
   les références enregistrées avant ne s'y comparent plus.
 - Le BDD reste un choix du projet, jamais imposé, et décidé une fois, à l'initialisation.
-- Points à trancher à la validation : refuser ou non un run sur un composant dont `bdd` n'est pas
-  décidé (la v2 refuse ; proposé ici : non) ; profondeur de détection des sous-projets.
+- Tranché le 07/11 : un composant dont `bdd` n'est pas déclaré n'est **pas** en BDD, et son run n'est
+  pas refusé (le BDD est un choix, le TDD la règle).
+- Reste à trancher à la validation : la profondeur de détection des sous-projets (proposé : 4
+  niveaux sous la racine, comme la v2).

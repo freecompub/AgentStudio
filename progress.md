@@ -16,7 +16,8 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - ADR 0074 **proposé** : section `composants` dans `projet.yaml` (`pile` seule reste valable),
   adaptateur composé derrière le port `StackAdapter`, portes par composant touché ; puis `bdd` par
   composant, `.feature` et étapes écrits en DISTILL et gelés, scénario relié à son test par `@ac-<n>`.
-  Différence voulue avec la v2 : `bdd` absent ne bloque pas les projets existants.
+  Différence voulue avec la v2 : `bdd` absent ne bloque pas les projets existants. **Décidé par le
+  responsable : le TDD toujours, le BDD au choix** (un composant qui ne dit rien n'est pas en BDD).
 - Critères `composants-d-un-projet` et `bdd-par-composant` (false). Prochaine étape : validation de
   l'ADR par le responsable.
 
