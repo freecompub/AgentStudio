@@ -217,6 +217,8 @@ export default async function skraft(w, entree) {
     derogations: [],
     // Lignes exemptées de la couverture du diff par l'humain, après contestation du testeur.
     derogationsCouverture: [],
+    // Tests existants déclarés obsolètes à l'escalade d'un scénario (ADR 0066).
+    testsObsoletes: [],
     // Phases approuvées dont le commit a échoué, continuées sans commit (D19 de docs/12).
     nonCommitees: [],
     // Matrice du plan de test (DISTILL) et écarts déclarés en DELIVER, vérifiés contre elle (ADR 0067).
@@ -275,14 +277,21 @@ export default async function skraft(w, entree) {
 * Défauts relevés hors du changement de la story (06/11) : les bloquants d'abord, à corriger après
 * la fin du cycle, puis les autres remarques.
 */
-function notesDuBilan(notes) {
+function notesDuBilan(notes, testsObsoletes = []) {
   const ligne = (n) => `- ${n.file}${n.line ? `:${n.line}` : ""} (${n.lens}, ${n.severity}) : ${n.description}`;
   const bloquants = notes.filter((n) => n.severity === "blocker");
   const autres = notes.filter((n) => n.severity !== "blocker");
   return [
+    ...rappelDesTestsObsoletes(testsObsoletes),
     ...(bloquants.length ? ["**À corriger après le cycle** — défauts bloquants hors du changement de la story :", ...bloquants.map(ligne)] : []),
     ...(autres.length ? ["Remarques hors du changement de la story :", ...autres.map(ligne)] : []),
   ];
+}
+/** Tests déclarés obsolètes (ADR 0066) : à mettre à jour après le cycle, comme les défauts hors du changement. */
+function rappelDesTestsObsoletes(tests) {
+  if (!tests.length)
+    return [];
+  return ["**À corriger après le cycle** — tests existants déclarés obsolètes, sortis des portes :", ...tests.map((x) => `- mettre à jour ${x.test} : déclaré obsolète au scénario ${x.scenario}${x.raison ? ` (${x.raison})` : ""}.`)];
 }
 function bilan(d, confirmee) {
   const adrs = d.adrs.map((a) => `${a.id} (${a.status})`).join(", ") || "aucun";
@@ -301,7 +310,7 @@ function bilan(d, confirmee) {
     ...(d.ecartsAuPlan?.length
       ? [`Écarts au plan de test : ${d.ecartsAuPlan.length} (détail dans .skraft/${d.slug}/deliver/ecarts-au-plan.md).`, ...d.ecartsAuPlan.map((x) => `- ${x.criterion} (${x.par}) : ${x.planned} → ${x.actual} — ${x.rule}`)]
       : []),
-    ...notesDuBilan(d.notesHorsChangement ?? []),
+    ...notesDuBilan(d.notesHorsChangement ?? [], d.testsObsoletes ?? []),
   ].join("\n");
 }
 /**

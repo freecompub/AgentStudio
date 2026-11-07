@@ -180,10 +180,10 @@
     },
     {
       "id": "escalade-de-scenario-test-existant-obsolete",
-      "title": "Un scénario qui échoue sur un test existant devenu rouge escalade en présentant le problème : rejouer DISTILL (DELIVER effacée) ou mettre en pause (puis choix du point de reprise)",
+      "title": "Un scénario qui échoue sur un test existant devenu rouge escalade en présentant le problème : l'humain le déclare obsolète, il sort des portes, le cycle se termine, et le bilan rappelle de le mettre à jour (ADR 0066 révisé)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"test existant obsolète\"",
-      "passes": false,
-      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations. Point à trancher avant de coder : qui met à jour un test unitaire obsolète (§4 : A recommandée, B, C)."
+      "passes": true,
+      "notes": "ADR 0066 accepté et révisé le 07/11 (le responsable) : au lieu de rejouer DISTILL ou de mettre en pause, l'humain déclare le test obsolète, comme les défauts hors du changement. Extension et workflow : cause portée par chaque refus (tests rouges qui passaient avant DELIVER), option « Déclarer ces tests obsolètes et continuer », tests retirés des résultats des portes (code de sortie rendu à 0 si leurs échecs étaient les seuls), arbitrage « obsolète » tracé (cœur, moteur), derogations.md, rappel au bilan. e2e-escalade-cause des deux côtés, vus rouges puis verts."
     },
     {
       "id": "lentilles-recoivent-ce-que-leur-prompt-annonce",
@@ -364,8 +364,8 @@
       "id": "escalade-de-scenario-lignes-non-couvertes",
       "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",
-      "passes": false,
-      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations ; réutilise derogationsCouverture et sansLignesExemptees à la porte du scénario."
+      "passes": true,
+      "notes": "ADR 0066 (07/11). Extension et workflow : lignes sous le seuil portées par la porte du scénario, option « Exempter ces lignes et continuer », dérogation de couverture (ADR 0065) appliquée désormais aussi à la porte du scénario (sansLignesExemptees), tracée et commitée. e2e-escalade-cause des deux côtés, vus rouges puis verts."
     },
     {
       "id": "couverture-contestee-arbitree-par-l-humain",

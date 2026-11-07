@@ -8,7 +8,7 @@
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
-import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
+import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -23,16 +23,33 @@ const PROJET = ".agent-studio/projet.yaml";
 const MAX_CYCLES = 20;
 const GELES_TESTEUR = ["@stack:acceptanceTests"];
 const GELES_DEV = ["@stack:acceptanceTests", "@stack:unitTests"];
-/** Un pas refusé par sa porte : le motif part au prochain essai du pas. */
+/** Un pas refusé par sa porte : le motif part au prochain essai du pas ; `rouges`, les tests en échec vus. */
 class PasRefuse extends Error {
+  rouges;
+  constructor(message, rouges = []) {
+    super(message);
+    this.rouges = rouges;
+  }
 }
-/** Le scénario échoue (budget d'un pas épuisé, porte de fin de scénario, cycles) : il reprend à son début. */
+/**
+* Le scénario échoue (budget d'un pas épuisé, porte de fin de scénario, cycles) : il reprend à son début.
+* `cause` : tests en échec et lignes non couvertes vus par le dernier refus (ADR 0066).
+*/
 class ScenarioEchoue extends Error {
   motifs;
-  constructor(motifs) {
+  cause;
+  constructor(motifs, cause = {}) {
     super(motifs.join(" ; "));
     this.motifs = motifs;
+    this.cause = { rouges: cause.rouges ?? [], lignes: cause.lignes ?? [] };
   }
+}
+/**
+* Tests de DELIVER, sans ceux que l'humain a déclarés obsolètes (ADR 0066) : aucune porte ne les
+* juge plus jusqu'à la fin du cycle. Les preuves, elles, gardent l'exécution complète.
+*/
+async function lancerTests(w, d, o) {
+  return sansTestsObsoletes(await w.lancerTests(o), d.testsObsoletes.map((x) => x.test));
 }
 const premiereLigne = (msg) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs) => [...new Set(xs)];
@@ -47,7 +64,7 @@ export async function livrer(w, d, lentilles, max) {
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
     await ecrireRapports(w, d.slug, "DELIVER", suivi);
     // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
-    if (d.derogations.length || d.derogationsCouverture.length)
+    if (d.derogations.length || d.derogationsCouverture.length || d.testsObsoletes.length)
       await w.ecrireFichier(`.skraft/${d.slug}/deliver/derogations.md`, rapportDeDerogations(d));
     // Écarts au plan de test commités avec la livraison (ADR 0067).
     if (d.ecartsAuPlan.length)
@@ -64,6 +81,7 @@ export async function livrer(w, d, lentilles, max) {
       d.derogations = [];
       d.derogationsCouverture = [];
       d.ecartsAuPlan = [];
+      d.testsObsoletes = [];
       return creerDossiers(w, d.slug);
     },
   });
@@ -144,7 +162,7 @@ async function planifier(w, d) {
   if (!(await gelIntact(w, d)))
     throw new PanneEnvironnement("Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés : restaurez-les avant de relancer.");
   const disp = await w.disposition();
-  const run = await w.lancerTests({ etiquette: "DELIVER_BASELINE" });
+  const run = await lancerTests(w, d, { etiquette: "DELIVER_BASELINE" });
   if (run.timedOut)
     throw new PanneEnvironnement("Les tests ont dépassé le délai avant le début de DELIVER.");
   const k = natures(disp);
@@ -157,6 +175,8 @@ async function planifier(w, d) {
     scenarios: planScenarios({ implPlan, acceptanceTestIds: run.results.filter(k.resultatAcceptance).map((r) => r.id), regressions: d.regressions }),
     granularity: levelEffects(d.niveau).granularity,
     baseline: { all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) },
+    // Un test de cette liste devenu rouge est un candidat à l'obsolescence (ADR 0066).
+    avantDeliver: run.results.filter((r) => r.status === "passed").map((r) => r.id),
     unitTestsHash: null,
     dernierVert: null,
     notes: sansGel ? [SANS_GEL] : [],
@@ -204,24 +224,53 @@ async function scenario(w, d, L, i, motifs, max) {
         continue;
       }
       if (panne || echecs >= max) {
-        await escaladeScenario(w, panne ? e.message : `Scénario ${sc.id} : ${retour.join(" ; ")}`);
+        // La cause choisit ce qui peut réussir (ADR 0066) : déclarer un test obsolète, exempter des lignes.
+        const cause = panne ? undefined : causeDEchec({ rouges: e.cause.rouges, avantDeliver: L.avantDeliver, lignes: e.cause.lignes });
+        const avis = await escaladeScenario(w, panne ? e.message : `Scénario ${sc.id} : ${retour.join(" ; ")}`, { d, sc, cause });
+        retour = [...retour, ...avis];
         echecs = 0;
       }
     }
   }
 }
-/** Escalade d'un scénario : relancer reprend CE scénario, sauter saute la phase (comme le réducteur). */
-async function escaladeScenario(w, motif) {
+const OPTIONS_DE_CAUSE = {
+  obsolete: { id: "obsolete", label: "Déclarer ces tests obsolètes et continuer" },
+  exempt: { id: "exempter", label: "Exempter ces lignes et continuer" },
+};
+/**
+* Escalade d'un scénario : relancer reprend CE scénario, sauter saute la phase (comme le réducteur).
+* Selon la cause (ADR 0066), deux options de plus, après lesquelles le scénario reprend aussi :
+* - « obsolete » : les tests nommés sortent des portes jusqu'à la fin du cycle ; le bilan rappellera
+*   de les mettre à jour (comme les défauts hors du changement) ;
+* - « exempter » : les lignes non couvertes sortent du calcul de la couverture du diff (ADR 0065).
+* Chaque décision est tracée en arbitrage. Rend l'avis à ajouter au retour de l'agent.
+*/
+async function escaladeScenario(w, motif, o = {}) {
   await w.etape("ESCALATED");
-  const d = await w.humain("escalade", "Pipeline skraft bloqué (DELIVER)", [
+  const cause = o.cause;
+  const rep = await w.humain("escalade", "Pipeline skraft bloqué (DELIVER)", [
+    ...optionsSelonLaCause(cause).map((c) => OPTIONS_DE_CAUSE[c]),
     { id: "relancer", label: "Relancer la phase" },
     { id: "sauter", label: "Sauter la phase" },
     { id: "abandonner", label: "Abandonner" },
-  ], { detail: motif });
-  if (d.decision === "sauter")
+  ], { detail: [motif, ...texteDeLaCause(cause)].join("\n\n") });
+  if (rep.decision === "sauter")
     throw new SauterPhase();
-  if (d.decision === "abandonner")
+  if (rep.decision === "abandonner")
     w.echec(`Abandon : ${motif}`);
+  const raison = rep.commentaire ?? "";
+  if (rep.decision === "obsolete" && cause) {
+    o.d.testsObsoletes = [...o.d.testsObsoletes, ...cause.testsObsoletes.map((test) => ({ test, scenario: o.sc.id, raison }))];
+    for (const test of cause.testsObsoletes)
+      await w.arbitrage({ porte: "tests existants", élément: test, contestation: "", décision: "obsolète", par: "humain", raison });
+    return [`Tests déclarés obsolètes par l'humain : ${cause.testsObsoletes.join(", ")}. Ils ne comptent plus dans les portes ; ne les modifie pas.`];
+  }
+  if (rep.decision === "exempter" && cause) {
+    o.d.derogationsCouverture = [...o.d.derogationsCouverture, ...cause.lignes.flatMap((l) => l.lines.map((line) => ({ file: l.file, line, raison, contestation: "", defaut: `scénario ${o.sc.id}` })))];
+    for (const l of cause.lignes)
+      await w.arbitrage({ porte: "couverture du diff", élément: `${l.file}:${l.lines.join(", ")}`, contestation: "", décision: "dérogation", par: "humain", raison });
+  }
+  return [];
 }
 /** Les pas d'un scénario jusqu'à sa porte de fin ; rend les tests unitaires ajoutés. */
 async function derouler(w, d, L, i, cpScenario, motifs, max) {
@@ -294,12 +343,13 @@ async function pas(w, d, L, i, etape, depuis, motifs, max, unitTests, nouveau, c
       const motif = e instanceof PasRefuse || e instanceof TourInterrompu ? e.message : null;
       if (motif === null)
         throw e;
+      const rouges = e instanceof PasRefuse ? e.rouges : [];
       // Pas refusé par sa porte, ou tour interrompu : tracé, puis rembobiné et relancé.
       await w.rejet(`pas ${etape} (${L.scenarios[i].id})`, [motif]);
       await w.rembobiner(depuis);
       await creerDossiers(w, d.slug);
       if (essais >= max)
-        throw new ScenarioEchoue([motif]);
+        throw new ScenarioEchoue([motif], { rouges });
       retour = [motif];
     }
   }
@@ -375,7 +425,7 @@ async function porteRouge(w, d, L, i, depuis, couvertPar) {
   const retouches = testsRetouches(changes, []);
   if (retouches.length)
     throw new PasRefuse(`À ce pas, un test unitaire existant ne peut recevoir que des ajouts : ${retouches.join(", ")}. Pour renforcer un test, ajoutes-en un plus strict ; ne modifie ni ne retire les tests existants.`);
-  const run = await w.lancerTests({ etiquette: "DELIVER_RED", etape: sc.id });
+  const run = await lancerTests(w, d, { etiquette: "DELIVER_RED", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
   const connus = new Set(L.baseline.all);
@@ -393,7 +443,7 @@ async function porteRouge(w, d, L, i, depuis, couvertPar) {
     throw new PasRefuse(`Le nouveau test échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${premiereLigne(t.message)}`);
   const regressions = run.results.filter((r) => L.baseline.passed.includes(r.id) && r.status === "failed");
   if (regressions.length)
-    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`, regressions.map((r) => r.id));
   L.unitTestsHash = await w.empreinte(["@stack:unitTests"]);
   await w.commiter(`test(${d.slug}): ${sc.id}, ${t.id}`);
   const cp = await w.checkpoint(`skraft ${d.slug} : rouge ${sc.id}`);
@@ -408,7 +458,7 @@ async function couvertParAcceptance(w, d, L, i, nbChanges, couvertPar) {
     throw new PasRefuse("Tu as déclaré le comportement couvert par l'acceptance : aucun fichier ne doit alors être modifié. Écris un test unitaire, ou ne déclare rien.");
   if (!concerns(sc.acceptanceTestId, couvertPar))
     throw new PasRefuse(`« ${couvertPar} » n'est pas le test d'acceptance du scénario : seul ${sc.acceptanceTestId} peut tenir lieu de test rouge à ce pas.`);
-  const run = await w.lancerTests({ etiquette: "DELIVER_RED", etape: sc.id });
+  const run = await lancerTests(w, d, { etiquette: "DELIVER_RED", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai.");
   const lui = run.results.find((r) => concerns(r.id, sc.acceptanceTestId));
@@ -420,7 +470,7 @@ async function couvertParAcceptance(w, d, L, i, nbChanges, couvertPar) {
     throw new PasRefuse(`Le test d'acceptance échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${premiereLigne(lui.message)}`);
   const regressions = run.results.filter((r) => L.baseline.passed.includes(r.id) && r.status === "failed");
   if (regressions.length)
-    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`, regressions.map((r) => r.id));
   L.unitTestsHash = await w.empreinte(["@stack:unitTests"]);
   const cp = await w.checkpoint(`skraft ${d.slug} : couvert par l'acceptance ${sc.id}`);
   L.dernierVert = cp;
@@ -461,13 +511,14 @@ async function porteVerte(w, d, L, i, etape, depuis, nouveau, sortie, correction
       throw new PasRefuse(`Cette correction retire du code des éléments du contrat ratifié (design/contracts.md) : ${disparus.join(", ")}. ` +
         "Corrige sans retirer ce que le contrat exige ; si le défaut ne peut pas être corrigé autrement, conteste-le ou déclare-le hors de ton périmètre (`outOfScope`).");
   }
-  const run = await w.lancerTests({ etiquette: etape === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN", etape: sc.id });
+  const run = await lancerTests(w, d, { etiquette: etape === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai : le code boucle-t-il ?");
   // Correction : plus aucun test d'acceptance n'est attendu rouge.
-  const suite = problemesDeSuite(run.results, etape === "fix" ? [] : enCours(L, i, true), k.resultatAcceptance);
+  const attendus = etape === "fix" ? [] : enCours(L, i, true);
+  const suite = problemesDeSuite(run.results, attendus, k.resultatAcceptance);
   if (suite.length)
-    throw new PasRefuse(suite.join(" "));
+    throw new PasRefuse(suite.join(" "), rougesDeLaSuite(run.results, attendus));
   // Un nettoyage ne change pas le comportement : l'acceptance du scénario, verte, le reste (D16 de docs/12).
   if (etape === "refactor" && L.acceptanceVerte && run.results.find((r) => r.id === sc.acceptanceTestId)?.status !== "passed")
     throw new PasRefuse(`Le nettoyage a fait passer le test d'acceptance du scénario au rouge (${sc.acceptanceTestId}) : un nettoyage ne change pas le comportement.`);
@@ -493,6 +544,10 @@ async function porteVerte(w, d, L, i, etape, depuis, nouveau, sortie, correction
   if (correction)
     correction.reponses = sortie.responses ?? [];
   return { cp, nouveau: null, viaAcceptance: false, acceptanceVerte: run.results.some((r) => r.id === sc.acceptanceTestId && r.status === "passed") };
+}
+/** Tests en échec de la suite, hors acceptance des scénarios pas encore livrés : la cause d'un refus (ADR 0066). */
+function rougesDeLaSuite(results, attente) {
+  return results.filter((r) => r.status === "failed" && !attente.some((p) => concerns(r.id, p))).map((r) => r.id);
 }
 /** Suite complète : verte, sauf les tests d'acceptance des scénarios pas encore livrés ; aucun test ignoré. */
 function problemesDeSuite(results, attente, estAcceptance) {
@@ -525,12 +580,15 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
   if (!(await gelIntact(w, d)))
     motifs.push("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL.");
   const k = natures(L.disp);
-  const run = await w.lancerTests({ etiquette: "DELIVER_SCENARIO", etape: sc.id });
+  const run = await lancerTests(w, d, { etiquette: "DELIVER_SCENARIO", etape: sc.id });
   if (run.timedOut)
     throw new ScenarioEchoue(["Les tests ont dépassé le délai à la fin du scénario."]);
   if (run.results.find((r) => r.id === sc.acceptanceTestId)?.status !== "passed")
     motifs.push(`Le test d'acceptance du scénario n'est pas vert : ${sc.acceptanceTestId}.`);
   motifs.push(...problemesDeSuite(run.results, enCours(L, i, false), k.resultatAcceptance));
+  // Cause du refus, si refus il y a (ADR 0066) : tests rouges de la suite, lignes non couvertes.
+  const rouges = rougesDeLaSuite(run.results, enCours(L, i, false));
+  const lignes = [];
   motifs.push(...checkRedGreenSequence((await w.preuves()).filter((x) => x.stepId === sc.id), unitTests));
   const changes = (await w.fichiersModifies(depuis)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(L.disp.sources, f.path));
   const sources = changes.map((f) => f.path);
@@ -546,9 +604,13 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
       notes.push(...m.notes);
     }
     if (run.coverage) {
-      const diff = couvertureDuDiff(run.coverage, changes);
+      // Lignes exemptées par l'humain (ADR 0065, et à l'escalade d'un scénario, ADR 0066) : hors du calcul.
+      const diff = couvertureDuDiff(run.coverage, sansLignesExemptees(changes, d.derogationsCouverture));
       notes.push(...diff.notes);
-      motifs.push(...checkCoverage(diff.report, sources, barre, true));
+      const couverture = checkCoverage(diff.report, sources, barre, true);
+      motifs.push(...couverture);
+      if (couverture.length)
+        lignes.push(...lignesSousLeSeuil(diff.report, sources, barre));
       for (const f of diff.report.files)
         faits.push(`Couverture du diff (${sc.id}) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`);
     }
@@ -588,7 +650,7 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
       notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
   }
   if (motifs.length)
-    throw new ScenarioEchoue(motifs);
+    throw new ScenarioEchoue(motifs, { rouges, lignes });
   L.notes = uniq([...L.notes, ...notes]);
   L.faits = uniq([...L.faits, ...faits]);
 }
@@ -704,7 +766,7 @@ async function finDePhase(w, d, s, L, cpPhase, lentilles, max, tentatives, conso
     const sources = (await w.fichiersModifies(d.qualityCheckpoint ?? cpPhase))
       .filter((f) => f.status !== "deleted" && matchesAny(L.disp.sources, f.path) && natures(L.disp).production(f.path));
     if (sources.length) {
-      const run = await w.lancerTests({ etiquette: "DELIVER_COVERAGE" });
+      const run = await lancerTests(w, d, { etiquette: "DELIVER_COVERAGE" });
       const problems = problemesTestsExistants(run);
       if (problems.length) {
         if (await correctionDeFin(w, d, L, s, max, tentatives, consommer, "suite finale", problems))
@@ -849,7 +911,8 @@ async function corriger(w, d, L, s, max) {
       // La reprise connaît la cause de l'échec (D15 de docs/12).
       motifs = e.motifs;
       if (echecs >= max) {
-        await escaladeScenario(w, `Scénario ${L.scenarios[i].id} : ${e.motifs.join(" ; ")}`);
+        const cause = causeDEchec({ rouges: e.cause.rouges, avantDeliver: L.avantDeliver, lignes: e.cause.lignes });
+        motifs = [...motifs, ...(await escaladeScenario(w, `Scénario ${L.scenarios[i].id} : ${e.motifs.join(" ; ")}`, { d, sc: L.scenarios[i], cause }))];
         echecs = 0;
       }
     }
@@ -911,7 +974,7 @@ async function porteCorrectionTests(w, d, L, i, depuis, sortie, c) {
   const retouches = testsRetouches(changes, cites);
   if (retouches.length)
     throw new PasRefuse(`Un test unitaire existant ne peut recevoir que des ajouts, sauf s'il est cité par un défaut ci-dessus : ${retouches.join(", ")}. Ajoute plutôt un test plus strict.`);
-  const run = await w.lancerTests({ etiquette: "DELIVER_FIX_TEST", etape: sc.id });
+  const run = await lancerTests(w, d, { etiquette: "DELIVER_FIX_TEST", etape: sc.id });
   if (run.timedOut)
     throw new PasRefuse("Les tests ont dépassé le délai : un test ajouté boucle-t-il ?");
   const ids = new Set(run.results.map((r) => r.id));
@@ -920,7 +983,7 @@ async function porteCorrectionTests(w, d, L, i, depuis, sortie, c) {
     throw new PasRefuse(`Des tests existants ont disparu : ${disparus.join(", ")}. Ajoute des tests, ne retire ni ne renomme les existants.`);
   const casses = run.results.filter((r) => L.baseline.passed.includes(r.id) && r.status === "failed");
   if (casses.length)
-    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${casses.map((r) => r.id).join(", ")}. Ne modifie pas les tests existants.`);
+    throw new PasRefuse(`Des tests qui passaient ne passent plus : ${casses.map((r) => r.id).join(", ")}. Ne modifie pas les tests existants.`, casses.map((r) => r.id));
   const neufs = run.results.filter((r) => !L.baseline.all.includes(r.id) && !k.resultatAcceptance(r));
   const ignores = neufs.filter((r) => r.status === "skipped");
   if (ignores.length)
@@ -1070,6 +1133,18 @@ function rapportDeDerogations(d) {
           "| Ligne | Décidé par | Raison | Contestation du testeur |",
           "| --- | --- | --- | --- |",
           ...d.derogationsCouverture.map((x) => `| ${x.file}:${x.line} | humain | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
+    ...(d.testsObsoletes.length
+      ? [
+          "## Tests existants déclarés obsolètes",
+          "",
+          "Tests qui passaient avant DELIVER, que la story fait échouer, sortis des portes par l'humain (ADR 0066). À mettre à jour après le cycle.",
+          "",
+          "| Test | Scénario | Raison |",
+          "| --- | --- | --- |",
+          ...d.testsObsoletes.map((x) => `| ${cellule(x.test)} | ${x.scenario} | ${cellule(x.raison)} |`),
           "",
         ]
       : []),

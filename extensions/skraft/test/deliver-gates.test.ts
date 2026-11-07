@@ -3,7 +3,7 @@ import { coverageForChanges } from "@agent-studio/extension-api";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
-import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -598,5 +598,46 @@ describe("couverture du diff et dérogations (arbitrage humain)", () => {
   it("sansLignesExemptees : les lignes accordées sortent des lignes modifiées, fichier par fichier", () => {
     const changes = [{ path: F, status: "modified", lines: [2, 3, 5] }, { path: "autre.swift", status: "added", lines: [3] }];
     expect(sansLignesExemptees(changes, [{ file: F, line: 3 }])).toEqual([{ path: F, status: "modified", lines: [2, 5] }, { path: "autre.swift", status: "added", lines: [3] }]);
+  });
+});
+
+/**
+ * Cause d'un scénario en échec (ADR 0066, révisé le 07/11) : le code la connaît, et l'escalade
+ * propose ce qui peut réussir. Un test rouge qui passait au début de DELIVER est un test que la
+ * story rend obsolète ; des lignes du scénario non couvertes peuvent être exemptées.
+ */
+describe("Cause d'un scénario en échec (ADR 0066)", () => {
+  const avant = ["tests/a.test.ts > ancien", "tests/b.test.ts > autre"];
+
+  it("test rouge qui passait avant DELIVER : obsolète possible ; un test neuf du scénario ne l'est pas", () => {
+    expect(causeDEchec({ rouges: ["tests/a.test.ts > ancien", "tests/neuf.test.ts > neuf"], avantDeliver: avant })).toEqual({ testsObsoletes: ["tests/a.test.ts > ancien"], lignes: [] });
+    expect(causeDEchec({ rouges: [], avantDeliver: avant, lignes: [{ file: "src/a.ts", lines: [3, 4] }] })).toEqual({ testsObsoletes: [], lignes: [{ file: "src/a.ts", lines: [3, 4] }] });
+  });
+
+  it("options et texte selon la cause ; sans cause connue, rien de plus", () => {
+    const c = { testsObsoletes: ["tests/a.test.ts > ancien"], lignes: [{ file: "src/a.ts", lines: [3, 4] }] };
+    expect(optionsSelonLaCause(c)).toEqual(["obsolete", "exempt"]);
+    expect(optionsSelonLaCause({ testsObsoletes: [], lignes: [] })).toEqual([]);
+    expect(optionsSelonLaCause(undefined)).toEqual([]);
+    expect(texteDeLaCause(c)).toEqual([
+      "Tests qui passaient avant DELIVER et que la story fait échouer : tests/a.test.ts > ancien. S'ils décrivent un comportement que la story change, déclarez-les obsolètes : ils sortent des portes, et le bilan rappellera de les mettre à jour après le cycle.",
+      "Lignes du scénario non couvertes : src/a.ts:3, 4. Si elles ne peuvent pas être atteintes, exemptez-les : la dérogation est tracée et commitée.",
+    ]);
+  });
+
+  it("tests déclarés obsolètes : retirés des résultats que lisent les portes", () => {
+    const run = { timedOut: false, results: [{ id: "tests/a.test.ts > ancien", status: "failed" }, { id: "tests/b.test.ts > autre", status: "passed" }] };
+    expect(sansTestsObsoletes(run, ["tests/a.test.ts > ancien"]).results.map((r) => r.id)).toEqual(["tests/b.test.ts > autre"]);
+    expect(sansTestsObsoletes(run, [])).toBe(run);
+  });
+
+  it("code de sortie : rendu à 0 quand les seuls échecs étaient des tests obsolètes ; gardé sinon", () => {
+    const seul = { exitCode: 1, results: [{ id: "ancien", status: "failed" }, { id: "b", status: "passed" }] };
+    expect(sansTestsObsoletes(seul, ["ancien"]).exitCode).toBe(0);
+    const autre = { exitCode: 1, results: [{ id: "ancien", status: "failed" }, { id: "b", status: "failed" }] };
+    expect(sansTestsObsoletes(autre, ["ancien"]).exitCode).toBe(1);
+    // Aucun échec retiré : le code de sortie dit autre chose (compilation, configuration), il reste.
+    const compilation = { exitCode: 2, results: [{ id: "b", status: "passed" }] };
+    expect(sansTestsObsoletes(compilation, ["ancien"]).exitCode).toBe(2);
   });
 });

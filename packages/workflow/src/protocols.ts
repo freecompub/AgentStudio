@@ -88,7 +88,7 @@ export interface Arbitrage {
   porte: string;
   élément: string;
   contestation: string;
-  décision: "dérogation" | "à corriger";
+  décision: "dérogation" | "à corriger" | "obsolète";
   par: "agent" | "humain";
   raison: string;
 }

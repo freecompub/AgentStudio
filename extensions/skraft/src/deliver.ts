@@ -231,3 +231,45 @@ export function checkFormat(report: FormatReport | null, scenarioId: string): { 
   const motif = `Format : ${outil} signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.`;
   return { motifs: [report.sortie ? `${motif}\n${report.sortie}` : motif], faits: [], notes: [] };
 }
+
+// ---------- cause d'un scénario en échec (ADR 0066) --------------------------------------
+
+/** Ce que le code sait d'un échec : tests que la story rend obsolètes, lignes non couvertes. */
+export interface CauseDEchec {
+  testsObsoletes: string[];
+  lignes: { file: string; lines: number[] }[];
+}
+
+/** Un test rouge qui passait au début de DELIVER : la story change ce qu'il décrit, ou le casse. */
+export function causeDEchec(o: { rouges: string[]; avantDeliver: string[]; lignes?: { file: string; lines: number[] }[] }): CauseDEchec {
+  return { testsObsoletes: o.rouges.filter((id) => o.avantDeliver.includes(id)), lignes: o.lignes ?? [] };
+}
+
+/** Options d'escalade que seule cette cause rend utiles, avant « relancer », « sauter », « abandonner ». */
+export function optionsSelonLaCause(c: CauseDEchec | undefined): ("obsolete" | "exempt")[] {
+  return [...(c?.testsObsoletes.length ? ["obsolete" as const] : []), ...(c?.lignes.length ? ["exempt" as const] : [])];
+}
+
+/** Le problème dit en clair à l'humain, avec ce que chaque option fera. */
+export function texteDeLaCause(c: CauseDEchec | undefined): string[] {
+  return [
+    ...(c?.testsObsoletes.length
+      ? [`Tests qui passaient avant DELIVER et que la story fait échouer : ${c.testsObsoletes.join(", ")}. S'ils décrivent un comportement que la story change, déclarez-les obsolètes : ils sortent des portes, et le bilan rappellera de les mettre à jour après le cycle.`]
+      : []),
+    ...(c?.lignes.length
+      ? [`Lignes du scénario non couvertes : ${c.lignes.map((l) => `${l.file}:${l.lines.join(", ")}`).join(" ; ")}. Si elles ne peuvent pas être atteintes, exemptez-les : la dérogation est tracée et commitée.`]
+      : []),
+  ];
+}
+
+/**
+ * Tests déclarés obsolètes par l'humain : retirés des résultats que lisent les portes de DELIVER. Si
+ * leurs échecs étaient les seuls, le code de sortie est rendu à 0 : la porte de la suite finale le lit.
+ */
+export function sansTestsObsoletes<R extends { results: { id: string; status: string }[]; exitCode?: number | null }>(run: R, obsoletes: readonly string[]): R {
+  if (!obsoletes.length) return run;
+  const results = run.results.filter((r) => !obsoletes.includes(r.id));
+  const retires = run.results.some((r) => obsoletes.includes(r.id) && r.status === "failed");
+  const seulsEchecs = retires && !results.some((r) => r.status === "failed");
+  return { ...run, results, ...(seulsEchecs && run.exitCode ? { exitCode: 0 } : {}) };
+}

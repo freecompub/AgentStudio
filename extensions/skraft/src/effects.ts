@@ -19,7 +19,7 @@ import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
-import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees } from "./deliver.js";
+import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees, sansTestsObsoletes } from "./deliver.js";
 import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects, rangerHorsChangement, verifierOccurrences } from "./review-thread.js";
 import type { LensDefect, LensVerdict } from "./review.js";
 
@@ -301,6 +301,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
             skip: "Sauter la phase",
             continue: "Continuer sans commiter",
             abort: "Abandonner",
+            // Selon la cause d'un scénario escaladé (ADR 0066).
+            obsolete: "Déclarer ces tests obsolètes et continuer",
+            exempt: "Exempter ces lignes et continuer",
           }[id],
         })),
         requiredRoles: ["developpeur", "architecte", "administrateur"],
@@ -339,7 +342,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       for (const [i, r] of state.reviews[effect.phase].entries())
         if (i >= (state.debutDesRevues?.[effect.phase] ?? 0)) await writeReview(ctx, state.slug, effect.phase, i + 1, r.attempt, r.lenses);
       // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
-      if (effect.phase === "DELIVER" && (state.derogations?.length || state.derogationsCouverture?.length))
+      if (effect.phase === "DELIVER" && (state.derogations?.length || state.derogationsCouverture?.length || state.testsObsoletes?.length))
         await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/derogations.md`, rapportDeDerogations(state));
       // Écarts au plan de test commités avec la livraison (ADR 0067).
       if (effect.phase === "DELIVER" && state.ecartsAuPlan?.length) await ctx.workspace.writeFile(`.skraft/${state.slug}/deliver/ecarts-au-plan.md`, rapportDEcarts(state));
@@ -433,7 +436,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
   const coverageFacts: string[] = [];
   const coverageNotes: string[] = state.qualityCheckpoint ? [] : ["Référence de qualité initiale absente (ancienne tâche) : couverture du diff limitée à DELIVER."];
   if (sources.length) {
-    const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_COVERAGE" } });
+    const run = sansTestsObsoletes(await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_COVERAGE" } }), (state.testsObsoletes ?? []).map((x) => x.test));
     const problems = baselineProblems(run);
     if (problems.length) return { type: "GATE_FAIL", gate: "suite finale", reasons: problems };
     if (run.coverage) {
@@ -640,9 +643,16 @@ function notesDuBilan(state: SkraftState): string[] {
   const bloquants = toutes.filter((x) => x.note.severity === "blocker");
   const autres = toutes.filter((x) => x.note.severity !== "blocker");
   return [
+    ...rappelDesTestsObsoletes(state.testsObsoletes ?? []),
     ...(bloquants.length ? ["**À corriger après le cycle** — défauts bloquants hors du changement de la story :", ...bloquants.map(ligne)] : []),
     ...(autres.length ? ["Remarques hors du changement de la story :", ...autres.map(ligne)] : []),
   ];
+}
+
+/** Tests déclarés obsolètes (ADR 0066) : à mettre à jour après le cycle, comme les défauts hors du changement. */
+function rappelDesTestsObsoletes(tests: { test: string; scenario: string; raison: string }[]): string[] {
+  if (!tests.length) return [];
+  return ["**À corriger après le cycle** — tests existants déclarés obsolètes, sortis des portes :", ...tests.map((x) => `- mettre à jour ${x.test} : déclaré obsolète au scénario ${x.scenario}${x.raison ? ` (${x.raison})` : ""}.`)];
 }
 
 /**
@@ -726,6 +736,7 @@ function rapportDeDerogations(s: SkraftState): string {
   const cellule = (x: string) => x.replace(/\|/g, "\\|");
   const mutants = s.derogations ?? [];
   const lignes = s.derogationsCouverture ?? [];
+  const obsoletes = s.testsObsoletes ?? [];
   return [
     `# Dérogations — ${s.story?.id ?? s.slug}`,
     "",
@@ -750,6 +761,18 @@ function rapportDeDerogations(s: SkraftState): string {
           "| Ligne | Décidé par | Raison | Contestation du testeur |",
           "| --- | --- | --- | --- |",
           ...lignes.map((x) => `| ${x.file}:${x.line} | humain | ${cellule(x.raison)} | ${cellule(x.contestation)} |`),
+          "",
+        ]
+      : []),
+    ...(obsoletes.length
+      ? [
+          "## Tests existants déclarés obsolètes",
+          "",
+          "Tests qui passaient avant DELIVER, que la story fait échouer, sortis des portes par l'humain (ADR 0066). À mettre à jour après le cycle.",
+          "",
+          "| Test | Scénario | Raison |",
+          "| --- | --- | --- |",
+          ...obsoletes.map((x) => `| ${cellule(x.test)} | ${x.scenario} | ${cellule(x.raison)} |`),
           "",
         ]
       : []),

@@ -467,6 +467,12 @@ describe("Moteur de tâches — trace", () => {
     expect(entries.filter((e) => e.kind === "arbitrage")).toEqual([expect.objectContaining({ kind: "arbitrage", ...a })]);
   });
 
+  it("un test existant déclaré obsolète par l'humain est tracé comme tel, pas « à corriger » (ADR 0066)", async () => {
+    const a = { porte: "tests existants", élément: "tests/a.test.ts > ancien", contestation: "", décision: "obsolète", par: "humain", raison: "la story change ce comportement" };
+    const entries = await run([{ type: "ARBITRE", a }, { type: "PASS" }]);
+    expect(entries.filter((e) => e.kind === "arbitrage")).toEqual([expect.objectContaining({ kind: "arbitrage", ...a })]);
+  });
+
   it("un motif conservé d'un rejet précédent ne compte pas comme un nouveau rejet", async () => {
     // `lastRejection` reste posé pendant tout le réessai : seul le compteur dit qu'un rejet a eu lieu.
     const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["x"] }, { type: "PASS" }]);

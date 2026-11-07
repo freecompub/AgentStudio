@@ -5,6 +5,53 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Distribution et mise à jour du serveur MCP : paquet npm (décidé, pas fait)
+
+- **Constat** : le serveur MCP tourne depuis `apps/mcp-skraft/dist/`, non versionné (`.gitignore`),
+  fabriqué par `pnpm --filter @agent-studio/mcp-skraft build`. Ce build **recopie**
+  `workflows/skraft/` dans `dist/workflows/skraft/`, et le serveur charge le workflow depuis cette
+  copie. Un `dist/` déjà construit garde donc l'ancien workflow tant qu'on ne relance pas le build,
+  puis le client MCP (Claude Code, Copilot CLI). Rien ne signale un `dist/` en retard.
+- **Décidé par le responsable** : distribuer le serveur en **paquet npm versionné**, sur GitHub
+  Packages, privé à l'organisation `freecompub`. Le client le déclare une fois :
+  `npx -y @freecompub/mcp-skraft@1`. Mise à jour : une nouvelle version publiée ; `npx` prend la
+  dernière `1.x` au démarrage suivant du client (ou une version fixée pour la figer). Écartés : une
+  archive dans les releases GitHub (mise à jour manuelle, facile à oublier) ; le serveur livré avec
+  l'application de bureau (elle n'a pas encore de mise à jour).
+- **À faire, dans l'ordre** :
+  1. fixer la licence du reste du paquet (le workflow est GPL-3.0-or-later, livré en sources) ;
+  2. `package.json` : nom `@freecompub/mcp-skraft`, retirer `"private": true`, champ `files`
+     (`dist/`), version semver ;
+  3. le serveur dit sa version (journal et `skraft_etat`) ; aujourd'hui `0.0.0` ;
+  4. CI : build puis publication à chaque tag de version ;
+  5. README : installation par `npx`, mise à jour, version fixée ;
+  6. ADR qui consigne ce choix.
+
+## 07/11 — Escalade d'un scénario selon sa cause (ADR 0066, accepté et révisé)
+
+- **Décisions du responsable** : option A (aucun agent ne réécrit un test existant), puis, plutôt que
+  « rejouer DISTILL » ou « mettre en pause », le principe des défauts hors du changement : l'humain
+  déclare le test obsolète, il sort des portes, le cycle se termine, le bilan rappelle de le mettre à
+  jour. **Piège évité** : la pause aurait laissé l'humain corriger, puis un retour au début de DELIVER
+  (rollback Git : `read-tree --reset`, `clean`) aurait effacé sa correction.
+- **Cause connue du code**, dans les deux implémentations : chaque refus porte les tests en échec vus
+  (`rouges`) et, à la porte du scénario, les lignes sous le seuil (`lignes`). Un rouge qui passait au
+  début de DELIVER (`avantDeliver`) est candidat à l'obsolescence. Fonctions pures en deux copies :
+  `causeDEchec`, `optionsSelonLaCause`, `texteDeLaCause`, `sansTestsObsoletes`.
+- **Escalade** : « Déclarer ces tests obsolètes et continuer » (`obsolete`), « Exempter ces lignes et
+  continuer » (`exempt` / `exempter` dans le workflow), puis relancer, sauter, abandonner. Le scénario
+  reprend ; l'agent reçoit l'avis « tests déclarés obsolètes : ne les modifie pas ».
+- **Effets** : tests obsolètes retirés des résultats que lisent les portes de DELIVER (les preuves
+  gardent l'exécution complète). **Piège trouvé par le test** : la porte « suite finale » lit aussi le
+  code de sortie, resté à 1 ; il est rendu à 0 quand les seuls échecs retirés étaient obsolètes. Les
+  lignes exemptées sortent désormais du calcul **à la porte du scénario** aussi (avant : fin de
+  DELIVER seulement). `derogations.md` a une section « Tests existants déclarés obsolètes » ; le bilan,
+  un rappel « À corriger après le cycle ».
+- **Trace** : troisième décision d'arbitrage, « obsolète » (cœur, moteur de tâches, workflow) ; avant,
+  le moteur rangeait toute décision inconnue en « à corriger ».
+- Rembobinage de toute la phase DELIVER : tests obsolètes oubliés avec les dérogations.
+- Le chemin de correction de revue escalade avec les mêmes options, dans les deux implémentations.
+
 ## 07/11 — Runtime Claude, brique D : documentation ; critère rempli
 
 - ADR 0070 : section « Mise en œuvre dans l'application » (réglage, connexion sans GitHub,
