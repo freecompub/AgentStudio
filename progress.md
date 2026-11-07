@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Lot [1] des reprises de skraft-plugin v2 : deux tâches mises en attente
+
+Décidé par le responsable, après le disjoncteur (PR #19). Les deux restent à faire, dans l'extension
+et le workflow, en TDD ; critères `lentilles-informees-des-portes-jugees` et
+`skills-disent-ce-que-le-code-verifie` (à `false`, verify à écrire avec le code).
+
+1. **Dire aux lentilles ce que les portes ont déjà jugé** (« Not yours to report » de la v2) : le
+   dossier de chaque lentille liste les portes déjà passées par le code (tests, couverture, lint,
+   format, règles de dépendance…), pour qu'elle ne reproche pas ce qui est vérifié. But : moins de
+   défauts redondants, donc moins de tours de correction.
+2. **Nos skills disent ce que le code vérifie déjà** : celles reprises de v1 décrivent encore des
+   étapes faites par les portes. Contenu partageable (ADR 0024) : ne nommer aucun outil
+   d'agent-studio.
+
+Restent aussi, hors du lot [1] : re-revue incrémentale et désaccord isolé (lot [2], à mesurer par un
+run réel) ; lentilles spécialisées, boucle de mutation par fichier, contrôle du patch pendant une
+correction, « accepter les défauts restants » (lot [3]).
+
 ## 07/11 — Disjoncteur des réessais (ADR 0073, proposé)
 
 - Repris de l'idée de skraft-plugin v2 (lot [1]) : deux refus **identiques de suite** — même porte,
