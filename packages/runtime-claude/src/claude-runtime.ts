@@ -39,6 +39,9 @@ function auMoins(v: string, min: string): boolean {
   return true;
 }
 
+/** Alias de modèle acceptés par `--model` ; ceux des classes de rôle en font partie (`MODELES_CLAUDE`). */
+const ALIAS = ["fable", "opus", "sonnet", "haiku"] as const;
+
 /** Nom de notre serveur MCP dans la configuration donnée au CLI. */
 const SERVEUR = "agent-studio";
 
@@ -182,8 +185,9 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
       usageUnit: "tokens",
       resumableSessions: true,
     },
+    // Les alias du CLI désignent la dernière version de chaque famille (`claude --help`, 2.1.319).
     async listModels() {
-      return [];
+      return ALIAS.map((id) => ({ id, name: id[0]!.toUpperCase() + id.slice(1) }));
     },
     async start() {
       let brute: string;

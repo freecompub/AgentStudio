@@ -1,4 +1,5 @@
 import type { AgentRuntime, ModelClass } from "@agent-studio/core";
+import type { EtatConnexionClaude } from "@agent-studio/runtime-claude";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload } from "../shared/ipc-contract.js";
 
@@ -10,6 +11,12 @@ export interface WorkspaceProvider {
 
 /** Construit le runtime d'agent une fois le jeton obtenu. */
 export type RuntimeFactory = (gitHubToken: string, hostname: string) => AgentRuntime;
+
+/** Runtime Claude par le CLI (ADR 0070) : sa connexion, lue par `claude auth status`, et sa fabrique. */
+export interface ClaudeRuntimeProvider {
+  etat(): Promise<EtatConnexionClaude>;
+  creer(): AgentRuntime;
+}
 
 /** Émission d'événements vers la fenêtre. */
 export interface EventSink {
@@ -26,6 +33,8 @@ export interface AppSettings {
   modelClasses?: Record<string, Partial<Record<ModelClass, string>>>;
   /** Hôte GitHub retenu : `github.com` ou une instance Enterprise (D4). */
   authHostname?: string;
+  /** Runtime des agents (ADR 0070) ; absent = Copilot. */
+  runtime?: "copilot" | "claude";
 }
 
 export interface SettingsStore {

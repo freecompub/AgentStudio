@@ -7,6 +7,8 @@ export const REQUEST_CHANNELS = [
   "auth:quota",
   "auth:login",
   "auth:logout",
+  "runtime:status",
+  "runtime:set",
   "workspace:current",
   "workspace:pick-folder",
   "workspace:open",

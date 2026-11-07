@@ -90,6 +90,20 @@ export type ModelClassesDto = z.infer<typeof modelClassesSchema>;
 export const uiModeSchema = z.enum(["simple", "advanced"]);
 export type UiMode = z.infer<typeof uiModeSchema>;
 
+/** Runtime des agents (ADR 0070) : Copilot par défaut, ou Claude par le CLI. */
+export const runtimeKindSchema = z.enum(["copilot", "claude"]);
+export type RuntimeKindDto = z.infer<typeof runtimeKindSchema>;
+export const runtimeStatusSchema = z.object({
+  choisi: runtimeKindSchema,
+  /** Ceux que l'application sait lancer : Copilot toujours, Claude s'il est intégré. */
+  disponibles: z.array(runtimeKindSchema),
+  /** Connexion de Claude Code (`claude auth status`), lue seulement si Claude est disponible. */
+  claude: z
+    .union([z.object({ etat: z.literal("connecte"), methode: z.string().optional() }), z.object({ etat: z.literal("non-connecte") }), z.object({ etat: z.literal("absent") })])
+    .nullable(),
+});
+export type RuntimeStatusDto = z.infer<typeof runtimeStatusSchema>;
+
 export const profileInfoSchema = z.object({
   role: roleSchema,
   roleLabel: z.string(),
@@ -136,6 +150,8 @@ export const requests = {
   "auth:quota": { input: empty, output: copilotQuotaSchema },
   "auth:login": { input: z.object({ hostname: text(253).min(1).optional() }).strict(), output: authStatusSchema },
   "auth:logout": { input: empty, output: z.void() },
+  "runtime:status": { input: empty, output: runtimeStatusSchema },
+  "runtime:set": { input: z.object({ runtime: runtimeKindSchema }).strict(), output: z.void() },
   "workspace:current": { input: empty, output: workspaceInfoSchema.nullable() },
   "workspace:pick-folder": { input: empty, output: z.string().nullable() },
   "workspace:open": { input: z.object({ path: text(4096).min(1) }).strict(), output: workspaceInfoSchema },

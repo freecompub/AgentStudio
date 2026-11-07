@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude, brique B : choix du runtime dans l'application (processus principal)
+
+- Réglage `runtime` (`copilot` par défaut, ou `claude`) dans `settings.json` ; canaux IPC
+  `runtime:status` (choisi, disponibles, état de la connexion Claude) et `runtime:set`.
+- Avec Claude, la conversation ne demande **pas** GitHub : la connexion est celle de Claude Code
+  (`claude auth status`). Non connecté ou absent : la conversation ne démarre pas, et le message dit
+  quoi taper (`claude auth login`) ; l'échec n'est pas retenu.
+- Changer de runtime ferme la conversation et arrête l'ancien runtime (comme une déconnexion) ;
+  même runtime : rien n'est fermé.
+- Modèles : `listModels` de Claude rend les alias du CLI (`fable`, `opus`, `sonnet`, `haiku`,
+  « alias for the latest model » dans `claude --help`). `modelFor` : les défauts `MODELES_CLAUDE`
+  par classe, un réglage de classe l'emporte ; un identifiant Copilot resté dans les réglages du
+  projet est écarté par la liste du runtime (les réglages de modèle sont par projet, pas par runtime).
+- `index.ts` : Claude proposé hors mode d'essai seulement (les essais Electron ne lancent aucun CLI).
+  Le SDK MCP du relais est intégré au bundle principal (`pnpm build` vérifié).
+- Piège TDD : le schéma des réglages avait été modifié avant son test ; retiré le temps de voir le
+  test rouge, puis remis.
+
 ## 07/11 — Runtime Claude, brique A : suppression des sessions, connexion partagée
 
 - `deleteSession(id)` applique la stratégie du 06/11 : `<projectsDirectory>/*/<id>.jsonl` et le

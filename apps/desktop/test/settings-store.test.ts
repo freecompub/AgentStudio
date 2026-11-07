@@ -29,6 +29,7 @@ describe("JsonSettingsStore", () => {
       models: { "/projets/demo": "claude-sonnet-4.5" },
       modelClasses: { "/projets/demo": { strong: "claude-sonnet-5.5", light: "gpt-5-mini" } },
       authHostname: "github.exemple.fr",
+      runtime: "claude" as const,
     };
     await createJsonSettingsStore(file).save(tout);
     expect(await createJsonSettingsStore(file).load()).toEqual(tout);
