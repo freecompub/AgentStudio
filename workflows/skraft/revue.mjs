@@ -5,7 +5,7 @@
 * dans le réducteur, ils survivent à une relance par l'humain.
 */
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
-import { buildBrief, lignePile } from "./brief.mjs";
+import { buildBrief, ecrirePassation, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
 import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, rangerHorsChangement, verifierOccurrences, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
@@ -36,6 +36,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
       const disp = await w.disposition();
       pile = `\n${lignePile(disp.pile, disp)}`;
     }
+    await ecrirePassation(w, d);
     const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides] });
     if (r.sortie) {
       if (r.sortie.responses?.length)

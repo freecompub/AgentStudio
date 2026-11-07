@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Questions ouvertes tranchées ; réponses humaines citables (passation.md)
+
+- **Décisions du responsable** : (1) gel des tests d'acceptance **absolu**, aucune retouche même
+  mécanique ; (2) qualité de forme au-delà du formatage : état des outils noté dans `features.json`
+  (rien de prêt pour C#) ; (3) budget de questions des agents **mis de côté** ; (4) réponses humaines
+  écrites et **commitées** (le gel pour les agents se décidera plus tard).
+- **Fait (4), extension et workflow** : `passationMd`, `reponsesDeLUtilisateur`, `ecrirePassation`
+  (deux copies, `brief.ts` / `brief.mjs`). Le code écrit `.skraft/<slug>/passation.md` avant chaque
+  tour d'agent (RESEARCH, spécialistes, pas de DELIVER), une réponse par ligne ; le dossier de
+  passation y renvoie comme source à citer ; le fichier part dans les commits de la phase.
+- **Piège** : écrit pendant un pas de DELIVER, le fichier comptait parmi les fichiers modifiés par
+  l'agent : la porte RED refusait le pas (« Seuls des tests unitaires… »), et pire, la porte verte
+  aurait pu le prendre pour du code de production. Les portes des pas l'écartent (`horsPassation`).
+- **Second piège** : le workflow n'écrivait le fichier qu'en début de pas ; une réponse donnée en
+  cours de pas n'y entrait qu'au pas suivant, et le test passait même sans l'exception — il ne prouvait
+  rien. Écrit désormais juste avant chaque appel à l'agent, comme l'extension. Les deux tests de bout
+  en bout sont vus rouges sans l'exception, verts avec.
+
 ## 07/11 — Lot [1] des reprises de skraft-plugin v2 : deux tâches mises en attente
 
 Décidé par le responsable, après le disjoncteur (PR #19). Les deux restent à faire, dans l'extension

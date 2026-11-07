@@ -77,7 +77,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
 
     // DESIGN démarre, avec les réponses dans le dossier de passation.
     await until(async () => designBrief !== "");
-    expect(designBrief).toContain("Réponses de l'utilisateur :");
+    expect(designBrief).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
     // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).

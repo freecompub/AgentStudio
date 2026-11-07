@@ -723,7 +723,7 @@
       "title": "Le gel des tests d'acceptance distingue une adaptation mécanique d'une altération de ce qui est vérifié",
       "verify": "pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
       "passes": false,
-      "notes": "OUVERT. Révélé par le run comparé du 29/09 (docs/05-run-compare-skraft-plugin-1.6.1.md, A1) : chez skraft-plugin, un refactoring réclamé par la revue fait naître les types `Article` et `Reference`, et la fabrique privée du test d'acceptance doit suivre — `new(reference, Quantite.De(q), Montant.De(p))` devient `new(new Article(Reference.De(reference), Montant.De(p)), Quantite.De(q))`. ASSERTIONS, VALEURS ET SCÉNARIOS INCHANGÉS. Chez nous `testFreezeGuard` refuserait l'écriture et `acceptanceHash` échouerait : le test ne compile plus ET ne peut pas être réparé, DELIVER est dans une impasse. Le fichier a été retouché DEUX FOIS pendant leur DELIVER, chaque fois pour suivre le modèle. Aucune correction évidente : il faudrait comparer ce que le test VÉRIFIE, pas ce qu'il CONTIENT. Aucun de nos tests ne couvre ce cas — nos scénarios de DELIVER n'ont jamais refactorisé un objet-valeur."
+      "notes": "TRANCHÉ le 07/11 par le responsable : INTERDIT. Un test d'acceptance gelé ne se retouche pas, même pour suivre un changement de modèle : le gel reste absolu (`testFreezeGuard`, `acceptanceHash`), sans distinguer adaptation et altération. Constat d'origine : run comparé du 29/09 (docs/05-run-compare-skraft-plugin-1.6.1.md, A1). Rien à implémenter."
     },
     {
       "id": "un-agent-peut-faire-ce-qu-on-lui-demande",
@@ -737,7 +737,7 @@
       "title": "La qualité de forme au-delà du formatage est mesurée par un analyseur, pas par une lentille",
       "verify": "(à définir)",
       "passes": false,
-      "notes": "OUVERT. Le run comparé (docs/05-…, A3) a recalé DELIVER sur deux constats JUSTES que personne ne relèverait chez nous : `LigneDePanier` a trois attributs d'instance (Object Calisthenics règle 8), `Remise()` enchaîne les points dans ses lambdas (règle 5, loi de Déméter). Le reproche a produit un vrai changement de modèle, deux objets-valeurs neufs. Chez nous l'ADR 0022 confie la forme au linter du projet, et `dotnet format` ne connaît pas Object Calisthenics ; et l'ADR 0028 a écarté `quality-gates` de ce mandat après qu'elle eut inventé un grief. On a donc supprimé le faux positif ET la capacité de voir. Piste : une règle d'analyseur Roslyn déclarée dans le profil de stack — mesurable, reproductible, configurable par projet — plutôt qu'un jugement de LLM. NOTRE ORDONNANCEMENT RESTE MEILLEUR : le linter juge pendant la boucle interne, avant le gel ; chez eux la remarque arrive à la revue finale et se propage en cascade jusqu'aux tests gelés (A4)."
+      "notes": "OUVERT. Recherche du 07/11 sur les outils : Java — object-calisthenics-analyzer (LarsEckart) et PMD (LawOfDemeter, TooManyFields) ; PHP — phpcs-calisthenics-rules (abandonné) au profit de symplify/phpstan-rules ; JavaScript — pas d'extension ESLint Object Calisthenics trouvée, règles voisines max-depth, max-params, max-statements, no-else-return ; C# — aucun analyseur Roslyn Object Calisthenics trouvé, SonarAnalyzer.CSharp a des règles voisines (S1200 couplage, S107 paramètres) mais pas « deux attributs au plus ». Ces outils passent par la section `lint` d'un profil, à condition d'écrire le lecteur de leur rapport (seul eslint-json existe). Constat d'origine : run comparé du 29/09 (docs/05-…, A3)."
     },
     {
       "id": "reprise-de-session",
@@ -835,14 +835,14 @@
       "title": "Le nombre de questions qu'un agent peut poser dans une phase est borné",
       "verify": "pnpm vitest run --project ext-skraft test/reducer.test.ts -t 'question'",
       "passes": false,
-      "notes": "Mesuré le 29/09, run 3 sur US-2 : sept questions en DESIGN, huit sessions neuves, et l'état affichait toujours « essai 1 ». `BLOCKED` → `HUMAN_DECISION` relance le spécialiste sans toucher à `attempts` (reducer.ts, case BLOCKED). Rien ne borne donc la boucle. Sur un vrai run l'humain répond, ce qui la masque derrière son temps de réponse ; au banc, qui répond en une seconde, elle se voit. Coût mesuré : 9 min 08 de phase pour une conception qui en demandait deux ou trois."
+      "notes": "MIS DE CÔTÉ le 07/11 par le responsable. Mesuré le 29/09, run 3 sur US-2 : sept questions en DESIGN, huit sessions neuves. Les questions de revue sont bornées depuis (2 par phase, ADR 0063), pas les questions bloquantes des agents (`report_blocker`). La cause principale, des réponses non citables, est corrigée par `reponses-humaines-citables`."
     },
     {
       "id": "reponses-humaines-citables",
       "title": "Les réponses humaines sont écrites dans le dépôt, donc citables par la porte `citations`",
-      "verify": "MANUEL : lancer skraft sur une story à questions ouvertes, vérifier que .skraft/<slug>/passation.md existe et que l'agent le cite",
-      "passes": false,
-      "notes": "Cause racine de la boucle ci-dessus, observée le 29/09. Cinq des sept questions de DESIGN étaient la MÊME : l'agent ne peut pas citer un `fichier:lignes` pour des clarifications qui n'arrivent que par le prompt. Il est pris entre notre porte `citations` — tout ce que tu affirmes doit citer une source — et le fait que les réponses de passation ne sont écrites nulle part. Sa dernière question demandait littéralement qu'on les mette dans un fichier. Le code les a déjà dans `state.answers` : les écrire dans `.skraft/<slug>/passation.md` suffirait."
+      "verify": "pnpm vitest run --project ext-skraft test/brief.test.ts test/e2e-passation.test.ts && pnpm vitest run --project workflow-skraft test/brief.test.ts test/e2e-passation-workflow.test.ts",
+      "passes": true,
+      "notes": "Fait le 07/11 (décision du responsable : commité ; le gel pour les agents se décidera plus tard). Le code écrit `.skraft/<slug>/passation.md` avant chaque tour d'agent (questions ouvertes répondues, puis réponses aux questions des agents ; une par ligne), le dossier de passation y renvoie comme source citable, et le fichier part dans les commits de la phase. Les portes des pas de DELIVER l'écartent des fichiers modifiés par l'agent : sans cela, une question posée pendant un pas faisait refuser ce pas (vu rouge dans les deux implémentations). Extension et workflow."
     },
     {
       "id": "retour-de-revue-cumulatif",
