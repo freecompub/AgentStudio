@@ -12,6 +12,8 @@ import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
 import { detecte } from "./detect.js";
+import { analyserImports } from "./architecture.js";
+import { compilerMotifSur } from "./motif-sur.js";
 
 /**
  * Adaptateur bâti sur un profil déclaratif (J5). Il ne connaît aucun langage : il exécute les
@@ -75,6 +77,9 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   /** Pour le GEL des tests : insensible à la casse (ADR 0035), sinon une majuscule le contourne. */
   const motifsSansCasse = (globs: readonly string[]) => globs.map((g) => globToRegExp(g, "i"));
   const testGlobs = [...profile.layout.unitTests, ...profile.layout.acceptanceTests];
+  // Motif d'import compilé une fois ; le profil a déjà été validé à la lecture (`parseStackProfile`).
+  const compile = profile.architecture ? compilerMotifSur("architecture.import", profile.architecture.import, ["module"]) : null;
+  const architecture = compile && "re" in compile ? compile.re : null;
 
   return {
     // L'identifiant du port reste fermé tant que d'autres stacks ne sont pas déclarées ailleurs.
@@ -160,6 +165,13 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
               return { available: false, violations: [] };
             }
           },
+        }
+      : {}),
+
+    // Analyse des imports déclarée (ADR 0072) : la règle de dépendance devient vérifiable.
+    ...(architecture
+      ? {
+          architecture: ({ root, rules }) => analyserImports(profile.architecture!, architecture, root, rules),
         }
       : {}),
 

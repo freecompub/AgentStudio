@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Profils de pile (ADR 0072), brique 3 : analyse des imports
+
+- Section `architecture` du profil : `fichiers`, motif `import` (groupe `module`, appliqué ligne à
+  ligne), `modules` (nom → motifs de chemin ; le premier qui correspond l'emporte ; un fichier hors
+  module n'est pas jugé). `analyserImports` (`profile/architecture.ts`) rend le rapport attendu par
+  les portes (`modules`, `violations`) : la règle de dépendance redevient vérifiable, elle ne
+  l'était plus nulle part depuis le retrait de Swift.
+- Règle visée par **nom** de module ou par **chemin** (`src/domain`, comme dans l'exemple de la
+  section qualite) ; interdit égal, préfixe suivi de `.`, `/`, `:`, ou segment égal — jamais une
+  sous-chaîne (`Infra` n'enfreint pas `Infrastructure`). **Ajout en cours de route** : un import
+  relatif est résolu depuis le fichier, sans quoi une règle en chemins ne voyait aucun import
+  TypeScript (`../infrastructure/db.js`).
+- Garde des motifs mise en commun avec `buildErrors` (`motif-sur.ts` : longueur, quantificateur
+  imbriqué, lignes bornées) ; tests de `buildErrors` inchangés et verts.
+- `profiles/typescript.yaml` déclare la section ; le test qui disait « un profil ne sait pas » exige
+  maintenant que la règle de sa section qualite soit vérifiée. `/stack doctor` avertit sans section.
+- Limite assumée : analyse textuelle (un import en commentaire compte).
+
 ## 07/11 — Profils de pile (ADR 0072), brique 2 : lecteur TAP
 
 - `parseTap` (`reports/tap.ts`), `report: tap` pour la section `tests`. Écrit d'après une **vraie

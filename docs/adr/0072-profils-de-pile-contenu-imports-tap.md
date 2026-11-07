@@ -50,12 +50,17 @@ chemins), comme pour `buildErrors`.
    - `import` est appliqué **ligne à ligne** ; le groupe nommé `module` donne ce qui est importé.
      Mêmes gardes que `buildErrors` : motif de 300 caractères au plus, quantificateur imbriqué
      refusé, lignes et longueur bornées ; fichiers de 1 Mo au plus ;
+   - un import **relatif** (`../infrastructure/db.js`) est résolu depuis le fichier
+     (`src/infrastructure/db.js`), pour qu'une règle en chemins le voie ;
    - une règle (`module`, `interdits`) vise un module par son **nom**, ou par un **chemin** (`src/domain`
      vise les fichiers sous ce dossier) ;
    - un import est interdit s'il est égal à l'interdit, s'il commence par lui suivi de `.`, `/` ou
      `:`, ou si l'un de ses segments lui est égal (`Tarification.Infrastructure.Db` enfreint
      `Infrastructure`) ;
+   - dossiers cachés et de dépendances (`node_modules`, `bin`, `obj`, `target`, `dist`, `vendor`)
+     non lus ; 20 000 fichiers au plus ;
    - limite assumée : l'analyse est textuelle ; un import en commentaire compte.
+   - `/stack doctor` avertit quand un profil n'a pas de section `architecture`.
 3. **Lecteur TAP** (`report: tap`, section `tests`) : versions 13 et 14, sous-tests indentés.
    - `ok` réussi, `not ok` en échec, `# SKIP` ignoré, `# TODO` ignoré (un échec attendu n'est pas
      un rouge) ; `Bail out!` : un échec pour la suite ;
@@ -76,4 +81,5 @@ chemins), comme pour `buildErrors`.
   la classification fine des échecs propre à chaque outil.
 - La porte de règle de dépendance redevient disponible pour tout projet qui déclare
   `architecture`.
-- `profiles/typescript.yaml` passe à la détection au contenu.
+- `profiles/typescript.yaml` passe à la détection au contenu et déclare l'analyse des imports.
+- Le motif d'import et celui de `buildErrors` partagent une même garde (`motif-sur.ts`).

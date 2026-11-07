@@ -73,6 +73,11 @@ describe("diagnoseProfile — ce que /stack doctor rapporte", () => {
     expect(d.some((x) => x.gravite === "avertissement" && /mutation/.test(x.message))).toBe(true);
   });
 
+  it("sans section `architecture`, la règle de dépendance ne sera pas vérifiée : avertissement (ADR 0072)", () => {
+    const d = diagnoseProfile(BON, { programmeTrouvable: () => true, cheminExiste: () => true, fichiersDeDetectionPresents: true });
+    expect(d).toContainEqual({ gravite: "avertissement", message: "Pas de section `architecture` : la règle de dépendance ne sera pas vérifiée (aucune analyse des imports)." });
+  });
+
   it("un programme introuvable est un problème, et on dit lequel", () => {
     const d = diagnoseProfile(BON, { programmeTrouvable: (p) => p !== "pytest", cheminExiste: () => true, fichiersDeDetectionPresents: true });
     const pb = d.find((x) => x.gravite === "probleme");

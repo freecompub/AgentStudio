@@ -1,6 +1,7 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { compileBuildErrorSpec } from "./build-errors.js";
+import { compilerMotifSur } from "./motif-sur.js";
 import { JETON_RAPPORT } from "./tokens.js";
 
 /**
@@ -142,6 +143,21 @@ const schema = z
       })
       .strict()
       .optional(),
+    /**
+     * Analyse des imports (ADR 0072) : ce qui rend la règle de dépendance vérifiable. `import` est
+     * appliqué ligne à ligne aux `fichiers` ; son groupe `module` donne ce qui est importé ; chaque
+     * fichier appartient au premier module dont un motif lui correspond.
+     */
+    architecture: z
+      .object({
+        fichiers: z.array(z.string().min(1)).min(1),
+        import: z.string().min(1),
+        modules: z
+          .record(z.string().min(1), z.array(z.string().min(1)).min(1, "un module doit avoir au moins un motif de chemin."))
+          .refine((m) => Object.keys(m).length > 0, "`modules` doit nommer au moins un module."),
+      })
+      .strict()
+      .optional(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -212,8 +228,12 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
   if (format !== undefined && !autorises.has(format))
     return { error: `Profil de stack refusé : « ${format} » (format) n'est pas un programme autorisé.` };
 
-  // Le motif est compilé dès la lecture, pour que son refus soit expliqué à l'auteur du profil
+  // Les motifs sont compilés dès la lecture, pour que leur refus soit expliqué à l'auteur du profil
   // plutôt que découvert au milieu d'une porte.
+  if (parsed.data.architecture) {
+    const c = compilerMotifSur("architecture.import", parsed.data.architecture.import, ["module"]);
+    if ("error" in c) return { error: `Profil de stack refusé : ${c.error}` };
+  }
   if (parsed.data.buildErrors) {
     const compile = compileBuildErrorSpec(parsed.data.buildErrors);
     if ("error" in compile) return { error: `Profil de stack refusé : ${compile.error}` };

@@ -96,6 +96,8 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
           ? "Aucun canari déclaré : le classement des échecs ne sera pas vérifié, alors que les portes RED en dépendent."
           : `Canaris manquants : ${manquants.map((k) => `\`${k}\``).join(", ")}. Sans eux, ce que ces genres éprouvent n'est pas vérifié — \`syntax\` en particulier est le seul à prouver qu'une erreur de compilation ne passe pas pour un rouge légitime.`,
     });
+  if (!profile.architecture)
+    constats.push({ gravite: "avertissement", message: "Pas de section `architecture` : la règle de dépendance ne sera pas vérifiée (aucune analyse des imports)." });
   if (profile.infrastructureModules.length === 0)
     constats.push({
       gravite: "avertissement",
