@@ -18,6 +18,7 @@ function fauxClaude(script: Script) {
   let tues = 0;
   const lanceur: LanceurClaude = {
     version: async () => "2.1.319 (Claude Code)",
+    statut: async () => ({ loggedIn: true }),
     lancer({ args, cwd, entree }) {
       const surLigne: ((l: string) => void)[] = [];
       const surFin: ((code: number | null, erreur: string) => void)[] = [];
@@ -219,7 +220,7 @@ describe("Runtime Claude par le CLI (ADR 0070)", () => {
   });
 
   it("version du CLI : au moins celle qu'on a vérifiée ; plus ancienne ou illisible, start refuse et dit laquelle il faut", async () => {
-    const avec = (v: string) => createClaudeRuntime({ lanceur: { version: async () => v, lancer: () => { throw new Error("non"); } } });
+    const avec = (v: string) => createClaudeRuntime({ lanceur: { version: async () => v, statut: async () => ({}), lancer: () => { throw new Error("non"); } } });
     await expect(avec("2.1.319 (Claude Code)").start()).resolves.toBeUndefined();
     await expect(avec("2.2.0 (Claude Code)").start()).resolves.toBeUndefined();
     await expect(avec("2.1.300 (Claude Code)").start()).rejects.toThrow(/2\.1\.300.*au moins 2\.1\.319/);
@@ -228,7 +229,7 @@ describe("Runtime Claude par le CLI (ADR 0070)", () => {
   });
 
   it("CLI absent ou illisible : start échoue avec un message qui dit quoi faire", async () => {
-    const rt = createClaudeRuntime({ lanceur: { version: async () => { throw new Error("ENOENT"); }, lancer: () => { throw new Error("non"); } } });
+    const rt = createClaudeRuntime({ lanceur: { version: async () => { throw new Error("ENOENT"); }, statut: async () => ({}), lancer: () => { throw new Error("non"); } } });
     await expect(rt.start()).rejects.toThrow(/Claude Code \(claude\) introuvable/);
   });
 });

@@ -14,6 +14,11 @@ export interface ProcessusClaude {
 export interface LanceurClaude {
   /** `claude --version` ; échoue si le CLI est absent. */
   version(): Promise<string>;
+  /**
+   * Sortie JSON de `claude auth status` (`loggedIn`, `authMethod`, `projectsDirectory`…) ; échoue si
+   * le CLI est absent (`code` `ENOENT`). Aucun secret n'y figure.
+   */
+  statut(): Promise<unknown>;
   /** Lance un tour : `entree` est écrite sur l'entrée standard, puis fermée. */
   lancer(o: { args: string[]; cwd: string; entree: string }): ProcessusClaude;
 }

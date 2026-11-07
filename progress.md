@@ -5,6 +5,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude, brique A : suppression des sessions, connexion partagée
+
+- `deleteSession(id)` applique la stratégie du 06/11 : `<projectsDirectory>/*/<id>.jsonl` et le
+  dossier `<id>/`, rien d'autre. Un identifiant qui n'est pas un UUID n'est pas à nous : ignoré
+  (journalisé), et retiré du registre. Une session absente compte comme supprimée. Dossier des
+  sessions inconnu : échec, pour que le registre réessaie au démarrage suivant (`task-agent-runner`).
+- `projectsDirectory` vient de `claude auth status`, désormais une méthode du lanceur (`statut`).
+- `etatConnexionClaude(lanceur)` et `MODELES_CLAUDE` passent du serveur MCP à `runtime-claude` :
+  l'application s'en servira ; le serveur garde ses messages (« appelle skraft_connexion »).
+- Tests vus rouges puis verts (suppression : dossier jetable qui imite celui de Claude Code, avec la
+  mémoire et une session de l'utilisateur, qui doivent survivre).
+
 ## 07/11 — Fichier de projet (ADR 0071) : l'exemple livré au nouveau format
 
 - `profiles/typescript.yaml` est désormais un `projet.yaml` complet : section `pile` (l'ancien

@@ -4,7 +4,7 @@
  * devient nos événements (`evenements.ts`). Rien de Claude ne sort de ce paquet (D10).
  */
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger, ToolCallRequest } from "@agent-studio/core";
@@ -43,6 +43,9 @@ function auMoins(v: string, min: string): boolean {
 const SERVEUR = "agent-studio";
 
 const cible = (r: ToolCallRequest): string | undefined => r.command ?? r.path ?? r.url;
+
+/** Nos identifiants de session sont des UUID (`randomUUID`, `--session-id`) : rien d'autre n'est à nous. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
   const { lanceur, logger } = deps;
@@ -199,7 +202,25 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
     },
     openSession: (cfg) => session(randomUUID(), cfg, false),
     resumeSession: (id, cfg) => session(id, cfg, true),
-    // Les sessions du CLI restent dans son dossier de données ; rien à libérer de notre côté.
-    async deleteSession() {},
+    /**
+     * Une session tient dans `<projectsDirectory>/<projet encodé>/<id>.jsonl` (et un dossier `<id>/`
+     * s'il existe). Ce dossier est partagé avec l'utilisateur (ses sessions, la mémoire du projet) :
+     * on n'y efface que ces deux entrées, et seulement pour un UUID. Une session absente compte comme
+     * supprimée ; un dossier des sessions inconnu fait échouer, pour que le registre réessaie.
+     */
+    async deleteSession(id) {
+      if (!UUID.test(id)) {
+        logger?.warn("session non supprimée : identifiant qui n'est pas le nôtre", { sessionId: id });
+        return;
+      }
+      const statut = (await lanceur.statut().catch(() => null)) as { projectsDirectory?: unknown } | null;
+      const racine = statut?.projectsDirectory;
+      if (typeof racine !== "string" || !racine) throw new Error("Session Claude non supprimée : dossier des sessions inconnu (`claude auth status` ne le donne pas).");
+      const projets = await readdir(racine, { withFileTypes: true }).catch(() => []);
+      for (const p of projets.filter((e) => e.isDirectory())) {
+        await rm(join(racine, p.name, `${id}.jsonl`), { force: true });
+        await rm(join(racine, p.name, id), { recursive: true, force: true });
+      }
+    },
   };
 }
