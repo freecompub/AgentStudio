@@ -187,3 +187,18 @@ export function checkLint(report) {
     return [];
   return report.violations.map((v) => `Lint : ${v.file}${v.line !== undefined ? `:${v.line}` : ""} — ${v.rule} : ${v.message}`);
 }
+/**
+* Porte de format (ADR 0071, point 6) : le code de sortie de la commande `format` de la pile suffit.
+* Un écart est une correction pour le développeur ; une commande absente ou muette n'atteste de rien.
+*/
+export function checkFormat(report, scenarioId) {
+  if (!report)
+    return { motifs: [], faits: [], notes: ["Format non mesuré : la pile du projet ne déclare pas de commande `format`."] };
+  if (!report.available)
+    return { motifs: [], faits: [], notes: ["Format non mesuré : la commande de format du projet n'a pas pu s'exécuter."] };
+  const outil = report.tool ?? "la commande de format";
+  if (report.ok)
+    return { motifs: [], faits: [`Format (${scenarioId}) : ${outil} sans écart.`], notes: [] };
+  const motif = `Format : ${outil} signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.`;
+  return { motifs: [report.sortie ? `${motif}\n${report.sortie}` : motif], faits: [], notes: [] };
+}

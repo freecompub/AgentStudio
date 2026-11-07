@@ -64,6 +64,7 @@ describe("skraft — porte de fin de scénario (pile simulée)", () => {
       "Scénario ac-1 : repris en sessions séparées après un échec.",
       "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+      "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
     ]);
     // Après la reprise : sessions séparées pour le vert puis le nettoyage.
     const deliverRoles = roles.filter((r) => r === "skraft-test" || r === "skraft-dev");

@@ -5,7 +5,7 @@
  * journalisé ; à chaque événement, le script est relancé depuis le début contre son journal :
  * un appel journalisé rend son résultat enregistré, le premier appel absent devient l'effet suivant.
  */
-import type { ArchitectureReport, DependencyRule, Evidence, LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
+import type { ArchitectureReport, DependencyRule, Evidence, FormatReport, LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
 
 /** Profils qui peuvent répondre à une question humaine (D6). */
 export type Profil = "testeur" | "po" | "developpeur" | "architecte" | "administrateur";
@@ -40,6 +40,7 @@ export type NomAppel =
   | "creerDossier"
   | "lancerTests"
   | "lint"
+  | "format"
   | "mutation"
   | "empreinte"
   | "disposition"
@@ -146,6 +147,8 @@ export interface W {
   /** Contrôle des règles de dépendance entre modules ; `null` si la stack ne sait pas l'analyser. */
   architecture(regles: readonly DependencyRule[]): Promise<ArchitectureReport | null>;
   lint(fichiers?: readonly string[]): Promise<LintReport | null>;
+  /** Mise en forme vérifiée par l'outil du projet (ADR 0071) ; `null` si le profil n'en déclare pas. */
+  format(fichiers?: readonly string[]): Promise<FormatReport | null>;
   mutation(): Promise<MutationReport | null>;
   /** Pile du projet (identifiant de l'adaptateur) et ses emplacements (tests d'acceptance, tests unitaires, sources), en motifs. */
   disposition(): Promise<{ pile: string; acceptanceTests: string[]; unitTests: string[]; sources: string[]; infrastructureModules: string[] }>;

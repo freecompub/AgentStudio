@@ -252,6 +252,8 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return ctx.stack.architecture(a.regles);
     case "lint":
       return ctx.stack.lint({ signal, ...(a.fichiers ? { files: a.fichiers } : {}) });
+    case "format":
+      return ctx.stack.format({ signal, ...(a.fichiers ? { files: a.fichiers } : {}) });
     case "mutation":
       return ctx.stack.mutation({ signal });
     case "empreinte":

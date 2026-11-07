@@ -2,7 +2,7 @@ import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/e
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief, lignePile } from "./brief.js";
 import { SANS_GEL, sansGel } from "./deliver-machine.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
 import { declaredIdentifiers } from "./text-analysis.js";
@@ -457,6 +457,11 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
         facts.push(`Lint (${e.scenarioId}) : ${lint.tool ?? "linter du projet"} sans erreur sur ${examines.join(", ")}.`);
       if (omis.length > 0) notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
     }
+    // Format (ADR 0071) : la commande de la pile, à côté du lint ; un écart revient au développeur.
+    const format = checkFormat(await ctx.stack.format({ files: sources, ...(signal ? { signal } : {}) }), e.scenarioId);
+    reasons.push(...format.motifs);
+    facts.push(...format.faits);
+    notes.push(...format.notes);
   }
   // Les règles du projet l'emportent ; à défaut, celles que la stack déduit de son écosystème.
   const regles = bar.dependencyRules.length ? bar.dependencyRules : defaultDependencyRules(ctx.stack.infrastructureModules);

@@ -68,10 +68,32 @@ describe("skraft en workflow — porte de fin de scénario (pile simulée)", () 
       "Scénario ac-1 : repris en sessions séparées après un échec.",
       "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+      "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
     ]);
     // Après la reprise : sessions séparées pour le vert puis le nettoyage.
     const deliverRoles = roles.filter((r) => r === "skraft-test" || r === "skraft-dev");
     expect(deliverRoles).toEqual(["skraft-test", "skraft-dev", "skraft-test", "skraft-dev", "skraft-dev"]);
     expect(mutation).toBe(2);
+  }, 90_000);
+
+  it("porte de format (ADR 0071) : un écart rejette le scénario, le développeur reformate, puis livré", async () => {
+    let format = 0;
+    const stack: StackAdapter = {
+      ...fakeStack(),
+      format: async () => (++format === 1 ? { available: true, ok: false, tool: "prettier", sortie: "[warn] src/domain/bolus-cap.ts" } : { available: true, ok: true, tool: "prettier" }),
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-test": unitTestWriter(root) });
+    const app = await assemble(root, runtime, tasksDir, { stack });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md");
+    const s = await fin(app, id, 60_000);
+
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets.map((r) => (r as { porte: string }).porte)).toEqual(["scénario ac-1"]);
+    expect((rejets[0] as { motifs: string[] }).motifs).toEqual([
+      "Format : prettier signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.\n[warn] src/domain/bolus-cap.ts",
+    ]);
+    expect(s.livraison?.notes).not.toContain("Format non mesuré : la pile du projet ne déclare pas de commande `format`.");
+    expect(format).toBeGreaterThanOrEqual(2);
   }, 90_000);
 });

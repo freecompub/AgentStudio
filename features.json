@@ -313,10 +313,10 @@
     },
     {
       "id": "fichier-projet",
-      "title": "Un seul fichier .agent-studio/projet.yaml, sections pile et qualite validées chacune selon ses règles ; les anciens stack.yaml, quality.yaml et .skraft/quality.json relus pendant la transition, avec un avertissement ; projet.yaml gelé pour les agents ; /stack init écrit la section pile",
-      "verify": "pnpm vitest run --project stack-adapters test/fichier-projet.test.ts && pnpm vitest run --project project-services test/pile.test.ts && pnpm vitest run --project workflow-skraft test/fichier-projet.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
-      "passes": false,
-      "notes": "ADR 0071 (07/11). Lecture faite (pile, barre, GELÉS) ; reste : /stack init qui écrit la section pile de projet.yaml, et la porte de format."
+      "title": "Un seul fichier .agent-studio/projet.yaml, sections pile et qualite validées chacune selon ses règles ; les anciens stack.yaml, quality.yaml et .skraft/quality.json relus pendant la transition, avec un avertissement ; projet.yaml gelé pour les agents ; /stack init écrit la section pile ; porte de format en fin de scénario (écart → correction du développeur, sans commande → noté)",
+      "verify": "pnpm vitest run --project stack-adapters test/fichier-projet.test.ts test/format.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/workspace-services.test.ts && pnpm vitest run --project workflow-skraft test/fichier-projet.test.ts && pnpm vitest run --project workflow-skraft test/deliver-gates.test.ts test/e2e-s5-workflow.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts test/e2e-s5.test.ts",
+      "passes": true,
+      "notes": "ADR 0071 (07/11), trois briques : lecture (pile, barre, GELÉS), écriture de la section pile par /stack init, porte de format (checkFormat, des deux côtés). Restent hors critère : les exemples de profiles/ au nouveau format."
     },
     {
       "id": "refutateur-mesure-us2",

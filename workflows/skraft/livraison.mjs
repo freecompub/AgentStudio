@@ -8,7 +8,7 @@
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -567,6 +567,11 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
       if (omis.length > 0)
         notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
     }
+    // Format (ADR 0071) : la commande de la pile, à côté du lint ; un écart revient au développeur.
+    const format = checkFormat(await w.format(sources), sc.id);
+    motifs.push(...format.motifs);
+    faits.push(...format.faits);
+    notes.push(...format.notes);
   }
   const regles = barre.dependencyRules.length ? barre.dependencyRules : defaultDependencyRules(L.disp.infrastructureModules);
   if (regles.length === 0)

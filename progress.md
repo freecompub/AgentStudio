@@ -5,6 +5,22 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Fichier de projet (ADR 0071), brique 3 : porte de format
+
+- Profil de pile : commande facultative `format` (`dotnet format --verify-no-changes`,
+  `prettier --check "{fichiers}"`), sans rapport ; son programme est vérifié contre la liste
+  autorisée comme les autres. L'adaptateur ne lit que le **code de sortie** : 0 au format, autre
+  hors format (fin de la sortie jointe, 4000 caractères) ; outil absent, délai ou code nul : non
+  mesuré (`available: false`), jamais « au format ».
+- Exposée comme le lint : `ctx.stack.format` (permission `shell:test`, `null` si la pile n'en
+  déclare pas), hôte isolé (`stack.format`), workflow (`w.format`, appel journalisé `format`).
+- `checkFormat(report, scenarioId)` → `{ motifs, faits, notes }`, en deux copies (`deliver.ts`,
+  `deliver.mjs`), appelée en fin de scénario juste après le lint. Un écart est un motif de rejet du
+  scénario, donc une correction pour le développeur ; sans commande, la note « Format non mesuré ».
+- Piège : les e2e comparent la liste exacte des notes ; la nouvelle note s'y ajoute (e2e-s1, e2e-s5
+  des deux côtés). Pas d'outil ajouté pour les agents : le code juge, l'agent reformate.
+- Prochaine étape : exemples de `profiles/` au format `projet.yaml` ; pousser `feat/fichier-projet`.
+
 ## 07/11 — Fichier de projet (ADR 0071), brique 2 : `/stack init` écrit la section pile
 
 - `ecrirePileDansProjet(existant, pile)` (`stack-adapters`, pur) : ajoute ou remplace la section

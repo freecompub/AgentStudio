@@ -60,6 +60,7 @@ const CALLS: Record<string, Dispatch> = {
   "stack.mutation": (ctx, _args, signal) => ctx.stack.mutation({ signal }),
   "stack.architecture": (ctx, [rules]) => ctx.stack.architecture(rules as never),
   "stack.lint": (ctx, [opts], signal) => ctx.stack.lint({ ...(opts as object), signal }),
+  "stack.format": (ctx, [opts], signal) => ctx.stack.format({ ...(opts as object), signal }),
   "tasks.start": (ctx, [name, input]) => ctx.tasks.start(String(name), input),
   "tasks.dispatch": (ctx, [id, event]) => ctx.tasks.dispatch(String(id), event as { type: string }),
   "tasks.cancel": (ctx, [id]) => ctx.tasks.cancel(String(id)),
