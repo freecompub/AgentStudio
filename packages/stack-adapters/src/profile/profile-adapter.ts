@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { access, mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
@@ -11,6 +11,7 @@ import { substituer } from "./tokens.js";
 import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
+import { detecte } from "./detect.js";
 
 /**
  * Adaptateur bâti sur un profil déclaratif (J5). Il ne connaît aucun langage : il exécute les
@@ -26,7 +27,6 @@ export interface ProfileAdapterDeps {
   defaultTimeoutMs?: number;
 }
 
-const existe = (p: string) => access(p).then(() => true, () => false);
 
 /**
  * Couverture, si le profil déclare un lecteur. Un rapport absent ou illisible rend `undefined` :
@@ -92,8 +92,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     isTestFile: (p) => motifsSansCasse(testGlobs).some((re) => re.test(p.replaceAll("\\", "/"))),
 
     async detect(root) {
-      for (const f of profile.detect) if (await existe(join(root, f))) return true;
-      return false;
+      return detecte(profile.detect, root);
     },
 
     async runTests(opts) {

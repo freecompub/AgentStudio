@@ -5,6 +5,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Profils de pile (ADR 0072), brique 1 : détection au contenu
+
+- `detect` accepte `{ fichier, contient }` en plus d'un nom de fichier : le fichier existe et
+  contient la sous-chaîne (pas d'expression régulière, chemin relatif sans `..`, 1 Mo au plus).
+  Un élément suffit, comme avant. Fonction commune `detecte` (adaptateur de profil et `/stack doctor`,
+  qui ne comparait que des noms) ; `libelleDetect` pour les messages du doctor.
+- `profiles/typescript.yaml` et le modèle TypeScript de `/stack init` exigent `"vitest"` dans
+  `package.json`, comme l'adaptateur écrit à la main.
+- ADR 0072 **proposé** (forme des trois sections) : à confirmer par le responsable.
+- Tests vus rouges puis verts (`detection-contenu.test.ts`, modèles livrés).
+
 ## 07/11 — Distribution et mise à jour du serveur MCP : paquet npm (décidé, pas fait)
 
 - **Constat** : le serveur MCP tourne depuis `apps/mcp-skraft/dist/`, non versionné (`.gitignore`),

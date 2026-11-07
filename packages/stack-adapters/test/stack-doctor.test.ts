@@ -20,6 +20,8 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
     const yaml = proposeProfile({ fichiers: ["package.json"], dependances: ["vitest"] });
     const r = parseStackProfile(yaml!, { allowedPrograms: AUTORISES });
     expect("error" in r ? r.error : r.profile.id).toBe("typescript");
+    // Détecté au contenu, comme l'adaptateur écrit à la main (ADR 0072) : un projet Node sans Vitest ne correspond pas.
+    expect("error" in r ? null : r.profile.detect).toEqual([{ fichier: "package.json", contient: '"vitest"' }]);
   });
 
   it("ne propose rien plutôt que de deviner", () => {

@@ -11,6 +11,7 @@ export { selectStackAdapter } from "./select-stack.js";
 export { parseStackProfile, CANARY_KINDS, REPORT_READERS, type CanaryKind, type ReportReader, type StackProfile } from "./profile/stack-profile.js";
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./glob.js";
 export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile-adapter.js";
+export { detecte, libelleDetect, type ElementDetect } from "./profile/detect.js";
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "./profile/quality-bar.js";
 export { ecrirePileDansProjet, FICHIER_PROJET, lireFichierProjet } from "./profile/fichier-projet.js";
 export { diagnoseProfile, proposeProfile, type Constat, type DiagnosticDeps, type Gravite, type IndicesDuProjet } from "./profile/stack-doctor.js";

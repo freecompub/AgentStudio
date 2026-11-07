@@ -14,6 +14,8 @@ describe("Profils d'exemple livrés", () => {
     const p = charger(nom);
     expect(p.id).toBe(nom);
     expect(p.layout.sources.length).toBeGreaterThan(0);
+    // Détection au contenu (ADR 0072) : la présence d'un fichier de configuration ne suffit plus.
+    expect(p.detect).toContainEqual({ fichier: "package.json", contient: '"vitest"' });
   });
 
   it("chacun est un projet.yaml complet : pile et qualite valides (ADR 0071)", () => {

@@ -76,9 +76,9 @@
     {
       "id": "j5-profil-detection-par-contenu",
       "title": "Un profil peut détecter une stack au contenu d'un fichier, pas seulement à son existence",
-      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts -t 'detect'",
-      "passes": false,
-      "notes": "L'adaptateur TypeScript vérifie que `vitest` figure dans les dépendances du package.json ; un profil ne sait dire que « ce fichier existe », ce qui est plus fragile."
+      "verify": "pnpm vitest run --project stack-adapters test/detection-contenu.test.ts test/profils-livres.test.ts test/stack-doctor.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 (07/11) : un élément de `detect` est un nom de fichier (il existe) ou `{ fichier, contient }` (sous-chaîne, pas d'expression régulière ; chemin relatif sans `..` ; fichier lu jusqu'à 1 Mo). Même règle pour l'adaptateur et pour `/stack doctor`. `profiles/typescript.yaml` et la proposition de `/stack init` exigent `\"vitest\"` dans package.json."
     },
     {
       "id": "j5-profil-architecture",

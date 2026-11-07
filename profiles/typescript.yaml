@@ -6,9 +6,10 @@
 pile:
   id: typescript
 
-  # Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
-  # existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
-  detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
+  # Ce qui signale cette stack : ici, `vitest` dans les dépendances de package.json (ADR 0072).
+  # Un élément peut aussi être un simple nom de fichier, qui doit alors exister. Un élément suffit.
+  detect:
+    - { fichier: package.json, contient: '"vitest"' }
 
   tests:
     command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
