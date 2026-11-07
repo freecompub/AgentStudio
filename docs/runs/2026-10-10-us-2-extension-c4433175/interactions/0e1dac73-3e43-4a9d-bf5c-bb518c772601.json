@@ -1,0 +1,30 @@
+{
+  "id": "0e1dac73-3e43-4a9d-bf5c-bb518c772601",
+  "taskId": "c4433175-1600-46f9-98b3-fd407ad00410",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "Contradiction confirmée, déjà signalée dans .skraft/us-2/design/domain-model.md (section « ADR existants à reconsidérer ») : docs/adr/adr-002-format-de-rapport-de-tests.md:17-18 indique que JunitXml.TestLogger est référencé par « tests/Dosage.Tests », tandis que .agent-studio/stack.yaml:9-10 indique « tests/Tarification.Tests », confirmé par tests/Tarification.Tests/Tarification.Tests.csproj:11. La règle d'arrêt sur contradiction empêche de poursuivre DESIGN en choisissant une source ; l'ADR est Accepted et hors de mon périmètre d'écriture. Confirmez-vous que « tests/Dosage.Tests » est une coquille et que DESIGN doit retenir « tests/Tarification.Tests », sans modifier l'ADR accepté ?",
+  "options": [
+    {
+      "id": "Confirmer la coquille : retenir tests/Tarification.Tests pour DESIGN, sans modifier l'ADR accepté.",
+      "label": "Confirmer la coquille : retenir tests/Tarification.Tests pour DESIGN, sans modifier l'ADR accepté."
+    },
+    {
+      "id": "Suspendre DESIGN jusqu'à correction de la contradiction par le responsable du projet.",
+      "label": "Suspendre DESIGN jusqu'à correction de la contradiction par le responsable du projet."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:16:52.291Z",
+  "status": "answered",
+  "answer": {
+    "option": "Confirmer la coquille : retenir tests/Tarification.Tests pour DESIGN, sans modifier l'ADR accepté.",
+    "answeredAt": "2026-10-10T19:16:52.294Z"
+  }
+}

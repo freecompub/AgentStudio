@@ -1,0 +1,905 @@
+{
+  "mode": "extension skraft",
+  "livre": false,
+  "arret": null,
+  "resume": {
+    "etapes": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T14:07:51.934Z",
+        "duréeMs": 1,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 56,
+        "codeMs": 56,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T14:07:51.935Z",
+        "duréeMs": 5974,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15011,
+        "sortie": 136,
+        "nanoAiu": 174987000,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 5493,
+        "effetsMs": 5967,
+        "codeMs": 474,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T14:07:57.909Z",
+        "duréeMs": 9,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T14:07:57.918Z",
+        "duréeMs": 5,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T14:07:57.923Z",
+        "duréeMs": 46066,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 6,
+        "entrée": 190243,
+        "sortie": 1769,
+        "nanoAiu": 11671101000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 43293,
+        "effetsMs": 45950,
+        "codeMs": 2657,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T14:08:43.989Z",
+        "duréeMs": 27083,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 15,
+        "entrée": 311074,
+        "sortie": 2818,
+        "nanoAiu": 25158105000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 69814,
+        "effetsMs": 26970,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T14:09:11.072Z",
+        "duréeMs": 245,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 89,
+        "codeMs": 89,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T14:09:11.317Z",
+        "duréeMs": 215067,
+        "tours": 8,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 31,
+        "entrée": 850600,
+        "sortie": 7102,
+        "nanoAiu": 29159775000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 182182,
+        "effetsMs": 215005,
+        "codeMs": 32823,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T14:12:46.384Z",
+        "duréeMs": 165,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 157,
+        "codeMs": 157,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T14:12:46.549Z",
+        "duréeMs": 202345,
+        "tours": 9,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 30,
+        "entrée": 1236470,
+        "sortie": 6215,
+        "nanoAiu": 22137552000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 169558,
+        "effetsMs": 202290,
+        "codeMs": 32732,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T14:16:08.894Z",
+        "duréeMs": 171,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 163,
+        "codeMs": 163,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T14:16:09.065Z",
+        "duréeMs": 201330,
+        "tours": 9,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 30,
+        "entrée": 1622577,
+        "sortie": 5964,
+        "nanoAiu": 25297623000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 168656,
+        "effetsMs": 201275,
+        "codeMs": 32619,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T14:19:30.395Z",
+        "duréeMs": 169,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 161,
+        "codeMs": 161,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T14:19:30.564Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T14:07:51.934Z",
+        "duréeMs": 1,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 56,
+        "codeMs": 56,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T14:07:51.935Z",
+        "duréeMs": 5974,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 1,
+        "entrée": 15011,
+        "sortie": 136,
+        "nanoAiu": 174987000,
+        "modèles": [
+          "gpt-6-luna"
+        ],
+        "agentsMs": 5493,
+        "effetsMs": 5967,
+        "codeMs": 474,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T14:07:57.909Z",
+        "duréeMs": 9,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T14:07:57.918Z",
+        "duréeMs": 5,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 2,
+        "codeMs": 2,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T14:07:57.923Z",
+        "duréeMs": 46311,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 6,
+        "entrée": 190243,
+        "sortie": 1769,
+        "nanoAiu": 11671101000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 43293,
+        "effetsMs": 46039,
+        "codeMs": 2746,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T14:08:43.989Z",
+        "duréeMs": 27083,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 15,
+        "entrée": 311074,
+        "sortie": 2818,
+        "nanoAiu": 25158105000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 69814,
+        "effetsMs": 26970,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T14:09:11.317Z",
+        "duréeMs": 618742,
+        "tours": 26,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 91,
+        "entrée": 3709647,
+        "sortie": 19281,
+        "nanoAiu": 76594950000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 520396,
+        "effetsMs": 618570,
+        "codeMs": 98174,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T14:12:46.384Z",
+        "duréeMs": 505,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          },
+          {
+            "porte": "scénario ac-2",
+            "motifs": [
+              "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+              "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 481,
+        "codeMs": 481,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T14:19:30.564Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "total": {
+      "duréeMs": 698630,
+      "tours": 32,
+      "appels": 113,
+      "entrée": 4225975,
+      "sortie": 24004,
+      "nanoAiu": 113599143000,
+      "agentsMs": 638996,
+      "effetsMs": 698089,
+      "codeMs": 101937,
+      "moteurMs": 0,
+      "rejets": 9
+    }
+  },
+  "comparable": {
+    "etapes": [
+      {
+        "etape": "PRÉPARATION",
+        "sousEtapes": [],
+        "duréeMs": 1,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 1,
+        "agentsMs": 0,
+        "codeMs": 56,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DIFFICULTÉ",
+        "sousEtapes": [
+          "classifieur",
+          "confirmation"
+        ],
+        "duréeMs": 5983,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 5980,
+        "agentsMs": 5493,
+        "codeMs": 478,
+        "moteurMs": 0,
+        "tours": 1,
+        "appels": 1,
+        "nanoAiu": 174987000,
+        "entrée": 15011,
+        "sortie": 136,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "QUESTIONS",
+        "sousEtapes": [],
+        "duréeMs": 5,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 2,
+        "agentsMs": 0,
+        "codeMs": 2,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 73394,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 73394,
+        "agentsMs": 113107,
+        "codeMs": 2746,
+        "moteurMs": 0,
+        "tours": 5,
+        "appels": 21,
+        "nanoAiu": 36829206000,
+        "entrée": 501317,
+        "sortie": 4587,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtapes": [
+          "escalade"
+        ],
+        "duréeMs": 619247,
+        "attenteHumaineMs": 9,
+        "horsAttenteMs": 619238,
+        "agentsMs": 520396,
+        "codeMs": 98655,
+        "moteurMs": 0,
+        "tours": 26,
+        "appels": 91,
+        "nanoAiu": 76594950000,
+        "entrée": 3709647,
+        "sortie": 19281,
+        "essaisMax": 0,
+        "rejets": 9,
+        "interventions": 3
+      },
+      {
+        "etape": "BILAN",
+        "sousEtapes": [
+          "abandon"
+        ],
+        "duréeMs": 0,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 0,
+        "agentsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      }
+    ],
+    "rejeux": [
+      {
+        "etape": "DELIVER",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 2,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtape": "escalade",
+        "essai": 3,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 4,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 5,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtape": "escalade",
+        "essai": 6,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 7,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "essai": 8,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtape": "escalade",
+        "essai": 9,
+        "nature": "porte",
+        "porte": "scénario ac-2",
+        "motifs": [
+          "Couverture : src/Tarification.Application/CalculDuPanier.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.",
+          "Couverture : src/Tarification.Domaine/Panier.cs à 87.5 % (minimum 90 %), 7 ligne(s) couverte(s) sur 8."
+        ]
+      }
+    ],
+    "total": {
+      "duréeMs": 698630,
+      "attenteHumaineMs": 15,
+      "horsAttenteMs": 698615,
+      "agentsMs": 638996,
+      "codeMs": 101937,
+      "moteurMs": 0,
+      "tours": 32,
+      "appels": 113,
+      "nanoAiu": 113599143000,
+      "entrée": 4225975,
+      "sortie": 24004,
+      "rejets": 9,
+      "interventions": 5
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-10T14:07:51.751Z",
+      "etape": "départ",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:07:51.935Z",
+      "etape": "CLASSIFY",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:07:57.909Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:07:57.918Z",
+      "etape": "ROUTE",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:07:57.923Z",
+      "etape": "DISTILL",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:08:43.989Z",
+      "etape": "REVIEW",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:09:11.072Z",
+      "etape": "DISTILL",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:09:11.317Z",
+      "etape": "DELIVER",
+      "restantes": 41041
+    },
+    {
+      "at": "2026-10-10T14:12:46.384Z",
+      "etape": "ESCALATED",
+      "restantes": 40966
+    },
+    {
+      "at": "2026-10-10T14:12:46.549Z",
+      "etape": "DELIVER",
+      "restantes": 40966
+    },
+    {
+      "at": "2026-10-10T14:16:08.894Z",
+      "etape": "ESCALATED",
+      "restantes": 40936
+    },
+    {
+      "at": "2026-10-10T14:16:09.065Z",
+      "etape": "DELIVER",
+      "restantes": 40936
+    },
+    {
+      "at": "2026-10-10T14:19:30.395Z",
+      "etape": "ESCALATED",
+      "restantes": 40936
+    },
+    {
+      "at": "2026-10-10T14:19:30.564Z",
+      "etape": "ABORTED",
+      "restantes": 40936
+    },
+    {
+      "at": "2026-10-10T14:19:32.409Z",
+      "etape": "fin",
+      "restantes": 40936
+    }
+  ],
+  "brancheRun": null,
+  "etatFinal": {
+    "stage": "ABORTED",
+    "phase": "DELIVER"
+  }
+}

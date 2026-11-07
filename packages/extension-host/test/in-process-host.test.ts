@@ -46,7 +46,7 @@ function setup(manifest: ExtensionManifest = MANIFEST) {
       runs.push({ spec, prompt });
       return { output: { summary: "ok", files: [] } as never };
     },
-    releaseTask: async () => {}, releaseRoles: async () => {},
+    releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {},
   };
   const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t") });
   const posted: string[] = [];
@@ -163,7 +163,7 @@ describe("Hôte d'extension en processus", () => {
           await tools.find((t) => t.name === "load_skill")!.handler({ name: "craft" });
           return { output: { summary: "", files: [] } as never };
         },
-        releaseTask: async () => {}, releaseRoles: async () => {},
+        releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {},
       };
       let ctx!: ExtensionContext;
       await activateInProcess({ manifest, module: { activate: (c) => void (ctx = c) }, directory: dir }, env.deps);
@@ -177,6 +177,30 @@ describe("Hôte d'extension en processus", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("mémoire déclarée par agent (ADR 0053) : « tour » repart toujours neuf, « tache » (défaut) garde sa session", async () => {
+    const manifest: ExtensionManifest = {
+      ...MANIFEST,
+      contributes: {
+        ...MANIFEST.contributes,
+        agents: [
+          { name: "writer", title: "Rédacteur", role: "r", output: "report_phase", write: ["tests/**"] },
+          { name: "lens", title: "Lentille", role: "r", output: "report_phase", memoire: "tour" },
+        ],
+      },
+    };
+    const env = setup(manifest);
+    const cles: (string | undefined)[] = [];
+    env.deps.agents = {
+      run: async (_s, _p, opts) => (cles.push(opts?.resumeKey), { output: { summary: "", files: [] } as never }),
+      releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {},
+    };
+    let ctx!: ExtensionContext;
+    await activateInProcess({ manifest, module: { activate: (c) => void (ctx = c) } }, env.deps);
+    await ctx.agents.run("writer", "x", { evidence: { taskId: "t1" } });
+    await ctx.agents.run("lens", "x", { evidence: { taskId: "t1" } });
+    expect(cles).toEqual(["t1/diabeo.demo/writer", undefined]);
   });
 
   it("une capacité non déclarée est refusée (D11)", async () => {
@@ -273,7 +297,7 @@ describe("Hôte d'extension en processus", () => {
   it("hooks : les gardes des extensions sont transmises à chaque agent lancé", async () => {
     let seen: unknown[] = [];
     const env = setup();
-    env.deps.agents = { releaseTask: async () => {}, releaseRoles: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    env.deps.agents = { releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
     let ctx!: ExtensionContext;
     await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void ((ctx = c), c.hooks.onPreToolUse(() => undefined)) } }, env.deps);
     await ctx.agents.run("writer", "x");
@@ -283,7 +307,7 @@ describe("Hôte d'extension en processus", () => {
   it("readOnly : écriture refusée sur les motifs gelés (@stack:* résolus), le reste du périmètre reste permis", async () => {
     let seen: import("@agent-studio/core").ToolCallGuard[] = [];
     const env = setup();
-    env.deps.agents = { releaseTask: async () => {}, releaseRoles: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
+    env.deps.agents = { releaseTask: async () => {}, releaseRoles: async () => {}, releaseAll: async () => {}, run: async (_s, _p, opts) => ((seen = opts?.guards ?? []), { output: { summary: "", files: [] } as never }) };
     let ctx!: ExtensionContext;
     await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (ctx = c) } }, env.deps);
     await ctx.agents.run("writer", "x", { readOnly: ["@stack:acceptanceTests"] });

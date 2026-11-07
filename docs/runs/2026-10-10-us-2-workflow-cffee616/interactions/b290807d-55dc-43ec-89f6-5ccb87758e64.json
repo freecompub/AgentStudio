@@ -1,0 +1,32 @@
+{
+  "id": "b290807d-55dc-43ec-89f6-5ccb87758e64",
+  "taskId": "cffee616-6ba6-4a79-b64a-df8e13c264ed",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question ouverte (US-2)",
+  "detail": "Quelle règle d'arrondi appliquer aux remises US-2 ? US-5 fixe un exemple d'arrondi d'une remise et",
+  "options": [
+    {
+      "id": "71:answer",
+      "label": "Répondre"
+    },
+    {
+      "id": "71:defer",
+      "label": "Reporter"
+    }
+  ],
+  "freeText": true,
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T15:10:00.437Z",
+  "status": "answered",
+  "answer": {
+    "option": "71:answer",
+    "comment": "Pas de précision supplémentaire : retiens l'option la plus simple qui respecte les critères d'acceptation.",
+    "answeredAt": "2026-10-10T15:10:00.441Z"
+  }
+}

@@ -120,6 +120,11 @@ export function createGitCheckpointStore(git: GitRunner, gitDir: string): Checkp
       const files: FileChange[] = [];
       for (let i = 0; i + 1 < parts.length; i += 2) files.push({ path: parts[i + 1]!, status: toStatus(parts[i]!) });
       files.sort((a, b) => a.path.localeCompare(b.path));
+      for (const file of files) {
+        const detail = await git.run(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-color", "--unified=0", "--inter-hunk-context=0", cp.sha, current, "--", `:(literal)${file.path}`]);
+        file.lines = addedLines(detail);
+        file.removed = removedLines(detail);
+      }
       const patch = files.length ? await git.run(["diff", "--no-renames", cp.sha, current]) : "";
       return { files, patch };
     },
@@ -134,6 +139,16 @@ export function createGitCheckpointStore(git: GitRunner, gitDir: string): Checkp
   };
 }
 
+function addedLines(patch: string): number[] {
+  const lines: number[] = [];
+  for (const hunk of patch.matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gm)) {
+    const start = Number(hunk[1]);
+    const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
+    for (let n = start; n < start + count; n++) lines.push(n);
+  }
+  return lines;
+}
+
 function toStatus(code: string): FileChangeStatus {
   if (code.startsWith("A")) return "added";
   if (code.startsWith("D")) return "deleted";
@@ -142,4 +157,11 @@ function toStatus(code: string): FileChangeStatus {
 
 function idToDate(id: string): string {
   return new Date(Number(id.split("-")[0])).toISOString();
+}
+
+/** Lignes de l'ancien arbre retirées ou remplacées : zéro pour un fichier qui n'a reçu que des ajouts. */
+function removedLines(patch: string): number {
+  let n = 0;
+  for (const hunk of patch.matchAll(/^@@ -\d+(?:,(\d+))? \+\d+(?:,\d+)? @@/gm)) n += hunk[1] === undefined ? 1 : Number(hunk[1]);
+  return n;
 }

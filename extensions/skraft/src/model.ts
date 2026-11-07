@@ -2,8 +2,9 @@
  * Modèle d'état unifié du pipeline skraft (SPEC-skraft §5.1) : un seul type, un seul validateur
  * (défaut C2 rendu impossible). Types purs, sérialisables, persistés par le moteur.
  */
+import type { EcartDeclare, LigneDuPlan } from "./distill.js";
 import { z } from "zod";
-import type { DeliverScenario, Granularity } from "./deliver.js";
+import type { DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
@@ -19,6 +20,9 @@ export type Stage =
   | "SPECIALIST"
   | "ARTIFACT_GATE"
   | "REVIEW"
+  // Transitoire, jamais enregistré (ADR 0013) : la synthèse du verdict a lieu dans la transition
+  // `LENSES_DONE`, qui mène directement à RATIFICATION, COMMIT, SPECIALIST ou ESCALATED. Gardé
+  // parce que SPEC-skraft §5.1 le déclare (écart S3 de docs/12).
   | "VERDICT_GATE"
   | "RATIFICATION"
   | "COMMIT"
@@ -60,9 +64,12 @@ export interface AdrRecord {
 }
 
 /** Pas de la sous-machine DELIVER : test unitaire, puis code (un tour) ou vert et nettoyage (sessions séparées). */
-export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate";
+export type DeliverStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix" | "scenario-gate" | "mutation-arbitration";
 
 /** Sous-machine DELIVER (§7.4). Les champs après `scenarioCheckpoint` sont internes au réducteur. */
+/** Écart au plan de test validé : la déclaration, son auteur et son scénario (ADR 0067). */
+export type EcartAuPlan = EcartDeclare & { par: string; scenario: string };
+
 export interface DeliverState {
   scenarios: DeliverScenario[];
   current: number;
@@ -75,9 +82,11 @@ export interface DeliverState {
   step: DeliverStep;
   /** Dernier point sûr (début du scénario ou dernier pas validé) : cible des rollbacks. */
   stepCheckpoint: string | null;
-  /** Tests connus et tests verts au dernier point sûr, et au début du scénario. */
+  /** Tests connus et tests verts au dernier point sûr, et au point de reprise (début du scénario ou de la correction). */
   baseline: { all: string[]; passed: string[] };
   scenarioBaseline: { all: string[]; passed: string[] };
+  /** Empreinte des tests unitaires au même point que `scenarioBaseline` : rendue à chaque reprise (D12 de docs/12). */
+  scenarioUnitTestsHash?: string | null;
   /** Tests unitaires ajoutés pendant le scénario, et celui qui attend son vert. */
   unitTests: string[];
   newTest: string | null;
@@ -110,12 +119,39 @@ export interface DeliverState {
    * un pas refusé est annulé par rollback, ses « corrigé » avec lui.
    */
   pendingResponses?: DefectResponse[];
+  /** Écarts au plan déclarés par le pas en cours : gardés si sa porte le valide (ADR 0067). */
+  pendingDeviations?: EcartAuPlan[];
   /** Fils à l'entrée en correction : restaurés avec le code si la porte de fin de scénario échoue. */
   threadsAtFixStart?: DefectThread[];
+  /**
+   * Mutants contestés en cours d'arbitrage (ADR 0065) : ceux qui attendent l'humain, avec l'avis de
+   * l'arbitre de mutation à lui montrer.
+   */
+  mutationArbitration?: { human: { id: string; avis: string }[] };
+}
+
+/** Mutant reconnu équivalent : exempté de la porte de mutation (ADR 0065). */
+export interface Derogation extends MutantExempte {
+  par: "agent" | "humain";
+  raison: string;
+  contestation: string;
+  defaut: string;
+}
+
+/** Arbitrage d'un défaut de porte contesté, tracé par le moteur (ADR 0065). */
+export interface ArbitrageRecord {
+  porte: string;
+  élément: string;
+  contestation: string;
+  décision: "dérogation" | "à corriger";
+  par: "agent" | "humain";
+  raison: string;
 }
 
 export interface SkraftInput {
   storyPath: string;
+  /** Skill d'architecture demandée à l'appel (`--archi`) ; absente ou inconnue : la clean architecture par défaut. */
+  archi?: string;
   /** Confirmation de la difficulté par l'utilisateur (O3 : mode simple) ; sinon automatique. */
   confirmDifficulty?: boolean;
   /** Surcharge de l'ordre des phases (tests) ; défaut : configuration unique. */
@@ -135,6 +171,8 @@ export interface SkraftState {
   phasesCompleted: Phase[];
   difficulty: { level: Difficulty; indicators: DifficultyIndicators; confirmedBy: "user" | "auto" } | null;
   baseSha: string;
+  /** Référence de la couverture du diff de toute la tâche, conservée au redémarrage. */
+  qualityCheckpoint?: string;
   branch: string;
   checkpoints: Partial<Record<Phase, string>>;
   artifacts: Record<Phase, ArtifactRecord[]>;
@@ -143,6 +181,14 @@ export interface SkraftState {
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
   openQuestions: { id: string; text: string; answer?: string }[];
+  /** Matrice du plan de test gardée depuis DISTILL (ADR 0067). */
+  planDeTest?: Record<string, LigneDuPlan>;
+  /** Écarts au plan de test déclarés et validés en DELIVER, commités dans `ecarts-au-plan.md` (ADR 0067). */
+  ecartsAuPlan?: EcartAuPlan[];
+  /** Skill d'architecture retenue au lancement, recopiée dans le dossier de DESIGN, DISTILL et DELIVER. */
+  architecture?: string;
+  /** Inventaire de la recherche validée (skraft-plugin v1.15.1) : recopié dans le dossier de DESIGN et DISTILL. */
+  recherche?: { conventions: string; existant: string } | null;
   adrs: AdrRecord[];
   pendingInteraction: string | null;
   /** Sous-machine DELIVER (§7.4) ; `null` hors de la phase. */
@@ -155,14 +201,37 @@ export interface SkraftState {
   lenses: LensName[];
   /** DESIGN se déroule en deux sessions : modélisation puis décisions (§7.2). */
   designStep: "model" | "decide";
-  /** Blocage signalé par un agent, en attente de réponse (§5.2, BLOCKED). */
-  blocker: { question: string; choices: string[] } | null;
+  /** Blocage signalé par un agent, en attente de réponse (§5.2, BLOCKED) ; `lens` : par une lentille de revue. */
+  blocker: { question: string; choices: string[]; lens?: LensName } | null;
+  /**
+   * Par phase, index dans `artifacts` du premier livrable du run en cours : ceux d'avant viennent
+   * d'un run effacé par un rembobinage, et ne doivent plus nourrir les faits (D6 de docs/12).
+   */
+  debutDuRun?: Partial<Record<Phase, number>>;
+  /** Par phase, index dans `reviews` de la première revue du run en cours : les rapports d'avant ne sont pas réécrits (D8 de docs/12). */
+  debutDesRevues?: Partial<Record<Phase, number>>;
+  /** Retour donné au spécialiste en cours, rendu tel quel après une question bloquante (D9 de docs/12). */
+  retour?: string[];
+  /** Mutants exemptés de la porte de mutation, pour le run en cours de DELIVER (ADR 0065). */
+  derogations?: Derogation[];
+  /** Lignes exemptées de la couverture du diff par l'humain, pour le run en cours de DELIVER. */
+  derogationsCouverture?: { file: string; line: number; raison: string; contestation: string; defaut: string }[];
+  /** Toutes les décisions d'arbitrage, en ajout seul : le moteur trace chaque nouvelle (ADR 0065). */
+  arbitrages?: ArbitrageRecord[];
+  /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
+  adrsAvantPhase?: AdrRecord[];
+  /** Questions de revue posées dans la phase en cours (D4 de docs/12) ; au-delà de 2, escalade. */
+  reviewQuestions?: number;
   /** Origine d'une escalade, pour savoir quoi relancer. */
-  escalation: { from: "INIT" | "CLASSIFY" | "PHASE"; reason: string } | null;
+  escalation: { from: "INIT" | "CLASSIFY" | "ROUTE" | "COMMIT" | "PHASE"; reason: string } | null;
   /** Réponses de l'utilisateur à transmettre au prochain dossier de passation. */
   answers: { question: string; answer: string }[];
   /** Questions ouvertes déjà soumises à l'utilisateur (pas de double demande). */
   questionsAsked: string[];
+  /** Questions dont la demande a réellement été créée : « relancer » après une panne en ROUTE repose les autres (D17 de docs/12). */
+  questionsConfirmees?: string[];
+  /** Phases approuvées dont le commit a échoué, continuées sans commit par l'humain (D19 de docs/12). */
+  nonCommitees?: Phase[];
   /** Empreinte des tests d'acceptance, gelés à la sortie de DISTILL (§7.3). */
   acceptanceHash: string | null;
   /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
@@ -188,26 +257,35 @@ export type SkraftEvent =
       slug: string;
       story: Story;
       baseSha: string;
+      qualityCheckpoint?: string;
       branch: string;
       indicators: DifficultyIndicators;
     }
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[] }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
+  /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
+  | { type: "LENS_BLOCKED"; lens: LensName; question: string; choices: string[] }
   | {
       type: "GATE_OK";
       artifacts: ArtifactRecord[];
       adrs?: AdrRecord[];
       openQuestions?: string[];
+      /** DISTILL : matrice du plan de test, par critère, pour vérifier les écarts déclarés en DELIVER (ADR 0067). */
+      planDeTest?: Record<string, LigneDuPlan>;
+      /** RESEARCH : conventions et existant réutilisable, transmis à DESIGN et DISTILL. */
+      recherche?: { conventions: string; existant: string };
       acceptanceHash?: string;
       regressions?: string[];
       /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
       facts?: string[];
       notes?: string[];
     }
-  | { type: "GATE_FAIL"; gate: string; reasons: string[] }
+  | { type: "GATE_FAIL"; gate: string; reasons: string[]; /** Porte de mutation : les survivants, un défaut chacun (ADR 0065). */ mutants?: MutantSurvivant[]; /** Couverture du diff : les lignes non couvertes, par fichier. */ lignes?: { file: string; lines: number[] }[] }
+  | { type: "QUESTION_ASKED"; id: string }
+  | { type: "MUTANTS_JUDGED"; rulings: { defect: string; decision: "accepted" | "maintained"; reason?: string }[] }
   | {
       type: "LENSES_DONE";
       lenses: LensVerdict[];
@@ -245,10 +323,13 @@ export type SkraftEffect =
   | { kind: "runReview"; phase: Phase; lenses: LensName[]; attempt: number }
   | { kind: "askRatification"; adr: AdrRecord }
   | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
-  | { kind: "askBlocker"; question: string; choices: string[] }
+  /** `lens` : question d'une lentille de revue (D4 de docs/12). */
+  | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
   | { kind: "askQuestion"; id: string; text: string }
-  | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "abort")[] }
+  | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
+  | { kind: "arbitrateMutants"; threads: DefectThread[] }
+  | { kind: "askMutationArbitration"; thread: DefectThread; avis: string }
   | { kind: "rollback"; to: string }
   // Rembobiner le dépôt sans faire oublier les conversations qui le décrivent, c'est garder le
   // souvenir et retirer la chose (ADR 0040, 0050). Les deux vont ensemble.
@@ -258,7 +339,7 @@ export type SkraftEffect =
   | { kind: "planDeliver" }
   | { kind: "startScenario"; scenarioId: string }
   | { kind: "runDeliverAgent"; step: "test" | "dev" | "green" | "refactor" | "fix-test" | "fix"; scenarioId: string; attempt: number; feedback: string[] }
-  | { kind: "verifyFixTests"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] } }
+  | { kind: "verifyFixTests"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; /** Tests existants qu'un défaut demande de renforcer (D10 de docs/12). */ editable?: string[] }
   | { kind: "verifyUnitRed"; scenarioId: string; since: string; baseline: { all: string[]; passed: string[] }; pending: string[]; coveredBy?: string }
   | {
       kind: "verifyUnitGreen";
@@ -272,6 +353,8 @@ export type SkraftEffect =
       targets?: string[];
       /** Correction : éléments du contrat ratifié qui doivent rester dans le code (ADR 0047). */
       contractSymbols?: string[];
+      /** Correction où chaque défaut est contesté ou renvoyé : le pas peut ne rien modifier (D7 de docs/12). */
+      nothingToChange?: true;
     }
   | { kind: "scenarioGate"; scenarioId: string; since: string; unitTests: string[]; pending: string[] };
 
@@ -312,6 +395,7 @@ const stateSchema = z.object({
   phasesCompleted: z.array(phase),
   difficulty: z.object({ level: z.enum(["simple", "medium", "medium-hard", "challenging"]), indicators: z.unknown(), confirmedBy: z.enum(["user", "auto"]) }).nullable(),
   baseSha: z.string(),
+  qualityCheckpoint: z.string().optional(),
   branch: z.string(),
   checkpoints: z.record(z.string(), z.string()),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
@@ -320,6 +404,10 @@ const stateSchema = z.object({
   budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
   openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
+  recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
+  architecture: z.string().optional(),
+  planDeTest: z.record(z.string(), z.object({ couche: z.string(), doublure: z.string() })).optional(),
+  ecartsAuPlan: z.array(z.object({ criterion: z.string(), planned: z.string(), actual: z.string(), rule: z.string(), par: z.string(), scenario: z.string() })).optional(),
   adrs: z.array(z.object({ id: z.string(), path: z.string(), status: z.enum(["Proposed", "Accepted", "Rejected"]), decisionBy: z.string().optional() })),
   pendingInteraction: z.string().nullable(),
   retries: z.record(z.string(), z.number().int().min(0)).optional(),

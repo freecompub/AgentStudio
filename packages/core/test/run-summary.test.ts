@@ -89,6 +89,22 @@ describe("resumerTrace", () => {
     expect(parPhase.find((p) => p.phase === "DESIGN")).toMatchObject({ duréeMs: 9 * 60_000, rejets: [{ porte: "revue" }] });
   });
 
+  it("temps des agents, des effets et du moteur, par étape (docs/10 P2)", () => {
+    const sec = (s: number) => new Date(Date.UTC(2026, 9, 3, 11, 0, s)).toISOString();
+    const x = (o: Record<string, unknown>, s: number): TraceEntry => ({ taskId: "t1", at: sec(s), ...o }) as TraceEntry;
+    const r = resumerTrace([
+      x({ kind: "transition", événement: "RESUMED", phase: "DESIGN", effets: ["agent"], duréeMs: 3 }, 0),
+      x({ kind: "tour-début", sessionId: "s1", phase: "DESIGN", prompt: "", repris: false }, 1),
+      x({ kind: "tour-fin", sessionId: "s1", fin: "output" }, 41),
+      x({ kind: "effet", effet: "agent", phase: "DESIGN", duréeMs: 42_000, issue: "ok" }, 42),
+      x({ kind: "transition", événement: "RESULTAT", phase: "DESIGN", effets: ["lancerTests"], duréeMs: 5 }, 42),
+      x({ kind: "effet", effet: "lancerTests", phase: "DESIGN", duréeMs: 18_000, issue: "ok" }, 60),
+      x({ kind: "transition", événement: "RESULTAT", phase: "DESIGN", effets: [], duréeMs: 2 }, 60),
+    ]);
+    expect(r.etapes[0]).toMatchObject({ phase: "DESIGN", agentsMs: 40_000, effetsMs: 60_000, codeMs: 20_000, moteurMs: 10 });
+    expect(r.total).toMatchObject({ agentsMs: 40_000, effetsMs: 60_000, codeMs: 20_000, moteurMs: 10 });
+  });
+
   it("une trace vide rend un résumé vide, pas une erreur", () => {
     expect(resumerTrace([])).toMatchObject({ etapes: [], parPhase: [], total: { duréeMs: 0, tours: 0 } });
   });

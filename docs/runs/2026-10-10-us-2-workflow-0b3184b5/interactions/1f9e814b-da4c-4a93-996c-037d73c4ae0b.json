@@ -1,0 +1,54 @@
+{
+  "id": "1f9e814b-da4c-4a93-996c-037d73c4ae0b",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "La portée commune des paliers est confirmée. Trois points restent nécessaires pour fixer les contrats de DESIGN : (1) D'où provient le barème : à chaque appel, à la construction du cas d'usage, ou d'une configuration fixe ? Le point d'entrée actuel ne reçoit que le panier (src/Tarification.Application/CalculDuPanier.cs:19-21), tandis que les critères parlent de paliers configurés (stories/US-2.md:7-11). (2) Faut-il déduire la remise de Facture.ATPayer dès US-2 ? Aujourd'hui cette propriété ignore la remise (src/Tarification.Application/CalculDuPanier.cs:10-12) ; US-2 ne précise que les remises attendues (stories/US-2.md:7-11), et US-4 utilise un montant après remises (stories/US-4.md:10). (3) Quelles configurations autoriser et comment traiter les invalides : seuil ≤ 0, taux hors [0,100] %, seuils dupliqués ? Ces règles ne sont pas définies par les critères (stories/US-2.md:7-11). Merci de préciser ces trois points ; l'arrondi reste réservé à US-5 (stories/US-5.md:7-10).",
+  "options": [
+    {
+      "id": "96:Barème fourni par l'appelant à chaque chiffrage.",
+      "label": "Barème fourni par l'appelant à chaque chiffrage."
+    },
+    {
+      "id": "96:Barème fourni à la construction de CalculDuPanier.",
+      "label": "Barème fourni à la construction de CalculDuPanier."
+    },
+    {
+      "id": "96:Barème fixé par une configuration du service, à préciser.",
+      "label": "Barème fixé par une configuration du service, à préciser."
+    },
+    {
+      "id": "96:Déduire la remise de ATPayer dès US-2.",
+      "label": "Déduire la remise de ATPayer dès US-2."
+    },
+    {
+      "id": "96:Conserver ATPayer inchangé dans US-2 ; déduction reportée à US-4.",
+      "label": "Conserver ATPayer inchangé dans US-2 ; déduction reportée à US-4."
+    },
+    {
+      "id": "96:Rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %.",
+      "label": "Rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %."
+    },
+    {
+      "id": "96:Rejeter seuils ≤ 0 et taux hors [0,100] %, mais autoriser les seuils dupliqués en retenant la meilleure remise.",
+      "label": "Rejeter seuils ≤ 0 et taux hors [0,100] %, mais autoriser les seuils dupliqués en retenant la meilleure remise."
+    },
+    {
+      "id": "96:Autre politique de validité des paliers, à préciser.",
+      "label": "Autre politique de validité des paliers, à préciser."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:56:54.241Z",
+  "status": "answered",
+  "answer": {
+    "option": "96:Barème fourni par l'appelant à chaque chiffrage.",
+    "answeredAt": "2026-10-10T19:56:54.245Z"
+  }
+}

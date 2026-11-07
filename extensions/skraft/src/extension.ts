@@ -1,4 +1,5 @@
 import type { ExtensionContext, ExtensionModule, TaskDefinition } from "@agent-studio/extension-api";
+import { skillDArchitecture } from "./architecture.js";
 import { runSkraftEffect } from "./effects.js";
 import { renderAdrTool } from "./render-adr-tool.js";
 import type { SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
@@ -17,16 +18,23 @@ export const skraftTask: TaskDefinition<SkraftState, SkraftEvent, SkraftEffect, 
   phaseOf,
 };
 
-const USAGE = "Utilisation : `/skraft <chemin de la story>`, par exemple `/skraft stories/us-12.md`. Ajoutez `--auto` pour confirmer la difficulté automatiquement.";
+const USAGE = "Utilisation : `/skraft <chemin de la story>`, par exemple `/skraft stories/us-12.md`. Ajoutez `--auto` pour confirmer la difficulté automatiquement, et `--archi <skill>` (par exemple `--archi java`) pour la skill d'architecture du projet ; sans elle, la clean architecture par défaut.";
 
 export function parseSkraftArgs(args: string): SkraftInput | null {
-  let rest = args.trim();
+  const jetons = args.trim().split(/\s+/).filter(Boolean);
   let confirmDifficulty = true;
-  if (/^--auto(\s|$)/.test(rest)) {
-    confirmDifficulty = false;
-    rest = rest.slice("--auto".length).trim();
+  let archi: string | undefined;
+  const reste: string[] = [];
+  for (let k = 0; k < jetons.length; k++) {
+    if (jetons[k] === "--auto") confirmDifficulty = false;
+    else if (jetons[k] === "--archi") {
+      // Skill d'architecture transmise à l'appel (skills de skraft-plugin v1.15.1).
+      archi = jetons[++k];
+      if (archi === undefined || archi.startsWith("--")) return null;
+    } else reste.push(jetons[k]!);
   }
-  return rest ? { storyPath: rest, confirmDifficulty } : null;
+  if (!reste.length) return null;
+  return { storyPath: reste.join(" "), confirmDifficulty, ...(archi ? { archi } : {}) };
 }
 
 export const skraftExtension: ExtensionModule = {
@@ -36,6 +44,8 @@ export const skraftExtension: ExtensionModule = {
     ctx.chat.registerCommand("skraft", async (args) => {
       const input = parseSkraftArgs(args);
       if (!input) return ctx.chat.post(USAGE);
+      const { avertissement } = skillDArchitecture(input.archi);
+      if (avertissement) ctx.chat.post(avertissement);
       await ctx.tasks.start("skraft-pipeline", input);
       ctx.chat.post(`Pipeline skraft lancé pour **${input.storyPath}** : lecture de la story et évaluation de la difficulté.`);
     });

@@ -11,7 +11,7 @@ export { createMainSession, type MainSession, type MainSessionDeps, type MainSes
 export { createJsonConversationStore } from "./conversation/json-conversation-store.js";
 export { createWorkspaceGuard, type WorkspaceGuardDeps } from "./guards/workspace-guard.js";
 export { createJsonLogger, type JsonLoggerOptions } from "./logging/json-logger.js";
-export { createTaskAgentGuard, type TaskAgentGuardDeps } from "./guards/task-agent-guard.js";
+export { createTaskAgentGuard, estDossierDeWorkflow, type TaskAgentGuardDeps } from "./guards/task-agent-guard.js";
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./guards/glob.js";
 export { terminalTool, terminalSchemas, type TerminalOutput, type TerminalToolName } from "./agents/terminal-tools.js";
 export {
@@ -41,6 +41,8 @@ export { createLazyRuntime } from "./agents/lazy-runtime.js";
 export { MODEL_CLASSES, resolveModel, type ModelClass, type ModelPreferences } from "./agents/model-class.js";
 export { MemoryInteractionStore } from "./testing/memory-doubles.js";
 export { createJsonInteractionStore } from "./interactions/json-interaction-store.js";
+export { createJsonTaskSessionStore } from "./agents/json-task-session-store.js";
+export type { TaskSessionEntry, TaskSessionStore } from "./protocols/task-sessions.js";
 export type * from "./protocols/evidence.js";
 export { createJsonEvidenceStore } from "./evidence/json-evidence-store.js";
 export { composeGuards } from "./guards/compose-guards.js";

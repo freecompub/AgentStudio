@@ -5,6 +5,8 @@ import type { MessageChannelLike } from "../rpc/protocol.js";
 
 export interface ActivationRequest {
   extensionId: string;
+  /** Identifiant de l'adaptateur de pile du projet. */
+  stackId: string;
   layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /** Ce que la stack tient pour de l'infrastructure : transmis, l'extension ne le devine pas. */
   infrastructureModules: string[];
@@ -131,6 +133,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
           return call("stack.runTests", [rest], signal);
         },
         isTestFile: (p) => testFile.test(p.replaceAll("\\", "/")),
+        id: r.stackId,
         layout: r.layout,
         infrastructureModules: r.infrastructureModules,
         mutation: (opts) => call("stack.mutation", [], opts?.signal),

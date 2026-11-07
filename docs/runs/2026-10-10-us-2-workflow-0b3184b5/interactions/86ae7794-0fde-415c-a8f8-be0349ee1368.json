@@ -1,0 +1,34 @@
+{
+  "id": "86ae7794-0fde-415c-a8f8-be0349ee1368",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "Dernière règle manquante : quelle politique de validation appliquer aux paliers ? Les critères ne définissent ni les bornes autorisées des taux ni le traitement des seuils dupliqués (stories/US-2.md:7-11 ; .skraft/us-2/design/domain-model.md, section Q3). Le barème fourni à chaque appel et la déduction de la remise dans ATPayer dès US-2 sont désormais confirmés.",
+  "options": [
+    {
+      "id": "104:Rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %.",
+      "label": "Rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %."
+    },
+    {
+      "id": "104:Rejeter explicitement seuils ≤ 0 et taux hors [0,100] %, autoriser les seuils dupliqués et retenir la meilleure remise.",
+      "label": "Rejeter explicitement seuils ≤ 0 et taux hors [0,100] %, autoriser les seuils dupliqués et retenir la meilleure remise."
+    },
+    {
+      "id": "104:Autre politique de validation, à préciser.",
+      "label": "Autre politique de validation, à préciser."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:57:04.956Z",
+  "status": "answered",
+  "answer": {
+    "option": "104:Rejeter explicitement seuils ≤ 0, taux hors [0,100] % et seuils dupliqués ; autoriser 0 % et 100 %.",
+    "answeredAt": "2026-10-10T19:57:04.961Z"
+  }
+}

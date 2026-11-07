@@ -13,7 +13,7 @@ import { parseStackProfile } from "@agent-studio/stack-adapters";
 import { createStackCommand, type StackCommandDeps } from "../src/main/stack-command.js";
 
 /** Extrait de la liste par défaut de l'administrateur : les modèles proposés doivent s'y tenir. */
-const AUTORISES = ["pytest", "vitest", "eslint", "ruff", "swift", "swiftlint", "muter", "stryker"];
+const AUTORISES = ["pytest", "vitest", "eslint", "ruff", "stryker"];
 
 const profil = (yaml: string): StackProfile => {
   const r = parseStackProfile(yaml, { allowedPrograms: AUTORISES });
@@ -60,7 +60,7 @@ describe("/stack — état de la stack du projet", () => {
   });
 
   it("distingue une stack détectée d'une stack déclarée : l'une est un choix, l'autre une devinette", async () => {
-    const h = harnais({ stackActive: () => ({ id: "swift", declaree: false }) });
+    const h = harnais({ stackActive: () => ({ id: "typescript", declaree: false }) });
     await h.lancer("");
     expect(h.postes[0]).toMatch(/détect/i);
     expect(h.postes[0]).toMatch(/\/stack init/);

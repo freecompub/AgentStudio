@@ -118,8 +118,12 @@ export const manifest: ExtensionManifest = {
         role: ROLES.lens,
         output: "submit_lens_verdict" as const,
         modelClass: LENS_MODEL_CLASS[name],
+        // Une décision métier qui manque part à l'humain, au lieu d'être devinée (D4 de docs/12).
+        tools: ["report_blocker"],
         skills: skillsOf(ROLE_SKILLS.lens),
       })),
+      // Juge les mutants survivants que le testeur conteste comme équivalents (ADR 0065).
+      { name: "skraft-mutation-arbiter", title: "Arbitre de mutation", prompt: agentFile("skraft-mutation-arbiter"), role: ROLES.mutationArbiter, output: "submit_lens_verdict", modelClass: ROLE_MODEL_CLASS.mutationArbiter },
     ],
     skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
     tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],

@@ -25,5 +25,7 @@ export interface CopilotClientPort {
   createSession(config: SessionConfig): Promise<CopilotSessionPort>;
   resumeSession(sessionId: string, config: ResumeSessionConfig): Promise<CopilotSessionPort>;
   deleteSession(sessionId: string): Promise<void>;
+  /** Métadonnées d'une session, ou `undefined` si le runtime ne la connaît pas (SDK 1.0.14). */
+  getSessionMetadata(sessionId: string): Promise<unknown>;
   listModels(): Promise<ModelInfo[]>;
 }

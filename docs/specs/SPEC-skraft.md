@@ -77,7 +77,7 @@ La colonne « 1.6.0 » donne le statut sur la branche `refactor/v1.6.0-tracking-
 | E3 | L'arrêt à budget épuisé dépend du LLM | Inchangé | Budget appliqué par le réducteur |
 | E4 | DESIGN et DISTILL exigent les artefacts de DISCUSS, phase supprimée | Non vérifié en 1.6.0 | Dossier de passation construit à partir des phases réellement exécutées |
 | E5 | La ratification des ADR se fait par édition manuelle de `adrRatification`, sans blocage | Aggravé : l'édition est désormais refusée par G7 (N1) | État `RATIFICATION` bloquant et persisté |
-| E6 | Seul un adaptateur de qualité .NET existe ; sortie DISTILL codée en `*AcceptanceTests.cs` | Partiel : `quality-gates-javascript` ajoutée, rien pour Swift | Profil de stack du projet (`SPEC.md` section 8) ; chemins, commandes et formats fournis par le profil ; capacité absente = porte non disponible, jamais un échec |
+| E6 | Seul un adaptateur de qualité .NET existe ; sortie DISTILL codée en `*AcceptanceTests.cs` | Partiel : `quality-gates-javascript` ajoutée | Profil de stack du projet (`SPEC.md` section 8) ; chemins, commandes et formats fournis par le profil ; capacité absente = porte non disponible, jamais un échec |
 | E7 | La skill de difficulté décrit encore le pipeline à cinq phases et ne donne aucun critère | Niveaux supprimés ; RESEARCH toujours exécutée | Indicateurs calculés et grille explicite (section 8) |
 | N1 | Le routage d'entrée (`entryPoint`, écrit à chaque pipeline neuf) et la ratification (`adrRatification`) sont prescrits en édition directe de `state.json`, sans commande CLI ; G7 les refuse désormais | Nouveau en 1.6.0 ; commandes typées prévues par le plan | Aucun champ d'état n'est écrit par un agent : décisions persistées par le moteur de tâches, via les demandes d'interaction |
 | N2 | G7 ne détecte pas les écritures par interpréteur (`node -e`, `python3 -c`) | Nouveau en 1.6.0, absent du plan | L'état vit hors du dépôt, dans le moteur de tâches ; les écritures dans le dépôt sont vérifiées par diff et empreinte à chaque porte, quel que soit l'outil |
@@ -191,7 +191,7 @@ Validation par schéma (Zod) à chaque chargement ; un état invalide met la tâ
 
 | Stage | Événement | Garde | Stage suivant | Effets |
 | --- | --- | --- | --- | --- |
-| INIT | `START` (état neuf) | story valide (6.1) | CLASSIFY | créer branche, enregistrer `baseSha`, calculer indicateurs, relever un éventuel transfert amont (8.1) |
+| INIT | `START` (état neuf) | story valide (6.1), précontrôle des tests verts | CLASSIFY | notifier la dette de couverture, enregistrer le checkpoint qualité initial, créer branche, enregistrer `baseSha`, calculer indicateurs, relever un éventuel transfert amont (8.1) |
 | INIT | `START` (état existant) | — | stage persisté | reprise (SPEC.md 6.3) |
 | CLASSIFY | `DIFFICULTY_PROPOSED` | niveau dans l'enum | CONFIRM_DIFFICULTY | demande d'interaction (mode simple) ou confirmation auto |
 | CONFIRM_DIFFICULTY | `HUMAN_DECISION` | — | ROUTE | écrire `difficulty` ; régler budget, granularité et lentilles (8.4) |
@@ -255,6 +255,12 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 
 Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3).
 
+**Précontrôle avant tout appel LLM (ADR 0060)** : le code exécute les tests existants
+(`INIT_BASELINE`). Échec, test ignoré, délai dépassé ou sortie non nulle bloquent le
+lancement avec motifs explicites. Une couverture existante sous les seuils déclarés
+déclenche un avertissement non bloquant ; une couverture absente est annoncée non mesurée.
+Un checkpoint de qualité initial conserve le périmètre de la tâche pour la couverture du diff.
+
 ### 6.2 Arborescence des artefacts
 
 Racine : `.skraft/<slug>/` dans le dépôt (OUVERT S-O1 : garder la racine `.copilot-tracking/skraft-plans/` de skraft pour compatibilité ?).
@@ -278,7 +284,7 @@ docs/adr/adr-<NNN>-<slug>.md       # dans le dépôt, append-only
 docs/adr/supersessions.md
 ```
 
-Les tests d'acceptance et le code vont aux emplacements déclarés dans le profil de stack (`paths.acceptanceTests`, `paths.unitTests`, `paths.sources`), par exemple `Tests/AcceptanceTests/` pour un projet SwiftPM.
+Les tests d'acceptance et le code vont aux emplacements déclarés dans le profil de stack (`paths.acceptanceTests`, `paths.unitTests`, `paths.sources`), par exemple `tests/acceptance/` pour un projet TypeScript.
 
 ### 6.3 Rôles, périmètres, outils terminaux
 
@@ -392,7 +398,12 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 | Erreur de syntaxe, crash de setup | Rejeté |
 | Réussi | Signalé : requalifié en test de non-régression (champ `role: "regression"` dans `test-plan.md`), visible des lentilles ; rejeté si le scénario était censé piloter un nouveau comportement et qu'aucune justification n'est donnée |
 
-À la sortie de la porte : **empreinte de tous les tests d'acceptance** enregistrée ; ils sont gelés pour toute la suite du pipeline.
+À la sortie de la porte : **empreinte de tous les tests d'acceptance** enregistrée pour la revue
+de l'essai courant. Si la revue refuse DISTILL, le gel est levé pour permettre la correction,
+y compris l'ajout de tests par `skraft-acceptance` ; les portes sont rejouées et une nouvelle
+empreinte est enregistrée. Une interruption, une panne ou un rembobinage de DISTILL invalide
+aussi cette empreinte. Après approbation de DISTILL, les tests sont gelés pour toute la suite
+du pipeline : un refus de revue en DELIVER ne lève pas ce gel (ADR 0059).
 
 **Revue** : lentilles `cold-reader` et `test-integrity`.
 
@@ -426,12 +437,19 @@ export interface DeliverState {
 | Test d'acceptance du scénario | Vert |
 | Suite complète | Verte, aucun test ignoré |
 | Séquence dans les preuves | Au moins un rouge puis un vert par test unitaire ajouté |
+| Couverture | Seuils déclarés par couche sur les seules lignes exécutables ajoutées ou modifiées depuis le checkpoint du scénario ; dette historique inchangée exclue, numéros des lignes non couvertes dans le rejet (ADR 0060) |
 | Mutation (profil de stack) | Seuils du profil ; par défaut 100 % domaine et application, 90 % API et infrastructure. Capacité absente : porte non disponible, selon la politique du projet |
 | Règle de dépendance | Couches et imports autorisés déclarés dans le profil ; capacité absente : porte non disponible |
-| Qualité de forme | Le **linter du projet** (ESLint, SwiftLint…), avec ses propres règles : longueur de méthode, imbrication, taille des types. Capacité absente : porte non disponible, constat « non mesurée » |
+| Qualité de forme | Le **linter du projet** (ESLint, ruff…), avec ses propres règles : longueur de méthode, imbrication, taille des types. Capacité absente : porte non disponible, constat « non mesurée » |
 | Tests qui ne tuent aucun mutant | Pas de rejet : listés pour le reviewer |
 
 Les seuils de mutation reprennent `skraft-quality-bar` ; ils sont configurables par projet (`ctx.settings`).
+
+La fin de DELIVER revérifie aussi la couverture du diff depuis le checkpoint de qualité
+initial de **toute la tâche**, y compris les sources écrites avant DELIVER. Le détail
+par ligne ou un fichier absent du rapport est signalé non mesuré, jamais remplacé par
+un taux global ni supposé conforme. Le checkpoint initial est conservé au redémarrage ;
+un ancien état qui n'en possède pas est vérifié depuis DELIVER avec avertissement explicite.
 
 **Preuves** : on reprend le schéma de `quality-gates-evidence-contract` (sortie, code de sortie, empreintes sha256, instantanés rouge et vert) ; l'écrivain est `run_tests`, jamais l'agent.
 
@@ -639,7 +657,7 @@ Mesurer par état : tokens, requêtes, réessais. Objectif de S6 : comparer le p
 
 ### 13.3 Bout en bout
 
-Projet Swift de démonstration minimal (un module Domain avec `BolusCalculator`, un module de réglages, XCTest, Muter), story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
+Projet de démonstration minimal (un module domain avec `BolusCalculator`, un module de réglages), sur une pile TypeScript simulée depuis le retrait de Swift (ADR 0061), story US-12, agents rejoués depuis des réponses enregistrées (faux `AgentRuntime` scripté) pour la CI ; un run réel manuel par jalon.
 
 Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un rejet de citation puis question « par prise ou par jour » → DESIGN avec un rejet de cohérence puis ratification d'un ADR → DISTILL avec un rejet de valeur puis scénario 3 requalifié → DELIVER des scénarios 1 et 2, une tentative de modification de test refusée → revue avec un défaut `major` corrigé → DONE avec bilan.
 
@@ -654,8 +672,14 @@ Déroulé attendu : difficulté `medium-hard` confirmée → RESEARCH avec un re
 | **S2** | RESEARCH : présélection, rôle `skraft-researcher`, porte citations, questions ouvertes | Fixture citations rejetée ; question posée et réponse présente dans le dossier de passation de DESIGN |
 | **S3** | DESIGN : deux rôles, `render_adr`, porte cohérence, revue DESIGN, état RATIFICATION | Fixture cohérence rejetée ; DISTILL inatteignable avant ratification ; `amend` relance le bon rôle |
 | **S4** | DISTILL : rôle `skraft-acceptance`, porte valeurs, porte RED d'acceptance, gel des tests d'acceptance | Fixtures valeurs et RED traitées ; empreinte enregistrée |
-| **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet Swift de démonstration ; modification de test refusée puis détectée par empreinte ; même pipeline sur un projet TypeScript sans modifier l'extension, seulement son profil |
+| **S5** | DELIVER : sous-machine, deux granularités, porte de fin de scénario, preuves via `run_tests` | US-12 livrée sur le projet de démonstration ; modification de test refusée puis détectée par empreinte ; même pipeline sur un projet TypeScript sans modifier l'extension, seulement son profil |
 | **S6** | Revue : faits, trois lentilles, synthèse par le code, rapports générés ; mesures d'usage | Verdict reproductible depuis les mêmes JSON ; bout en bout 13.3 vert ; mesures sur trois stories |
+
+### État au 2026-10-11
+
+Swift est retiré (ADR 0061). Les critères de S5 (« US-12 livrée ») et de S6 (« bout en bout 13.3
+vert ») tenaient à des tests sur une vraie chaîne Swift : ils ne sont plus couverts que par la pile
+simulée. Un bout en bout sur une vraie chaîne (TypeScript ou .NET) est à écrire.
 
 ### État au 2026-09-24
 

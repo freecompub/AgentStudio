@@ -1,0 +1,32 @@
+{
+  "id": "acde7ef1-2655-4c91-ae63-80a5ca4928d2",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question ouverte (US-2)",
+  "detail": "Les paliers sont-ils les mêmes pour toutes les références, ou définis par référence ?",
+  "options": [
+    {
+      "id": "85:answer",
+      "label": "Répondre"
+    },
+    {
+      "id": "85:defer",
+      "label": "Reporter"
+    }
+  ],
+  "freeText": true,
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:55:04.797Z",
+  "status": "answered",
+  "answer": {
+    "option": "85:answer",
+    "comment": "Les mêmes paliers s'appliquent à toutes les références.",
+    "answeredAt": "2026-10-10T19:55:04.800Z"
+  }
+}

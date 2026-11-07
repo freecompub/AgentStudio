@@ -1,0 +1,1185 @@
+{
+  "mode": "extension skraft",
+  "livre": false,
+  "arret": null,
+  "resume": {
+    "etapes": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T12:43:32.534Z",
+        "duréeMs": 1,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 53,
+        "codeMs": 53,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T12:43:32.535Z",
+        "duréeMs": 14866,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 5,
+        "entrée": 77487,
+        "sortie": 376,
+        "nanoAiu": 4574052000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 14375,
+        "effetsMs": 14861,
+        "codeMs": 486,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T12:43:47.401Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T12:43:47.414Z",
+        "duréeMs": 17692,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 67758,
+        "sortie": 770,
+        "nanoAiu": 5408658000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 17460,
+        "effetsMs": 17585,
+        "codeMs": 125,
+        "moteurMs": 0
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T12:44:05.106Z",
+        "duréeMs": 10,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T12:44:05.116Z",
+        "duréeMs": 116358,
+        "tours": 2,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "Section manquante : « Recommandation ».",
+              "Section manquante : « Passage de relais ».",
+              "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-51` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-51` : plage hors du fichier, qui compte 50 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 296921,
+        "sortie": 7464,
+        "nanoAiu": 17475930000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 115810,
+        "effetsMs": 116000,
+        "codeMs": 190,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T12:46:01.474Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T12:46:01.481Z",
+        "duréeMs": 32144,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 4,
+        "entrée": 102237,
+        "sortie": 1811,
+        "nanoAiu": 9476397000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 31935,
+        "effetsMs": 32041,
+        "codeMs": 106,
+        "moteurMs": 0
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T12:46:33.625Z",
+        "duréeMs": 15,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 3,
+        "codeMs": 3,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T12:46:33.640Z",
+        "duréeMs": 276916,
+        "tours": 2,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 14,
+        "entrée": 552524,
+        "sortie": 17779,
+        "nanoAiu": 36536022000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 276450,
+        "effetsMs": 276602,
+        "codeMs": 152,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T12:51:10.556Z",
+        "duréeMs": 37336,
+        "tours": 3,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 12,
+        "entrée": 298710,
+        "sortie": 6384,
+        "nanoAiu": 19262727450,
+        "modèles": [
+          "gpt-6.1-sol",
+          "gpt-6-luna"
+        ],
+        "agentsMs": 89669,
+        "effetsMs": 37234,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T12:51:47.892Z",
+        "duréeMs": 87009,
+        "tours": 2,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, major, deliverable] Le modele dit que l'emplacement de la regle de remise n'est pas decide (Panier, LigneDePanier ou politique separee), alors que contracts.md attribue l'evaluation des lignes a ConfigurationDePaliers et diagrams.md represente explicitement ce flux. Le lecteur ne peut pas savoir si cette responsabilite est une decision de conception ou reste ouverte. (.skraft/us-2/design/domain-model.md)",
+              "[cold-reader#1.2, major, deliverable] La transmission de ConfigurationDePaliers au calcul est presentee comme une decision future, alors que contracts.md retient deja une configuration explicite pour ChiffrerPanier et conserve l'appel historique avec configuration vide. Aligner le modele de domaine sur ce contrat, ou marquer le contrat comme proposition non tranchee. (.skraft/us-2/design/domain-model.md)",
+              "[cold-reader#1.3, major, deliverable] Le modele evenementiel indique que le point d'invocation et la forme du rejet ne sont pas fixes, mais contracts.md tranche la validation a la construction et precise les exceptions de rejet. Cette divergence laisse le cycle de validation ambigu pour le lecteur. (.skraft/us-2/design/event-model.md)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 10,
+        "entrée": 576329,
+        "sortie": 5237,
+        "nanoAiu": 23907591000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 86561,
+        "effetsMs": 86694,
+        "codeMs": 133,
+        "moteurMs": 1
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T12:53:14.901Z",
+        "duréeMs": 14342,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 6,
+        "entrée": 227135,
+        "sortie": 1751,
+        "nanoAiu": 19406745000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 35571,
+        "effetsMs": 14238,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T12:53:29.243Z",
+        "duréeMs": 219,
+        "tours": 0,
+        "essaisMax": 1,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 70,
+        "codeMs": 70,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T12:53:29.462Z",
+        "duréeMs": 126142,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 7,
+        "entrée": 262894,
+        "sortie": 7463,
+        "nanoAiu": 19537281000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 123516,
+        "effetsMs": 126035,
+        "codeMs": 2519,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T12:55:35.604Z",
+        "duréeMs": 15957,
+        "tours": 4,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 321379,
+        "sortie": 2506,
+        "nanoAiu": 13846779000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 50062,
+        "effetsMs": 15857,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T12:55:51.561Z",
+        "duréeMs": 77722,
+        "tours": 2,
+        "essaisMax": 2,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[test-integrity#1.1, major, test] Le seul scénario multi-ligne attend zéro pour deux lignes inéligibles. Tous les cas de remise positive portent sur une seule ligne : un mutant qui évalue uniquement la première ligne et ignore les suivantes satisfait donc les sept tests. La séparation des quantités est vérifiée, mais pas le calcul et l'addition des remises de chaque ligne, pourtant prévus dans consistency-matrix.md. Ajouter un test d'acceptance passant par Chiffrer avec deux références différentes de 10 articles à 2,00 € et le palier 10 / 5 %, puis assertant Facture.Remise = 2,00 €. Ce test distingue une véritable évaluation par ligne d'une implémentation limitée à la première ligne, sans dupliquer une couverture existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:69)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          },
+          {
+            "porte": "RED d'acceptance",
+            "motifs": [
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac5_Le_client_ne_recoit_pas_de_remise_sans_palier_configure » (critère 5) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac4_Les_quantites_de_references_differentes_ne_se_cumulent_pas » (critère 4) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac1_Le_client_ne_recoit_pas_de_remise_sous_le_seuil » (critère 1) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 9,
+        "entrée": 502114,
+        "sortie": 3908,
+        "nanoAiu": 15875595000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 72643,
+        "effetsMs": 77486,
+        "codeMs": 4843,
+        "moteurMs": 0
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T12:57:09.283Z",
+        "duréeMs": 13254,
+        "tours": 4,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 8,
+        "entrée": 375229,
+        "sortie": 2300,
+        "nanoAiu": 11533077000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 42325,
+        "effetsMs": 13146,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T12:57:22.537Z",
+        "duréeMs": 187,
+        "tours": 0,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 68,
+        "codeMs": 68,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T12:57:22.724Z",
+        "duréeMs": 117,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 113,
+        "codeMs": 113,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T12:57:22.841Z",
+        "duréeMs": 140,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 133,
+        "codeMs": 133,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T12:57:22.981Z",
+        "duréeMs": 14,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 13,
+        "codeMs": 13,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T12:57:22.995Z",
+        "duréeMs": 164,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 150,
+        "codeMs": 150,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T12:57:23.159Z",
+        "duréeMs": 23,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 21,
+        "codeMs": 21,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T12:57:23.182Z",
+        "duréeMs": 138,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 132,
+        "codeMs": 132,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T12:57:23.320Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "parPhase": [
+      {
+        "phase": "INIT",
+        "début": "2026-10-10T12:43:32.534Z",
+        "duréeMs": 1,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 53,
+        "codeMs": 53,
+        "moteurMs": 0
+      },
+      {
+        "phase": "CLASSIFY",
+        "début": "2026-10-10T12:43:32.535Z",
+        "duréeMs": 14866,
+        "tours": 1,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 5,
+        "entrée": 77487,
+        "sortie": 376,
+        "nanoAiu": 4574052000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 14375,
+        "effetsMs": 14861,
+        "codeMs": 486,
+        "moteurMs": 1
+      },
+      {
+        "phase": "CONFIRM_DIFFICULTY",
+        "début": "2026-10-10T12:43:47.401Z",
+        "duréeMs": 13,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 4,
+        "codeMs": 4,
+        "moteurMs": 0
+      },
+      {
+        "phase": "RESEARCH",
+        "début": "2026-10-10T12:43:47.414Z",
+        "duréeMs": 134050,
+        "tours": 3,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "citations",
+            "motifs": [
+              "Section manquante : « Recommandation ».",
+              "Section manquante : « Passage de relais ».",
+              "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-51` : plage hors du fichier, qui compte 50 lignes.",
+              "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-51` : plage hors du fichier, qui compte 50 lignes."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 13,
+        "entrée": 364679,
+        "sortie": 8234,
+        "nanoAiu": 22884588000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 133270,
+        "effetsMs": 133585,
+        "codeMs": 315,
+        "moteurMs": 0
+      },
+      {
+        "phase": "BLOCKED",
+        "début": "2026-10-10T12:44:05.106Z",
+        "duréeMs": 25,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 6,
+        "codeMs": 6,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ROUTE",
+        "début": "2026-10-10T12:46:01.474Z",
+        "duréeMs": 7,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 1,
+        "codeMs": 1,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DESIGN",
+        "début": "2026-10-10T12:46:01.481Z",
+        "duréeMs": 396288,
+        "tours": 5,
+        "essaisMax": 1,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[cold-reader#1.1, major, deliverable] Le modele dit que l'emplacement de la regle de remise n'est pas decide (Panier, LigneDePanier ou politique separee), alors que contracts.md attribue l'evaluation des lignes a ConfigurationDePaliers et diagrams.md represente explicitement ce flux. Le lecteur ne peut pas savoir si cette responsabilite est une decision de conception ou reste ouverte. (.skraft/us-2/design/domain-model.md)",
+              "[cold-reader#1.2, major, deliverable] La transmission de ConfigurationDePaliers au calcul est presentee comme une decision future, alors que contracts.md retient deja une configuration explicite pour ChiffrerPanier et conserve l'appel historique avec configuration vide. Aligner le modele de domaine sur ce contrat, ou marquer le contrat comme proposition non tranchee. (.skraft/us-2/design/domain-model.md)",
+              "[cold-reader#1.3, major, deliverable] Le modele evenementiel indique que le point d'invocation et la forme du rejet ne sont pas fixes, mais contracts.md tranche la validation a la construction et precise les exceptions de rejet. Cette divergence laisse le cycle de validation ambigu pour le lecteur. (.skraft/us-2/design/event-model.md)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 28,
+        "entrée": 1231090,
+        "sortie": 24827,
+        "nanoAiu": 69920010000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 394946,
+        "effetsMs": 395407,
+        "codeMs": 461,
+        "moteurMs": 1
+      },
+      {
+        "phase": "REVIEW",
+        "début": "2026-10-10T12:51:10.556Z",
+        "duréeMs": 80889,
+        "tours": 14,
+        "essaisMax": 2,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 34,
+        "entrée": 1222453,
+        "sortie": 12941,
+        "nanoAiu": 64049328450,
+        "modèles": [
+          "gpt-6.1-sol",
+          "gpt-6-luna"
+        ],
+        "agentsMs": 217627,
+        "effetsMs": 80475,
+        "codeMs": 0,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DISTILL",
+        "début": "2026-10-10T12:53:29.462Z",
+        "duréeMs": 204051,
+        "tours": 3,
+        "essaisMax": 2,
+        "rejets": [
+          {
+            "porte": "revue",
+            "motifs": [
+              "[test-integrity#1.1, major, test] Le seul scénario multi-ligne attend zéro pour deux lignes inéligibles. Tous les cas de remise positive portent sur une seule ligne : un mutant qui évalue uniquement la première ligne et ignore les suivantes satisfait donc les sept tests. La séparation des quantités est vérifiée, mais pas le calcul et l'addition des remises de chaque ligne, pourtant prévus dans consistency-matrix.md. Ajouter un test d'acceptance passant par Chiffrer avec deux références différentes de 10 articles à 2,00 € et le palier 10 / 5 %, puis assertant Facture.Remise = 2,00 €. Ce test distingue une véritable évaluation par ligne d'une implémentation limitée à la première ligne, sans dupliquer une couverture existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:69)",
+              "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+            ]
+          },
+          {
+            "porte": "RED d'acceptance",
+            "motifs": [
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac5_Le_client_ne_recoit_pas_de_remise_sans_palier_configure » (critère 5) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac4_Les_quantites_de_references_differentes_ne_se_cumulent_pas » (critère 4) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+              "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac1_Le_client_ne_recoit_pas_de_remise_sous_le_seuil » (critère 1) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement."
+            ]
+          }
+        ],
+        "finsAnormales": [],
+        "appels": 16,
+        "entrée": 765008,
+        "sortie": 11371,
+        "nanoAiu": 35412876000,
+        "modèles": [
+          "gpt-6.1-sol"
+        ],
+        "agentsMs": 196159,
+        "effetsMs": 203589,
+        "codeMs": 7430,
+        "moteurMs": 0
+      },
+      {
+        "phase": "DELIVER",
+        "début": "2026-10-10T12:57:22.724Z",
+        "duréeMs": 154,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 147,
+        "codeMs": 147,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ESCALATED",
+        "début": "2026-10-10T12:57:22.841Z",
+        "duréeMs": 442,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 415,
+        "codeMs": 415,
+        "moteurMs": 0
+      },
+      {
+        "phase": "ABORTED",
+        "début": "2026-10-10T12:57:23.320Z",
+        "duréeMs": 0,
+        "tours": 0,
+        "essaisMax": 0,
+        "rejets": [],
+        "finsAnormales": [],
+        "appels": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "nanoAiu": 0,
+        "modèles": [],
+        "agentsMs": 0,
+        "effetsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0
+      }
+    ],
+    "total": {
+      "duréeMs": 830786,
+      "tours": 26,
+      "appels": 96,
+      "entrée": 3660717,
+      "sortie": 57749,
+      "nanoAiu": 196840854450,
+      "agentsMs": 956377,
+      "effetsMs": 828543,
+      "codeMs": 9318,
+      "moteurMs": 2,
+      "rejets": 4
+    }
+  },
+  "comparable": {
+    "etapes": [
+      {
+        "etape": "PRÉPARATION",
+        "sousEtapes": [],
+        "duréeMs": 1,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 1,
+        "agentsMs": 0,
+        "codeMs": 53,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      },
+      {
+        "etape": "DIFFICULTÉ",
+        "sousEtapes": [
+          "classifieur",
+          "confirmation"
+        ],
+        "duréeMs": 14879,
+        "attenteHumaineMs": 4,
+        "horsAttenteMs": 14875,
+        "agentsMs": 14375,
+        "codeMs": 490,
+        "moteurMs": 1,
+        "tours": 1,
+        "appels": 5,
+        "nanoAiu": 4574052000,
+        "entrée": 77487,
+        "sortie": 376,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "RESEARCH",
+        "sousEtapes": [
+          "blocage"
+        ],
+        "duréeMs": 134060,
+        "attenteHumaineMs": 3,
+        "horsAttenteMs": 134057,
+        "agentsMs": 133270,
+        "codeMs": 318,
+        "moteurMs": 0,
+        "tours": 3,
+        "appels": 13,
+        "nanoAiu": 22884588000,
+        "entrée": 364679,
+        "sortie": 8234,
+        "essaisMax": 1,
+        "rejets": 1,
+        "interventions": 1
+      },
+      {
+        "etape": "QUESTIONS",
+        "sousEtapes": [],
+        "duréeMs": 7,
+        "attenteHumaineMs": 2,
+        "horsAttenteMs": 5,
+        "agentsMs": 0,
+        "codeMs": 1,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 1
+      },
+      {
+        "etape": "DESIGN",
+        "sousEtapes": [
+          "blocage",
+          "revue"
+        ],
+        "duréeMs": 447981,
+        "attenteHumaineMs": 5,
+        "horsAttenteMs": 447976,
+        "agentsMs": 520186,
+        "codeMs": 464,
+        "moteurMs": 1,
+        "tours": 11,
+        "appels": 46,
+        "nanoAiu": 108589482450,
+        "entrée": 1756935,
+        "sortie": 32962,
+        "essaisMax": 1,
+        "rejets": 1,
+        "interventions": 1
+      },
+      {
+        "etape": "DISTILL",
+        "sousEtapes": [
+          "revue"
+        ],
+        "duréeMs": 233262,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 233262,
+        "agentsMs": 288546,
+        "codeMs": 7430,
+        "moteurMs": 0,
+        "tours": 11,
+        "appels": 32,
+        "nanoAiu": 60792732000,
+        "entrée": 1461616,
+        "sortie": 16177,
+        "essaisMax": 2,
+        "rejets": 2,
+        "interventions": 0
+      },
+      {
+        "etape": "DELIVER",
+        "sousEtapes": [
+          "escalade"
+        ],
+        "duréeMs": 596,
+        "attenteHumaineMs": 12,
+        "horsAttenteMs": 584,
+        "agentsMs": 0,
+        "codeMs": 562,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 3
+      },
+      {
+        "etape": "BILAN",
+        "sousEtapes": [
+          "abandon"
+        ],
+        "duréeMs": 0,
+        "attenteHumaineMs": 0,
+        "horsAttenteMs": 0,
+        "agentsMs": 0,
+        "codeMs": 0,
+        "moteurMs": 0,
+        "tours": 0,
+        "appels": 0,
+        "nanoAiu": 0,
+        "entrée": 0,
+        "sortie": 0,
+        "essaisMax": 0,
+        "rejets": 0,
+        "interventions": 0
+      }
+    ],
+    "rejeux": [
+      {
+        "etape": "RESEARCH",
+        "essai": 1,
+        "nature": "porte",
+        "porte": "citations",
+        "motifs": [
+          "Section manquante : « Recommandation ».",
+          "Section manquante : « Passage de relais ».",
+          "`stories/US-2.md:14-15` : plage hors du fichier, qui compte 14 lignes.",
+          "`tests/Tarification.Tests/CalculDuPanierTests.cs:13-51` : plage hors du fichier, qui compte 50 lignes.",
+          "`tests/Tarification.Tests/CalculDuPanierTests.cs:16-51` : plage hors du fichier, qui compte 50 lignes."
+        ]
+      },
+      {
+        "etape": "DESIGN",
+        "essai": 1,
+        "nature": "revue",
+        "porte": "revue",
+        "motifs": [
+          "[cold-reader#1.1, major, deliverable] Le modele dit que l'emplacement de la regle de remise n'est pas decide (Panier, LigneDePanier ou politique separee), alors que contracts.md attribue l'evaluation des lignes a ConfigurationDePaliers et diagrams.md represente explicitement ce flux. Le lecteur ne peut pas savoir si cette responsabilite est une decision de conception ou reste ouverte. (.skraft/us-2/design/domain-model.md)",
+          "[cold-reader#1.2, major, deliverable] La transmission de ConfigurationDePaliers au calcul est presentee comme une decision future, alors que contracts.md retient deja une configuration explicite pour ChiffrerPanier et conserve l'appel historique avec configuration vide. Aligner le modele de domaine sur ce contrat, ou marquer le contrat comme proposition non tranchee. (.skraft/us-2/design/domain-model.md)",
+          "[cold-reader#1.3, major, deliverable] Le modele evenementiel indique que le point d'invocation et la forme du rejet ne sont pas fixes, mais contracts.md tranche la validation a la construction et precise les exceptions de rejet. Cette divergence laisse le cycle de validation ambigu pour le lecteur. (.skraft/us-2/design/event-model.md)",
+          "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+        ]
+      },
+      {
+        "etape": "DISTILL",
+        "essai": 1,
+        "nature": "revue",
+        "porte": "revue",
+        "motifs": [
+          "[test-integrity#1.1, major, test] Le seul scénario multi-ligne attend zéro pour deux lignes inéligibles. Tous les cas de remise positive portent sur une seule ligne : un mutant qui évalue uniquement la première ligne et ignore les suivantes satisfait donc les sept tests. La séparation des quantités est vérifiée, mais pas le calcul et l'addition des remises de chaque ligne, pourtant prévus dans consistency-matrix.md. Ajouter un test d'acceptance passant par Chiffrer avec deux références différentes de 10 articles à 2,00 € et le palier 10 / 5 %, puis assertant Facture.Remise = 2,00 €. Ce test distingue une véritable évaluation par ligne d'une implémentation limitée à la première ligne, sans dupliquer une couverture existante. (tests/Tarification.Tests/RemiseParQuantiteAcceptanceTests.cs:69)",
+          "Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain."
+        ]
+      },
+      {
+        "etape": "DISTILL",
+        "essai": 2,
+        "nature": "porte",
+        "porte": "RED d'acceptance",
+        "motifs": [
+          "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac5_Le_client_ne_recoit_pas_de_remise_sans_palier_configure » (critère 5) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+          "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac4_Les_quantites_de_references_differentes_ne_se_cumulent_pas » (critère 4) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement.",
+          "Le test d'acceptance « Tarification.Tests.RemiseParQuantiteAcceptanceTests.Ac1_Le_client_ne_recoit_pas_de_remise_sous_le_seuil » (critère 1) passe déjà : requalifiez-le en non-régression avec une justification dans test-plan.md, ou faites-le piloter un nouveau comportement."
+        ]
+      }
+    ],
+    "total": {
+      "duréeMs": 830786,
+      "attenteHumaineMs": 26,
+      "horsAttenteMs": 830760,
+      "agentsMs": 956377,
+      "codeMs": 9318,
+      "moteurMs": 2,
+      "tours": 26,
+      "appels": 96,
+      "nanoAiu": 196840854450,
+      "entrée": 3660717,
+      "sortie": 57749,
+      "rejets": 4,
+      "interventions": 7
+    }
+  },
+  "releves": [
+    {
+      "at": "2026-10-10T12:43:32.321Z",
+      "etape": "départ",
+      "restantes": 41407
+    },
+    {
+      "at": "2026-10-10T12:43:32.535Z",
+      "etape": "CLASSIFY",
+      "restantes": 41407
+    },
+    {
+      "at": "2026-10-10T12:43:47.401Z",
+      "etape": "CONFIRM_DIFFICULTY",
+      "restantes": 41407
+    },
+    {
+      "at": "2026-10-10T12:43:47.414Z",
+      "etape": "RESEARCH",
+      "restantes": 41407
+    },
+    {
+      "at": "2026-10-10T12:44:05.106Z",
+      "etape": "BLOCKED",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:44:05.116Z",
+      "etape": "RESEARCH",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:46:01.474Z",
+      "etape": "ROUTE",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:46:01.481Z",
+      "etape": "DESIGN",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:46:33.625Z",
+      "etape": "BLOCKED",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:46:33.640Z",
+      "etape": "DESIGN",
+      "restantes": 41379
+    },
+    {
+      "at": "2026-10-10T12:51:10.556Z",
+      "etape": "REVIEW",
+      "restantes": 41334
+    },
+    {
+      "at": "2026-10-10T12:51:47.892Z",
+      "etape": "DESIGN",
+      "restantes": 41334
+    },
+    {
+      "at": "2026-10-10T12:53:14.901Z",
+      "etape": "REVIEW",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:53:29.243Z",
+      "etape": "DESIGN",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:53:29.462Z",
+      "etape": "DISTILL",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:55:35.604Z",
+      "etape": "REVIEW",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:55:51.561Z",
+      "etape": "DISTILL",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:09.283Z",
+      "etape": "REVIEW",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:22.537Z",
+      "etape": "DISTILL",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:22.724Z",
+      "etape": "DELIVER",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:22.841Z",
+      "etape": "ESCALATED",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:22.981Z",
+      "etape": "DELIVER",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:22.995Z",
+      "etape": "ESCALATED",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:23.159Z",
+      "etape": "DELIVER",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:23.182Z",
+      "etape": "ESCALATED",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:23.320Z",
+      "etape": "ABORTED",
+      "restantes": 41261
+    },
+    {
+      "at": "2026-10-10T12:57:29.572Z",
+      "etape": "fin",
+      "restantes": 41261
+    }
+  ],
+  "brancheRun": "tests/us-2/extension-1",
+  "etatFinal": {
+    "stage": "ABORTED",
+    "phase": "DELIVER"
+  }
+}

@@ -65,7 +65,7 @@ ne voit jamais le SDK : seulement l'API `ctx`.
 | `packages/task-engine` | Réducteur pur, effets, persistance, reprise après redémarrage |
 | `packages/workspace` | Seul service à toucher le disque et Git |
 | `packages/runtime-copilot` | Adaptateur du port `AgentRuntime` vers le Copilot SDK |
-| `packages/stack-adapters` | Lancement des tests par langage (TypeScript/Vitest, Swift/XCTest) |
+| `packages/stack-adapters` | Lancement des tests par langage (TypeScript/Vitest ; profils déclaratifs pour les autres) |
 | `packages/extension-*` | API, hôte isolé, manifeste, empaquetage signé, installation |
 | `extensions/{tdd,skraft}` | Les deux méthodes de travail |
 

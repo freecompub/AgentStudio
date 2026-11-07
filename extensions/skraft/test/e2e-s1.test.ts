@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, git, type HangPoint, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
+import { acceptanceWriter, answerQuestions, assemble, createProject, fakeStack, git, type HangPoint, put, researchDoc, ROLE, shutdownHosts, simulatedAgents, stateOf, unitTestWriter, until } from "./support/harness.js";
 
 type App = Awaited<ReturnType<typeof assemble>>;
 
@@ -44,6 +44,238 @@ describe("skraft — critères de sortie de S1", () => {
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
+  it.each(["failed", "skipped", "exit", "timeout"] as const)("précontrôle %s : bloque avant le classifieur, sans appel LLM", async (status) => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const stack = fakeStack();
+    stack.runTests = async () => ({
+      results: [{ id: "test existant", file: "tests/existing.test.ts", status: status === "failed" || status === "skipped" ? status : "passed" }],
+      exitCode: status === "exit" ? 1 : 0, timedOut: status === "timeout", output: "", durationMs: 1,
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED");
+    expect(runtime.history).toEqual([]);
+    expect(app.posted.join("\n")).toContain("bloqué avant tout appel");
+  });
+
+  it("la dette de couverture initiale est notifiée mais ne bloque pas le classifieur", async () => {
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90}}\n');
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const stack = fakeStack();
+    stack.runTests = async () => ({
+      results: [], exitCode: 0, timedOut: false, output: "", durationMs: 1,
+      coverage: { files: [{ file: "src/domain/bolus-calculator.ts", covered: 1, total: 2, score: 50 }] },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    expect(app.posted.join("\n")).toContain("avertissement non bloquant");
+    expect(app.posted.join("\n")).toContain("50 % (minimum 90 %)");
+    expect(runtime.history).toHaveLength(1);
+  });
+
+  it.each([true, false])("couverture du diff en isolation : ligne modifiée couverte=%s, dette historique inchangée", async (covered) => {
+    const before = "export class BolusCalculator {}\n\n\n\n\n\n\n// propriété existante non couverte\n";
+    await put(root, "src/domain/bolus-calculator.ts", before);
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
+    const stack = fakeStack();
+    const original = stack.runTests;
+    stack.runTests = async (opts) => ({
+      ...await original(opts),
+      coverage: { files: [
+        { file: "src/domain/bolus-calculator.ts", covered: covered ? 1 : 0, total: 2, score: covered ? 50 : 0, lines: [{ number: 1, covered }, { number: 8, covered: false }] },
+        { file: "src/domain/bolus-cap.ts", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+      ] },
+    });
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        await put(root, "src/domain/bolus-calculator.ts", before.replace("{}", "{ /* raccordement */ }"));
+        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    const state = stateOf(await app.engine.status(id))!;
+    expect(state.stage).toBe(covered ? "DONE" : "ESCALATED");
+    if (covered) {
+      expect(state.deliver?.facts?.join("\n")).toContain("Couverture du diff (tâche) : src/domain/bolus-calculator.ts à 100 %");
+      expect(app.posted.join("\n")).toContain("avertissement non bloquant");
+    } else {
+      expect(state.escalation?.reason).toContain("Lignes non couvertes : 1.");
+      expect(state.escalation?.reason).not.toContain("non couvertes : 8");
+    }
+  }, 90_000);
+
+  // D5 (docs/12) : une source écrite en DISTILL n'est vue que par la porte de fin de DELIVER. Les
+  // scénarios étant verts, rejouer la phase ne ferait travailler personne : le motif va au testeur.
+  it("couverture du diff en fin de DELIVER sur une source de DISTILL : correction ciblée par le testeur, puis livré", async () => {
+    await put(root, ".skraft/quality.json", '{"coverage":{"core":90},"mutation":{"active":false}}\n');
+    const stack = fakeStack();
+    const original = stack.runTests;
+    // La ligne du squelette n'est couverte qu'une fois le second test unitaire écrit.
+    stack.runTests = async (opts) => {
+      const unit = await readFile(join(root, "tests/unit/bolus-cap.test.ts"), "utf8").catch(() => "");
+      const covered = unit.includes("plafond 2");
+      return {
+        ...await original(opts),
+        coverage: { files: [
+          { file: "src/domain/bolus-stub.ts", covered: covered ? 1 : 0, total: 1, score: covered ? 100 : 0, lines: [{ number: 1, covered }] },
+          { file: "src/domain/bolus-cap.ts", covered: 1, total: 1, score: 100, lines: [{ number: 1, covered: true }] },
+        ] },
+      };
+    };
+    const testPrompts: string[] = [];
+    const writeTest = unitTestWriter(root);
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await put(root, "src/domain/bolus-stub.ts", "export const plafond = (dose: number, max: number) => Math.min(dose, max);\n");
+        await accept(t);
+      },
+      "skraft-test": async (t) => {
+        testPrompts.push(t.prompt);
+        await writeTest(t);
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { stack, isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const correction = testPrompts.find((p) => p.includes("[couverture#"));
+    expect(correction).toMatch(/\[couverture#\d+\.1, major, test\].*src\/domain\/bolus-stub\.ts, lignes non couvertes : 1\..*test qui exerce/s);
+  }, 90_000);
+
+  // D5 (docs/12) : revue de DELIVER sans défaut bloquant ni majeur, alors que tout est vert.
+  it("revue de DELIVER à défauts mineurs seulement : le développeur les corrige, puis livré", async () => {
+    let deliverReviews = 0;
+    const devPrompts: string[] = [];
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        devPrompts.push(t.prompt);
+        // En correction, le développeur renomme : un pas de correction doit modifier le code.
+        const corrige = t.prompt.includes("mineur1");
+        await put(root, "src/domain/bolus-cap.ts", corrige ? "export class PlafondDeBolus {}\nexport { PlafondDeBolus as BolusCap };\n" : "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: ["src/domain/bolus-cap.ts"] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        const premiere = t.prompt.includes("phase DELIVER") && deliverReviews++ === 0;
+        await t.callTool("submit_lens_verdict", premiere
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague : BolusCap", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    expect(devPrompts.some((p) => p.includes("[cold-reader#1.mineur1, minor, code] nom vague : BolusCap"))).toBe(true);
+  }, 90_000);
+
+  // D7 (docs/12) : contester n'oblige pas à modifier le code ; la lentille arbitre.
+  it("correction de DELIVER où le développeur conteste tout : pas refusé pour « aucun fichier modifié », la lentille arbitre", async () => {
+    const lensPrompts: string[] = [];
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-dev": async (t) => {
+        if (t.prompt.includes("[cold-reader#1.1")) {
+          await t.callTool("report_phase", { summary: "contesté", files: [], responses: [{ defect: "cold-reader#1.1", status: "contested", reason: "Le contrat ratifié impose ce nom." }] });
+          return;
+        }
+        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
+        await t.callTool("report_phase", { summary: "code", files: ["src/domain/bolus-cap.ts"] });
+      },
+      "skraft-lens-cold-reader": async (t) => {
+        if (!t.prompt.includes("phase DELIVER")) return void (await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "APPROVED", defects: [] }));
+        lensPrompts.push(t.prompt);
+        await t.callTool("submit_lens_verdict", lensPrompts.length === 1
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague : BolusCap", target: "code" }] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [], rulings: [{ defect: "cold-reader#1.1", decision: "accepted", reason: "Le contrat fait foi." }] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.escalation?.reason).toBeUndefined();
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    expect(lensPrompts[1]).toContain("Le contrat ratifié impose ce nom.");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet") as { motifs: string[] }[];
+    expect(rejets.flatMap((r) => r.motifs).some((m) => m.startsWith("Aucun fichier de production modifié"))).toBe(false);
+  }, 90_000);
+
+  it("revue de DELIVER « changements demandés » sans aucun défaut : escalade, personne à qui l'adresser", async () => {
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-lens-cold-reader": async (t) => {
+        await t.callTool("submit_lens_verdict", t.prompt.includes("phase DELIVER")
+          ? { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] }
+          : { lens: "cold-reader", verdict: "APPROVED", defects: [] });
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED", 60_000);
+    const s = stateOf(await app.engine.status(id))!;
+    expect(s.escalation?.reason).toContain("Revue sans défaut à corriger");
+  }, 90_000);
+
+  it("plans de DISTILL incomplets : rejet sous « plan de test », avant toute exécution (option C de docs/15 §4.5)", async () => {
+    let essais = 0;
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await accept(t);
+        if (essais++ === 0) {
+          await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n");
+          await put(root, ".skraft/us-12/distill/test-plan.md", "# Plan de test\n");
+        }
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: [
+      "impl-plan.md : aucune étape du critère 1 (ac-1) ne nomme son fichier de test (« - Test : `chemin` »).",
+      "impl-plan.md ne cite pas le critère 2 (ac-2) : chaque critère y a sa place dans l'ordre de livraison.",
+      "impl-plan.md ne cite pas le critère 3 (ac-3) : chaque critère y a sa place dans l'ordre de livraison.",
+      "test-plan.md n'a pas de matrice de couverture : un tableau aux colonnes Scénario, Cas d'usage, Couche, Doublure, Walking skeleton, une ligne par critère.",
+      "test-plan.md ne désigne aucun walking skeleton : au moins une ligne de la matrice porte « oui », ou sa stratégie, dans la colonne Walking skeleton.",
+    ] }));
+  }, 90_000);
+
+  it("plan de test absent : rejet tracé sous sa propre porte, pas sous « valeurs » (D11)", async () => {
+    let essais = 0;
+    const accept = acceptanceWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-acceptance": async (t) => {
+        await accept(t);
+        if (essais++ === 0) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+      },
+    });
+    const app = await assemble(root, runtime, tasksDir, { isolated: true });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    const id = await taskId(app);
+    await confirmDifficulty(app);
+    await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us-12/distill/test-plan.md"] }));
+  }, 90_000);
+
   it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
     const app = await assemble(root, runtime, tasksDir, { isolated });
@@ -64,7 +296,7 @@ describe("skraft — critères de sortie de S1", () => {
     expect(git(root, "log", "--format=%s", `${s.baseSha}..HEAD`).split("\n")).toEqual([
       "feat(us-12): livraison de la story",
       "feat(us-12): ac-1",
-      "test(us-12): ac-1, UnitTests.BolusCapTests/testCap1",
+      "test(us-12): ac-1, tests/unit/bolus-cap.test.ts > plafond 1",
       "docs(skraft): distill de us-12",
       "docs(skraft): design de us-12",
       "docs(skraft): research de us-12",
@@ -86,6 +318,8 @@ describe("skraft — critères de sortie de S1", () => {
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
     ]);
+    // Le rapport final est publié par un effet, après la transition vers DONE : on l'attend.
+    await until(async () => app.posted.some((p) => p.includes("Pipeline skraft terminé")), 60_000);
     expect(app.posted.at(-1)).toMatch(/Pipeline skraft terminé pour \*\*US-12\*\*/);
     // Usage par état (D37).
     expect((await app.usage.report(id)).map((r) => r.phase)).toEqual(expect.arrayContaining(["CLASSIFY", "RESEARCH", "DESIGN", "REVIEW", "DELIVER"]));

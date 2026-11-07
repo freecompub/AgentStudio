@@ -16,8 +16,8 @@ export function createNodeCommandRunner(timeoutMs = 30_000): CommandRunner {
 
 export function createNodeProcessSpawner(): ProcessSpawner {
   return {
-    spawn(cmd, args): InteractiveProcess {
-      const child = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+    spawn(cmd, args, opts): InteractiveProcess {
+      const child = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"], ...(opts?.env ? { env: { ...process.env, ...opts.env } } : {}) });
       const exited = new Promise<number>((resolve, reject) => {
         child.on("error", reject);
         child.on("close", (code) => resolve(code ?? 1));

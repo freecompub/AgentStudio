@@ -1,10 +1,12 @@
 import type { TaskEvent } from "@agent-studio/task-engine";
+import { skillDArchitecture } from "./architecture.js";
 import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole } from "./config.js";
-import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty } from "./difficulty.js";
+import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
+import type { MutantSurvivant } from "./deliver.js";
 import { synthesize, type LensVerdict } from "./review.js";
-import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, reviewRound, type DefectThread } from "./review-thread.js";
-import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, startReviewFix } from "./deliver-machine.js";
+import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
+import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
 type Out = { state: SkraftState; effects: SkraftEffect[] };
@@ -35,6 +37,7 @@ export function initialState(input: SkraftInput): SkraftState {
     pendingInteraction: null,
     deliver: null,
     confirmDifficulty: input.confirmDifficulty ?? true,
+    architecture: skillDArchitecture(input.archi).skill,
     story: null,
     indicators: null,
     proposed: null,
@@ -72,6 +75,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
   if (e.type === "ABORT") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (e.type === "RESUMED") return same;
   if (e.type === "ENV_FAILURE") return escalate(s, e.reason);
+  // Demande de question créée : notée quel que soit le stade, une panne sur une autre question a pu
+  // faire escalader entre-temps (D17 de docs/12).
+  if (e.type === "QUESTION_ASKED") return { state: { ...s, questionsConfirmees: uniq([...(s.questionsConfirmees ?? []), e.id]) }, effects: [] };
 
   switch (s.stage) {
     case "INIT":
@@ -79,11 +85,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
         const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
         return {
-          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions },
+          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}) },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
         };
       }
-      if (e.type === "INIT_FAILED") return escalateFrom(s, "INIT", `Story invalide : ${e.reasons.join(" ; ")}`, ["retry", "abort"]);
+      if (e.type === "INIT_FAILED") return escalateFrom(s, "INIT", `Préparation skraft refusée : ${e.reasons.join(" ; ")}`, ["retry", "abort"]);
       break;
 
     case "CLASSIFY":
@@ -111,8 +117,10 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (r) return r;
       }
       if (e.type === "PHASE_CHECKPOINTED" && e.phase === p) {
-        const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId } };
-        return { state: ns, effects: [specialist(ns, [])] };
+        // Le rejet « commit » d'une phase précédente, continuée sans commit, a été tracé : il ne
+        // concerne pas cette phase (D19 de docs/12).
+        const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId }, ...(s.lastRejection?.gate === "commit" ? { lastRejection: null } : {}) };
+        return lancer(ns, []);
       }
       if (e.type === "AGENT_REPORTED") {
         // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
@@ -120,7 +128,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (p === "DESIGN" && s1.designStep === "model") {
           // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
           const ns: SkraftState = { ...s1, designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, s1.lastRejection?.reasons ?? [])] };
+          return lancer(ns, s1.lastRejection?.reasons ?? []);
         }
         return { state: { ...s1, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s1.attempts + 1 }] };
       }
@@ -133,9 +141,11 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "BLOCKED":
       if (e.type === "HUMAN_DECISION" && s.blocker && s.phase) {
         const answer = e.comment ? `${e.decision} (${e.comment})` : e.decision;
+        if (s.blocker.lens) return afterReviewQuestion(s, s.blocker.lens, s.blocker.question, answer);
         const ns: SkraftState = { ...s, stage: "SPECIALIST", blocker: null, answers: [...s.answers, { question: s.blocker.question, answer }] };
-        if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, []);
-        return { state: ns, effects: [specialist(ns, [])] };
+        // L'agent repart avec le retour qu'il avait avant sa question (D9 de docs/12).
+        if (ns.phase === "DELIVER" && ns.deliver) return resumeDeliver(ns, ns.deliver.feedback);
+        return lancer(ns, s.retour ?? []);
       }
       break;
 
@@ -143,28 +153,48 @@ export function transition(s0: SkraftState, e: Ev): Out {
       const p = s.phase;
       if (!p) break;
       if (e.type === "GATE_OK") {
-        const known = new Set(s.adrs.map((a) => a.id));
+        // Seule la conception produit des ADR (§7.2). Les propositions de la phase sont celles que la
+        // porte vient de lire sur le disque : une proposition d'un essai précédent, renommée ou
+        // retirée depuis, ne survit pas (D2 de docs/12). Les ADR décidés et ceux d'avant la phase restent.
+        const avant = new Set((s.adrsAvantPhase ?? []).map((a) => a.id));
+        const gardes = s.adrs.filter((a) => a.status !== "Proposed" || avant.has(a.id));
+        const known = new Set(gardes.map((a) => a.id));
         const ns: SkraftState = {
           ...s,
           artifacts: { ...s.artifacts, [p]: [...s.artifacts[p], ...e.artifacts] },
-          // Seule la conception produit des ADR (§7.2).
-          adrs: p === "DESIGN" ? [...s.adrs, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
+          adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
           openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
+          ...(p === "RESEARCH" && e.recherche ? { recherche: e.recherche } : {}),
+          ...(p === "DISTILL" && e.planDeTest ? { planDeTest: e.planDeTest } : {}),
           lastRejection: null,
           // Mutation de fin de DELIVER (ADR 0049) : ses faits et notes vont aux lentilles.
           ...(p === "DELIVER" && s.deliver && (e.facts?.length || e.notes?.length)
             ? { deliver: { ...s.deliver, facts: [...new Set([...(s.deliver.facts ?? []), ...(e.facts ?? [])])], notes: [...new Set([...s.deliver.notes, ...(e.notes ?? [])])] } }
             : {}),
-          // Gel des tests d'acceptance à la sortie de DISTILL (écrit une seule fois).
-          ...(p === "DISTILL" && e.acceptanceHash && !s.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
+          // Empreinte de l'essai validé ; un refus de DISTILL l'invalide avant correction.
+          ...(p === "DISTILL" && e.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
         };
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
       }
-      // Mutant survivant en fin de DELIVER (ADR 0049) : un test trop faible, pas une phase à refaire.
-      // Chaque motif devient un défaut adressé au testeur, par la correction de l'ADR 0046.
-      if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "mutation" && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase)
-        return startReviewFix(s, [...(s.reviewThreads ?? []), ...mutationThreads(e.reasons, s.attempts + 1)]);
+      // Porte de fin de DELIVER avec une cible (ADR 0049, D5 de docs/12) : les scénarios sont verts,
+      // rejouer la phase ne ferait travailler personne. Chaque motif devient un défaut adressé à
+      // l'agent concerné, par la correction de l'ADR 0046.
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && Object.hasOwn(CORRECTIONS_DE_FIN, e.gate) && s.deliver?.stepCheckpoint && s.attempts + 1 < s.budget.maxAttemptsPerPhase) {
+        const threads = [
+          ...(s.reviewThreads ?? []),
+          // Mutation : un défaut par mutant survivant, qui peut être tué ou contesté puis arbitré (ADR 0065).
+          ...(e.gate === "mutation" && e.mutants?.length
+            ? mutationThreads(e.mutants, s.attempts + 1)
+            : e.gate === "couverture du diff" && e.lignes?.length
+              ? couvertureThreads(e.lignes, s.attempts + 1)
+              : endGateThreads(e.gate, e.reasons, s.attempts + 1)),
+        ];
+        // Les fils sont tenus dans l'état, comme ceux d'une revue : les réponses de l'agent s'y appliquent.
+        return startReviewFix({ ...s, reviewThreads: threads }, threads);
+      }
+      // Rien produit : personne à qui adresser le motif, l'humain décide sans qu'un essai soit consommé (D5).
+      if (e.type === "GATE_FAIL" && p === "DELIVER" && e.gate === "livrables") return escalate(s, `${e.gate} : ${e.reasons.join(" ; ")}`);
       if (e.type === "GATE_FAIL") return failure(s, e.gate, e.reasons);
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
@@ -188,6 +218,15 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (r.persistent.length) return { state: { ...ns, stage: "ARBITRATION" }, effects: r.persistent.map((thread) => ({ kind: "askArbitration", thread })) };
         return resolveReview(ns, r.lenses, false);
       }
+      if (e.type === "LENS_BLOCKED") {
+        // D4 de docs/12 : une question n'est pas un échec du producteur ; elle part à l'humain.
+        const n = (s.reviewQuestions ?? 0) + 1;
+        if (n > MAX_QUESTIONS_DE_REVUE) return escalate(s, `Plus de ${MAX_QUESTIONS_DE_REVUE} questions de revue dans la phase ${p} : « ${e.question} » (${e.lens})`);
+        return {
+          state: { ...s, stage: "BLOCKED", reviewQuestions: n, blocker: { question: e.question, choices: e.choices, lens: e.lens } },
+          effects: [{ kind: "askBlocker", question: e.question, choices: e.choices, lens: e.lens }],
+        };
+      }
       if (e.type === "TIMEOUT") return failure(s, "délai", tourInterrompu(e.reason));
       break;
     }
@@ -199,17 +238,16 @@ export function transition(s0: SkraftState, e: Ev): Out {
         if (!adr || !["accept", "reject", "amend"].includes(action ?? "")) break;
         if (action === "amend") {
           const ns: SkraftState = { ...s, stage: "SPECIALIST", designStep: "decide" };
-          return { state: ns, effects: [specialist(ns, [`Amendement demandé sur ${adr.id} : ${e.comment ?? "(sans précision)"}`])] };
+          return lancer(ns, [`Amendement demandé sur ${adr.id} : ${e.comment ?? "(sans précision)"}`]);
         }
         const status = action === "accept" ? "Accepted" : "Rejected";
         const adrs = s.adrs.map((a): AdrRecord => (a.id === adr.id ? { ...a, status, decisionBy: "user" } : a));
         const ns: SkraftState = { ...s, adrs };
-        if (adrs.some((a) => a.status === "Proposed")) return { state: ns, effects: [] };
-        // Statuts basculés dans les fichiers par le code, puis enregistrement de la phase (ou reprise de la route).
-        const apply: SkraftEffect = {
-          kind: "applyAdrStatuses",
-          adrs: adrs.filter((a) => a.status !== "Proposed").map((a) => ({ path: a.path, status: a.status as "Accepted" | "Rejected" })),
-        };
+        // Statut écrit dans le fichier par le code dès la décision (D3 de docs/12) : pendant
+        // l'amendement d'un autre ADR, celui-ci est déjà décidé, donc protégé.
+        const apply: SkraftEffect = { kind: "applyAdrStatuses", adrs: [{ path: adr.path, status }] };
+        if (adrs.some((a) => a.status === "Proposed")) return { state: ns, effects: [apply] };
+        // Tous décidés : enregistrement de la phase (ou reprise de la route).
         const next = ns.phase && !ns.phasesCompleted.includes(ns.phase) ? commit(ns) : route(ns);
         return { state: next.state, effects: [apply, ...next.effects] };
       }
@@ -218,11 +256,8 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "ROUTE":
       // Attente des réponses aux questions ouvertes (§7.1, §11) : réponse libre ou report explicite.
       if (e.type === "HUMAN_DECISION") {
-        const [action, id] = e.decision.split(":");
-        const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
-        if (!q || (action !== "answer" && action !== "defer")) break;
-        const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (e.comment ?? "").trim() || "(réponse vide)";
-        return route({ ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) });
+        const ns = repondre(s, e.decision, e.comment);
+        if (ns) return route(ns);
       }
       break;
 
@@ -233,11 +268,18 @@ export function transition(s0: SkraftState, e: Ev): Out {
       break;
 
     case "ESCALATED":
-      if (e.type === "HUMAN_DECISION" && s.escalation) return decide(s, e.decision);
+      if (e.type === "HUMAN_DECISION" && s.escalation) {
+        // Escalade en ROUTE : une question déjà posée peut recevoir sa réponse entre-temps (D17 de docs/12).
+        const ns = s.escalation.from === "ROUTE" ? repondre(s, e.decision, e.comment) : null;
+        if (ns) return { state: ns, effects: [] };
+        return decide(s, e.decision);
+      }
       break;
 
     case "ARBITRATION": {
       const p = s.phase;
+      // Arbitrage d'un mutant contesté, pendant une correction de DELIVER (ADR 0065).
+      if (p === "DELIVER" && s.deliver?.step === "mutation-arbitration") return deliverTransition(s, e) ?? same;
       if (e.type !== "HUMAN_DECISION" || !p) break;
       const threads = applyArbitration(s.reviewThreads ?? [], e.decision);
       const ns: SkraftState = { ...s, reviewThreads: threads };
@@ -253,16 +295,96 @@ export function transition(s0: SkraftState, e: Ev): Out {
 
 // ---------- aides -------------------------------------------------------------------
 
-/** Motifs de la mutation de fin de DELIVER → défauts adressés au testeur (ADR 0049). */
-function mutationThreads(reasons: string[], round: number): DefectThread[] {
+/** Au-delà, une question de revue escalade : le budget ne borne plus ces rejeux (D4 de docs/12). */
+const MAX_QUESTIONS_DE_REVUE = 2;
+
+/**
+ * Réponse à la question d'une lentille (D4 de docs/12) : une information nouvelle, pas un échec.
+ * La phase est rejouée avec la question et la réponse, sans consommer d'essai ; en DELIVER, où tout
+ * est déjà vert, seule la revue est relancée. La réponse rejoint celles de la story.
+ */
+function afterReviewQuestion(s: SkraftState, lens: LensName, question: string, answer: string): Out {
+  const p = s.phase!;
+  const motif = `Question de la revue (${lens}) : ${question} — Réponse de l'utilisateur : ${answer}`;
+  const ns: SkraftState = {
+    ...s,
+    blocker: null,
+    answers: [...s.answers, { question, answer }],
+    rejections: (s.rejections ?? 0) + 1,
+    lastRejection: { gate: "question de revue", reasons: [motif] },
+  };
+  if (p === "DELIVER") return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
+  const replay: SkraftState = { ...ns, stage: "SPECIALIST", designStep: "model" };
+  return lancer(replay, [motif]);
+}
+
+/**
+ * Portes de fin de DELIVER qui désignent leur correcteur : un test trop faible (mutation, lignes
+ * modifiées non couvertes) va au testeur, un test existant cassé au développeur.
+ */
+const CORRECTIONS_DE_FIN: Record<string, { id: string; target: "test" | "code"; consigne: string }> = {
+  mutation: {
+    id: "mutation",
+    target: "test",
+    consigne:
+      "Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. " +
+      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si le mutant est équivalent (aucune entrée ne le distingue du code), conteste-le en le démontrant : un arbitre jugera, et l'humain si besoin.",
+  },
+  "couverture du diff": {
+    id: "couverture",
+    target: "test",
+    consigne:
+      "Ajoute le test qui exerce ces lignes par un comportement observable. " +
+      "Si une ligne ne sert à aucun comportement (code superflu), déclare ce défaut `outOfScope` : il ira au développeur. " +
+      "Si elle ne peut pas être exercée (code défensif inatteignable), conteste le défaut avec ta raison : l'humain tranchera.",
+  },
+  "suite finale": {
+    id: "suite finale",
+    target: "code",
+    consigne: "Corrige le code pour que ce test repasse ; ne modifie pas ce test.",
+  },
+};
+
+/** Motifs d'une porte de fin de DELIVER → défauts adressés à son correcteur. */
+function endGateThreads(gate: string, reasons: string[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN[gate]!;
   return reasons.map((description, i) => ({
-    id: `mutation#${round}.${i + 1}`,
-    lens: "mutation",
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
     severity: "major" as const,
-    description:
-      `${description} Ajoute le test qui tue ce mutant : il doit passer sur le code actuel et échouer sur le mutant. ` +
-      "Si la ligne mutée ne sert à aucun comportement observable (code superflu), déclare ce défaut `outOfScope` : il ira au développeur.",
-    target: "test" as const,
+    description: `${description} ${c.consigne}`,
+    target: c.target,
+    status: "open" as const,
+    round,
+  }));
+}
+
+/** Lignes non couvertes → un défaut par fichier, adressé au testeur, qui garde ses lignes. */
+function couvertureThreads(lignes: { file: string; lines: number[] }[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN["couverture du diff"]!;
+  return lignes.map((x, i) => ({
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
+    severity: "major" as const,
+    description: `Couverture du diff : ${x.file}, lignes non couvertes : ${x.lines.join(", ")}. ${c.consigne}`,
+    target: c.target,
+    couverture: x,
+    status: "open" as const,
+    round,
+  }));
+}
+
+/** Mutants survivants → un défaut chacun, adressé au testeur, qui garde le mutant exact (ADR 0065). */
+function mutationThreads(mutants: MutantSurvivant[], round: number): DefectThread[] {
+  const c = CORRECTIONS_DE_FIN.mutation!;
+  return mutants.map((m, i) => ({
+    id: `${c.id}#${round}.${i + 1}`,
+    lens: c.id,
+    severity: "major" as const,
+    description: `Mutant survivant : ${m.file}:${m.line} (${m.operator})${m.replacement ? ` — code du mutant : ${m.replacement}` : ""}. ${c.consigne}`,
+    target: c.target,
+    mutant: m,
     status: "open" as const,
     round,
   }));
@@ -281,11 +403,23 @@ function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: b
     if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
     return commit(ns);
   }
-  if (verdict === "REJECTED") return escalate({ ...ns }, "Revue : verdict REJECTED");
+  if (verdict === "REJECTED") {
+    // Tracé comme tout rejet (D11 de docs/12) : sinon la cause n'existe que dans le texte de l'escalade.
+    const motifs = lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
+    return escalate({ ...ns, rejections: (ns.rejections ?? 0) + 1, lastRejection: { gate: "revue", reasons: motifs } }, `Revue : verdict REJECTED (${motifs.join(" ; ")})`);
+  }
   const threads = ns.reviewThreads ?? [];
   const active = threads.filter(isActive);
   // DELIVER : correction ciblée depuis le dernier vert, routée vers l'agent concerné (§9.3, ADR 0046).
   if (p === "DELIVER" && active.length && ns.deliver?.stepCheckpoint && (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || decidedByHuman)) return startReviewFix(ns, threads);
+  // DELIVER sans défaut bloquant ni majeur (D5 de docs/12) : tout est vert, rejouer la phase ne ferait
+  // travailler personne. Les mineurs sont corrigés comme des majeurs ; sans aucun défaut, personne à
+  // qui adresser la revue : l'humain décide, sans qu'un essai soit consommé.
+  if (p === "DELIVER" && !active.length && ns.deliver?.stepCheckpoint) {
+    const mineurs = minorThreads(lenses, ns.reviews[p].length);
+    if (!mineurs.length) return escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
+    if (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || ns.reviews[p].length === 1 || decidedByHuman) return startReviewFix(ns, [...threads, ...mineurs]);
+  }
   // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
   // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
   // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
@@ -312,6 +446,14 @@ const tourInterrompu = (raison: string): string[] => [
   "Ce que tu avais écrit est resté sur le disque, possiblement incomplet. Reprends-le et termine-le ; ne recommence pas de zéro, et ne considère aucun fichier comme fini sans l'avoir relu.",
 ];
 
+/**
+ * Lance le spécialiste de la phase. Son retour (motif de rejet, amendement, question de revue) est
+ * gardé dans l'état : une question bloquante ne le lui fait pas perdre (D9 de docs/12).
+ */
+function lancer(ns: SkraftState, feedback: string[], avant: SkraftEffect[] = []): Out {
+  return { state: { ...ns, retour: feedback }, effects: [...avant, specialist(ns, feedback)] };
+}
+
 function specialist(s: SkraftState, feedback: string[]): SkraftEffect {
   const p = s.phase!;
   // DELIVER : sous-machine par scénario, à partir du plan d'implémentation (§7.4).
@@ -324,6 +466,8 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
   const fx = levelEffects(level);
   return route({
     ...s,
+    // Le motif d'une relance du classifieur n'est pas un « rejet précédent » pour la première phase.
+    lastRejection: null,
     difficulty: { level, indicators: s.indicators, confirmedBy },
     skipPhases: fx.skipResearch ? ["RESEARCH"] : [],
     lenses: fx.lenses,
@@ -332,6 +476,15 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
 }
 
 /** Invariant 2 : prochaine phase de `phaseOrder` hors phases faites et sautées ; invariant 7 : pas de DISTILL avec un ADR proposé. */
+/** Réponse (ou report) à une question ouverte ; `null` si la décision ne la concerne pas. */
+function repondre(s: SkraftState, decision: string, comment: string | undefined): SkraftState | null {
+  const [action, id] = decision.split(":");
+  const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
+  if (!q || (action !== "answer" && action !== "defer")) return null;
+  const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (comment ?? "").trim() || "(réponse vide)";
+  return { ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) };
+}
+
 function route(s: SkraftState): Out {
   const pendingAdrs = s.adrs.filter((a) => a.status === "Proposed");
   if (pendingAdrs.length) return { state: { ...s, stage: "RATIFICATION" }, effects: pendingAdrs.map((adr) => ({ kind: "askRatification", adr })) };
@@ -346,7 +499,7 @@ function route(s: SkraftState): Out {
       effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text })),
     };
   }
-  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null }, effects: [{ kind: "checkpointPhase", phase: next }] };
+  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };
 }
 
 function commit(s: SkraftState): Out {
@@ -359,7 +512,9 @@ function commit(s: SkraftState): Out {
  * toute phase, donc `failure()` ne s'applique pas : le budget est compté ici, faute de quoi un
  * agent qui répond toujours de travers rebouclerait sans fin, une requête par tour (D24).
  */
-function relancerClassifieur(s: SkraftState, reason: string): Out {
+function relancerClassifieur(s0: SkraftState, reason: string): Out {
+  // Compté et tracé comme rejet, porte « classifieur » comme dans le workflow (D21 de docs/12).
+  const s: SkraftState = { ...s0, rejections: (s0.rejections ?? 0) + 1, lastRejection: { gate: "classifieur", reasons: [reason] } };
   const attempts = s.attempts + 1;
   if (attempts >= s.budget.maxAttemptsPerPhase) return escalateFrom({ ...s, attempts }, "CLASSIFY", reason, ["retry", "abort"]);
   return {
@@ -402,7 +557,32 @@ function rembobiner(s: SkraftState): SkraftEffect[] {
   return [{ kind: "rollback", to: cp }, ...(s.phase ? [{ kind: "forgetSessions", roles: phaseRoles(s.phase) } as SkraftEffect] : [])];
 }
 
-function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
+/**
+ * Le rembobinage efface les fichiers de la phase. La mémoire suit : la liste des ADR revient à
+ * celle du début de la phase (D2 de docs/12) — sans cela, la ratification portait sur un ADR effacé,
+ * et une phase sautée passait quand même en RATIFICATION —, et ses livrables sont oubliés (D6).
+ */
+function oublierLaPhase(s: SkraftState): SkraftState {
+  // Livrables du run effacé : leurs essais ne seront pas renumérotés, ils fausseraient les faits
+  // donnés aux lentilles (D6 de docs/12).
+  // Ajout seul (invariant 4, §5.3) : on n'efface pas, on marque où commence le run suivant.
+  // Rapports de revue du run effacé : pas réécrits au commit de la phase (D8 de docs/12).
+  const sansLivrables = s.phase
+    ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
+    : s;
+  // Le code effacé emporte les mutants exemptés (ADR 0065) ; les arbitrages, eux, restent tracés.
+  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [], ecartsAuPlan: [] } : sansLivrables;
+  return s.adrsAvantPhase ? { ...sansDerogations, adrs: s.adrsAvantPhase } : sansDerogations;
+}
+
+function leverGelDistill(s: SkraftState): SkraftState {
+  return s.phase === "DISTILL" && !s.phasesCompleted.includes("DISTILL")
+    ? { ...s, acceptanceHash: null, regressions: [] }
+    : s;
+}
+
+function failure(etat: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
+  const s0 = leverGelDistill(etat);
   const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
   const attempts = s.attempts + 1;
   const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
@@ -410,46 +590,78 @@ function failure(s0: SkraftState, gate: string, reasons: string[], essaiGaranti 
   const lastRejection = { gate, reasons };
   if (epuise) {
     return {
-      state: { ...s, stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
+      state: { ...oublierLaPhase(s), stage: "ESCALATED", attempts, lastRejection, escalation: { from: "PHASE", reason: `${gate} : ${reasons.join(" ; ")}` } },
       effects: [...rollback, { kind: "askEscalation", reason: `${gate} : ${reasons.join(" ; ")}`, options: ["retry", "skip", "abort"] }],
     };
   }
   const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model" };
-  return { state: ns, effects: [...rollback, specialist(ns, reasons)] };
+  return lancer(ns, reasons, rollback);
 }
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */
-function escalate(s: SkraftState, reason: string): Out {
+function escalate(etat: SkraftState, reason: string): Out {
+  // Commit d'une phase approuvée : rien à rembobiner, le travail est bon (D19 de docs/12). Testé avant
+  // de lever le gel : DISTILL approuvée garde son empreinte et ses non-régressions, que l'humain
+  // relance le commit ou continue sans (défaut relevé le 13/10, docs/skraft-fonctionnement).
+  if (etat.stage === "COMMIT") return escalateFrom(etat, "COMMIT", `Commit impossible : ${reason}`, ["retry", "continue", "abort"]);
+  const s = leverGelDistill(etat);
   if (s.stage === "INIT") return escalateFrom(s, "INIT", reason, ["retry", "abort"]);
   if (s.stage === "CLASSIFY" || s.stage === "CONFIRM_DIFFICULTY") return escalateFrom(s, "CLASSIFY", reason, ["retry", "abort"]);
+  // Hors de toute phase : rien à sauter ; « relancer » repose les questions (D17 de docs/12).
+  if (s.stage === "ROUTE") return escalateFrom(s, "ROUTE", reason, ["retry", "abort"]);
   if (s.stage === "SPECIALIST" && s.phase === "DELIVER" && s.deliver) return escalateDeliver(s, reason);
   return {
-    state: { ...s, stage: "ESCALATED", escalation: { from: "PHASE", reason } },
+    state: { ...oublierLaPhase(s), stage: "ESCALATED", escalation: { from: "PHASE", reason } },
     effects: [...rembobiner(s), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
   };
 }
 
-function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY", reason: string, options: ("retry" | "skip" | "abort")[]): Out {
+function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY" | "ROUTE" | "COMMIT", reason: string, options: ("retry" | "skip" | "continue" | "abort")[]): Out {
   return { state: { ...s, stage: "ESCALATED", escalation: { from, reason } }, effects: [{ kind: "askEscalation", reason, options }] };
 }
 
 function decide(s: SkraftState, decision: string): Out {
   const from = s.escalation!.from;
   if (decision === "abort") return { state: { ...s, stage: "ABORTED" }, effects: [] };
+  if (from === "COMMIT" && s.phase) {
+    // Le commit seul est refait ; ou la phase continue sans commit, choix tracé (rejet « commit »).
+    if (decision === "retry") return commit({ ...s, escalation: null });
+    if (decision === "continue") {
+      const motif = `Phase ${s.phase} approuvée mais ${s.escalation!.reason.charAt(0).toLowerCase()}${s.escalation!.reason.slice(1)} : continuée sans commit, ses fichiers partent dans le commit suivant.`;
+      return route({
+        ...s,
+        escalation: null,
+        phasesCompleted: [...s.phasesCompleted, s.phase],
+        attempts: 0,
+        designStep: "model",
+        reviewThreads: [],
+        rejections: (s.rejections ?? 0) + 1,
+        lastRejection: { gate: "commit", reasons: [motif] },
+        nonCommitees: [...(s.nonCommitees ?? []), s.phase],
+      });
+    }
+    return { state: s, effects: [] };
+  }
   if (decision === "retry") {
     if (from === "INIT") return { state: { ...s, stage: "INIT", escalation: null }, effects: [{ kind: "init", storyPath: s.storyPath }] };
+    // Panne en ROUTE : les questions sans réponse dont la demande n'a pas été créée sont reposées.
+    if (from === "ROUTE") return route({ ...s, escalation: null, questionsAsked: s.questionsAsked.filter((id) => (s.questionsConfirmees ?? []).includes(id)) });
     if (from === "CLASSIFY" && s.indicators)
       // Budget rendu : sans cela, le tour suivant escaladerait aussitôt.
       return { state: { ...s, stage: "CLASSIFY", escalation: null, attempts: 0 }, effects: [{ kind: "classify", indicators: s.indicators, proposed: gradeDifficulty(s.indicators, DEFAULT_THRESHOLDS) }] };
     if (!s.phase) return { state: s, effects: [] };
+    // Pendant une correction, « relancer » la reprend, au lieu de replanifier DELIVER (D14 de docs/12).
+    if (s.phase === "DELIVER" && s.deliver?.fixing && !s.phasesCompleted.includes("DELIVER")) return retryFix(s);
     if (s.phase === "DELIVER" && s.deliver && !s.phasesCompleted.includes("DELIVER") && s.deliver.scenarios.some((x) => x.status !== "done")) return retryDeliver(s);
     const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts: 0, escalation: null, designStep: "model" };
     if (!ns.checkpoints[ns.phase!]) return { state: ns, effects: [{ kind: "checkpointPhase", phase: ns.phase! }] };
-    return { state: ns, effects: [specialist(ns, s.lastRejection?.reasons ?? [])] };
+    return lancer(ns, s.lastRejection?.reasons ?? []);
   }
   if (decision === "skip" && from === "PHASE" && s.phase) {
     const efface = rembobiner(s);
-    const r = route({ ...s, skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null });
+    // Comme le commit d'une phase : son motif et ses défauts ne passent pas à la suivante (D18 de docs/12).
+    // Un « relancer », lui, les garde : la phase reprend avec eux.
+    const r = route({ ...oublierLaPhase(s), skipPhases: uniq([...s.skipPhases, s.phase]), escalation: null, lastRejection: null, reviewThreads: [] });
     return { state: r.state, effects: [...efface, ...r.effects] };
   }
   return { state: s, effects: [] };

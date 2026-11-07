@@ -3,19 +3,22 @@
   "compilerOptions": {
     "types": [
       "node"
-    ]
+    ],
+    "allowJs": true
   },
   "include": [
     "packages/*/src",
     "packages/*/test",
     "extensions/*/src",
     "extensions/*/test",
+    "tests/*/test",
     "apps/desktop/src/main",
     "apps/desktop/src/preload",
     "apps/desktop/src/shared",
     "apps/desktop/test",
     "scripts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.global-setup.ts"
   ],
   "exclude": [
     "apps/desktop/test/renderer"

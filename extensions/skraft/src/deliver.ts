@@ -52,7 +52,7 @@ export function planScenarios(input: { implPlan: string; acceptanceTestIds: stri
 
 /**
  * Un résultat désigne-t-il ce test ? Un fichier qui ne compile plus apparaît sous son seul nom :
- * - en `chemin > test` (Vitest, Swift), le chemin est un préfixe de l'identifiant ;
+ * - en `chemin > test` (Vitest), le chemin est un préfixe de l'identifiant ;
  * - en JUnit, l'identifiant est une classe qualifiée (`Projet.Tests.QuantiteTests.Methode`) : le
  *   fichier `…/QuantiteTests.cs` désigne alors les tests de la classe du même nom. Le 03/10, faute
  *   de cette règle, la porte GREEN a déclaré introuvable un test rouge par compilation devenu vert.
@@ -96,7 +96,7 @@ export function defaultDependencyRules(infrastructureModules: readonly string[])
   return [{ module: "Domain", forbidden: [...infrastructureModules] }];
 }
 // Les seuils de forme ne figurent plus ici : ils appartiennent à la configuration du linter du
-// projet (`.eslintrc`, `.swiftlint.yml`…), seul endroit où ils ne peuvent pas se contredire.
+// projet (`.eslintrc`…), seul endroit où ils ne peuvent pas se contredire.
 
 export { parseQualityBar, type QualityBar } from "@agent-studio/extension-api";
 
@@ -108,25 +108,70 @@ export { parseQualityBar, type QualityBar } from "@agent-studio/extension-api";
  * Un fichier absent du rapport n'est pas reproché : il n'a pas été mesuré, et le compter à zéro
  * serait attester d'une mesure qui n'a pas eu lieu.
  */
-export function checkCoverage(report: CoverageReport, sources: string[], bar: QualityBar): string[] {
+export function checkCoverage(report: CoverageReport, sources: string[], bar: QualityBar, diff = false): string[] {
   const reasons: string[] = [];
   for (const path of sources) {
     const seuil = bar.coverage[layerOf(path, bar)];
     if (seuil === undefined) continue; // le projet n'exige rien : le fait suffit
     const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
     if (!f) continue;
-    if (f.score + 1e-9 < seuil)
-      reasons.push(`Couverture : ${path} à ${round(f.score)} % (minimum ${seuil} %), ${f.covered} ligne(s) couverte(s) sur ${f.total}.`);
+    if (f.score + 1e-9 < seuil) {
+      const missing = diff ? f.lines?.filter((l) => !l.covered).map((l) => l.number) ?? [] : [];
+      reasons.push(`Couverture${diff ? " du diff" : ""} : ${path} à ${round(f.score)} % (minimum ${seuil} %), ${f.covered} ligne(s) couverte(s) sur ${f.total}.${missing.length ? ` Lignes non couvertes : ${missing.join(", ")}.` : ""}`);
+    }
   }
   return reasons;
 }
 
 /** Seuils de mutation sur les fichiers de production : par couche (domaine, application, reste), ADR 0049. */
-export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar): string[] {
+/** Lignes non couvertes des fichiers sous leur seuil : chaque fichier devient un défaut, que l'humain peut exempter. */
+export function lignesSousLeSeuil(report: CoverageReport, sources: string[], bar: QualityBar): { file: string; lines: number[] }[] {
+  const res: { file: string; lines: number[] }[] = [];
+  for (const path of sources) {
+    const seuil = bar.coverage[layerOf(path, bar)];
+    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (seuil === undefined || !f || f.score + 1e-9 >= seuil) continue;
+    const lines = f.lines?.filter((l) => !l.covered).map((l) => l.number) ?? [];
+    if (lines.length) res.push({ file: path, lines });
+  }
+  return res;
+}
+
+/** Lignes modifiées, sans celles qu'une dérogation humaine a exemptées de la couverture du diff. */
+export function sansLignesExemptees<C extends { path: string; lines?: number[] }>(changes: C[], derogations: readonly { file: string; line: number }[]): C[] {
+  return changes.map((c) => (c.lines ? { ...c, lines: c.lines.filter((n) => !derogations.some((d) => d.file === c.path && d.line === n)) } : c));
+}
+
+/** Mutant reconnu équivalent par un arbitrage : exempté de la porte de mutation (ADR 0065). */
+export interface MutantExempte {
+  file: string;
+  line: number;
+  operator: string;
+}
+
+/** Mutant survivant d'un fichier sous son seuil : chacun devient un défaut (ADR 0065). */
+export interface MutantSurvivant extends MutantExempte {
+  replacement?: string;
+}
+
+/**
+ * Mutants d'un fichier, sans ceux qu'une dérogation a reconnus équivalents (ADR 0065) : le score est
+ * recalculé sur les mutants restants quand le rapport donne ses comptes ; sinon, le score mesuré reste.
+ */
+function sansDerogations(f: MutationReport["files"][number], path: string, derogations: readonly MutantExempte[]) {
+  const accorde = (m: { line: number; operator: string }) => derogations.some((d) => d.file === path && d.line === m.line && d.operator === m.operator);
+  const survived = f.survived.filter((m) => !accorde(m));
+  const retires = f.survived.length - survived.length;
+  const score = retires && f.total !== undefined && f.killed !== undefined ? (f.total - retires > 0 ? (f.killed / (f.total - retires)) * 100 : 100) : f.score;
+  return { score: retires && !survived.length ? 100 : score, survived };
+}
+
+export function checkMutation(report: MutationReport, sources: string[], bar: QualityBar, derogations: readonly MutantExempte[] = []): string[] {
   const reasons: string[] = [];
   for (const path of sources) {
-    const f = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
-    if (!f) continue; // aucun mutant applicable dans ce fichier
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut) continue; // aucun mutant applicable dans ce fichier
+    const f = sansDerogations(brut, path, derogations);
     const threshold = bar.mutation[layerOf(path, bar)];
     if (f.score + 1e-9 < threshold) {
       const survivors = f.survived.map((s) => `ligne ${s.line} (${s.operator})`).join(", ");
@@ -134,6 +179,18 @@ export function checkMutation(report: MutationReport, sources: string[], bar: Qu
     }
   }
   return reasons;
+}
+
+export function mutantsSousLeSeuil(report: MutationReport, sources: string[], bar: QualityBar, derogations: readonly MutantExempte[] = []): MutantSurvivant[] {
+  const mutants: MutantSurvivant[] = [];
+  for (const path of sources) {
+    const brut = report.files.find((x) => x.file === path || path.endsWith(`/${x.file}`));
+    if (!brut) continue;
+    const f = sansDerogations(brut, path, derogations);
+    if (f.score + 1e-9 < bar.mutation[layerOf(path, bar)])
+      for (const m of f.survived) mutants.push({ file: path, line: m.line, operator: m.operator, ...(m.replacement !== undefined ? { replacement: m.replacement } : {}) });
+  }
+  return mutants;
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;

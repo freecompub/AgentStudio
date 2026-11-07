@@ -1,0 +1,38 @@
+{
+  "id": "369c980e-c649-4ee8-9216-b40f476f7013",
+  "taskId": "c4433175-1600-46f9-98b3-fd407ad00410",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question de l'agent (DESIGN)",
+  "detail": "Le modèle de domaine doit définir les invariants de la configuration des paliers, et les critères US-2 ne couvrent que les seuils 10 et 50 avec les taux 5 % et 12 % (stories/US-2.md:7-11). Quelle règle retenir pour les configurations hors exemples : seuil < 1, taux < 0 % ou > 100 %, deux paliers de même seuil ? Aucune valeur n'est donnée dans la story ni dans la recherche (.skraft/us-2/research/research.md, « Questions ouvertes »).",
+  "options": [
+    {
+      "id": "Rejet explicite à la construction : seuil < 1 (comme Quantite.De), taux hors ]0 %, 100 %], seuils dupliqués",
+      "label": "Rejet explicite à la construction : seuil < 1 (comme Quantite.De), taux hors ]0 %, 100 %], seuils dupliqués"
+    },
+    {
+      "id": "Rejet : seuil < 1 et taux hors [0 %, 100 %] ; seuils dupliqués autorisés (le plus avantageux l'emporte)",
+      "label": "Rejet : seuil < 1 et taux hors [0 %, 100 %] ; seuils dupliqués autorisés (le plus avantageux l'emporte)"
+    },
+    {
+      "id": "Aucune validation au-delà des types existants (hors périmètre US-2)",
+      "label": "Aucune validation au-delà des types existants (hors périmètre US-2)"
+    },
+    {
+      "id": "Autre règle (à préciser)",
+      "label": "Autre règle (à préciser)"
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:15:03.235Z",
+  "status": "answered",
+  "answer": {
+    "option": "Rejet explicite à la construction : seuil < 1 (comme Quantite.De), taux hors ]0 %, 100 %], seuils dupliqués",
+    "answeredAt": "2026-10-10T19:15:03.238Z"
+  }
+}

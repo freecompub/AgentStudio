@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
-import { parseMuterReport } from "../swift/muter-report.js";
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
@@ -180,7 +179,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
               if (r.timedOut) throw new Error("L'outil de mutation a dépassé le délai");
               const brut = (await readFile(rapport, "utf8").catch(() => null)) ?? (await rapportDansDossier(dossier)) ?? r.stdout;
               const json = JSON.parse(brut);
-              return c.report === "stryker-json" ? parseStrykerReport(json, opts.root) : parseMuterReport(json, opts.root);
+              return parseStrykerReport(json, opts.root);
             } finally {
               await rm(rapport, { force: true });
               await rm(dossier, { recursive: true, force: true });

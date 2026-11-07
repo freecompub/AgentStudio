@@ -51,8 +51,6 @@ jobs:
       - name: Vérifier les types
         run: pnpm typecheck
 
-      # Les tests Swift sont sautés d'eux-mêmes si la chaîne est absente (J5) : elle n'est pas
-      # installée ici, les tests Swift ne sont donc pas couverts par cette CI.
       - name: Lancer les tests
         run: pnpm test
 

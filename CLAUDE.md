@@ -11,8 +11,8 @@ Monorepo pnpm (Node ≥ 22.12, pnpm 10). Jalons : J1 livré (`feat/j1-socle`, bl
 `pnpm --filter @agent-studio/desktop build:extensions` (lancé aussi par `dev` et `build`) ; seule
 `tdd` est livrée avec l'application. `skraft` se distribue à part en paquet `.asx`
 (`pnpm ext:build` puis `pnpm ext:pack`), non signé donc réservé au mode développeur (ADR 0021).
-J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`) : les tests Swift utilisent la chaîne de
-`~/.cache/agent-studio/swift` (ou `$AGENT_STUDIO_SWIFT_HOME`) et sont sautés si elle est absente.
+J5 livré (`feat/j5-swift-usage`, `docs/jalons/J5-bilan.md`). Swift a été **retiré** le 2026-10-11
+(ADR 0061) : adaptateur, profil, lecteurs SwiftLint et Muter, tests sur la vraie chaîne.
 J6 livré (`feat/j6-distribution-profils`, `docs/jalons/J6-bilan.md`) : paquets `.asx` signés
 (`pnpm ext:keys`, `pnpm ext:pack`), profils via `admin.json` (O5 provisoire), modes simple et avancé.
 skraft : S0 tranché (ADR 0012, option C : l'auteur autorise la reprise ; elle n'a pas commencé,
@@ -24,13 +24,27 @@ S5 livré (`feat/s5-skraft-deliver`, `docs/jalons/S5-bilan.md`), S6 livré (`fea
 les blocages de J1 (jeton Copilot, Electron injouable) sont levés depuis le 2026-09-24
 (`docs/jalons/J1-blocages.md`).
 Un jalon = une branche partie du précédent, avec des commits séparés par brique.
+Orchestration : passage décidé à des **workflows rejouables** (script ordinaire, appels journalisés,
+reprise par rejeu ; ADR 0052 et 0053, `docs/09-workflows-rejouables.md`). Le moteur existe
+(`packages/workflow` : `createWorkflowTask`, `essayer`, `agir`). skraft et tdd tournent toujours
+sur leur réducteur ; l'essai est le **workflow** `workflows/skraft/` (`/skraft-workflow`, pipeline
+complet), **indépendant de l'extension skraft** : il n'en importe rien, ses copies divergent.
+Les deux coexistent le temps de les comparer avec Copilot (ADR 0054) : une correction dans l'un
+ne se reporte pas seule dans l'autre. (L'extension `extensions/skraft-workflow`, première version,
+a été convertie en ce workflow puis retirée le 10/10.)
+**Décidé le 08/10 (ADR 0055, `docs/11`)** : un workflow n'est plus une extension mais un **dossier**
+(`workflow.mjs` en JavaScript, `meta` littéral en tête, agents, skills, contrôles), sur la machine
+(`~/.agent-studio/workflows/`) ou dans le projet (`.agent-studio/workflows/`). Implémenté : chargeur,
+exécution isolée, accord, lancement (`packages/workflow`) ; le modèle skraft est `workflows/skraft/`, testé par
+`tests/workflow-skraft/` (projet Vitest `workflow-skraft`). L'approche YAML de `docs/08` est
+abandonnée.
 
 ```bash
 pnpm install
 pnpm test                       # toute la suite Vitest (projets : packages/*, apps/desktop)
-pnpm vitest run --project core  # projets : core, task-engine, workspace, stack-adapters, runtime-copilot, github-auth,
+pnpm vitest run --project core  # projets : core, task-engine, workflow, workspace, stack-adapters, runtime-copilot, github-auth,
                                 #            extension-api, extension-host, extension-manifest, extension-installer,
-                                #            extension-packaging, ext-tdd, ext-skraft, desktop
+                                #            extension-packaging, ext-tdd, ext-skraft, workflow-skraft, desktop
 pnpm vitest run packages/core/test/run-turn.test.ts -t "watchdog"   # un seul test
 pnpm typecheck                  # tsc --noEmit (Node) + tsconfig.web.json (renderer)
 pnpm dev                        # Electron en développement (electron-vite)

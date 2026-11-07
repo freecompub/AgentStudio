@@ -5,6 +5,1876 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 17/10 — Revue de la PR #12 : sept constats corrigés
+
+- **Lien symbolique d'un workflow** (sécurité) : la compilation vérifie le chemin **réel** de chaque
+  fichier chargé et refuse une cible hors du dossier ; l'empreinte du dossier compte chaque lien et
+  sa cible. Avant, un lien vers l'extérieur contournait l'accord « toujours » et le gel.
+- **Projet rouvert** (installation d'une extension) : `WorkspaceServices.demarrer()` sépare purge
+  des sessions et reprise des tâches de la construction ; le contrôleur l'appelle après avoir
+  libéré les anciens services. Avant, la purge des anciens supprimait les sessions des nouveaux.
+- `lireEntrees` : une entrée nommée répétée, ou déjà donnée par position, ne retire plus une autre
+  positionnelle (`indexOf` à -1).
+- `pour-les-scripts.ts` exporte `couvertureDuDiff` et `problemesTestsExistants` ; un test vérifie
+  que chaque nom importé de `@agent-studio/workflow` par le workflow est défini sous Vitest.
+- Connexion GitHub : `gh` reçoit `GH_BROWSER` sans effet ; seule l'application ouvre la page.
+- `proposer_workflow` : réponse fidèle (tâche créée ou « Rien n'a démarré ») et une seule demande
+  (l'accord du workflow tient lieu de confirmation tant qu'il n'est pas donné pour toujours).
+- `deleteSession` (adaptateur Copilot) : une session introuvable (`getSessionMetadata` →
+  `undefined`) est tenue pour supprimée ; elle ne reste plus au registre.
+
+## 16/10 — À faire : mesurer sur des runs Copilot, puis décider de trois évolutions du plugin
+
+- **Runs réels** (avec l'accord du responsable du projet, requêtes premium consommées) : au moins
+  deux runs, extension et workflow, d'une story qui va jusqu'à DELIVER, par
+  `scripts/mesure-skraft.ts`. Leur rapport contient la section « Coût des revues et des
+  corrections » ; reporter les chiffres dans docs/15 §5. Les runs du 10/10 sont antérieurs aux
+  évolutions du 14 au 16/10 (portes de DESIGN et DISTILL, consignes de phase, inventaire de la
+  recherche, skill d'architecture, écarts au plan) : leurs chiffres ne valent plus pour décider.
+- **Puis décider**, critère par critère dans `features.json` (tous à `passes: false`) :
+  `re-revue-selective`, `patch-partage-aux-lentilles`, `mode-rework`. Chacun dans l'extension et
+  le workflow, en TDD.
+- Repères des runs du 10/10 : re-revue sélective, au plus 8,4 requêtes premium sur 64,3 de
+  revues ; lectures des lentilles 151 et 111, 31 % et 21 % des tokens d'entrée ; après la 1re revue
+  de DELIVER, 4 exécutions de tests et une revue relancée (17,9 requêtes premium).
+
+## 16/10 — Mesures du coût des revues et des corrections (docs/15 §5)
+
+- Section « Coût des revues et des corrections » du rapport du banc (`scripts/banc/revues.ts`,
+  branchée dans `mesure-skraft.ts`, non lancé) : coût par tour et par lentille (appels, requêtes
+  premium, tokens, lectures, verdict, défauts) ; re-revue sélective (coût des lentilles relancées
+  après avoir approuvé sans défaut, borne haute) ; patch partagé (lectures, part des tokens) ; mode
+  rework (exécutions de tests du code et revues relancées après la 1re revue de DELIVER).
+- `pnpm banc:revues docs/runs/<run>` recalcule la section sur un run enregistré, sans requête.
+  Chiffres des runs du 10/10 dans docs/15 §5.
+- Piège : une lentille **garde sa session** d'une revue à l'autre ; mesurer par session écrasait
+  les revues précédentes. Chaque `tour-début` ouvre une mesure. Le verdict vient de la sortie du
+  `tour-fin`, pas des rapports de revue du projet.
+- `vitest.global-setup.ts` ajouté au typecheck.
+
+## 15/10 — Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1)
+
+- `report_phase` (cœur) gagne `planDeviations` (critère, prévu, réel, règle). DISTILL garde la
+  matrice (`planDeTest`) ; en DELIVER, `verifierEcarts` refuse le pas si le critère n'est pas dans
+  la matrice ou si le prévu ne reprend pas sa ligne. L'écart est gardé avec la porte du pas, effacé
+  avec ses tests (scénario repris, DELIVER rembobinée), donné en fait à la revue, commité dans
+  `deliver/ecarts-au-plan.md`, cité dans le rapport final. E et W.
+- Lentilles DELIVER : `test-integrity` (écart non déclaré = défaut, écart déclaré jugé sur sa
+  règle), `quality-gates` (chaque critère a un test fidèle à sa ligne, sauf écart déclaré).
+- Piège (ADR 0024) : le contenu partagé des agents ne nomme ni `report_phase` ni un dossier
+  `.skraft/` hors de son périmètre ; la partie outil va dans la consigne d'orchestration
+  (`ECARTS_AU_PLAN` dans `roles.ts`, `consignes` dans `workflow.mjs`).
+- Reste au §5 de docs/15 : re-revue sélective, patch partagé, mode rework (à mesurer d'abord).
+
+## 15/10 — Skill d'architecture transmise à l'appel, pile dans le dossier
+
+- Skills reprises de v1.15.1 : `clean-architecture-{dotnet,java,python,react}`, et mise à jour de
+  `architecture-patterns` et `clean-architecture-testing`. Indispensable : notre
+  `architecture-patterns` v1.6.1 disait « dépôt dans l'application, jamais dans le domaine »,
+  contraire à nos consignes et à la v1.15.1 (« domaine ou application »).
+- `/skraft <story> --archi <skill>` (nom ou langage) ; absente ou inconnue : clean architecture
+  par défaut (`architecture-patterns`), avec avertissement si inconnue (`architecture.ts`,
+  `architecture.mjs`). Les quatre skills sont à la demande pour les architectes, le testeur et le
+  développeur ; le dossier de DESIGN, DISTILL et DELIVER nomme celle à charger.
+- Ligne « Pile du projet » (adaptateur et emplacements) en DESIGN, DISTILL et DELIVER.
+- Plateforme : `lireEntrees` accepte `--nom valeur` pour une entrée texte ; `disposition()` rend
+  `pile` ; `StackApi.id` (extension-api, hôte en processus et isolé).
+- Piège : un import ajouté conditionnellement a été sauté parce que « import » figurait dans un
+  commentaire ; et un double appel journalisé à `w.disposition()` a été évité.
+- Reste au §5 de docs/15 : `PLAN_DEVIATION`, re-revue sélective, patch partagé, mode rework.
+
+## 15/10 — La recherche, entrée de DESIGN et DISTILL (repris de skraft-plugin v1.15.1)
+
+- Porte « citations » (E et W) : sous-section « ### Existant réutilisable » du passage de relais,
+  une ligne « `Nom` → `chemin` » par élément (ou « aucun ») ; **chaque nom doit figurer dans le
+  fichier cité** (ajout par rapport au plugin). `FileIndex` gagne `contains`.
+- Non repris de v1.15.1 : les commandes de build et de test dans les conventions. L'adaptateur de
+  pile en est l'autorité, et le contrat du cœur interdit aux agents de les lancer
+  (`agent-prompts.ts`) : les faire déclarer par le LLM créerait une seconde source. Les
+  emplacements des tests et des sources sont déjà injectés par le code (DISTILL, DELIVER).
+- Le code garde l'inventaire (`extraireInventaire` ; E : `GATE_OK.recherche` → `state.recherche` ;
+  W : `vue.recherche`) et le recopie dans le dossier de DESIGN et DISTILL, borné à 2 000
+  caractères par partie. RESEARCH sautée : le dossier le dit.
+- Prompts du chercheur, du modélisateur et de l'agent d'acceptance mis à jour (provenance v1.15.1).
+- Piège : la fixture S2 réécrivait `bolus-calculator.ts` en 55 lignes de commentaires, sans le nom
+  inventorié ; la première ligne déclare maintenant la classe.
+- Reste au §5 de docs/15 : `PLAN_DEVIATION`, skills clean-architecture par langage, re-revue
+  sélective, patch partagé, mode rework.
+
+## 15/10 — Écarts du chapitre 11 du PDF traités
+
+- Workflow : un défaut de travail de l'arbitre de mutation (muet, délai) n'était pas rattrapé ;
+  il laisse maintenant chaque mutant à l'humain, comme l'extension (`arbitrerMutants`). Test
+  « arbitre muet » dans les deux, celui du workflow échouait avant.
+- Workflow : la mutation de la porte de scénario reçoit les dérogations (`d.derogations`), comme
+  l'extension. Sans test de bout en bout : les dérogations naissent en fin de DELIVER, où la
+  mutation par scénario ne tourne pas ; le cas suppose une barre changée pendant le run.
+- Extension : `VERDICT_GATE` documenté transitoire (ADR 0013) dans `model.ts` ; S3 de `docs/12`
+  marqué conforme.
+- PDF : chapitre 11 réécrit, tous les écarts traités.
+
+## 15/10 — Fuite de dossiers temporaires des tests corrigée
+
+- Cause : les harnais compilent le processus enfant (et l'extension) dans `tmpdir()` « une fois
+  pour la suite », en fait une fois **par fichier** (Vitest isole les fichiers), sans jamais les
+  supprimer ; certains tests n'avaient pas de `rm` ; et une tâche qui écrit après le `rm` de son
+  dossier le recrée. Environ 115 Mo par lancement, dans un /tmp en tmpfs de 3,8 Go.
+- Correctif : `vitest.global-setup.ts`, déclaré dans `vitest.config.ts`, crée un dossier
+  `agent-studio-tests-*` par lancement, le met dans `TMPDIR` (hérité par les processus de test et
+  leurs enfants) et le supprime en entier à la fin.
+- Vérifié : sans lui, `e2e-commit-workflow` laisse `agent-studio-workflow-runtime-*` ; avec lui,
+  la suite complète (1943 tests) ne laisse aucun dossier `agent-studio-*`.
+
+## 15/10 — Gel gardé quand le commit de DISTILL échoue (extension)
+
+- Défaut introduit par D19 : `escalate` appelait `leverGelDistill` avant de reconnaître une panne de
+  commit. DISTILL approuvée perdait son empreinte et ses non-régressions, que l'humain relance le
+  commit **ou** continue sans : DELIVER ne vérifiait plus le gel, sans avertissement (`sansGel` ne
+  vise que DISTILL sautée), et le dossier de passation ne disait plus « gelés ».
+- Correctif : le stade COMMIT est testé avant de lever le gel (`reducer.ts`, `escalate`). Tests :
+  réducteur (relancer et continuer), bout en bout dans l'extension (échoue sans le correctif) et
+  contrôle dans le workflow, qui gardait déjà l'empreinte.
+- PDF : l'écart est retiré du chapitre 11.
+
+## 15/10 — Autorisation de reprise étendue à toutes les versions < v2.0.0
+
+- Déclaration du responsable du projet, consignée dans `docs/licences/autorisation-skraft.md`
+  (même nature de trace que les précédentes). Plus récente au 15/10 : `v1.15.1` (`1e41a98`).
+- Une reprise cite le tag exact d'où elle vient ; `v2.0.0` et au-delà ne sont pas couverts.
+- Conséquence : les évolutions du plugin listées au §5 de `docs/15` peuvent être reprises.
+
+## 15/10 — Plan de test de DISTILL (docs/15 §4.7)
+
+- Code (E et W), porte « plan de test » : matrice de couverture dans `test-plan.md` (une ligne par
+  critère, couche, doublure, walking skeleton) ; une étape par critère dans `impl-plan.md` qui
+  nomme son fichier de test. Les harnais ont `testPlanDe` et `implPlanDe` pour écrire des plans
+  conformes.
+- Prompt de `skraft-acceptance` réécrit (matrice, étapes, conventions de la recherche) ; skill
+  `clean-architecture-testing` à la demande ; consigne DELIVER de `test-integrity` (couche et
+  doublure du plan). Le workflow passe maintenant `slug` au contexte des lentilles.
+- Piège : `/tmp` (tmpfs de 3,8 Go) était plein à 80 % de dossiers `agent-studio-*` laissés par les
+  tests ; la suite échouait par fichiers entiers. Supprimés à la main le 15/10 ; fuite corrigée
+  ensuite (`vitest.global-setup.ts`).
+- **À surveiller** : « ADR accepté pendant que l'autre est amendé » (e2e-s3 de l'extension) a
+  échoué une fois, dans la suite complète lancée juste avant la saturation de /tmp ; l'assertion
+  en échec n'a pas été relevée. Passé depuis seul trois fois et dans toutes les suites complètes
+  après le nettoyage. Cause probable : /tmp plein (corrigé). Fragilité réelle : jusqu'à quatre
+  attentes de 60 s sous un plafond de 120 s. S'il revient : le relancer en boucle sous charge et
+  capturer l'assertion avant de toucher au code.
+- Reste : docs/15 §5 ; G7 en code (proposé) ; défaut du gel perdu en DISTILL (extension).
+
+## 15/10 — Méthode de DESIGN reprise du plugin (docs/15 §4.6)
+
+- Code, porte « cohérence » (E et W) : contexte non classé Core/Supporting/Generic ; commande,
+  requête ou événement du modèle sans section dans `contracts.md` ; dépôt sans « Couche : Domaine /
+  Application » ou dans l'infrastructure ; engagement déjà dans le code (bus CQRS, event store,
+  saga : signatures de la phase 7.0 du plugin) ou couche anticorruption de la carte sans ADR
+  valable (ni Rejected, ni Superseded, ni Deprecated, hors Alternatives).
+- La porte lit maintenant les **sources de production** du projet (`DesignInput.sources`).
+- Prompts : démarche en quatre temps pour le modélisateur (réutilisation, Event Modeling, DDD
+  stratégique, DDD tactique) ; format des contrats et déclencheurs obligatoires d'ADR pour le
+  décideur. Lentilles : réutilisation et déclencheurs (architecture), tranches verticales
+  (test-integrity).
+- Piège : les fixtures écrivaient des contrats en prose ; elles portent maintenant les sections
+  (`SECTIONS` dans `design-gate.test.ts`, S3 de bout en bout). Le test D15 du workflow utilise le
+  modèle du harnais, dont le décideur par défaut écrit un contrat sans sections.
+- Reste : docs/15 §4.7 et §5 ; G7 en code (annotations `ac-N` dans le modèle), proposé.
+
+## 14/10 — Revue de DESIGN et de DISTILL : portes en code, puis consignes de phase (docs/15 §4.5)
+
+- Option C (code), E et W :
+  - DESIGN, porte « cohérence » : chaque « Commande `X` » a un événement (« `X` → … `Y` » ou ligne
+    de tableau) ; chaque relation « `A` → `B` » de `context-map.md` nomme son patron.
+  - DISTILL, porte « plan de test », **avant** l'exécution des tests : `impl-plan.md` présent et
+    citant chaque `ac-N` ; `test-plan.md` avec au moins une ligne « - @ac-N : walking skeleton — … ».
+- Option A (jugement) : `CONSIGNES_DE_PHASE` ajoute « Points à examiner en DESIGN / DISTILL » au
+  dossier des lentilles ; rien en DELIVER.
+- Prompts : `skraft-architect-model` et `skraft-acceptance` annoncent les formats vérifiés.
+- Les skills `*-review-criteria` restent à la demande : elles contiennent la dérivation du verdict
+  du plugin, que notre code remplace.
+- Piège : les harnais de test écrivaient des plans vides ; ils citent maintenant chaque critère et
+  un walking skeleton (E et W, `support/harness.ts`, `e2e-s4*`).
+- PDF régénérés (porte cohérence, porte plan de test, consignes de phase, organigrammes).
+- Matrice de cohérence (G10) **construite par le code** : catégorie de chaque nom relevée par
+  libellé (« Commande `X` »…), refus des paires incompatibles du plugin, `consistency-matrix.md`
+  écrite par la porte cohérence à chaque essai et commitée. Le décideur ne l'écrit plus.
+- Piège : le drapeau `i` sur la regex faisait accepter un nom en minuscules (`onClick`) ; le
+  libellé est décliné en minuscule, majuscule initiale et capitales, le nom reste `[A-Z]`.
+- `STRUCTURAL_DRIFT` du plugin : sens « ADR → modèle » en code (`conceptsAbsentsDuModele`, hors
+  section Alternatives) ; sens « agrégat → ADR » laissé à la lentille architecture (décision du
+  responsable : un essai en code aurait demandé un ADR par agrégat, y compris existant).
+- Consigne de la lentille architecture corrigée : les interfaces de dépôt vont dans le domaine **ou**
+  l'application, jamais l'infrastructure (solution-architect, phase 6). Piège : le relecteur du
+  plugin (G4) ne cite que l'application ; le plugin se contredit, l'architecte fait foi.
+- Reste : docs/15 §4.6 (démarche dans le prompt, engagements existants sans ADR, déclencheurs
+  obligatoires d'ADR, format des contrats), 4.7 et §5.
+
+## 14/10 — Lentilles : chacune reçoit ce que son prompt annonce ; cold-reader plafonnée (docs/15 §4.1 à 4.4)
+
+- `test-integrity` reçoit maintenant le code de production ; `architecture` reçoit les tests
+  (une doublure du domaine se voit dans les tests). Extension (`review-brief.ts`) et workflow
+  (`review-brief.mjs`).
+- Prompts : `cold-reader` ne parle plus de « faits fournis » et annonce sa gravité maximale ;
+  `architecture` dit recevoir code et tests. Les deux copies d'agents restent identiques.
+- Plafond repris du plugin v1.6.1 : appliqué par le **code** dans `numberDefects` (E et W), pas
+  seulement dans le prompt. `blocker` → `major`, `REJECTED` → `CHANGES_REQUESTED`, champ
+  `severityNote` (schéma de relecture E et lecteur W).
+- Piège : quatre tests de bout en bout faisaient rejeter DESIGN par `cold-reader` ; ils font
+  maintenant rejeter `test-integrity` (le scénario testé est le même : deux lentilles rejettent).
+- PDF régénérés (tableau des lentilles, écart test-integrity retiré du chapitre 11).
+- Reste : docs/15 §4.5 à 4.7 et §5, à décider.
+
+## 14/10 — Constat : nos agents face à ceux de skraft-plugin (v1.6.1 et main 1.15.1)
+
+- Document : `docs/15-agents-face-a-skraft-plugin.md`. Aucune correction faite.
+- Globalement équivalents ; la procédure (commits, preuves, portes, ratification, synthèse) est
+  dans notre code, comme prévu par `docs/licences/autorisation-skraft.md`.
+- À corriger (E et W) : `test-integrity` ne reçoit pas le code de production alors que son prompt
+  l'annonce ; `architecture` doit juger les doublures sans recevoir les tests ; `cold-reader`
+  annonce des faits qu'elle ne reçoit pas ; pas de plafond `medium` pour `cold-reader`.
+- À décider : revue propre à DESIGN et DISTILL, méthode de DESIGN, plan de test de DISTILL,
+  reprise des évolutions de main (l'autorisation ne couvre que la v1.6.1).
+- Piège : le plugin a beaucoup bougé depuis la reprise (v1.6.1 → 1.15.1) ; comparer aux deux.
+
+## 13/10 — Étude : skraft en serveur MCP local (aucune décision)
+
+- Document : `docs/14-skraft-en-serveur-mcp.md`. Pas d'ADR tant que l'option n'est pas choisie.
+- Conclusion : faisable si le serveur MCP **orchestre** et lance ses propres agents (option A) ;
+  exposer seulement les portes au LLM de l'hôte (option B) casse « le code décide ».
+- Vérifié : le moteur (`workflow`, `core`, `task-engine`, `runtime-copilot`, `extension-host`) et
+  `apps/desktop/src/main/workspace-services.ts` n'importent pas Electron ; un lanceur Node existe.
+- Non vérifié : la reprise (tâches et journal de rejeu) hors Electron.
+- Prochaine étape proposée : ADR (option A, workflow seulement), puis essai avec `ScriptedRuntime`.
+
+## 13/10 — À faire : escalade d'un scénario selon sa cause (ADR 0066, proposé)
+
+- Document de travail : `docs/13-escalade-de-scenario-selon-sa-cause.md`. Il contient le
+  problème, les décisions, la proposition, le point à trancher et le plan.
+- Il y a deux causes qu'aucune option d'escalade actuelle ne résout :
+  - **un test existant devenu rouge**, parce que la story change ce comportement. Personne ne
+    peut le mettre à jour (développeur, testeur depuis D10, agent d'acceptance) ;
+  - **des lignes non couvertes** écrites pendant un scénario. La porte du scénario les refuse sans
+    défaut à contester.
+- **Décisions du responsable du projet** :
+  - présenter le problème à l'humain, avec « rejouer DISTILL » (DELIVER effacée) ou « mettre en
+    pause » (puis lui demander d'où repartir) ;
+  - pour la couverture, l'humain tranche.
+- **Point ouvert** (§4 du document) : qui met à jour un test **unitaire** obsolète, puisque
+  l'agent d'acceptance n'écrit pas les tests unitaires. L'option A est recommandée : la pause
+  seule, l'humain corrige.
+- Deux critères ajoutés à `features.json`, à `false` : `escalade-de-scenario-test-existant-obsolete`
+  et `escalade-de-scenario-lignes-non-couvertes`.
+
+Prochaine étape : trancher le §4, passer l'ADR 0066 à « accepté », puis coder selon le plan
+(§5), dans les deux implémentations.
+
+---
+
+## 13/10 — Couverture du diff contestée : l'humain tranche (suite de D22)
+
+- En fin de DELIVER, une contestation de couverture va directement à l'humain : dérogation sur les
+  lignes précises (retirées du calcul, tracées, commitées dans `derogations.md`), ou « à tester »
+  sans recours. Les défauts de couverture portent maintenant leur fichier et leurs lignes.
+- **Limite découverte en testant** : la couverture est aussi mesurée à la porte de **chaque
+  scénario**. Une ligne écrite pendant un scénario fait échouer le scénario, puis il y a escalade,
+  sans défaut à contester. L'arbitrage ne vaut donc que pour les sources écrites hors des
+  scénarios (en DISTILL, par exemple). Même structure pour la « suite finale » : un test existant
+  cassé est refusé dès le pas vert.
+- **Décision du responsable du projet** pour le test existant devenu obsolète : remonter à
+  l'humain avec deux options. « Rejouer DISTILL » efface DELIVER. « Mettre en pause » demande
+  ensuite d'où repartir. À concevoir (ADR à venir).
+
+---
+
+## 11/10 — D1 terminé : gel annoncé quand il est définitif, DISTILL sautée signalée
+
+- Le fait de revue de DISTILL disait « Tests d'acceptance gelés », alors que la revue peut encore
+  faire corriger un test : le gel n'est définitif qu'au commit. Il est reformulé dans les deux.
+- DISTILL sautée : il n'y a pas d'empreinte, donc la vérification du gel passait en silence.
+  DELIVER prévient maintenant l'utilisateur dans le fil, et la note va aux lentilles.
+- Tous les défauts D1 à D23 de l'audit sont traités. D13 ne se reproduit plus depuis D4 et D5,
+  il n'a pas été modifié.
+
+Prochaine étape : l'arbitrage des contestations de couverture et de suite finale (ouvert depuis
+D22), puis les écarts de spécification S1 à S5 (décisions à prendre).
+
+---
+
+## 11/10 — D21 : tous les rejets de l'extension comptés et tracés
+
+- Trois rejets échappaient au compteur `rejections`, donc à la trace : le plafond de 20 cycles,
+  le nettoyage refusé et la relance du classifieur. Le workflow les tracait déjà : la comparaison
+  sur banc (ADR 0054) était faussée en faveur de l'extension.
+- Les noms de porte sont repris du workflow : « scénario ac-N », « pas refactor (ac-N) »,
+  « classifieur ». Le motif du classifieur est effacé dès que la difficulté est fixée, pour ne pas
+  devenir le « Rejet précédent » de la première phase (piège de D18).
+- **Tests instables corrigés** : trois tests de l'extension (`e2e-arbitrage-mutation`,
+  `e2e-commit`, `e2e-s1`) lisaient le rapport final dès le stade DONE. Or ce rapport est publié par
+  un effet **après** cette transition, ce qui crée une course sous charge. Ils attendent maintenant
+  sa publication.
+
+Prochaine étape : restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D20 : une escalade de DELIVER fait aussi oublier les sessions (extension)
+
+- Les deux escalades de la sous-machine DELIVER (budget d'échecs du scénario et panne) émettaient
+  un `rollback` seul. Au « relancer », le testeur et le développeur se souvenaient d'un code effacé
+  (ADR 0050). `rembobinerScenario` émet maintenant la paire avec `forgetSessions`.
+- Les reprises **sans** escalade (pas refusé, scénario repris automatiquement) gardent leur
+  session, qui reçoit le motif « tour annulé ». Ce cas n'est pas visé par l'audit.
+- Le workflow n'a pas ce défaut : `w.rembobiner` oublie toujours (ADR 0053). Le test de contrôle a
+  été vérifié en désactivant cet oubli : il échoue alors.
+- Instabilité vue une fois sous charge (`e2e-arbitrage-mutation`, cas « équivalent ») : passe seul
+  et à la suite complète suivante. À surveiller.
+
+Prochaine étape : D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D19 : commit de phase en échec
+
+- Avant, une panne au commit rembobinait une phase **approuvée**, et « relancer » la refaisait
+  entièrement (revue, ratification). Le workflow avait le même défaut, et il terminait la tâche
+  sur une erreur imprévue (la nature « erreur » n'est pas attrapée par `w.phase`).
+- Maintenant, dans les deux, il n'y a aucun rembobinage. L'humain choisit :
+  - « Relancer le commit » : le commit seul. Cela marche aussi si l'utilisateur a commité
+    lui-même entre-temps ;
+  - « Continuer sans commiter » : tracé en rejet `commit` et signalé au bilan. Les fichiers
+    partent dans le commit suivant (`git add -A`) ;
+  - « Abandonner ».
+- **Décision du responsable du projet** : l'utilisateur doit pouvoir continuer sans commiter.
+- Rien ne dépend du sha d'un commit de phase ; les checkpoints photographient l'arbre de travail.
+- Un hook de pré-commit ne peut pas être la cause : le dépôt commite avec `--no-verify`. Causes
+  réalistes : verrou `.git/index.lock`, disque plein, droits.
+- Extension : le rejet `commit` est tracé à la transition, puis effacé au checkpoint de la phase
+  suivante, pour ne pas devenir le « Rejet précédent » d'une autre phase.
+
+Prochaine étape : D20, D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D18 : une phase sautée ne transmet plus son motif ni ses défauts (extension)
+
+- « Sauter » vide `lastRejection` et `reviewThreads`, comme le commit d'une phase. Pas dans
+  `oublierLaPhase` : « relancer » réutilise le motif, et les fils survivent à une relance
+  (ADR 0046).
+- Le workflow n'a pas ce défaut : un suivi par phase et une `relance` vide après un saut. Un test
+  de contrôle le confirme (il passe d'emblée).
+- Test : RESEARCH sans document, donc la porte citations échoue jusqu'à l'escalade, puis
+  « sauter ». Le décideur de DESIGN ne doit pas recevoir « Document de recherche absent ».
+
+Prochaine étape : D19 à D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D17 : panne pendant les questions ouvertes (ROUTE)
+
+- Extension : l'escalade proposait « relancer » et « sauter », qui ne faisaient rien hors phase.
+  Elle a maintenant ses propres options, « relancer » et « abandonner ». Workflow : les questions
+  sont posées hors de `w.phase`, donc une panne terminait la tâche en échec.
+- « Relancer » repose les seules questions dont la demande n'a pas été créée :
+  - extension : `askQuestion` rend `QUESTION_ASKED`, noté à tout stade (une autre question a pu
+    faire escalader entre-temps) ;
+  - workflow : `Promise.allSettled`.
+- Piège trouvé en testant : une question déjà posée pouvait recevoir sa réponse **pendant**
+  l'escalade, et l'extension l'ignorait (la réponse était perdue, et la question n'avait plus de
+  demande en attente). Les réponses aux questions sont maintenant acceptées en ESCALATED depuis
+  ROUTE.
+- Le workflow ne reconnaît que la panne (`PanneEnvironnement`) : une erreur imprévue d'effet
+  (nature « erreur ») y reste fatale, par conception de la bibliothèque. Le script s'en sert pour
+  les fichiers absents.
+
+Prochaine étape : D18 à D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D16 : un nettoyage ne change pas le comportement
+
+- Décision du responsable du projet (option B, dans les deux) : un nettoyage qui fait passer
+  l'acceptance du scénario de vert à rouge est refusé. On revient au vert et le nettoyage est
+  annulé, sans escalade (SPEC §8.3). Le workflow prend en plus le résultat du nettoyage, comme
+  l'extension.
+- Avant : le workflow rembobinait tout le scénario à la porte de fin ; l'extension continuait le
+  cycle sur un code cassé.
+- Test : la pile « par marques » casse l'acceptance (marque `// ac-1` retirée) sans casser les
+  tests unitaires. Le mode sessions séparées correspond au niveau `challenging`.
+
+Prochaine étape : D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D14 : une panne pendant une correction ne rembobine plus toute la phase
+
+- Workflow : `corriger` attrape aussi `PanneEnvironnement`. Il rembobine à l'entrée de la
+  correction, restaure `L` et les fils, puis escalade (`escaladeScenario`). « Relancer » reprend la
+  boucle de correction, sans essai consommé.
+- **L'audit se trompait sur l'extension**. Elle rembobinait au bon point, mais « relancer »
+  replanifiait DELIVER, parce que `retryDeliver` n'est appelé que s'il reste un scénario non
+  terminé. Il y avait donc une nouvelle revue et la correction était perdue. `retryFix` reprend
+  maintenant la correction.
+- Ne pas aligner le workflow sur l'ancien comportement de l'extension : replanifier avec des
+  scénarios déjà verts, c'est le chemin de D13 (`dernierVert` reste `null`).
+- Piège de test : la pile ne reçoit pas l'étiquette de l'exécution (`opts.evidence` est absent).
+  La panne est donc déclenchée au premier lancement de tests après la revue.
+
+Prochaine étape : D16 (W), D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D22 : arbitrage des mutants équivalents (ADR 0065)
+
+- **Décision du responsable du projet.** Un mutant contesté comme équivalent est jugé par un
+  agent dédié, `skraft-mutation-arbiter`, distinct du testeur. S'il est équivalent, c'est une
+  dérogation de l'agent. Sinon, ou au-delà de deux dérogations de l'agent, l'humain tranche.
+  **Toute décision est tracée.**
+- Un défaut par mutant survivant. Une dérogation retire ce seul mutant du score, recalculé avec
+  les mutants tués et jugés que donne maintenant le lecteur Stryker.
+- La traçabilité couvre l'entrée `arbitrage` de la trace (champ `arbitrages` de l'état, ou
+  `w.arbitrage` dans le workflow), `.skraft/<slug>/deliver/derogations.md` commité, les faits
+  donnés aux lentilles et le rapport final.
+- **Défaut trouvé en route (extension)** : les fils des portes de fin de DELIVER (D5) n'étaient
+  pas dans `reviewThreads`, donc les réponses des agents à ces défauts étaient ignorées. Corrigé.
+- Pièges de test :
+  - *cold-reader* ne reçoit aucun fait (voulu) : pour vérifier les faits de la revue, lire le
+    dossier de *test-integrity*.
+  - La revue de D22 a montré que le constat de l'audit (« la revue rend APPROVED ») n'était plus
+    exact depuis D5 : la porte relancée échoue de nouveau.
+- **Reste ouvert** : la contestation d'un défaut de couverture ou de suite finale n'a toujours pas
+  d'arbitre.
+
+Prochaine étape : D14, D16 (W), D17 à D21 (E), restes de D1, S1 à S5.
+
+---
+
+## 11/10 — D12, D15, D23 : reprise d'une correction et phase relancée
+
+- D12 : la correction rembobinait le disque mais pas `L` (empreinte, référence, dernier vert). La
+  reprise était refusée sans fin (« tests unitaires modifiés »). Correctif ciblé : `L` est
+  photographié à l'entrée de `corriger` et restauré. L'aide générale de la bibliothèque n'est pas
+  faite et reste à décider.
+- L'extension avait la même empreinte périmée, et sa référence de reprise remontait au début du
+  scénario (D23). Les deux sont maintenant prises à l'entrée de la correction.
+- D15 : la reprise reçoit la cause de l'échec. **API de la bibliothèque** : `w.phase` passe
+  `relance` (les motifs de l'escalade) à `fn` au « relancer », et `essayer` accepte `motifs`. Le
+  changement est rétrocompatible.
+- On ne remet pas l'empreinte à `null` : `null` désactive le contrôle. La mémoire revient au même
+  point que le disque.
+- Piège : dans un test de la bibliothèque, le script est **rejoué** à chaque pas du moteur. Un
+  compteur extérieur au script fausse sa logique ; la décision doit dépendre de ce que le script
+  reçoit.
+
+Prochaine étape : D13, D14, D16 (W), puis D17 à D22 (E).
+
+---
+
+## 11/10 — D10 : un test unitaire existant ne s'affaiblit plus en silence
+
+- Cœur : `FileChange.removed`, le nombre de lignes de l'ancien arbre retirées ou remplacées, lu
+  dans les hunks `--unified=0` déjà calculés pour `lines`. Zéro veut dire « ajouts seulement ».
+- Pas `test` : ajouts seulement aux tests existants. Pas `fix-test` : modification permise pour
+  les fichiers cités par un défaut actif adressé au testeur. Une lentille peut demander de
+  renforcer un test faible (décision du responsable du projet, option B).
+- Preuves des essais effacés (second point) : vérifié sans effet, rien codé. La porte de scénario
+  lance ses tests avant de lire les preuves, donc le vert est toujours le sien.
+- Piège de test : avec le faux runner, tout passe dès que `src/domain/bolus-cap.ts` existe, et un
+  seul scénario n'a pas de cycle. Le test du pas `test` utilise une pile « par marques » (un test
+  passe si le code contient `// <nom>`).
+
+Prochaine étape : D12 à D16 (W), D17 à D23 (E).
+
+---
+
+## 11/10 — D9 : après une question bloquante, le motif reste
+
+- L'agent repart avec la réponse **et** son retour : rejet de porte, amendement, question de revue
+  ou pas refusé.
+- Extension : `lancer(ns, retour)` (`reducer.ts`) remplace les `{ state, effects: [specialist(…)] }`
+  et garde `state.retour`. `lastRejection` ne suffisait pas : un amendement n'est pas un rejet.
+  En DELIVER, `agent` tient `deliver.feedback`.
+- Workflow : les trois boucles (`specialiste`, `agentDuPas`, RESEARCH) ne vident plus leur retour.
+- **Décision du responsable du projet** : les réponses humaines sont gardées et réutilisées dans
+  tout le processus, même après un rembobinage. Le second point de D9 (les oublier) est écarté.
+
+Prochaine étape : D10, puis D12 à D16 (W) et D17 à D23 (E).
+
+---
+
+## 11/10 — D8 : un rapport par revue, sans écrasement ni résurrection
+
+- Rapport nommé par le **rang** de la revue dans la phase, et non plus par l'essai :
+  - un amendement ne consomme pas d'essai, donc ses deux revues écrivaient le même fichier ;
+  - après une relance, la réécriture d'avant commit remettait les rapports du run effacé.
+- Les listes de revues ne sont pas vidées au rembobinage : leur rang numérote aussi les fils de
+  défauts, qui survivent à la relance. On marque à la place le début du run (`debutDuRun` dans le
+  suivi du workflow, `debutDesRevues` dans l'état de l'extension).
+- L'audit ne citait que le workflow. L'extension avait les deux défauts ; les tests le montrent.
+- Piège : le test D3 du workflow contourne la garde, ce qui provoque un rejet et consomme un essai.
+  Ses deux revues ont donc des essais différents, et il ne reproduit pas l'écrasement. Il a fallu
+  un test d'amendement pur.
+
+Prochaine étape : D9, D10.
+
+---
+
+## 11/10 — D7 : en correction, contester n'oblige plus à modifier le code
+
+- Règle « aucun fichier de production modifié » levée au pas `fix` quand **chaque** défaut actif
+  du développeur est `contested` ou `outOfScope` avec une raison (`allDisputed`), et qu'aucun
+  test rouge de la correction côté tests n'attend. Sinon, la contestation proposée par la consigne
+  était refusée 3 × 3 fois et la lentille n'arbitrait jamais.
+- Extension : décision dans le réducteur (`nothingToChange` sur l'effet), l'effet ne fait que la
+  lire. Workflow : `porteVerte`, avec les fils transmis par `correction.fils`.
+- Pas de garde sur le commit : `commit`/`commiter` rendent `null` sans changement.
+
+Prochaine étape : D8 (rapports de revue écrasés ou ressuscités), D9, D10.
+
+---
+
+## 11/10 — D6 : faits de revue du run en cours, sans rapports de revue
+
+- Rapports `/reviews/` exclus des livrables (workflow : `enregistrerLivrables` ; extension :
+  `pasUnRapport` dans les trois portes). Ils sont écrits sur le disque à **chaque** revue, d'où
+  leur présence dans les fichiers modifiés de l'essai suivant.
+- Au rembobinage : workflow, `suivi.livrables = []` dans `apresRembobinage` ; extension, **pas
+  d'effacement** — le test d'invariants (§5.3, invariant 4 : `artifacts` en ajout seul) l'interdit.
+  `debutDuRun[phase]` marque le début du run, `artifactsDuRun` ne lit que lui.
+- Non remis à zéro : le suivi des revues (collision des identifiants de défauts avec les fils
+  conservés). Numérotation des rapports : D8.
+- Piège de test : lentilles en parallèle, compteur partagé → course ; un compteur par lentille.
+
+Prochaine étape : D7 à D10, ou D8 (rapports écrasés/ressuscités) qui prolonge celui-ci.
+
+---
+
+## 11/10 — D2 : plus d'ADR fantôme après un rembobinage
+
+- Workflow : la liste des ADR (`d.adrs`) est **relue sur le disque** (`adrsDuDisque`, fichiers de
+  `docs/adr/` avec `Story : <slug>`), à la porte cohérence et dans `apresRembobinage` de DESIGN.
+  Le disque est rembobiné et porte le statut dès la ratification (ADR 0064) : il dit vrai.
+- Extension : `adrsAvantPhase` pris à l'entrée de la phase, restauré par `oublierAdrsDeLaPhase` à
+  chaque rembobinage (budget épuisé, escalade, saut) ; au `GATE_OK` de DESIGN, une proposition
+  d'un essai précédent qui n'est plus sur le disque disparaît.
+- Les deux moitiés se testent séparément : la relance est couverte par la relecture à la porte,
+  le saut par la restauration.
+
+Prochaine étape : D6 — fait juste après.
+
+---
+
+## 11/10 — D3 : statut d'un ADR écrit dès sa ratification (ADR 0064)
+
+- Accept/reject écrit le statut dans le fichier aussitôt (extension : `applyAdrStatuses` par
+  décision ; workflow : `ratifier`). ADR décidés en lecture seule pour les agents, avec les gelés.
+- **Piège** : un ADR décidé reste « ajouté » depuis le checkpoint de DESIGN ; sans l'exclure de
+  `isNew`, la porte cohérence le refusait (« statut Accepted, Proposed attendu »).
+- Un test lit le source d'`effects.ts` (`readOnly: [...GELÉS]`) : motif élargi à `GELÉS` suivi
+  d'autres chemins.
+- Lié : D2 (mémoire `adrs` non remise au point d'un rembobinage) — fait juste après.
+
+---
+
+## 11/10 — D4 : question ou silence d'une lentille (ADR 0063)
+
+- **Rectification de l'audit** : les lentilles n'avaient pas `report_blocker` ; la branche
+  « Blocage inattendu » était morte. Décision utilisateur (option A) : leur donner l'outil, puis
+  appliquer la décision du 10/10.
+- Question → humain (« Question de la revue (<phase>, <lentille>) ») → réponse dans celles de la
+  story et dans les faits des lentilles → phase rejouée sans essai (workflow : rejet `nonCompte`
+  d'`essayer` ; extension : `afterReviewQuestion`, `attempts` intact). DELIVER : revue relancée
+  seule. 3e question dans la phase → escalade. Question déjà tranchée → renvoyée une fois.
+- Lentille muette ou en délai → relancée seule une fois, puis « revue impossible » (escalade sans
+  essai). **Piège** : le moteur d'agents relance déjà une fois un agent sans sortie, dans le même
+  appel — une lentille « muette » se simule avec deux tours vides.
+- **Piège** : dans l'extension, reconnaître un défaut de travail par le **nom** de l'erreur, pas
+  par `instanceof` : en mode isolé, l'erreur est recréée par le runtime de l'hôte.
+
+Prochaine étape : `docs/12` §8 — D2, D3, D6.
+
+---
+
+## 11/10 — D11 : trace comparable entre l'extension et le workflow
+
+- ROUTE annoncé seulement s'il reste des questions (workflow). **Piège / rectification de
+  l'audit** : `w.etape` n'écrit rien dans la trace ; ROUTE n'y apparaît que si une question est
+  posée pendant l'étape. Le banc ne voyait donc rien de faux. Le test lit le journal
+  (`etat.journal`, appels `etape`).
+- Verdict REJECTED tracé sous la porte « revue », une ligne par lentille qui rejette, dans les deux
+  (workflow : `w.rejet` avant `Escalade` ; extension : `rejections` + `lastRejection`, que le moteur
+  lit). Le motif d'escalade cite ces lignes.
+- « Plan de test absent » : porte `plan de test` au lieu de `valeurs`, dans les deux.
+- Le harnais de l'extension expose maintenant la trace (`app.trace`), comme celui du workflow.
+
+Prochaine étape : D4 (fait juste après, voir au-dessus).
+
+---
+
+## 11/10 — Revue des commits du 10/10, client Copilot réparé, Swift retiré
+
+Revue des trois commits rapatriés (`45680cf`, `036016a`, `f8c2d16`) ; constats complets dans la
+conversation, les principaux ci-dessous.
+
+- **Client Copilot** : `env: { GH_HOST }` (ADR 0057) remplaçait tout l'environnement du CLI —
+  le SDK fait `options.env ?? process.env`. Plus de PATH, HOME ni proxy pour les agents. Corrigé
+  en `{ ...process.env, GH_HOST }` (`sdkCopilotClientOptions` prend l'environnement en paramètre
+  pour le test). Piège : le test d'origine figeait le défaut avec `toEqual`.
+- **Swift retiré** (ADR 0061, demande utilisateur). Cause : le précontrôle de `036016a` lance les
+  tests avant tout agent, et le projet Swift de démonstration déclarait la cible
+  `AcceptanceTests` avant que DISTILL n'en crée le dossier. Les 4 tests Swift étaient sautés sous
+  macOS et en CI : seule cette machine les voyait échouer. Retirés : adaptateur, lecteurs
+  SwiftLint/Muter, profil, modèle `/stack init`, programmes autorisés, `swift test` souple,
+  bouts en bout réels. JUnit XML déplacé dans `src/reports/`. Pile simulée skraft en TypeScript.
+- Défaut trouvé en passant : `profiles/typescript.yaml` lisait Stryker avec `muter-json`.
+- **D5 aggravé par `036016a`** : la porte « couverture du diff » échoue en fin de DELIVER, toute
+  la phase est rejouée sans agent destinataire ; tous scénarios verts → même échec jusqu'au
+  budget. À corriger avec D5 (`docs/12`, non commité).
+
+- **D5 corrigé en partie** (ADR 0062) : mutation, couverture du diff → testeur ; suite finale →
+  développeur, par la correction ciblée de l'ADR 0046, dans les deux implémentations. Piège : le
+  test « couverture du diff en isolation » existant échoue sur la porte du *scénario*, pas de fin
+  de phase — le vrai cas D5 est un squelette écrit en DISTILL (nouveau test bout en bout). Aide
+  `acceptanceWriter` exportée par les deux harnais.
+- **Puis le reste de D5** (accord utilisateur) : revue de DELIVER à mineurs seuls → mineurs en fils
+  (`minorThreads`), corrigés comme des majeurs ; revue sans aucun défaut ou aucun livrable →
+  escalade sans essai (qui rembobine, comme toute escalade). Piège : dans le test bout en bout, le
+  faux développeur doit *modifier* le code en correction, sinon la porte refuse le pas (« Aucun
+  fichier de production modifié »). Workflow : le motif d'une `Escalade` est dans le **titre** de
+  l'interaction (`Phase DELIVER : …`), pas dans `detail`.
+
+Prochaine étape : S5/S6 n'ont plus de bout en bout sur une vraie chaîne — en écrire un (TypeScript
+ou .NET) ; puis mettre `docs/12` à jour (D1 corrigé par l'ADR 0059, lignes du workflow
+décalées).
+
+---
+
+## 10/10 — Publication des corrections et de la campagne comparative
+
+À la demande utilisateur, publication sur `feat/workflow-rejouable` des corrections
+d'environnement et d'authentification, du regel DISTILL, du précontrôle et de la
+couverture du diff, puis du banc et des rapports archivés. Aucun changement de main.
+Avant publication : typage et contrôle des diffs verts ; 1 279 tests verts et neuf
+sautés sur les neuf projets concernés. Deux échecs sous exécution concurrente
+(délai du clonage Workspace et observation running/waiting de DESIGN) :
+rejeu des deux fichiers avec un seul worker, 12/12 verts. Pas de modification
+de tests pour masquer ces échecs ; leur sensibilité à la concurrence reste à surveiller.
+Branches des essais réussis déjà vérifiées sur GitHub : workflow-1 b7b6928,
+workflow-2 69a9c8a et extension-2 59f2454 dans exemple-dotnet-tdd.
+
+---
+
+## 10/10 — Productions finales à modèles fixés comparées
+
+Analyse du workflow 0b3184b5 contre extension c4433175, code/tests et documents :
+§6 de `docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md`.
+Même calcul sur les cinq exemples ; workflow : 19 exemples acceptance, somme
+de deux remises positives couverte et invalides dès DISTILL ; extension :
+test d'immuabilité et gardes nulles plus explicites. Workflow copie correctement
+son barème mais ne teste pas la mutation source exigée par sa matrice DESIGN.
+Extension additionne correctement mais ne teste toujours pas deux remises positives.
+Taux zéro reste autorisé seulement côté workflow, par choix automatique du banc.
+Les revues finales approuvent sans signaler ces trous respectifs. Aucun changement
+de code ni de livrable d'essai ; pas de nouveau run.
+
+---
+
+## 10/10 — Workflow à modèles verrouillés terminé DONE
+
+À la demande utilisateur, mêmes modèles par rôle que l'extension c4433175 :
+classifieur gpt-6-luna, modélisation claude-sonnet-5.5, autres gpt-6.1-sol.
+Exception explicitement choisie : cold-reader fixé à gpt-6.1-sol, alors que le
+run extension avait aussi utilisé mai-code-1.1-flash. Le banc accepte désormais
+`--modeles-roles`, refuse les rôles non configurés et annule au modèle effectif
+différent signalé par usage. Association conservée dans le résumé.
+35 tests banc verts et typage vert ; test livraison ajusté pour exactOptionalPropertyTypes.
+
+Run `0b3184b5-d4af-4a9a-8c97-101af6d61ecf`, copie mesure-skraft-pzsXn3 :
+**fini / DONE**, 17m58, 29 tours, 111 appels, 335,4 requêtes équivalentes SDK,
+un rejet RESEARCH (sections manquantes), aucun silence. Plafond 600 non atteint.
+Tous les événements usage ont été comparés aux modèles demandés : aucun écart.
+Branche workflow-2 à `69a9c8a9b0cc40c1d1464a8251b6dcb0078354ea`, arbre propre,
+main inchangé a7cf6db. Vérification indépendante : 24/24 tests verts, zéro ignoré.
+Rapport, trace, preuves et interactions archivés sous
+`docs/runs/2026-10-10-us-2-workflow-0b3184b5/`.
+Comparaison distincte `docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md`.
+
+Cette fois le workflow a demandé en DESIGN provenance du barème, déduction dans
+ATPayer et validation des configurations. Le répondeur a encore choisi la première
+option non configurée : taux [0,100] avec zéro autorisé, contre ]0,100] dans
+l'extension. Les modèles verrouillés n'ont donc pas rendu les contrats identiques.
+Ne pas attribuer causalement la différence de questions au modèle seul.
+Aucun run actif ni nouveau lancement automatique.
+
+---
+
+## 10/10 — Documents US-2 comparés aux deux livraisons
+
+Lecture complète RESEARCH/DESIGN/DISTILL et revues des runs livrés c4433175 et
+cffee616, puis tests concernés. Analyse conservée en §6 de
+`docs/runs/2026-10-10-comparaison-us-2-extension-600.md`. Aucun artefact de run modifié.
+Les cinq critères sont présents dans les deux ; contrats différents hors exemples :
+extension valide taux ]0,100] et doublons, workflow les exclut faute de décision.
+Les clarifications dites « utilisateur » extension sont des choix du répondeur
+automatique (blocages sans règle = premier choix), pas une intervention humaine.
+
+Faiblessse concrète : aucun test extension de deux remises positives à additionner,
+alors que le workflow en ajoute un après sa revue. Code extension additionne bien,
+mais ses exemples ne protègent pas contre la conservation de la dernière remise.
+Le meilleur palier inversé est aussi manqué par sa revue DISTILL puis récupéré
+en DELIVER. Invariants et immuabilité du plan extension réalisés seulement après
+refus de revue finale. Docs DESIGN parfois laissés en état intermédiaire après
+fermeture des contrats. Aucun correctif de code demandé ni réalisé dans cette analyse.
+
+---
+
+## 10/10 — Extension à plafond 600 terminée DONE
+
+Run `c4433175` livré en **17m35**, 35 tours, 128 appels, 232,2 requêtes
+équivalentes SDK, 4 rejets ; plafond 600 non atteint, consommation même inférieure
+à 350. Réserve 40032 → 39856 (écart 176, relevé retardé). Branche extension-2
+à `59f2454eb5388619da67fd1a8d4e4813e6bba8fc`, arbre propre ; main inchangé a7cf6db.
+Vérification indépendante `dotnet test` : **21/21**, zéro ignoré ; ac-1 à ac-5 présents.
+Rapport, résumé, trace, preuves et interactions archivés sous
+`docs/runs/2026-10-10-us-2-extension-c4433175/`.
+
+Comparaison distincte `docs/runs/2026-10-10-comparaison-us-2-extension-600.md`,
+sans écraser le couple précédent. Workflow : 55m21 / 264,3 ; extension : 17m35 /
+232,2. Ne pas conclure que relever le budget a provoqué cette amélioration :
+nouveau run, modèles effectifs et choix métier différents ; plafond différent,
+mais aucun des deux runs livrés n'a consommé 350. Aucun silence dans ce run
+extension, contrairement aux deux interruptions du workflow. Revue finale :
+tests et code complétés pour invariants de configuration, copie défensive et
+sélection du meilleur palier. Aucun run actif ; campagne de quatre runs non terminée.
+
+---
+
+## 10/10 — Extension rejouée depuis main, plafond porté à 600
+
+Demande utilisateur : nouveau run complet extension, plafond 600 requêtes
+équivalentes SDK. Réinitialisation de `tests/us-2/extension-2` explicitement
+autorisée, effectuée avec lease sur `8333982` vers `a7cf6db` ; main inchangé.
+L'ancien rapport 521f0098 et sa copie mesure-skraft-LDRZZe sont conservés.
+
+Run **en cours** `c4433175-1600-46f9-98b3-fd407ad00410`, processus
+`us2-extension-600`, copie
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-dSODxp`.
+Commande banc : `--base=main --hote-copilot=byb.ghe.com --plafond-requetes=600`,
+`--pousser --branche-run=tests/us-2/extension-2`. Même répondeur, modèles non
+imposés. Précontrôle franchi avec avertissement non bloquant, CLASSIFY terminé,
+RESEARCH démarré. Réserve initiale 40032/45000.
+Ce run n'a plus le même plafond que le workflow : consigner cet écart dans la
+comparaison, sans remplacer le résultat précédent au plafond 350.
+
+---
+
+## 10/10 — Extension arrêtée au plafond, premier couple mesuré
+
+Run `521f0098-3032-4c26-9846-0f2c530be45b` terminé **ABORTED / DISTILL** :
+plafond de 350 atteint, 352,5 requêtes équivalentes comptabilisées après l'appel
+ayant franchi la limite. Arrêt pendant la revue DISTILL, aucun DELIVER lancé.
+16m48, 22 tours, 99 appels, 3 rejets ; réserve 40421 → 40064, écart 357.
+DESIGN et ses revues ont consommé 297 requêtes équivalentes, dont une correction
+sur l'exception absente du modèle et une demande de marqueur/nom de matrice par
+la lentille. Ce dernier grief paraît lié au format amont : à examiner, pas corrigé
+pendant la mesure.
+
+Branche `tests/us-2/extension-2` à `8333982a9a9f175a2dd5f900da343dd9e1ef4f64` ;
+main vérifié inchangé à `a7cf6db`. Rapport, résumé, trace, preuves et interactions
+archivés dans `docs/runs/2026-10-10-us-2-extension-521f0098/`.
+Premier tableau produit dans `docs/runs/2026-10-10-comparaison-us-2.md`.
+Workflow livré (264,3), extension non livrée au plafond (352,5) : constat de ce
+couple, pas conclusion générale. Les modèles n'étaient pas imposés et leurs
+associations effectives diffèrent ; le répondeur commun choisit par défaut le
+premier choix aux blocages non configurés, donc les précisions métier peuvent
+aussi diverger. Ne pas attribuer tout l'écart au moteur sans ces réserves.
+Aucun run encore actif ni relance automatique.
+
+---
+
+## 10/10 — Indicateur de livraison du banc corrigé avant le run extension
+
+Run extension **en cours** : tâche `521f0098-3032-4c26-9846-0f2c530be45b`,
+processus `us2-extension-2`, copie isolée
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-LDRZZe`.
+Précontrôle franchi avec avertissement non bloquant de couverture, classification
+confirmée « assez difficile », RESEARCH démarré. Réserve initiale 40421/45000 ;
+plafond 350 requêtes équivalentes SDK. Même répondeur que cffee616, modèles laissés
+au runtime comme pour le workflow. Base et branche distante vérifiées à `a7cf6db`.
+Commande : banc sans `--workflow`, `--base=main --hote-copilot=byb.ghe.com`,
+`--plafond-requetes=350 --pousser --branche-run=tests/us-2/extension-2`.
+À la fin : archiver le rapport et vérifier le livrable avant comparaison.
+
+Accord utilisateur pour le run extension suivant sur la branche libre
+`tests/us-2/extension-2`, depuis main `a7cf6db`, sans réinitialiser extension-1.
+Préparation : `workflowLivre` réutilise `relire` du moteur pour lire résultats en
+clair ou référencés ; contenu absent = erreur explicite. TDD, 32 tests banc verts,
+dont 4 nouveaux ; résultat réel cffee616 relu et confirmé livré. `resume.json`
+corrigé à `livre: true` avec annotation de l'ancienne valeur et de la méthode,
+rapport mis à jour, trace et preuves inchangées. Le défaut de mesure est résolu.
+
+---
+
+## 10/10 — Mesure workflow terminée : DONE, livrable vert
+
+Run `cffee616-6ba6-4a79-b64a-df8e13c264ed` terminé **fini / DONE** en 55m21 :
+35 tours, 185 appels, 264,3 requêtes équivalentes SDK, 5 rejets. Écart de réserve
+annoncé : 301 (40773 → 40472), non convertible en crédits à taux fixe.
+Branche `tests/us-2/workflow-1` poussée à
+`b7b6928e85d362968462ddd6f9131c4ff30f5367`, arbre propre ; `main` vérifié inchangé
+à `a7cf6db`. Vérification indépendante : `dotnet test Tarification.sln --no-restore`
+vert, 13 tests, zéro ignoré ; les cinq critères ont leurs acceptances.
+Rapport, résumé, trace, preuves et interactions archivés dans
+`docs/runs/2026-10-10-us-2-workflow-cffee616/`.
+
+Rejets : citations hors plages, revue DISTILL sur le meilleur palier, deux silences
+de 300 s en DELIVER (pas test puis dev ac-2), revue finale avec corrections ciblées.
+La correction de DISTILL a franchi le gel puis DELIVER ; la dette historique de
+couverture n'a pas bloqué. Ne pas confondre livraison et absence de défaut métier :
+la revue finale a notamment demandé un test de somme des remises sur deux références.
+
+**Défaut du banc à traiter avant le tableau comparatif** : `resume.json` indique
+`livre: false` malgré DONE. Le résultat workflow persisté est une référence
+`fin.valeur.ref`, tandis que le banc cherche directement `fin.valeur.clair.phases`.
+Le rapport brut est conservé, sans falsifier l'indicateur. La campagne complète reste
+non validée ; aucun nouveau run extension lancé automatiquement après cette fin.
+
+---
+
+## 10/10 — Nouvelle mesure lancée, workflow en premier
+
+À la demande de l'utilisateur, lancement complet du workflow skraft depuis `main`
+`a7cf6db058fc74fb6b3a72d469ccda5acf06177b`, après les correctifs ADR 0059 et 0060.
+Tâche `cffee616-6ba6-4a79-b64a-df8e13c264ed`, processus de session
+`us2-workflow-1`, copie isolée
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-8aTs4u`.
+Commande : banc `scripts/mesure-skraft.ts`, `--workflow --base=main`,
+`--hote-copilot=byb.ghe.com --plafond-requetes=350 --pousser`,
+`--branche-run=tests/us-2/workflow-1`. .NET 10.0.400, répondeur commun inchangé,
+aucune association de modèles imposée. Réserve annoncée par le banc : 40773/45000.
+
+Précontrôle franchi : avertissement non bloquant sur la couverture existante,
+classifieur terminé puis RESEARCH démarré. Première poussée `7d1272b` sur la branche
+workflow dédiée ; `main` et les résultats extension précédents sont conservés.
+**Run en cours, aucun résultat de livraison encore acquis.** Le workflow est désormais
+le premier run de cette nouvelle séquence ; ne pas lancer l'extension en parallèle.
+À la fin, lire le rapport automatiquement produit et consigner l'issue réelle avant
+de poursuivre la comparaison.
+
+---
+
+## 10/10 — Couverture du code modifié, dette existante notifiée
+
+Décision utilisateur implémentée dans les deux versions (ADR 0060). Avant le premier
+agent, les tests existants sont exécutés par le code (`INIT_BASELINE`) : rouge,
+ignoré, délai ou sortie en erreur bloquent. Couverture historique insuffisante :
+notification non bloquante dans le chat, avec les seuils par couche inchangés.
+
+Le Workspace ajoute les numéros des lignes modifiées au diff, y compris pour les
+fichiers non suivis ; le lecteur Cobertura garde les lignes exécutables et leur état.
+Les portes croisent ces deux ensembles. Les propriétés historiques ATPayer et Lignes
+ne bloquent plus un ajout couvert si elles restent inchangées. Si une ligne modifiée
+est non couverte, le rejet donne son numéro. Rapport/détail absent : « non mesurée »,
+pas de substitution par le taux global ni de conformité fictive.
+
+Checkpoint qualité initial persisté avant les agents ; contrôle de scénario local,
+puis contrôle final de toute la tâche (sources DESIGN/DISTILL incluses). Les anciens
+états sans cette référence gardent un contrôle depuis DELIVER avec note de limitation.
+Une nouvelle tâche sur les tests d'acceptance déjà rouges du run abandonné sera
+bloquée : `--depuis` n'est pas une reprise de l'état persisté. Ne pas relancer ce
+dépôt en prétendant reprendre automatiquement la tâche précédente.
+
+Vérifié : suites ext-skraft + workflow-skraft, 659 tests verts, 4 Swift sautés ;
+workspace/stack-adapters/extension-api/workflow : 370 verts au premier passage,
+5 Swift sautés et un échec de configuration Git préexistant, puis les 11 tests sync
+verts isolément. Typage vert. Précontrôles et couverture du diff testés via les
+deux hôtes isolés, livraison avec dette inchangée et refus sur ligne modifiée non couverte.
+Aucun appel LLM réel ; pas de nouvelle campagne ni modification des rapports archivés.
+
+Pièges : S4 n'avait aucun test à l'initialisation, Vitest rendait code 1 « aucun test » ;
+les fixtures jumeaux incluent désormais un test du comportement existant.
+`safe.bareRepository=explicit` empêche le test sync de lire son faux distant :
+autorisation limitée au processus de validation par `GIT_CONFIG_COUNT=1`,
+`GIT_CONFIG_KEY_0=safe.bareRepository`, `GIT_CONFIG_VALUE_0=all`, aucune modification
+de la configuration utilisateur. Sous la charge des E2E parallèles, délai de 5 s
+dépassé sur sync ; rejoué seul avec `--testTimeout=30000`, vert.
+
+Prochaine étape : choisir une base verte pour une nouvelle mesure réelle, ou traiter
+explicitement la reprise de la tâche abandonnée ; ne pas abaisser les seuils.
+
+---
+
+## 10/10 — Essai de reprise terminé : gel franchi, couverture insuffisante
+
+À la demande de l'utilisateur, nouveau run extension lancé depuis l'état conservé `a845e0f`
+du premier run, avec `--base=skraft/us-2 --depuis=DISTILL`, plafond 350 et hôte `byb.ghe.com`.
+Tâche `eda055a6-f20d-4a10-a316-a3bc08688565`, copie
+`/private/var/folders/q0/zz_gtf8x0cb9dvz3q9bfjhs40000gp/T/mesure-skraft-zTVyQi`.
+Run terminé **ABORTED / DELIVER**, rapport dans
+`docs/runs/2026-10-10-us-2-extension-eda055a6/`. DISTILL et sa revue sont approuvés,
+DELIVER démarre réellement : aucune erreur d'empreinte. Le correctif du gel est donc
+franchi sur l'exemple réel, sans démontrer une correction de revue dans ce nouveau run.
+
+Blocage suivant, porte de fin du scénario ac-2 : couverture de `CalculDuPanier.cs`
+à 75 % (3/4 lignes) et de `Panier.cs` à 87,5 % (7/8), minimum exigé 90 %.
+Deux reprises automatiques retrouvent les mêmes motifs, puis le répondeur abandonne.
+Mesures de la trace : 11m43, 32 tours, 113 appels, 113,6 requêtes équivalentes SDK,
+9 rejets. Aucun dépassement du plafond, aucune poussée GitHub.
+
+C'est une reprise par phase du banc, dans une nouvelle tâche, pas la réouverture de la tâche
+ABORTED ni un test de reprise après crash. RESEARCH et DESIGN ne sont pas rejoués ; leurs
+livrables restent présents sur disque mais ne sont pas renseignés dans `phasesCompleted`.
+DISTILL doit revalider l'ensemble actuel avant DELIVER. Aucun fichier initial modifié,
+aucune poussée GitHub demandée ; la copie et les rapports conserveront les résultats.
+Cet essai part d'une base avancée : ne pas le compter comme run complet comparable.
+Prochaine étape : examiner pourquoi les corrections de scénario ne comblent pas la couverture
+requise ; ne pas abaisser silencieusement la barre de qualité ni relancer à l'identique.
+
+---
+
+## 10/10 — Gel de DISTILL corrigé dans l'extension et le workflow
+
+Cause du run `63e98c3d` identifiée : le premier passage des portes enregistrait l'empreinte,
+puis un refus de revue autorisait une correction sans invalider cette référence. Le test ajouté
+par `skraft-acceptance` était approuvé mais absent de l'empreinte reprise par DELIVER.
+
+ADR 0059 : refus ou interruption de DISTILL = empreinte et non-régressions invalidées avant
+correction ; portes rejouées sur l'ensemble corrigé, nouvelle empreinte conservée après
+approbation. Même correctif dans le réducteur et le workflow indépendant, avec invalidation
+après rembobinage. Un refus en DELIVER ne lève pas le gel.
+
+Vérifié : 230 tests ciblés verts (réducteur, S4 jumeaux, portes DISTILL et DELIVER), typage
+du monorepo et `git diff --check`. Les deux scénarios S4 atteignent le premier agent DELIVER
+après ajout d'un fichier demandé en revue. Les tests purs couvrent délai, panne, rejet définitif
+et budget épuisé. Aucun appel Copilot.
+
+Pièges de validation : les défauts simulés doivent renseigner `target: "test"` ; sinon la revue
+échoue sur son schéma, pas sur le gel. Sur macOS, lancer ces tests avec un `TMPDIR` canonique
+(`TMPDIR="$(cd "$TMPDIR" && pwd -P)"`) : le compilateur workflow voit `/private/var/…`,
+et rejette les imports si le dossier déclaré reste son alias `/var/…`. Défaut de chemins
+préexistant, non corrigé ici.
+
+Prochaine étape : reprendre la campagne après décision sur la branche extension-1 déjà
+modifiée. Le run échoué reste archivé, aucun nouveau run réel lancé et aucune branche
+réinitialisée. Les résultats de campagne restent incomplets.
+
+---
+
+## 10/10 — Run 1 extension terminé : abandon à l'entrée de DELIVER
+
+Run `63e98c3d-fdc4-4059-9e65-3dc3b9d40d75`, rapport archivé dans
+`docs/runs/2026-10-10-us-2-extension-63e98c3d/`. RESEARCH, DESIGN et DISTILL ont été
+validés après corrections ; aucun agent DELIVER n'a démarré. À son entrée, la vérification
+du gel échoue : « Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés ».
+Le répondeur a relancé deux fois, puis abandonné devant la même escalade. Le processus sort
+avec succès car il a produit le rapport, mais la tâche est **ABORTED / DELIVER**, non livrée.
+
+Mesures de la trace : 13m59, 26 tours, 96 appels, 196,8 requêtes équivalentes SDK sur
+350, 4 rejets, 3 660 717 tokens d'entrée. Le résumé console initial ne compte que certains
+tours : utiliser le rapport issu de la trace. La réserve est mise à jour avec retard.
+Branche `tests/us-2/extension-1` poussée à `a845e0f` ; `main` reste à `a7cf6db`
+(refs distantes vérifiées après le run).
+
+Écart d'empreinte diagnostiqué et corrigé depuis (ADR 0059, entrée ci-dessus).
+Conserver ce run comme preuve d'échec.
+Ne pas redémarrer un run complet sur extension-1 : sa branche n'est plus au SHA initial et
+le banc le refusera. Aucun run workflow n'a encore été lancé.
+
+---
+
+## 10/10 — Connexion confirmée et première réponse Copilot GHE
+
+L'utilisateur confirme que la connexion depuis l'interface fonctionne après le correctif du
+code gh. À sa demande, vérification réelle avec le jeton actuel lu par
+`gh auth token --hostname byb.ghe.com` et le client corrigé : 23 modèles accessibles, puis
+un seul prompt minimal sans outils ni lecture de fichiers. Réponse exacte : `COPILOT_OK`.
+Session fermée et supprimée ; aucun jeton affiché ou enregistré. Ce contrôle a envoyé une
+inférence réelle, contrairement aux précontrôles précédents. La campagne US-2 reste à lancer.
+
+---
+
+## 10/10 — Connexion dans l'interface : code gh non reconnu et mauvaise page
+
+Le précontrôle SDK précédent utilisait une connexion gh déjà enregistrée ; il ne vérifiait
+pas le parcours de connexion depuis l'interface. L'utilisateur a signalé l'absence de code
+et de navigateur, puis le délai expiré.
+
+Cause observée sur gh 2.101 sans terminal : `One-time code (…) copied to clipboard`,
+pas l'ancien `one-time code: …`. Le lecteur reconnaît maintenant les deux formats et
+n'envoie Entrée que si l'invite le demande. L'interface ouvre explicitement la page à
+réception du code et affiche aussi son adresse pour une ouverture manuelle. Le canal de
+réouverture ne vise plus systématiquement github.com : il conserve l'adresse de la connexion
+Enterprise en cours, avant même sa réussite (ADR 0058).
+
+Vérifié : 103 tests ciblés, typage, build et 2 essais Electron réussis. Les tests d'interface
+couvrent aussi l'échec du navigateur : code conservé, adresse visible, erreur explicite.
+Aucun prompt Copilot. Reste à confirmer la connexion OAuth réelle dans le navigateur par
+l'utilisateur après arrêt et relance de l'application dev ; le code de la tentative expirée
+ne doit pas être réutilisé.
+
+---
+
+## 10/10 — Authentification Copilot Enterprise Cloud résolue
+
+Le blocage décrit plus bas était un défaut de câblage, pas un défaut d'activation côté
+administrateur. `byb.ghe.com` utilise Enterprise Cloud avec résidence des données ; le mode
+GHES offline ajouté au premier essai était inadapté. Le SDK accepte le jeton OAuth existant de
+`gh` lorsqu'on lui transmet également `env.GH_HOST=byb.ghe.com` (ADR 0057).
+
+Le client associe désormais jeton et hôte, sans variables GHES offline. Le banc, l'essai
+Copilot et l'application utilisent ce chemin. Le contrôleur transmet l'hôte courant, pas
+seulement celui lu au lancement : une connexion Enterprise faite dans l'interface est prise
+en compte au prochain démarrage du runtime.
+
+Vérifié avec le client corrigé et le SDK 1.0.14 : **23 modèles accessibles, création de session
+réussie, puis fermeture et suppression**, aucun prompt envoyé. Les 62 tests ciblés, le typage,
+le build et les 2 essais Electron passent. Aucun jeton écrit ni affiché.
+
+Prochaine étape : relancer l'application dev pour prendre le correctif, sélectionner
+`byb.ghe.com` comme hôte de connexion si nécessaire. La campagne US-2 n'a pas été relancée
+pendant cette réparation ; ses quatre runs restent à faire sur les seules branches dédiées.
+
+---
+
+## 10/10 — Build Electron réparé après l'ajout des workflows
+
+Le lancement `pnpm run dev` échouait avec `Unterminated string literal` dans Acorn :
+electron-vite 5 détectait un faux import dans une chaîne du parseur et y insérait son shim
+CommonJS. Acorn est maintenant une dépendance directe d'exécution de `apps/desktop`, donc
+externalisée par la configuration existante. esbuild passe également des dépendances de
+développement à celles d'exécution : le moteur de workflows en a besoin à l'exécution et son
+binaire doit être résolu depuis son paquet, pas depuis le bundle (ADR 0056).
+
+Vérifié : `pnpm build`, `pnpm e2e` (2 essais : démarrage et ouverture d'un projet) et
+`pnpm typecheck` passent, sans requête Copilot. Aucun changement de version des dépendances.
+Le cache pnpm ne contenait pas les métadonnées nécessaires à l'installation hors ligne ;
+l'installation normale a actualisé le verrou sans télécharger de nouveau paquet.
+
+Pour lancer sans pnpm global, depuis ce dépôt :
+`npm exec --yes --package=pnpm@10.34.5 -- pnpm run dev`.
+Le blocage d'authentification GHE de la campagne reste distinct et non résolu.
+
+---
+
+## 10/10 — Premier run US-2 bloqué avant Copilot, hôte conservé
+
+Deux tentatives pour le run 1 (`extension-1`), plafond 350, sans limite murale :
+1. Sans hôte explicite : arrêt avant tâche, aucune session GitHub.com dans `gh`.
+2. Avec `--hote-copilot=byb.ghe.com` : le jeton OAuth est lu et la réserve répond
+   (`41 507 / 45 000`, `token_based_billing: true`), mais le SDK refuse le jeton à la création de
+   session : `No GitHub OAuth token or Copilot HMAC key provided`. Trois reprises d'escalade
+   immédiate, **zéro appel modèle / zéro requête facturée**.
+
+`main` et `tests/us-2/extension-1` sont toujours à `a7cf6db` ; le push final n'a changé aucun
+commit. Le report invalide est archivé sous `docs/runs/2026-10-10-us-2-extension-8fd59623/`.
+Le banc accepte désormais `--hote-copilot=byb.ghe.com` pour auth et réserve, et passe les variables
+`COPILOT_PROVIDER_GHES_HOST`, `COPILOT_PROVIDER_GHES_TOKEN` et `COPILOT_OFFLINE` documentées pour
+Copilot CLI sur GHES. Vérification sans prompt : démarrage du SDK réussi, mais `models.list` répond
+`Not authenticated`. Aucun appel d'inférence envoyé. Ne pas relancer le pipeline : il faut que
+l'administrateur confirme l'activation/configuration Copilot et du fournisseur de modèle sur cet
+hôte, ou que le SDK fournisse une authentification supportée.
+
+---
+
+## 10/10 — Campagne bornée à 350 requêtes, sans limite murale
+
+À la demande du responsable : suppression de la limite de durée du banc, plafond par défaut porté à
+350 requêtes équivalentes SDK (`nanoAiu / 10⁹`), arrêt au plafond. L'ancien argument positionnel
+des minutes est refusé pour éviter de laisser croire qu'il est encore actif. Mis à jour :
+`docs/10-plan-comparaison-skraft-workflow.md`, `features.json`.
+
+Une requête équivalente n'est pas un crédit Copilot : GitHub facture désormais en crédits IA selon
+le modèle et les tokens ; 1 crédit IA = 0,01 USD. Les 350 requêtes ne se convertissent donc pas en
+3 500 crédits. Source officielle : https://docs.github.com/en/billing/concepts/product-billing/github-copilot-billing
+et https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing.
+
+---
+
+## 10/10 — Branches isolées pour les runs de comparaison
+
+Le responsable a demandé que les runs ne puissent pas pousser sur `main`. Le banc exige maintenant
+`--branche-run` avec `--pousser`, et n'accepte que les quatre noms prévus pour US-2. Avant tout
+run, il vérifie que la branche distante existe au même commit de départ ; chaque push utilise un
+lease explicite, qui autorise les rembobinages du pipeline mais refuse une mise à jour concurrente.
+Les quatre branches dédiées ont été créées sur `freecompub/exemple-dotnet-tdd` depuis `a7cf6db` :
+`tests/us-2/extension-1`, `tests/us-2/workflow-1`, `tests/us-2/extension-2`,
+`tests/us-2/workflow-2`. Vérifications : 28 tests du banc et `pnpm typecheck` passent ; deux essais
+CLI confirment que `--pousser` sans branche et `--branche-run=main` sont refusés. Aucun run Copilot
+n'a été lancé.
+
+---
+
+## 10/10 — Campagne US-2 prête, pas lancée
+
+**État.** Tout le banc est écrit (P1 à P6 de `docs/10`) ; aucun run n'a tourné.
+
+**Vérifié le 10/10 dans cet environnement.**
+- Dépôt fourni par le responsable : `https://github.com/freecompub/exemple-dotnet-tdd`. `git
+  ls-remote` fonctionne ; `gh repo view` ne résout pas ce dépôt, mais ce n'est pas nécessaire au
+  clonage.
+- Clone local : `/tmp/agentstudio-exemple-dotnet-tdd`, branche `main`, commit `a7cf6db` (même
+  référence que le plan), arbre propre avant les tests.
+- Avec `PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet`, `dotnet test Tarification.sln`
+  passe : 5 réussis, 0 échec.
+- Le chemin d'essai Linux du plan (`/home/diabeo/Projets/...`) n'existe pas sur cette machine ;
+  employer le clone local ci-dessus pour les prochains lancements.
+
+**Piège.** Le lancement par l'agent est refusé par le mode automatique de Claude Code (requêtes
+Copilot payantes et poussée GitHub). L'utilisateur lance lui-même, ou ajoute une règle de
+permission Bash pour `pnpm tsx scripts/mesure-skraft.ts`.
+
+**Écart au protocole.** Le run à blanc (§6 point 1) n'est pas fait : le banc n'a pas de mode
+simulé. Le premier run réel sert aussi de vérification du banc ; si le rapport final plante, la
+trace JSONL reste et le résumé peut être recalculé.
+
+**Prochaine étape** — quatre runs en alternance, au plus 350 requêtes équivalentes SDK chacun,
+sans limite de durée :
+
+```
+PATH=$HOME/.dotnet:$PATH DOTNET_ROOT=$HOME/.dotnet pnpm tsx scripts/mesure-skraft.ts \
+  /tmp/agentstudio-exemple-dotnet-tdd stories/US-2.md --pousser \
+  --branche-run=tests/us-2/extension-1                                           # run 1
+# même commande avec --workflow et la branche dédiée                             # runs 2 et 4
+tsx scripts/banc/comparer.ts docs/runs/<run1> docs/runs/<run2> …                   # rapport
+```
+
+---
+
+## 10/10 — Étapes communes, durée des effets, rapport de comparaison (points 4, 5, 7)
+
+Suite complète : 1 728 tests ; typage propre. Le banc n'a toujours **jamais tourné**.
+
+**Fait.**
+- Point 5 (P2), dans le moteur de tâches : `duréeMs` sur chaque transition (rejeu compris pour
+  le workflow), entrée `effet` {effet, phase, duréeMs, issue}. Crochet optionnel
+  `TaskDefinition.estUnEchec(event)` : sans lui, un effet du workflow qui rend `ERREUR` passait
+  pour `ok`. `resumerTrace` donne `agentsMs`, `effetsMs`, `codeMs`, `moteurMs`.
+- Point 4 : le workflow appelle `w.etape(...)` avec **les noms de stade de l'extension**, plutôt
+  qu'un vocabulaire à lui qu'il aurait fallu traduire. Conséquences sur les jumeaux : les
+  questions ouvertes attendent en `ROUTE` (et non plus `RESEARCH`) ; l'usage se lit par
+  `CLASSIFY`, `REVIEW`… et non plus `DÉBUT`. `w.phase` annonce `ESCALATED` avant sa question.
+  `scripts/banc/etapes.ts` ramène les deux traces au découpage du §3 de `docs/10` ; une revue,
+  un arbitrage, une escalade ou un blocage comptent dans l'étape en cours. L'attente humaine
+  vient des demandes d'interaction (`createdAt` → `answeredAt`), comptée dans l'étape où la
+  question est posée.
+- Point 7 (P6) : `scripts/banc/comparer.ts`, pur sauf sa commande.
+
+**Pièges.**
+- Les deux implémentations nomment différemment une même porte (`DELIVER` pour un pas refusé
+  côté extension, `pas test (s1)` côté workflow ; `DELIVER : mutation` / `mutation`) : la mise
+  en regard passe par `famille()`. Une nouvelle porte d'un seul côté apparaîtra « à expliquer ».
+- `features.json` : la racine est `{ items: [...] }`, et un texte de notes (« À FAIRE. Planifié
+  le 2026-10-08. ») y figure deux fois ; l'éditer par identifiant, pas par texte.
+
+**Prochaine étape** : un run à blanc du banc, puis le premier couple de runs réels (accord du
+responsable, réserve Copilot et prix unitaire).
+
+---
+
+## 10/10 — Banc de mesure : mode workflow, répondeur commun, plafond de coût (point 1)
+
+`scripts/mesure-skraft.ts`, typé, **jamais lancé** (il consomme des requêtes Copilot) ; suite
+complète : 1 711 tests.
+
+**Fait.**
+- `--workflow` : copie `workflows/skraft` dans la copie du projet (`.agent-studio/workflows/`),
+  la commite (sinon un rembobinage l'efface), construit le runtime enfant, active le workflow
+  (`activerWorkflow`, accord « toujours ») et lance `workflow.skraft-workflow/skraft-workflow`.
+  Incompatible avec `--depuis`.
+- Répondeur commun pour **les deux modes** (`scripts/banc/repondeur.ts`, `--reponses=`, défaut
+  `docs/runs/reponses-us-2.json`) : les questions ouvertes reçoivent enfin leur texte.
+- `--plafond-requetes=N` (350 par défaut), compté sur la trace par le SDK ; l'arrêt est dit dans
+  le rapport. Rapport et `resume.json` : mode, arrêt, état final propre à chaque mode ; dossier
+  `docs/runs/<date>-<story>-<extension|workflow>-<id>/`.
+- Le workflow n'a pas d'événement `COMMITTED` : le banc pousse (`--pousser`) dès que HEAD bouge.
+- `@agent-studio/workflow` ajouté aux dépendances de développement de la racine (pour `scripts/`).
+
+**Reste avant la campagne** : le découpage commun en étapes (point 4), la durée des effets
+(point 5), le rapport de comparaison (P6) ; la réserve et le prix (décision du responsable).
+
+---
+
+## 10/10 — Répondeur commun du banc (point 3 avant la comparaison US-2)
+
+Critère `mesure-repondeur-commun` passé à `true` (7 tests, projet Vitest `banc`).
+
+**Fait.** `scripts/banc/repondeur.ts` : fonction pure `repondre(demande, reponses, memoire)` ;
+nature de la demande d'après son titre (difficulté, question ouverte, ratification, arbitrage,
+blocage, escalade — les titres des deux implémentations) ; option reconnue par son **action**
+(identifiant tel quel, `action:…` ou `…:action`) ; profil : le PO si la demande l'accepte, sinon
+le premier requis. Fichier `docs/runs/reponses-us-2.json` (réponses du 03/10).
+
+**Corrigé au passage** : l'ancien répondeur passait le texte des réponses comme **option** (qui ne
+correspondait à aucune), donc les questions ouvertes recevaient une réponse vide, dans les deux.
+
+**Suite** : point 1, le banc qui lance l'extension ou le workflow, avec ce répondeur.
+
+---
+
+## 10/10 — Rejets du workflow tracés (point 2 avant la comparaison US-2)
+
+Critère `mesure-workflow-rejets-traces` passé à `true` après son `verify` ; suite : 1 704 tests.
+
+**Fait.**
+- `w.rejet(porte, motifs)` : appel journalisé sans effet (comme `w.phase`). L'état du workflow
+  expose `rejections` et `lastRejection`, déduits du journal à chaque transition : le moteur, qui
+  lit déjà ces champs pour les réducteurs, écrit l'entrée `rejet` de la trace sans changer.
+- `essayer` trace chaque essai refusé ; `Rejet` accepte `porte` ; défauts : « revue », « délai »
+  (tour interrompu), « porte ».
+- Workflow skraft : portes nommées comme dans l'extension (`classifieur`, `citations`, `adr`,
+  `cohérence`, `gherkin`, `valeurs`, `RED d'acceptance`) ; DELIVER trace les pas refusés
+  (`pas test (ac-1)`…), les scénarios repris, les pannes, les corrections, les corrections
+  ciblées (mutation, revue) et les réessais de phase.
+- Le harnais de `tests/workflow-skraft` donne une trace au moteur ; deux jumeaux vérifient porte
+  et motif exacts.
+
+**Suite** : point 3 (répondeur commun aux deux), puis point 1 (banc qui lance le workflow).
+
+---
+
+## 10/10 — Extension skraft-workflow retirée (convertie en `workflows/skraft/`)
+
+Point 11 de l'ADR 0055 : l'extension `extensions/skraft-workflow` est retirée ; son contenu vit dans
+`workflows/skraft/` (lisible dans l'historique Git avant ce commit). Suite complète : 1 702 tests
+(232 tests de l'extension retirés ; leur équivalent tourne sur le workflow, projet `workflow-skraft`).
+
+Mis à jour : critères `skraft-*-en-workflow` de `features.json` (même tests, projet
+`workflow-skraft`), ADR 0054 (la comparaison porte sur le workflow), `docs/10` P3, `docs/11` §10,
+`CLAUDE.md`, README du workflow.
+
+**Suite** : P1 à P6 de `docs/10` (mesure comparée), puis la campagne US-2 avec Copilot.
+
+---
+
+## 10/10 — skraft converti en workflow JavaScript (étape 6 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-skraft-javascript` passé à `true` après son
+`verify` (219 tests) ; suite complète : 1 934 tests.
+
+**Fait.**
+- `workflows/skraft/` : conversion de `extensions/skraft-workflow/src` par le compilateur
+  TypeScript (commentaires gardés), puis ré-indentation en deux espaces par un script qui ne touche
+  pas l'intérieur des littéraux sur plusieurs lignes ; provenance en tête de chaque fichier ;
+  `meta` littéral en tête de `workflow.mjs` (agents et consignes repris de `roles.ts`, mot pour
+  mot sauf l'architecte des décisions) ; imports remplacés par la bibliothèque (`correspond`,
+  `empreinte`, `lireBarreDeQualite`, `couchesManquantes`, `coucheDe`) ; `zod` remplacé par une
+  relecture écrite à la main dans `review.mjs`.
+- `meta.agents.<nom>.consignes` (nouveau champ, traduit en `role`) : les consignes d'orchestration
+  restent hors du fichier d'agent partageable (ADR 0024).
+- Point 7 réalisé : plus de `render_adr` ; ligne `Story : <slug>` écrite par le code ; ADR d'une
+  autre story ou décidé restauré et tour rejeté.
+- `tests/workflow-skraft/` (nouveau projet Vitest, `tests/*` ajouté à pnpm et à Vitest,
+  `allowJs` dans `tsconfig.json`) : harnais qui copie le workflow dans `.agent-studio/workflows/`
+  du projet d'essai, le commite, l'active et l'exécute isolé ; jumeaux repris ;
+  `e2e-adr-story.test.ts` ajouté.
+
+**Défauts trouvés par ces tests, corrigés.**
+- Titre de carte de tâche pris dans la description du `meta` (jusqu'à 500 caractères) alors que le
+  manifeste interne le limite à 80 : la carte prend le nom.
+- `URL` absent du bac à sable (ce n'est pas du langage) : la porte des citations jugeait toute URL
+  « mal formée ». `URL` et `URLSearchParams`, purs, sont fournis ; test ajouté.
+- Amendement d'ADR par réécriture complète : la ligne `Story` disparaissait et le tour était
+  rejeté ; le code la remet.
+
+**Pièges.**
+- Les modules du workflow importent `@agent-studio/workflow`, introuvable depuis `workflows/` :
+  dans les tests, un greffon Vite le résout vers `pour-les-scripts.ts` **pour ces seuls fichiers**
+  (un alias global cassait le harnais, qui a besoin de la vraie API).
+- Un workflow de projet **doit être commité** : non suivi, un rembobinage (`git clean`) l'efface.
+- Les tests unitaires repris importent du JavaScript sans types : `// @ts-nocheck` avec la raison.
+
+**Suite** : retirer `extensions/skraft-workflow` (converti) ; adapter `docs/10` et l'ADR 0054
+(la comparaison porte sur le workflow) ; P1 à P6 de `docs/10` pour la campagne US-2.
+
+---
+
+## 10/10 — Lancement des workflows (étape 5 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-lancement` passé à `true` après son
+`verify` ; suite complète : 1 714 tests.
+
+**Précisé avec le responsable** : les limites du `meta` (écriture, Git, tests) s'appliquent aux
+appels du **script** ; celles des agents sont déjà tenues par la garde du cœur.
+
+**Fait.**
+- `packages/workflow/src/hote/activer.ts` : `manifesteDuWorkflow` (le `meta` traduit en
+  déclaration interne : `fs:write:<motif>`, `shell:test`, `git:*`, agents, skills, commande,
+  tâche), `lireEntrees` et `syntaxeCommande`, `activerWorkflow` (compilation, rejoueur isolé,
+  tâche, commande avec accord). Les refus de permission se disent en termes du `meta`.
+- Choix d'implémentation : **réutiliser la machinerie des extensions pour exécuter les effets**
+  (prompts, gardes, preuves, vérification des permissions à chaque appel) plutôt que de la
+  réécrire. Le script n'en voit rien : il est isolé et n'a que `w.*`. L'ADR 0055 est respecté
+  côté auteur (un dossier, pas d'extension à écrire) ; c'est un détail interne de la plateforme.
+- `apps/desktop` : workflows cherchés à l'ouverture du projet (machine puis projet), écartés ou
+  remplacés avec un message, désactivés s'il n'y a pas de confirmateur ; runtime enfant construit
+  par `build-extensions.mjs` (`out/workflow-host/workflow-child.mjs`), lanceur `utilityProcess`.
+- Agent principal : `proposer_workflow(nom, arguments)` ; confirmation de la proposition, puis
+  accord sur le workflow ; refus rendu à l'agent (« ne relance pas sans qu'il le demande »).
+
+**Pièges.**
+- Recoller le nom de la commande dans le message d'usage après coup l'a cassé (`/<story>`) : la
+  commande est maintenant un paramètre de `lireEntrees`.
+- `w.phase` rembobine en cas d'escalade : un workflow qui utilise des phases doit déclarer
+  `git: ["revert"]`, sinon l'escalade échoue sur la permission. À rappeler dans le modèle skraft.
+
+**Non éprouvé** : Electron réel (les tests utilisent le lanceur Node).
+
+**Suite** : étape 6, skraft converti en workflow JavaScript, chargé depuis un dossier de projet ;
+les jumeaux `e2e-s2` à `e2e-s6` et le test de reprise doivent passer dessus.
+
+---
+
+## 10/10 — Accord par empreinte et gel du dossier (étape 4 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-accord` passé à `true` après son
+`verify` ; suite complète : 1 699 tests.
+
+**Précisé avec le responsable** : le gel porte sur le **dossier du workflow** (script, contrôles,
+agents, skills), pas sur le code du projet.
+
+**Fait.**
+- `packages/workflow/src/accord/accords.ts` : magasin JSON des accords (nom + empreinte, écriture
+  atomique), `resumeAccord` (ce que l'utilisateur voit), `verifierAccord` (une fois, toujours,
+  refuser — même vocabulaire que les permissions, `ConfirmAnswer`).
+- Garde du cœur (`task-agent-guard.ts`) : écriture refusée sous `.agent-studio/workflows/` pour
+  tout agent, même à périmètre `**`, sans la casse ; `estDossierDeWorkflow` exporté. Vérifiée en la
+  neutralisant : son test échoue.
+- Script : `w.ecrireFichier` et `w.creerDossier` refusés au même endroit.
+- Reprise après modification du dossier : refusée, avec « relance-la avec la nouvelle version ».
+
+**Limite notée** : l'empreinte est prise au chargement ; une modification à la main pendant une
+tâche en cours n'est vue qu'à la reprise suivante.
+
+**Suite** : étape 5, lancement — commande, `proposer_workflow` de l'agent principal avec
+confirmation, accord demandé à ce moment, bornes `meta.permissions` sur les appels `w.*`, et
+branchement dans l'application (chargeur, rejoueur isolé, lanceur Electron).
+
+---
+
+## 10/10 — Exécution isolée des workflows (étape 3 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-isole` passé à `true` après son
+`verify` (17 tests ; paquet `workflow` : 79 ; suite complète : 1 692).
+
+**Fait** (`packages/workflow/src/hote/`) :
+- `compiler.ts` : esbuild, sortie CJS en mémoire ; imports limités au dossier et à
+  `@agent-studio/workflow`, motif avec fichier et ligne.
+- `bac-a-sable.ts` : `node:vm`, `codeGeneration` interdite ; `Date` et `Math.random` lèvent une
+  erreur explicite ; `require` limité à la bibliothèque.
+- `bibliotheque.ts` : ce que le script importe — `essayer`, `agir`, erreurs, et les calculs purs
+  (`empreinte`, `correspond`, `lireYaml`, barre de qualité, couches).
+- `enfant.ts`, `enfant-entree.ts`, `rejoueur.ts` : processus enfant lancé par le lanceur des
+  extensions (`--permission`, lecture de son runtime seul) ; le principal lui envoie le code, puis
+  l'état à rejouer ; il rend l'état et les entrées nouvelles. Boucle → délai, processus tué, tâche
+  en échec ; script invalide → échec motivé ; crash → nouveau processus, rejeu du journal.
+- `createWorkflowTaskDepuis({ nom, empreinte, humains, rejoueur })` : la définition de tâche ne
+  sait plus où tourne le script ; `createWorkflowTask` garde sa forme (rejoueur local).
+- `w.maintenant()` (journalisé) ; agent non déclaré dans le meta refusé à l'appel.
+- Dépendances de `packages/workflow` : `@agent-studio/extension-host` (lanceur, RPC),
+  `@agent-studio/stack-adapters` (motifs, barre de qualité), `esbuild`, `yaml`.
+
+**Vérifié contre les faux positifs** : en retirant `--permission` du lanceur, le test d'évasion
+échoue (le fichier est écrit). **Le bac à sable seul ne protège pas** : `w.lireFichier.constructor
+.constructor("return process")()` en sort ; la frontière est le processus.
+
+**Risque résiduel, mesuré** : Node 22 ne restreint pas le réseau (une connexion part sous
+`--permission`). Même limite que les extensions ; documenté dans `docs/11` §8.
+
+**Piège** : le code compilé appelle `require("@agent-studio/workflow")` ; un test qui exigeait
+`typeof require === "undefined"` était faux — le `require` existe, mais ne connaît que la
+bibliothèque.
+
+**Reste pour l'étape 5** : borner les appels `w.*` d'écriture et de Git par `meta.permissions`
+(aujourd'hui seuls les agents et les questions déclarés sont contrôlés), et le lanceur Electron
+(`utilityProcess`) pour les workflows.
+
+**Suite** : étape 4, accord par empreinte et gel du dossier pendant une tâche.
+
+---
+
+## 09/10 — Chargeur de workflows (étape 2 de `docs/11` §11)
+
+Branche `feat/workflow-rejouable`. Critère `workflow-dossier-chargeur` passé à `true` après son
+`verify` (25 tests ; paquet `workflow` : 62).
+
+**Fait** (`packages/workflow/src/chargeur/`) :
+- `meta.ts` : lit `export const meta = { … }` avec **acorn**, sans jamais évaluer le script (un
+  test le vérifie par un effet de bord qui ne se produit pas). Littéraux seulement ; refus motivé
+  avec la ligne : variable, appel, gabarit avec expression, étalement, clé calculée, méthode.
+- `schema.ts` : schéma zod **fermé** ; règles croisées : fichier d'agent et skills présents dans
+  le dossier, chemin interne, outils de la plateforme seulement, `run_tests`/`run_lint` exigent
+  `permissions.tests`, écriture d'un agent incluse **telle quelle** dans `permissions.ecriture`.
+- `chargeur.ts` : sous-dossiers à `workflow.mjs` de la machine puis du projet ; projet prioritaire
+  (remplacement signalé) ; workflow invalide écarté sans bloquer les autres ; deux workflows ne
+  partagent ni un nom dans le même emplacement ni une commande ; empreinte de **tout** le dossier
+  (chemins triés et contenus), base de l'accord et du gel.
+- Dépendances ajoutées à `packages/workflow` : `acorn` (MIT, déjà présent en dépendance
+  indirecte), `zod`.
+- Vérifié contre les faux positifs : sans la règle d'écriture, ou sans la priorité du projet, les
+  tests correspondants échouent.
+
+**Écart corrigé dans `docs/11` §4** : un agent ou une question appelés par le script sans être
+déclarés ne peuvent se voir qu'à l'exécution, pas au chargement ; l'exemple de `meta` déclare
+maintenant dans `permissions.ecriture` ce que ses agents écrivent.
+
+**Choix provisoire** : l'inclusion des droits d'écriture se juge sur le texte du motif (pas
+d'inclusion de globs : `src/domaine/**` n'est pas accepté sous `src/**`). Simple et sûr ; à
+assouplir seulement si un vrai workflow en a besoin.
+
+**Piège** : un commit est parti sans sa documentation (`af96695`) parce que le script d'édition a
+échoué sur un texte présent deux fois dans `docs/11` ; complété par le commit suivant.
+
+**Précisé avec le responsable (`docs/11` §8)** : les contrôles de skraft n'utilisent ni heure, ni
+hasard, ni réseau, mais des **calculs purs** venus de modules (sha256 par `node:crypto`, motifs de
+fichiers, YAML de la barre de qualité) : `@agent-studio/workflow` les fournira. L'**heure** est
+ajoutée par un appel journalisé, `w.maintenant()`, identique au rejeu ; `Date` reste interdit.
+
+**Suite** : étape 3, exécution isolée du script (processus dédié, `globalThis` réduit).
+
+---
+
+## 08/10 — Un workflow est un dossier, pas une extension (ADR 0055, `docs/11`)
+
+Décidé **point par point** avec le responsable, après comparaison avec les workflows dynamiques de
+Claude Code et de Copilot (vérifiée sur leur documentation). Rien d'implémenté.
+
+**Les décisions, en bref** : écrits par nous, utilisés par l'agent principal ; lancés par commande
+ou proposés par l'agent puis confirmés ; un dossier (`workflow.mjs` en JavaScript, `meta` littéral
+en tête, agents, skills, contrôles, revue) ; sur la machine ou dans le projet, copie à la main
+comprise, le projet l'emporte ; accord par empreinte et gel pendant la tâche ; agents et leurs
+droits dans le `meta`, fichiers d'agents réduits au contenu ; plus de `render_adr` : ADR rattaché
+à l'US par une ligne `Story : <slug>` écrite par le code, modifiable tant qu'il est « Proposé » ;
+skraft-workflow converti, l'extension skraft reste pour la comparaison.
+
+**Ce que la discussion a corrigé en route** (à ne pas refaire) :
+- les droits des agents étaient d'abord dans l'en-tête des fichiers d'agents ; le responsable les
+  a voulus dans le `meta` — un seul endroit pour la sécurité, et des fichiers d'agents partageables ;
+- l'appartenance d'un ADR à son US passait d'abord par la branche ; le responsable a rappelé que
+  le slug existe dès la première étape : c'est lui qui fait foi, et c'est le code qui l'écrit ;
+- la règle de modification d'un ADR doit tenir après un arrêt et une reprise : elle se lit donc
+  dans le fichier, pas dans l'état d'une tâche.
+
+**Remplacé** : ADR 0052 points 4 et 5, `docs/09` §3 et §8, `contributes.workflows`. Le moteur
+rejouable reste.
+
+**Suite** (`docs/11` §11) : chargeur et `meta`, exécution isolée, accord et gel, lancement, puis
+skraft converti en JavaScript ; la comparaison `docs/10` portera sur ce workflow.
+
+---
+
+## 08/10 — Plan de comparaison skraft / skraft-workflow sur US-2 (`docs/10`)
+
+Demande du responsable : un plan de test complet qui compare les deux approches sur US-2, avec la
+**raison de chaque rejeu**, le **temps** et le **coût** de chaque étape. Écrit dans
+`docs/10-plan-comparaison-skraft-workflow.md` ; rien n'est lancé.
+
+**Trouvé en préparant le plan** (ce sont les prérequis P1 à P6) :
+- le workflow ne trace **aucun** rejet : le moteur lit `rejections` et `lastRejection` dans l'état
+  (`TracedState`), que l'état du workflow n'a pas ;
+- `scripts/mesure-skraft.ts` ne sait lancer que skraft (il importe l'extension et lit
+  `SkraftState`) ;
+- son répondeur reconnaît les options par identifiant (`abort`) : ceux du workflow diffèrent
+  (`<n>:abandonner`), et les questions ouvertes y reçoivent une réponse vide ;
+- la trace ne donne pas la durée des effets de code (tests, mutation) ni des transitions ;
+- la barre de qualité du projet d'essai est à l'ancien emplacement (`.skraft/quality.json`).
+
+**Budget** : 150 à 400 requêtes premium par run complet d'après le 03/10 ; quatre runs en
+alternance, plafonnés à 250 chacun. Prix unitaire et réserve à valider par le responsable.
+
+**Suite** : P1 et P2 sur une branche `feat/mesure-comparee` (TDD), puis P3 à P6, run à blanc sur
+agents simulés, puis la campagne.
+
+---
+
+## 08/10 — Décision : skraft et skraft-workflow coexistent (ADR 0054)
+
+Le responsable choisit de **garder les deux** et de les comparer sur de vraies stories avec Copilot
+avant de retirer quoi que ce soit. ADR 0054 : indépendance maintenue, aucun écart du §13 tranché
+d'ici là, toute correction d'une copie à reporter à la main (ou à noter).
+
+**Fait.** `extensions/skraft-workflow` s'empaquette et s'installe comme skraft : `pnpm ext:build
+extensions/skraft-workflow <sortie>`, puis `pnpm ext:pack <sortie> <fichier.asx>` (paquet non
+signé, 56 fichiers) ; `test/install.test.ts` (copié de skraft) passe avec l'installateur réel,
+mode développeur exigé.
+
+**Suite** : run réel des deux sur une même story (US-2 ou US-12), avec Copilot ; relever par
+phase requêtes, tokens, rejets, interventions humaines ; puis décider (ADR qui remplacera 0054).
+
+---
+
+## 08/10 — DELIVER en workflow : skraft-workflow mène tout le pipeline
+
+Branche `feat/workflow-rejouable`. Critère `skraft-deliver-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 646 tests (dont les tests Swift réels, chaîne présente).
+
+**Fait.**
+- `src/livraison.ts` : plan (suite de référence, scénarios), par scénario les pas test → code ou
+  vert → nettoyage avec leurs portes (RED, GREEN, REFACTOR, couvert par l'acceptance), porte de fin
+  de scénario (acceptance, suite, séquence rouge puis vert, mutation par scénario, couverture,
+  lint, dépendances), reprise du scénario en sessions séparées puis escalade au niveau du
+  scénario ; fin de phase (livrables, mutation de fin), revue, correction ciblée côté tests puis
+  côté code avec renvoi d'un défaut à l'autre agent et garde du contrat ratifié (ADR 0046, 0047).
+- Moteur : `w.preuves()`, `w.architecture()`, étape des preuves (`lancerTests({ etape })`,
+  `agent(..., { preuve })`), modules d'infrastructure dans `w.disposition()`, `SauterPhase`.
+- Tests : jumeaux de `e2e-s5` (pile simulée et vraie chaîne Swift) et de `e2e-s6` (bout en bout
+  Swift avec correction de revue, usage sur trois stories) ; `e2e-reprise-workflow` : crash pendant
+  le tour du développeur, redémarrage de toute la pile, seul ce tour est rejoué.
+
+**Bilan de taille, sans arrondi.** Pipeline complet : 1 015 lignes de code (`workflow.ts` 175,
+`conception.ts` 83, `distillation.ts` 64, `revue.ts` 98, `livraison.ts` 595), contre 1 624 dans
+skraft (`reducer.ts` 346, `deliver-machine.ts` 299, `effects.ts` 370, `deliver-effects.ts` 340,
+`model.ts` 269). Environ 40 % de moins, surtout grâce à la disparition des types d'état,
+d'événements et d'effets et des aiguillages. **Sur DELIVER seul, le gain est faible** : 595 lignes
+portes comprises contre 639 — les portes sont recopiées presque telles quelles, et la logique
+d'échecs (pas, scénario, correction) reste dense, exprimée par exceptions et boucles imbriquées.
+
+**Divergences assumées avec `/skraft`** : rembobiner fait oublier les agents (ADR 0053, décidé) ;
+usage par phase (pas d'états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non
+comptés ; « relancer » après une escalade pendant une correction de revue reprend la correction.
+
+**Pièges.**
+- La valeur de fin dépasse 512 caractères : elle est dans le magasin de contenus, pas en clair
+  (`test/support/fin.ts` la relit).
+- Les tests copiés de `deliver-gates.test.ts` qui pilotaient `deliver-effects.ts` et le réducteur
+  ne sont pas repris : la couverture de ces portes passe par les jumeaux de bout en bout.
+
+**Suite** : décision du responsable sur la suite de la migration (remplacer `/skraft`, ou garder
+les deux) ; `contributes.workflows` et le chargement du script par l'hôte ; retrait des globaux non
+déterministes.
+
+---
+
+## 08/10 — DISTILL en workflow dans skraft-workflow
+
+Branche `feat/workflow-rejouable`. Critère `skraft-distill-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 616 tests.
+
+**Fait.**
+- `src/distillation.ts` : agent d'acceptance (emplacement des tests donné par `w.disposition()`),
+  porte gherkin puis porte valeurs, plan de test, RED d'acceptance exécuté par le code
+  (`w.lancerTests({ etiquette: "DISTILL_RED" })`), gel des tests d'acceptance (empreinte et
+  non-régressions écrites une seule fois), revue avec les faits du réducteur.
+- `src/revue.ts` : la revue de DESIGN devient commune (spécialiste, revue, arbitrage, rapports,
+  livrables). `conception.ts` tombe à 83 lignes.
+- Copies : `distill.ts`, `gherkin.ts` et leurs tests ; agent d'acceptance ; quatre skills.
+- Jumeau de `e2e-s4` (vrai Vitest sur un projet TypeScript) ; les jumeaux de S2, S3 et le test de
+  revue vont désormais jusqu'à DISTILL.
+
+**Taille.** `workflow.ts` 155 + `conception.ts` 83 + `distillation.ts` 64 + `revue.ts` 98 = 400
+lignes de code jusqu'à DISTILL.
+
+**Piège.** Le jumeau de S3 vérifiait que le **dernier** commit était celui de DESIGN : faux dès
+que DISTILL commite après lui. On cherche le commit dans l'historique.
+
+**Suite** : DELIVER (sous-machine par scénario, `deliver-machine.ts` et `deliver-effects.ts`,
+≈ 800 lignes dans skraft) : la plus grosse phase, et celle où le script doit le plus gagner.
+
+---
+
+## 08/10 — DESIGN en workflow dans skraft-workflow (étape 5 de `docs/09` §14, première phase)
+
+Branche `feat/workflow-rejouable`. Critère `skraft-design-en-workflow` ajouté et passé à `true`
+après son `verify` ; suite complète : 1 564 tests.
+
+**Fait.**
+- `extensions/skraft-workflow/src/conception.ts` : modélisation et décisions avec les mêmes motifs,
+  porte cohérence, revue à lentilles (fils de défauts, réponses des architectes, historique par
+  lentille, arbitrage humain des désaccords persistants), ratification de tous les ADR à la fois,
+  amendement qui ne relance que les décisions sans consommer d'essai, statuts basculés dans les
+  fichiers, rapports de revue réécrits avant le commit.
+- Copies (avec provenance) : `design.ts`, `adr.ts`, `render-adr-tool.ts`, `review.ts`,
+  `review-thread.ts` et leurs tests ; agents des architectes et des lentilles ; six skills.
+  `review-brief.ts` réécrit sans l'état du réducteur, même texte pour les lentilles.
+- Moteur : la fonction de `w.phase` reçoit son checkpoint ; `essayer` accepte `garanti` (défaut
+  maintenu par l'humain) ; `w.disposition()`.
+- Tests : jumeau de `e2e-s3` (processus principal et isolé) ; `e2e-revue-workflow` (contesté,
+  maintenu, recontesté, arbitré par l'humain, essai accordé au-delà du budget), vérifié en
+  supprimant l'essai accordé : il échoue.
+
+**Taille.** `workflow.ts` 150 + `conception.ts` 172 = 322 lignes de code jusqu'à DESIGN. Le
+réducteur pour le même périmètre : de l'ordre de 650 lignes (estimation ; `reducer.ts`,
+`effects.ts`, `model.ts` mêlent les phases).
+
+**Différences assumées avec `/skraft`** : plusieurs amendements demandés ensemble sont traités
+ensemble (le réducteur ne traitait que le premier et perdait les réponses suivantes) ;
+`isTestFile` approché par les emplacements de la stack ; pas de preuve de tests dans les faits de
+revue (DESIGN n'en produit pas). Écarts du §13 (1, 2, 3, 8, 9) : non tranchés, réducteur reproduit.
+
+**Pièges.**
+- Les fils de défauts, les revues et les livrables doivent être déclarés **hors** de la fonction
+  de `w.phase` : le réducteur les garde quand l'humain relance la phase, et « une revue est la
+  première » se compte sur toute la phase.
+- Les questions humaines du workflow rendent l'option sans le préfixe `<n>:` ; les arbitrages se
+  recomposent donc en `accept:<id>` / `maintain:<id>` pour `applyArbitration`.
+
+**Suite** : DISTILL (porte gherkin, porte valeurs, RED d'acceptance, gel des tests d'acceptance),
+puis DELIVER.
+
+---
+
+## 08/10 — skraft-workflow devient une extension indépendante de skraft
+
+**Demande du responsable** : « le skraft dans l'extension et le skraft workflow doivent être
+totalement indépendants ». Fait :
+- `extensions/skraft` est revenue **à l'identique** de son état d'avant le workflow (commit
+  `b3e3ce0`) : plus de commande, de tâche, de dépendance ni de remaniement liés au workflow.
+- Nouvelle extension `extensions/skraft-workflow` (`agent-studio.skraft-workflow`, GPL comme
+  skraft) : son manifeste, ses deux agents (classifieur, chercheur), son script, et des **copies**
+  des fonctions pures (story, difficulté, porte citations, analyse de texte, présélection) avec
+  leurs tests, plus un `brief.ts` réduit à ce que le workflow produit. Chaque copie porte sa
+  provenance en tête ; `README.md` les liste.
+- `test/independance.test.ts` refuse tout import de skraft (paquet ou chemin) ; vérifié en
+  ajoutant un import exprès.
+
+**Le prix, à connaître** : environ 450 lignes de fonctions pures existent maintenant en deux
+exemplaires. Une correction dans une porte de skraft ne se reporte pas seule dans skraft-workflow.
+Les tests copiés protègent chaque copie, pas leur accord.
+
+---
+
+## 08/10 — skraft en workflow jusqu'à RESEARCH (`/skraft-workflow`, d'abord dans skraft, étape 4 de `docs/09` §14)
+
+Branche `feat/workflow-rejouable`. Option B retenue par le responsable du projet : une **deuxième
+commande** à côté de `/skraft`, qui reste intacte. Critère `skraft-research-en-workflow` passé à
+`true` après son `verify` ; suite complète : 1 415 tests.
+
+**Fait.**
+- `extensions/skraft/src/workflow.ts` : préparation (story, branche, dossiers, indicateurs),
+  classifieur avec budget, confirmation de la difficulté, RESEARCH (`w.phase` + `essayer`,
+  présélection, question bloquante, porte citations), questions ouvertes posées toutes à la fois,
+  puis publication du dossier de passation de DESIGN. Mêmes fonctions pures que le réducteur
+  (`parseStory`, `computeIndicators`, `checkResearch`, `preselectFiles`, `buildBrief`).
+- `buildBrief` accepte une vue réduite (`BriefSource`) : même consigne au mot près.
+- Moteur : `w.rembobiner` archive les livrables effacés dans la trace (ADR 0038), et `w.phase`
+  prend `apresRembobinage` (skraft y recrée ses dossiers, que Git ne suit pas).
+- Test jumeau `e2e-s2-workflow.test.ts`, joué dans le processus principal **et en processus
+  isolé** (le script tourne alors dans l'utilityProcess, transitions par RPC).
+
+**Mesure pour le critère d'arrêt.** `workflow.ts` : 154 lignes de code. Le même comportement dans
+le réducteur : ≈ 430 lignes estimées (cas INIT, CLASSIFY, CONFIRM_DIFFICULTY, BLOCKED, ROUTE,
+COMMIT, ESCALATED et leurs aides dans `reducer.ts` ; effets correspondants dans `effects.ts` ;
+types d'état, d'événements et d'effets dans `model.ts`). Une partie de ce code sert aussi aux
+phases suivantes : le rapport réel ne se saura qu'après DESIGN. Le jugement « nettement plus
+simple » revient au responsable.
+
+**Écarts avec `/skraft`** (assumés, pas des décisions sur le comportement) : identifiants
+d'options préfixés `<n>:` ; libellé de l'escalade (« Phase RESEARCH : <motif> ») ; le workflow
+s'arrête avant DESIGN.
+
+**Pièges.**
+- `w.phase` rend `undefined` quand l'humain saute la phase **et** quand `fn` ne rend rien
+  (`essayer` rend `void`) : le script croyait RESEARCH sautée. La fonction de phase doit rendre
+  une valeur ; documenté dans `protocols.ts`.
+- Le critère d'origine (« `e2e-s2` sans modification ») ne pouvait pas tenir : ce test lit
+  `stage`, `lastRejection`, `artifacts` du réducteur. Amendé dans `docs/09` §14 et `features.json`.
+
+**Reste.** `contributes.workflows` et le chargement du fichier par l'hôte (le workflow passe pour
+l'instant par `ctx.tasks.register` et `contributes.tasks`) ; retrait des globaux non
+déterministes ; l'empreinte par défaut ne couvre que la fonction principale du script (une aide
+modifiée n'est pas détectée).
+
+**Suite** : décision du responsable sur le critère d'arrêt ; si on continue, DESIGN (revue,
+ratification, écarts 1, 2, 3, 7, 8 du §13).
+
+---
+
+## 08/10 — Moteur de workflows rejouables (`packages/workflow`, étape 3 de `docs/09` §14)
+
+Branche `feat/workflow-rejouable`, partie de `fix/sessions-orphelines`. Critère `workflow-rejouable`
+passé à `true` après son `verify` (29 tests). Suite complète : 1 410 tests.
+
+**Fait.**
+- `createWorkflowTask(declaration)` implémente le `TaskDefinition` existant : aucun nouveau moteur.
+  L'état est `{ script, entree, journal, contenus, fin? }`. Un effet ne porte que `{ kind, n }` :
+  `runEffect` relit ses arguments dans le journal (`EffectContext.state`), donc `pending` reste petit.
+- `rejeu.ts` : relance le script contre le journal. Appel journalisé = résultat rendu ; autres
+  arguments = **non-déterminisme**, la tâche s'arrête ; appel absent = inscrit, ne se résout pas.
+  Le script est considéré bloqué quand plus aucun appel n'arrive d'un `setImmediate` à l'autre.
+- Erreurs journalisées par nature (`tour-interrompu`, `panne`, `erreur`) et relevées sous la même
+  classe au rejeu (`TourInterrompu`, `PanneEnvironnement`, `Error`). `runEffect` attrape tout
+  lui-même : le moteur ne voit jamais d'exception d'effet, donc l'erreur garde son numéro d'appel.
+- Questions humaines : options préfixées `<n>:` pour retrouver l'appel quand plusieurs questions
+  attendent ; profils pris dans `declaration.humains`, jamais dans le script ; question non
+  déclarée = échec.
+- Magasin de contenus dans l'état : au-delà de 512 caractères, valeur rangée sous son empreinte
+  sha256 ; un fichier lu deux fois n'est stocké qu'une fois.
+- Script modifié (empreinte différente) : la tâche s'arrête en échec avec le motif.
+- `w.phase` (checkpoint unique, commit, escalade → rembobine + question relancer/sauter/abandonner),
+  `essayer` (budget, motifs transmis, première revue garantie ADR 0042, tour interrompu compté,
+  panne remontée sans consommer), `agir` (question bloquante → humain → même agent relancé).
+- `w.rembobiner` fait oublier les agents lancés depuis le checkpoint, **déduits du journal**.
+- `memoire: "tache" | "tour"` par agent dans le manifeste ; l'hôte ne donne pas de clé de
+  continuité à un agent `tour`.
+
+**Vérifié contre de faux positifs** : en cassant la comparaison des arguments, puis l'oubli au
+rembobinage, les tests correspondants échouent.
+
+**Pas encore fait (étape 4)** : `contributes.workflows` dans le manifeste, chargement du fichier de
+workflow par l'hôte, et le retrait des globaux non déterministes (`Date`, `Math.random`…) prévu
+par `docs/09` §6.4. Aujourd'hui, un script qui lit l'heure n'est **détecté** qu'au rejeu suivant.
+
+**Pièges.**
+- Un marqueur (`phase`) est journalisé avec un résultat nul dès son premier passage : il doit
+  compter dans la numérotation, sinon tous les appels suivants changent de numéro au rejeu.
+- `HUMAN_DECISION` ne dit pas à quelle demande il répond ; sans le préfixe `<n>:`, deux
+  ratifications simultanées seraient indiscernables.
+- `noUncheckedIndexedAccess` : les arguments relus du journal sont typés par une interface `Args`
+  plutôt que par `Record<string, …>`.
+
+**Suite** : étape 4, RESEARCH de skraft en workflow ; critère : `e2e-s2` et `research-gate`
+inchangés, et un script nettement plus simple que la partie de `reducer.ts` remplacée.
+
+---
+
+## 08/10 — Sessions orphelines corrigées (ADR 0053, étape 2 de `docs/09` §14)
+
+Branche `fix/sessions-orphelines`, partie de `docs/workflows-rejouables`. Critère
+`sessions-orphelines-au-redemarrage` passé à `true` après son `verify`.
+
+**Fait.**
+- Port `TaskSessionStore` (`packages/core/src/protocols/task-sessions.ts`) et registre JSON
+  `createJsonTaskSessionStore` : un fichier `sessions.json` par projet, écriture atomique.
+- `task-agent-runner.ts` : chaque session est **inscrite dès son ouverture** (avant le tour : un
+  crash au milieu du tour ne la perd pas) et retirée quand le runtime l'a supprimée. Nouvelle
+  méthode `releaseAll()` : Map en mémoire + registre. Commentaire d'en-tête périmé (d'avant
+  l'ADR 0039) corrigé.
+- `workspace-services.ts` : `releaseAll()` lancée **sans attendre** à l'ouverture du projet, avant
+  `engine.resumeAll()`, et **attendue** dans `dispose()` (fermeture normale = crash).
+- Double `MemoryTaskSessionStore` dans `@agent-studio/core/testing`.
+- Tests : `packages/core/test/sessions-orphelines.test.ts` (crash après un tour gardé, crash au
+  milieu d'un tour, toutes tâches, fermeture, suppression refusée, écritures simultanées, fichier
+  illisible) et un test de branchement dans `apps/desktop/test/workspace-services.test.ts`,
+  vérifié en échec quand on retire l'appel de `dispose()`.
+
+**Décisions et raisons.**
+- **Registre par projet plutôt que dans le fichier de la tâche** (l'ADR 0053 disait « avec la
+  tâche ») : l'exécuteur ne connaît pas le magasin des tâches, et l'inscription doit précéder toute
+  transition. La clé `<taskId>/<extension>/<rôle>` garde le lien. Noté dans l'ADR 0053.
+- **Purge au démarrage sans attendre** : s'il reste des sessions, elle démarre le runtime Copilot,
+  ce qui ne doit pas bloquer l'ouverture du projet. Pas de course : `releaseAll` met la lecture du
+  registre en file avant toute inscription des tâches reprises.
+- **Suppression refusée = identifiant gardé** : le démarrage suivant réessaie.
+
+**Pièges.**
+- Les lentilles ouvrent leurs sessions en parallèle : sans file d'attente sur le registre, deux
+  lectures-écritures entrelacées perdaient une inscription (test « inscriptions simultanées »).
+- Les tests de `workspace-services` utilisent `tasksDir: "/inutile"` : sans registre injecté, le
+  registre par défaut aurait tenté d'écrire là (échec seulement journalisé). Ils injectent désormais
+  `MemoryTaskSessionStore`.
+
+**Suite** : étape 3 de `docs/09` §14, `packages/workflow` en TDD.
+
+---
+
+## 08/10 — Retour des échecs à l'agent dans un workflow (documentation seule)
+
+Branche `docs/workflows-rejouables`. Ajout de `docs/09` §5.4 : le workflow ne change rien à ce que
+l'agent reçoit après un échec (SPEC §6.6, ADR 0040, 0042, 0046, 0047). Une porte rend des textes ;
+la revue rend des **fils de défauts**, que `revue()` garde dans une variable du script, recalculée
+au rejeu. `essayer` ne transmet donc pas qu'un `string[]`.
+
+**Piège.** En DESIGN, les deux architectes reçoivent **tous** les défauts de la revue
+(`agentFeedback(threads, () => true)`, `reducer.ts`) ; le routage par cible (`target`) n'existe
+qu'en DELIVER, entre testeur et développeur. Je l'avais affirmé à tort pour DESIGN avant de relire.
+
+**Aussi discuté, sans rien écrire dans le dépôt** : faire tourner skraft dans Claude Code. Un
+workflow Claude Code ne peut ni définir d'outil, ni en attribuer par agent, ni lire un fichier ou
+lancer des tests sans passer par un agent ; la reprise ne vaut que dans la même session. Les
+outils viendraient d'un serveur MCP livré avec le plugin, mais les preuves resteraient rapportées
+par un agent (contraire à D20). Conclusion : on ne vise **pas** la compatibilité du script avec
+Claude Code ; le plugin (agents et skills) reste à éprouver (critère `skraft-plugin-autonome`).
+
+**Suite** : inchangée (`docs/09` §14, étape 2 : sessions orphelines sur une branche `fix/`).
+
+---
+
+## 05/10 — YAML abandonné ; l'orchestration s'écrira comme un script rejouable (documentation seule)
+
+**Décision du responsable du projet**, après discussion : on arrête l'approche YAML de la veille et
+on documente l'approche « workflow rejouable », inspirée des workflows de Claude Code. **Aucun code
+de production** : on écrit d'abord toute la doc. Branche `docs/skraft-planification-hierarchique`
+(son nom datait de l'approche abandonnée), renommée `docs/workflows-rejouables`.
+
+**Fait.**
+- Retiré : `fonctionnalites/` (schéma, catalogue, recette, scripts Python, copies des agents et
+  skills), `extensions/skraft/test/fonctionnalite-generique.test.ts`, les dépendances `ajv` et
+  `yaml` d'ext-skraft, la ligne `__pycache__/` du `.gitignore`. `package.json`, `.gitignore` et
+  `pnpm-lock.yaml` sont revenus à l'identique de `main`. Tout reste lisible au commit `df4eed3`.
+- `docs/08` réduit à une note d'abandon : ce qui était proposé, les cinq raisons, ce qu'on garde.
+- `docs/09-workflows-rejouables.md` : le document de référence de la nouvelle approche.
+- ADR 0052 (orchestration par script rejouable, **lecture retenue de D16**) et ADR 0053 (mémoire
+  déclarée par agent ; crash, redémarrage ou fermeture = toutes les sessions supprimées ; précise
+  D17).
+- `features.json` : critère YAML retiré ; trois critères à `false` pour les étapes 2 à 4 du plan.
+
+**Pourquoi le YAML est abandonné** (détail dans `docs/08`) : langage déguisé sans outils, deux
+comportements de skraft inexprimables (ADR 0042, arbitrage hors budget), fautes de séquence
+invisibles au test, portes dupliquées en Python, et personne pour l'écrire. La vraie cause du coût
+de skraft est la **forme réducteur** (≈ 820 lignes de machine à états, une quarantaine de champs
+« où j'en suis »), pas le TypeScript.
+
+**Décisions prises en discutant, à ne pas rediscuter :**
+- le déclaratif (agents, skills, outils, mémoire, entrées, phases, questions et profils) reste
+  dans le **manifeste**, pas dans un `meta` en tête du script : un seul endroit vérifié et signé ;
+- le script ne choisit **jamais** les skills ni les outils d'un agent ; il peut seulement
+  restreindre un tour. Une autre combinaison = un agent de plus dans le manifeste ;
+- **pas de nouveau moteur** : `createWorkflowTask(script)` implémente le `TaskDefinition` actuel ;
+- la fermeture normale de l'application est traitée comme un crash pour les sessions.
+
+**Trouvé en lisant le cœur** (vrai défaut, indépendant des workflows) : après un crash, les sessions
+Copilot restent orphelines sur le disque, car le lien rôle → session ne vit que dans la `Map`
+`reprenables` de `task-agent-runner.ts`. Étape 2 du plan.
+
+**Piège.** Les écarts entre la recette YAML et le code (`docs/09` §13, quinze lignes) ne sont **pas**
+des décisions : tant qu'un écart n'est pas tranché, le workflow doit reproduire le code actuel.
+
+**Suite** (`docs/09` §14) : étape 2, sessions orphelines, sur une branche `fix/` ; puis étape 3,
+`packages/workflow` en TDD ; puis RESEARCH de skraft en workflow, avec `e2e-s2` et
+`research-gate` inchangés comme critère.
+
+---
+
+## 04/10 — skraft en fonctionnalité téléversable : recette normalisée, scripts à parité
+
+> **Abandonné le 05/10** (voir ci-dessus et `docs/08`). `fonctionnalites/` n'existe plus.
+
+**Le but, précisé par le responsable du projet en cours de journée** : un utilisateur crée une
+fonctionnalité en **téléversant un dossier** dont un YAML décrit tout (entrées, sessions, actions,
+contrôles, tâches et méthodes), sans TypeScript. J'avais d'abord compris « extensions importées par
+le YAML » : ce n'est pas ça. Branche `docs/skraft-planification-hierarchique`, aucun code de
+production.
+
+**Fait.** `fonctionnalites/` : `fonctionnalite.schema.json` (propriétés fermées partout, demandé
+explicitement), `catalogue.yaml` (opérations, primitives, vérifications, outils de la plateforme,
+avec leurs paramètres), `skraft/skraft.yaml` (skraft complet), `skraft/scripts/*.py` (douze
+scripts : le code propre à skraft porté depuis ses portes), prompts et skills copiés.
+`docs/08` réécrit. Test `extensions/skraft/test/fonctionnalite-generique.test.ts` : schéma,
+cohérence (tout nom et toute référence existent, rien d'inutilisé), **parité** de onze scripts avec
+les fonctions TypeScript, et copies identiques. Un script cassé exprès fait échouer la parité
+(vérifié). `ajv` et `yaml` ajoutés en dépendances de développement d'ext-skraft.
+
+**Décisions du jour** (à inscrire en ADR) : les sessions sont déclarées dans la fonctionnalité,
+`memoire: neuve | conservee`, **toutes détruites à la fin de l'orchestration** (précise D17 après
+l'ADR 0039) ; sortie d'agent toujours normalisée ; `creation-seule` remplace `render_adr`.
+
+**Pièges.**
+- Moteurs d'expressions régulières : `\w`, `\d`, `\b` sont ASCII en JS, Unicode en Python — tout
+  est réécrit en classes explicites. `split` JS ne coupe pas sur une correspondance vide en 0.
+  `localeCompare` n'est qu'approché (départage de `planScenarios`).
+- **Ma recette avait deux défauts de séquence**, vus en l'écrivant au propre : le diff de
+  conception relevé *avant* le tour de l'architecte, et un réessai de phase qui reposait le
+  checkpoint (les ADR du premier essai devenaient « existants »). Une phase ouvre donc une fois,
+  puis appelle une tâche « travail » seule réessayée. Le test de cohérence ne voit PAS ce genre de
+  faute : seule une exécution le prouvera.
+- J'ai utilisé une fusion YAML `<<` après l'avoir exclue du format ; retirée.
+
+**Écarts recette / code, à trancher** (docs/08 §7) : classifieur non borné, grille non réglable,
+story du chat, amendement qui relance aussi `modeliser`, budget partagé, `render_adr` retiré.
+
+**Suite** : ADR (format, sessions) ; puis un chargeur dans le cœur et l'exécution de
+`rechercher-phase` depuis `skraft.yaml`.
+
+---
+
 ## 03/10 (soir) — Trois correctifs du 29/09 restés hors de `main`, intégrés
 
 `fix/plafond-duree-tour` portait trois commits poussés **après** la fusion de la PR #9, donc jamais

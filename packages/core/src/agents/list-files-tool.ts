@@ -12,7 +12,7 @@ import { matchesAny } from "../guards/glob.js";
 /**
  * Aucun langage n'apparaît dans les textes rendus à l'agent (D10) : le cœur et les extensions
  * ignorent les langages, seul l'adaptateur de pile les connaît. Un exemple en `.cs` dans la
- * description biaiserait l'agent sur un projet Swift ou Python, et ferait entrer une connaissance
+ * description biaiserait l'agent sur un projet Java ou Python, et ferait entrer une connaissance
  * de pile là où elle n'a rien à faire.
  */
 

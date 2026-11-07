@@ -6,8 +6,8 @@ import type { FailureKind, TestResult } from "../protocols.js";
  *
  * Dans un langage compilé, un symbole absent **empêche la compilation** : le lanceur ne produit
  * aucun rapport de tests, et sans cette lecture le rouge légitime du pas RED — « la fonction que
- * je viens d'appeler n'existe pas encore » — n'atteint jamais la porte. L'adaptateur Swift écrit à
- * la main savait le faire ; un profil ne savait pas, ce qui rendait les profils inutilisables sur
+ * je viens d'appeler n'existe pas encore » — n'atteint jamais la porte. Un adaptateur écrit à la main
+ * sait le faire ; un profil ne savait pas, ce qui rendait les profils inutilisables sur
  * la moitié des écosystèmes.
  *
  * Le motif vient du dépôt du projet, donc d'une source non fiable. Trois bornes en découlent, et

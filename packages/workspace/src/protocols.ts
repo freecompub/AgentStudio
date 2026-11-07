@@ -39,6 +39,10 @@ export type FileChangeStatus = "added" | "modified" | "deleted";
 export interface FileChange {
   path: string;
   status: FileChangeStatus;
+  /** Lignes ajoutées ou remplacées, numérotées dans le nouvel arbre. */
+  lines?: number[];
+  /** Lignes de l'ancien arbre retirées ou remplacées ; zéro si le fichier n'a reçu que des ajouts. */
+  removed?: number;
 }
 
 export interface WorkspaceDiff {

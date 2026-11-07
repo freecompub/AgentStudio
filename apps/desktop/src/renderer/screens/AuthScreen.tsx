@@ -13,7 +13,18 @@ export function AuthScreen({ status, onDone }: { status: AuthStatusDto; onDone: 
   const [cible, setCible] = useState<Cible>(dejaEnterprise ? "enterprise" : "github");
   const [domaine, setDomaine] = useState(dejaEnterprise ? status.hostname : "");
 
-  useEffect(() => api.on("auth:device-code", setCode), []);
+  async function ouvrirPage() {
+    try {
+      await api.call("shell:open-device-page", {});
+    } catch (err) {
+      setError(`Impossible d'ouvrir le navigateur : ${(err as Error).message}. Ouvrez l'adresse affichée manuellement.`);
+    }
+  }
+
+  useEffect(() => api.on("auth:device-code", (next) => {
+    setCode(next);
+    void ouvrirPage();
+  }), []);
 
   const patRefused = status.loggedIn && !status.copilotCompatible;
   const pretAConnecter = cible === "github" || domaine.trim().length > 0;
@@ -48,11 +59,12 @@ export function AuthScreen({ status, onDone }: { status: AuthStatusDto; onDone: 
 
         {code ? (
           <div className="device">
-            <p>Saisissez ce code sur la page GitHub qui vient de s'ouvrir :</p>
+            <p>Saisissez ce code sur la page GitHub :</p>
             <output className="device-code" aria-live="polite">
               {code.code}
             </output>
-            <button className="link" onClick={() => void api.call("shell:open-device-page", {})}>
+            <p className="hint">{code.verificationUrl}</p>
+            <button className="link" onClick={() => void ouvrirPage()}>
               Rouvrir la page GitHub
             </button>
             <p className="hint">Cette fenêtre continuera toute seule une fois le code validé.</p>

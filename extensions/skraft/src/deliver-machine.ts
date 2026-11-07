@@ -1,7 +1,9 @@
+import { verifierEcarts } from "./distill.js";
+import { phaseRoles } from "./config.js";
 import { levelEffects } from "./difficulty.js";
-import type { DeliverState, SkraftEffect, SkraftState } from "./model.js";
+import type { ArbitrageRecord, DeliverState, Derogation, SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
-import { agentFeedback, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
+import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, type DefectThread } from "./review-thread.js";
 
 type Out = { state: SkraftState; effects: SkraftEffect[] };
 type AgentStep = "test" | "dev" | "green" | "refactor" | "fix-test" | "fix";
@@ -13,8 +15,9 @@ const forDev = (t: DefectThread) => t.target !== "test";
 const otherAgent = (t: DefectThread) => (t.target === "test" ? "code" : "test");
 
 /**
- * Réessais par phase, pour les mesures d'usage (§12). Tout rejet passe par ici, ce qui en fait
- * aussi le seul endroit où compter `rejections`, que le moteur lit pour tracer chaque rejet.
+ * Réessais par phase, pour les mesures d'usage (§12), et compteur `rejections`, que le moteur lit
+ * pour tracer chaque rejet avec `lastRejection`. Chaque rejet doit passer par ici, porte nommée
+ * comme dans le workflow, sinon le banc compare des traces inégales (D21 de docs/12).
  */
 export function bumpRetries(s: SkraftState, key: string): SkraftState {
   const retries = s.retries ?? {};
@@ -27,6 +30,10 @@ export function bumpRetries(s: SkraftState, key: string): SkraftState {
  * jusqu'au vert du test d'acceptance ; puis porte de fin de scénario. Un scénario en échec en mode
  * tour repart de son début en sessions séparées (D22) ; en sessions séparées, le budget s'applique.
  */
+/** DISTILL sautée : rien n'est gelé, et DELIVER le dit au lieu de vérifier en silence (D1 de docs/12). */
+export const SANS_GEL = "DISTILL a été sautée : les tests d'acceptance ne sont pas gelés. DELIVER ne peut pas vérifier qu'ils restent inchangés.";
+export const sansGel = (s: SkraftState) => !s.acceptanceHash && s.skipPhases.includes("DISTILL");
+
 export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
   let s = s0;
   if (e.type === "DELIVER_PLANNED") {
@@ -50,7 +57,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       scenarioFailures: 0,
       cycles: 0,
       feedback: s.lastRejection?.reasons ?? [],
-      notes: [],
+      notes: sansGel(s) ? [SANS_GEL] : [],
       facts: [],
       fixing: false,
     });
@@ -58,6 +65,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
   const d = s.deliver;
   if (!d) return null;
   const scenario = d.scenarios[d.current]!;
+
+  if (d.step === "mutation-arbitration") return arbitrageEnCours(s, d, e);
 
   switch (e.type) {
     case "SCENARIO_STARTED": {
@@ -69,10 +78,16 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
 
     case "AGENT_REPORTED": {
       if (d.step === "scenario-gate" || !d.stepCheckpoint) return null;
+      // Écarts au plan de test (ADR 0067) : vérifiés contre la matrice gardée depuis DISTILL ; une
+      // déclaration fausse refuse le pas, une juste attend que la porte du pas le valide.
+      const ecarts = e.planDeviations ?? [];
+      const motifsEcarts = ecarts.length ? verifierEcarts(ecarts, s.planDeTest ?? {}) : [];
+      if (motifsEcarts.length) return stepFailure(s, d, motifsEcarts);
+      s = { ...s, deliver: { ...d, pendingDeviations: ecarts.map((x) => ({ ...x, par: e.role, scenario: scenario.id })) } };
       // Correction de revue : les réponses de l'agent (ADR 0046) attendent que sa porte valide le pas.
-      if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...d, pendingResponses: e.responses ?? [] } };
+      if (d.step === "fix-test" || d.step === "fix") s = { ...s, deliver: { ...s.deliver!, pendingResponses: e.responses ?? [] } };
       if (d.step === "fix-test")
-        return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline }] };
+        return { state: s, effects: [{ kind: "verifyFixTests", scenarioId: scenario.id, since: d.stepCheckpoint, baseline: d.baseline, ...editable(s) }] };
       if (d.step === "test")
         return {
           state: s,
@@ -101,6 +116,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
               pending: [],
               ...(d.fixTargets?.length ? { targets: d.fixTargets } : {}),
               ...(d.contractSymbols?.length ? { contractSymbols: d.contractSymbols } : {}),
+              // Tout contesté ou renvoyé, sans test rouge à faire passer : rien à modifier (D7 de docs/12).
+              ...(!d.fixTargets?.length && allDisputed(s.reviewThreads ?? [], e.responses ?? [], forDev) ? { nothingToChange: true as const } : {}),
             },
           ],
         };
@@ -113,7 +130,9 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     }
 
     case "STEP_OK": {
-      const base: DeliverState = { ...d, baseline: { all: e.all, passed: e.passed }, stepCheckpoint: e.checkpointId, attempts: 0, feedback: [] };
+      // Le pas est validé : ses écarts au plan déclarés le sont avec lui (ADR 0067).
+      if (d.pendingDeviations?.length) s = { ...s, ecartsAuPlan: [...(s.ecartsAuPlan ?? []), ...d.pendingDeviations] };
+      const base: DeliverState = { ...d, pendingDeviations: [], baseline: { all: e.all, passed: e.passed }, stepCheckpoint: e.checkpointId, attempts: 0, feedback: [] };
       if (d.step === "test") {
         const newTest = e.newTest ?? null;
         const nd: DeliverState = {
@@ -134,11 +153,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       // rouges à faire passer ; sinon, directement la porte de fin de scénario.
       if (d.step === "fix-test") {
         s = closeTurn(s, d, forTests);
-        const nd: DeliverState = { ...base, newTest: null, pendingResponses: [], fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash };
-        const devWork = (s.reviewThreads ?? []).some((t) => isActive(t) && forDev(t));
-        // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
-        if (devWork || nd.fixTargets!.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: d.reviewFeedback?.test ?? [], code: agentFeedback(s.reviewThreads ?? [], forDev) } }, []);
-        return scenarioGate(s, { ...nd, unitTests: [] });
+        // Mutants contestés comme équivalents : arbitrés avant de poursuivre (ADR 0065).
+        return arbitrerMutants(s, { ...base, newTest: null, pendingResponses: [], fixTargets: e.fixTargets ?? [], unitTestsHash: e.unitTestsHash ?? d.unitTestsHash });
       }
       // Correction de revue validée : la porte de fin de scénario revérifie le code corrigé, et la
       // séquence rouge puis vert des tests rouges ajoutés par la correction côté tests.
@@ -161,9 +177,11 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     case "TIMEOUT": {
       const reason = e.reason;
       if (d.step === "scenario-gate") return scenarioFailure(s, d, [reason]);
-      // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3).
+      // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3). Compté et tracé comme
+      // rejet, sous le nom de porte du workflow (D21 de docs/12).
       if (d.step === "refactor") {
-        const r = afterCode(s, { ...d, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
+        const rejete = { ...bumpRetries(s, "DELIVER"), lastRejection: { gate: `pas refactor (${scenario.id})`, reasons: [reason] } };
+        const r = afterCode(rejete, { ...d, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
         return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
       }
       return stepFailure(s, d, [reason]);
@@ -192,6 +210,12 @@ function pending(d: DeliverState, includeCurrent: boolean): string[] {
   return d.scenarios.filter((x, i) => x.role === "driver" && x.status !== "done" && (includeCurrent || i !== d.current)).map((x) => x.acceptanceTestId);
 }
 
+/** Fichiers de tests cités par un défaut actif adressé au testeur : il peut les renforcer (D10 de docs/12). */
+function editable(s: SkraftState): { editable?: string[] } {
+  const files = [...new Set((s.reviewThreads ?? []).filter((t) => isActive(t) && forTests(t) && t.file).map((t) => t.file!))];
+  return files.length ? { editable: files } : {};
+}
+
 function agent(s: SkraftState, d: DeliverState, feedback: string[]): Out {
   const step = d.step as AgentStep;
   // Correction de revue : chaque agent reçoit les défauts qui le concernent (ADR 0046), et ils
@@ -207,7 +231,8 @@ function agent(s: SkraftState, d: DeliverState, feedback: string[]): Out {
         : [];
   const fb = step === "fix" || step === "fix-test" ? [...new Set([...routed, ...feedback])] : feedback;
   return {
-    state: { ...s, stage: "SPECIALIST", deliver: d },
+    // Retour gardé jusqu'à la porte du pas : une question bloquante ne le fait pas perdre (D9 de docs/12).
+    state: { ...s, stage: "SPECIALIST", deliver: { ...d, feedback } },
     effects: [{ kind: "runDeliverAgent", step, scenarioId: d.scenarios[d.current]!.id, attempt: d.attempts + 1, feedback: fb }],
   };
 }
@@ -233,8 +258,9 @@ function afterCode(s: SkraftState, d: DeliverState, acceptanceGreen: boolean): O
   // Chaque cycle ajoute un test unitaire et un checkpoint : sans plafond, un scénario dont
   // l'acceptance ne verdit jamais tournerait sans fin, une requête par tour (D24).
   const cycles = d.cycles + 1;
+  // Compté comme rejet ici : `scenarioFailure` ne compte que l'échec de la porte de scénario (D21 de docs/12).
   if (cycles >= s.budget.maxCyclesPerScenario)
-    return scenarioFailure(s, { ...d, cycles }, [
+    return scenarioFailure(bumpRetries(s, "DELIVER"), { ...d, cycles }, [
       `Le test d'acceptance du scénario reste rouge après ${cycles} cycles test puis code.`,
     ]);
   return agent(s, { ...d, acceptanceGreen: false, step: "test", cycles }, []);
@@ -255,6 +281,7 @@ function nextScenario(s: SkraftState, d: DeliverState): Out {
     attempts: 0,
     scenarioFailures: 0,
     scenarioBaseline: d.baseline,
+    scenarioUnitTestsHash: d.unitTestsHash,
   };
   return { state: { ...s, stage: "SPECIALIST", deliver: nd }, effects: [{ kind: "startScenario", scenarioId: scenarios[i]!.id }] };
 }
@@ -267,10 +294,21 @@ function stepFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
   return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
 }
 
+/**
+ * Empreinte des tests unitaires au point de reprise : celle de l'essai effacé ferait refuser chaque
+ * pas de code de la reprise pour des tests « modifiés » (D12 de docs/12). Absente d'un état
+ * enregistré avant ce champ : inchangée.
+ */
+function repriseDeLEmpreinte(d: DeliverState): { unitTestsHash?: string | null } {
+  return d.scenarioUnitTestsHash !== undefined ? { unitTestsHash: d.scenarioUnitTestsHash } : {};
+}
+
 /** Scénario repris depuis son début : en sessions séparées après un premier échec, puis selon le budget. */
 function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
-  const s = d.step === "scenario-gate" ? bumpRetries(s0, "DELIVER") : s0;
+  const s1 = d.step === "scenario-gate" ? bumpRetries(s0, "DELIVER") : s0;
   const sc = d.scenarios[d.current]!;
+  // Le scénario repart de son début : ses tests sont effacés, et les écarts au plan qu'ils portaient avec eux (ADR 0067).
+  const s = s1.ecartsAuPlan?.some((x) => x.scenario === sc.id) ? { ...s1, ecartsAuPlan: s1.ecartsAuPlan.filter((x) => x.scenario !== sc.id) } : s1;
   const failures = d.scenarioFailures + 1;
   const restart: DeliverState = {
     ...d,
@@ -282,6 +320,7 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     scenarioFailures: failures,
     cycles: 0,
     baseline: d.scenarioBaseline,
+    ...repriseDeLEmpreinte(d),
     stepCheckpoint: d.scenarioCheckpoint,
     feedback: reasons,
   };
@@ -307,24 +346,62 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     const reason = `Scénario ${sc.id} : ${reasons.join(" ; ")}`;
     return {
       state: { ...s, stage: "ESCALATED", deliver: restart, lastRejection, escalation: { from: "PHASE", reason } },
-      effects: [...rollback, { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+      effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
     };
   }
   const r = agent({ ...s, lastRejection }, restart, reasons);
   return { state: r.state, effects: [...rollback, ...r.effects] };
 }
 
+/**
+ * Escalade de DELIVER : retour au point de reprise du scénario (ou de la correction) ET oubli des
+ * sessions du testeur et du développeur, qui se souviendraient d'un code effacé (ADR 0050, D20 de
+ * docs/12). Les reprises sans escalade, elles, gardent leur session : leur motif dit que le tour est annulé.
+ */
+function rembobinerScenario(d: DeliverState): SkraftEffect[] {
+  if (!d.scenarioCheckpoint) return [];
+  return [{ kind: "rollback", to: d.scenarioCheckpoint }, { kind: "forgetSessions", roles: phaseRoles("DELIVER") }];
+}
+
 /** Panne d'environnement pendant un scénario : retour au début du scénario, escalade immédiate (D25). */
 export function escalateDeliver(s: SkraftState, reason: string): Out {
   const d = s.deliver!;
-  const restart: DeliverState = { ...d, step: "test", unitTests: [], newTest: null, acceptanceGreen: false, attempts: 0, baseline: d.scenarioBaseline, stepCheckpoint: d.scenarioCheckpoint };
+  const restart: DeliverState = { ...d, step: "test", unitTests: [], newTest: null, acceptanceGreen: false, attempts: 0, baseline: d.scenarioBaseline, ...repriseDeLEmpreinte(d), stepCheckpoint: d.scenarioCheckpoint };
   return {
     state: { ...s, stage: "ESCALATED", deliver: restart, escalation: { from: "PHASE", reason } },
-    effects: [...(d.scenarioCheckpoint ? [{ kind: "rollback", to: d.scenarioCheckpoint } as SkraftEffect] : []), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+    effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
   };
 }
 
 /** « Relancer » après une escalade dans DELIVER : le scénario reprend à son début, budget remis à zéro. */
+/**
+ * « Relancer » après une escalade pendant une correction (panne, D14 de docs/12, ou échecs
+ * répétés) : la correction reprend depuis son entrée, avec ses défauts d'entrée. Le rollback de
+ * l'escalade a déjà ramené le code à ce point ; rien de livré n'est rejoué, aucune revue refaite.
+ */
+export function retryFix(s: SkraftState): Out {
+  const d = s.deliver!;
+  const threads = d.threadsAtFixStart ?? s.reviewThreads ?? [];
+  const step = threads.some((t) => isActive(t) && forTests(t)) ? "fix-test" : "fix";
+  const reviewFeedback = { test: agentFeedback(threads, forTests), code: agentFeedback(threads, forDev) };
+  const { mutationArbitration: _, ...reste } = d;
+  const nd: DeliverState = {
+    ...reste,
+    step,
+    attempts: 0,
+    unitTests: [],
+    newTest: null,
+    fixTargets: [],
+    pendingResponses: [],
+    reviewFeedback,
+    reviewDefects: step === "fix-test" ? reviewFeedback.test : reviewFeedback.code,
+    baseline: d.scenarioBaseline,
+    ...repriseDeLEmpreinte(d),
+    stepCheckpoint: d.scenarioCheckpoint,
+  };
+  return agent({ ...s, stage: "SPECIALIST", escalation: null, reviewThreads: threads }, nd, s.lastRejection?.reasons ?? []);
+}
+
 export function retryDeliver(s: SkraftState): Out {
   const d = s.deliver!;
   if (!d.scenarioCheckpoint) return { state: { ...s, stage: "SPECIALIST", escalation: null }, effects: [{ kind: "startScenario", scenarioId: d.scenarios[d.current]!.id }] };
@@ -357,10 +434,144 @@ export function startReviewFix(s0: SkraftState, threads: DefectThread[]): Out {
     attempts: 0,
     scenarioFailures: 0,
     scenarioCheckpoint: cp,
+    // Point de reprise de la correction : la référence et l'empreinte y sont prises aussi (D12, D23 de docs/12).
+    scenarioBaseline: d.baseline,
+    scenarioUnitTestsHash: d.unitTestsHash,
     unitTests: [],
     newTest: null,
     feedback: own,
   };
   const r = agent(s, nd, []);
   return { state: r.state, effects: [{ kind: "rollback", to: cp }, ...r.effects] };
+}
+
+// ---------- arbitrage des mutants contestés (ADR 0065) ------------------------------
+
+/** Au-delà, l'arbitre ne peut plus exempter de mutant : l'humain tranche (ADR 0065). */
+export const MAX_DEROGATIONS_PAR_ARBITRE = 2;
+
+const elementDe = (m: { file: string; line: number; operator: string }) => `${m.file}:${m.line} (${m.operator})`;
+const memeMutant = (a: { file: string; line: number; operator: string }, b: { file: string; line: number; operator: string }) =>
+  a.file === b.file && a.line === b.line && a.operator === b.operator;
+const conteste = (t: DefectThread) => t.mutant !== undefined && (t.status === "contested" || t.status === "recontested");
+const avecStatut = (s: SkraftState, id: string, status: DefectThread["status"]): SkraftState => ({
+  ...s,
+  reviewThreads: (s.reviewThreads ?? []).map((t) => (t.id === id ? { ...t, status } : t)),
+});
+const tracer = (s: SkraftState, t: DefectThread, décision: ArbitrageRecord["décision"], par: ArbitrageRecord["par"], raison: string): SkraftState => ({
+  ...s,
+  arbitrages: [...(s.arbitrages ?? []), { porte: "mutation", élément: elementDe(t.mutant!), contestation: t.contestation ?? "", décision, par, raison }],
+});
+
+/** Dérogation : tracée, et le mutant exempté de la porte de mutation (une seule fois). */
+function accorder(s: SkraftState, t: DefectThread, par: Derogation["par"], raison: string): SkraftState {
+  const m = t.mutant!;
+  const derogations = s.derogations ?? [];
+  const ns = tracer(s, t, "dérogation", par, raison);
+  if (derogations.some((x) => memeMutant(x, m))) return ns;
+  return { ...ns, derogations: [...derogations, { file: m.file, line: m.line, operator: m.operator, par, raison, contestation: t.contestation ?? "", defaut: t.id }] };
+}
+
+/**
+ * Après le tour du testeur : les mutants qu'il conteste comme équivalents vont à l'arbitre de
+ * mutation, puis à l'humain s'il refuse ou si le plafond de ses dérogations est atteint.
+ */
+function arbitrerMutants(s0: SkraftState, d: DeliverState): Out {
+  let s = s0;
+  const aJuger: DefectThread[] = [];
+  for (const t of (s.reviewThreads ?? []).filter(conteste))
+    // Déjà exempté (correction reprise après un échec) : rien à rejuger.
+    if ((s.derogations ?? []).some((x) => memeMutant(x, t.mutant!))) s = avecStatut(s, t.id, "accepted");
+    else aJuger.push(t);
+  // Couverture du diff contestée : pas d'arbitre, l'humain tranche directement.
+  const couverture = (s.reviewThreads ?? []).filter((t) => t.couverture !== undefined && (t.status === "contested" || t.status === "recontested")).map((t) => ({ id: t.id, avis: "" }));
+  if (!aJuger.length && !couverture.length) return apresCorrectionTests(s, d);
+  const nd: DeliverState = { ...d, step: "mutation-arbitration", mutationArbitration: { human: couverture } };
+  if (!aJuger.length) return demanderHumain(s, nd);
+  if (restantes(s) > 0) return { state: { ...s, stage: "ARBITRATION", deliver: nd }, effects: [{ kind: "arbitrateMutants", threads: aJuger }] };
+  const avis = `L'arbitre n'a pas été consulté : plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre atteint.`;
+  return demanderHumain(s, { ...nd, mutationArbitration: { human: [...couverture, ...aJuger.map((t) => ({ id: t.id, avis }))] } });
+}
+
+const restantes = (s: SkraftState) => MAX_DEROGATIONS_PAR_ARBITRE - (s.derogations ?? []).filter((x) => x.par === "agent").length;
+
+function arbitrageEnCours(s0: SkraftState, d: DeliverState, e: Ev): Out | null {
+  let s = s0;
+  const fil = (id: string) => (s.reviewThreads ?? []).find((t) => t.id === id);
+  if (e.type === "MUTANTS_JUDGED") {
+    const human: { id: string; avis: string }[] = [];
+    let accordes = 0;
+    const plafond = restantes(s);
+    for (const t of (s.reviewThreads ?? []).filter(conteste)) {
+      const j = e.rulings.find((r) => r.defect === t.id);
+      if (j?.decision === "accepted" && accordes < plafond) {
+        accordes++;
+        s = avecStatut(accorder(s, t, "agent", j.reason ?? ""), t.id, "accepted");
+        continue;
+      }
+      if (j?.decision === "maintained") s = tracer(s, t, "à corriger", "agent", j.reason ?? "");
+      const avis = !j
+        ? "L'arbitre n'a rien rendu pour ce mutant."
+        : j.decision === "accepted"
+          ? `L'arbitre le juge équivalent (${j.reason ?? "sans raison"}), mais le plafond de ${MAX_DEROGATIONS_PAR_ARBITRE} dérogations par l'arbitre est atteint.`
+          : `L'arbitre le juge non équivalent : ${j.reason ?? "sans raison"}.`;
+      human.push({ id: t.id, avis });
+    }
+    return demanderHumain(s, { ...d, mutationArbitration: { human: [...(d.mutationArbitration?.human ?? []), ...human] } });
+  }
+  if (e.type === "HUMAN_DECISION") {
+    const attendu = d.mutationArbitration?.human[0];
+    const i = e.decision.indexOf(":");
+    const [choix, id] = [e.decision.slice(0, i), e.decision.slice(i + 1)];
+    const t = attendu && id === attendu.id ? fil(id) : undefined;
+    if (!t || (choix !== "derogation" && choix !== "corriger")) return { state: s, effects: [] };
+    if (t.couverture) {
+      s = choixCouverture(s, t, choix === "derogation", e.comment);
+      return demanderHumain(s, { ...d, mutationArbitration: { human: d.mutationArbitration!.human.slice(1) } });
+    }
+    s =
+      choix === "derogation"
+        ? avecStatut(accorder(s, t, "humain", e.comment ?? "(sans justification)"), t.id, "humanAccepted")
+        : avecStatut(tracer(s, t, "à corriger", "humain", e.comment ?? ""), t.id, "humanMaintained");
+    return demanderHumain(s, { ...d, mutationArbitration: { human: d.mutationArbitration!.human.slice(1) } });
+  }
+  return null;
+}
+
+/** Couverture contestée, tranchée par l'humain : dérogation sur ces lignes, ou à tester sans recours. */
+function choixCouverture(s: SkraftState, t: DefectThread, derogation: boolean, comment: string | undefined): SkraftState {
+  const c = t.couverture!;
+  const raison = comment ?? (derogation ? "(sans justification)" : "");
+  const trace: ArbitrageRecord = { porte: "couverture du diff", élément: `${c.file}:${c.lines.join(", ")}`, contestation: t.contestation ?? "", décision: derogation ? "dérogation" : "à corriger", par: "humain", raison };
+  const ns: SkraftState = { ...s, arbitrages: [...(s.arbitrages ?? []), trace] };
+  const exemptees = derogation ? c.lines.map((line) => ({ file: c.file, line, raison, contestation: t.contestation ?? "", defaut: t.id })) : [];
+  return avecStatut({ ...ns, derogationsCouverture: [...(s.derogationsCouverture ?? []), ...exemptees] }, t.id, derogation ? "humanAccepted" : "humanMaintained");
+}
+
+/** Prochain mutant à soumettre à l'humain ; quand il n'y en a plus, la correction reprend. */
+function demanderHumain(s: SkraftState, d: DeliverState): Out {
+  const suivant = d.mutationArbitration?.human[0];
+  if (!suivant) {
+    const { mutationArbitration: _, ...reste } = d;
+    return apresCorrectionTests(s, { ...reste, step: "fix-test" });
+  }
+  const thread = (s.reviewThreads ?? []).find((t) => t.id === suivant.id)!;
+  return { state: { ...s, stage: "ARBITRATION", deliver: d }, effects: [{ kind: "askMutationArbitration", thread, avis: suivant.avis }] };
+}
+
+/**
+ * Correction côté tests validée (ADR 0046) : au testeur de nouveau s'il lui reste un défaut (un
+ * mutant que l'humain exige de tuer), au développeur s'il a des défauts ou des tests rouges à faire
+ * passer ; sinon, directement la porte de fin de scénario.
+ */
+function apresCorrectionTests(s: SkraftState, nd: DeliverState): Out {
+  const threads = s.reviewThreads ?? [];
+  if (threads.some((t) => isActive(t) && forTests(t))) {
+    const test = agentFeedback(threads, forTests);
+    return agent(s, { ...nd, step: "fix-test", reviewFeedback: { test, code: nd.reviewFeedback?.code ?? [] }, reviewDefects: test }, []);
+  }
+  const devWork = threads.some((t) => isActive(t) && forDev(t));
+  // Retour du développeur recalculé : un défaut renvoyé par le testeur a pu s'y ajouter.
+  if (devWork || nd.fixTargets?.length) return agent(s, { ...nd, step: "fix", reviewFeedback: { test: nd.reviewFeedback?.test ?? [], code: agentFeedback(threads, forDev) } }, []);
+  return scenarioGate(s, { ...nd, unitTests: [] });
 }

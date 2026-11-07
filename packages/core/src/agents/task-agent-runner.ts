@@ -2,6 +2,7 @@ import type { AgentEvent, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } 
 import type { Logger } from "../protocols/logger.js";
 import type { UsageDelta } from "../protocols/usage.js";
 import type { TraceBody, TraceEntry, TraceStore, TurnEnd } from "../protocols/trace.js";
+import type { TaskSessionStore } from "../protocols/task-sessions.js";
 import { TurnBudgetError, TurnContextError, TurnCostError } from "../turns/run-turn.js";
 import { createTaskAgentGuard } from "../guards/task-agent-guard.js";
 import { composeGuards } from "../guards/compose-guards.js";
@@ -63,6 +64,12 @@ export interface TaskAgentRunner {
    * l'incohérence que l'ADR 0040 a levée pour le réessai, et qui restait sur le chemin d'escalade.
    */
   releaseRoles(taskId: string, roles: readonly string[]): Promise<void>;
+  /**
+   * Supprime toutes les sessions connues, de toutes les tâches (ADR 0053) : au démarrage, celles
+   * qu'un crash a laissées dans le registre ; à la fermeture normale, celles qu'on gardait. Après
+   * un redémarrage, tout agent repart neuf avec son dossier de passation.
+   */
+  releaseAll(): Promise<void>;
 }
 
 export interface TaskAgentRunnerDeps {
@@ -78,12 +85,19 @@ export interface TaskAgentRunnerDeps {
   logger?: Logger;
   /** Trace d'exécution (ADR 0032). Son échec n'interrompt jamais un tour : elle observe, elle ne décide pas. */
   trace?: TraceStore;
+  /**
+   * Registre persisté des sessions ouvertes (ADR 0053). Absent, les identifiants ne vivent qu'en
+   * mémoire et un crash laisse les sessions orphelines côté runtime.
+   */
+  sessions?: TaskSessionStore;
 }
 
 /**
- * Exécute un rôle dans une session neuve (D17) : garde de périmètre, outil terminal,
- * une relance ciblée si la sortie manque, puis fermeture et suppression de la session.
- * Ne renvoie qu'un résultat sérialisé, jamais la session (D10).
+ * Exécute un tour d'un rôle (D17) : garde de périmètre, outil terminal, une relance ciblée si la
+ * sortie manque. La session est gardée pour le tour suivant du même rôle dans la même tâche quand
+ * une clé de continuité est donnée (ADR 0039), supprimée sinon ; chaque session ouverte est inscrite
+ * au registre pour qu'aucune ne survive au processus (ADR 0053). Ne renvoie qu'un résultat
+ * sérialisé, jamais la session (D10).
  */
 export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunner {
   /**
@@ -96,13 +110,31 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
    */
   const reprenables = new Map<string, string>();
 
+  /** Inscrit une session dès son ouverture : un crash pendant le tour ne doit pas la perdre. */
+  const inscrire = (key: string, sessionId: string) =>
+    deps.sessions?.add({ key, sessionId }).catch((err: unknown) => deps.logger?.warn("session non inscrite au registre", { sessionId, error: String(err) }));
+
+  /**
+   * Supprime une session côté runtime, puis la retire du registre. Si le runtime refuse,
+   * l'identifiant reste inscrit : le démarrage suivant réessaiera.
+   */
+  const supprimer = async (id: string): Promise<void> => {
+    try {
+      await deps.runtime.deleteSession(id);
+    } catch (err) {
+      deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) });
+      return;
+    }
+    await deps.sessions?.remove(id).catch((err: unknown) => deps.logger?.warn("session non retirée du registre", { sessionId: id, error: String(err) }));
+  };
+
   return {
     async releaseTask(taskId) {
       const prefixe = `${taskId}/`;
       for (const [cle, id] of [...reprenables]) {
         if (!cle.startsWith(prefixe)) continue;
         reprenables.delete(cle);
-        await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
+        await supprimer(id);
       }
     },
     async releaseRoles(taskId, roles) {
@@ -113,9 +145,19 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         for (const [cle, id] of [...reprenables]) {
           if (!cle.startsWith(`${taskId}/`) || !cle.endsWith(suffixe)) continue;
           reprenables.delete(cle);
-          await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
+          await supprimer(id);
         }
       }
+    },
+    async releaseAll() {
+      const ids = new Set(reprenables.values());
+      reprenables.clear();
+      const inscrites = await (deps.sessions?.list() ?? Promise.resolve([])).catch((err: unknown) => {
+        deps.logger?.warn("registre des sessions illisible", { error: String(err) });
+        return [];
+      });
+      for (const e of inscrites) ids.add(e.sessionId);
+      for (const id of ids) await supprimer(id);
     },
 
     async run(spec, prompt, opts = {}) {
@@ -264,6 +306,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         })().catch((err: unknown) => {
           throw new EnvFailureError(`Ouverture de session impossible : ${err instanceof Error ? err.message : String(err)}`, { cause: err });
         });
+        await inscrire(opts.resumeKey ?? spec.role, session.id);
         opts.signal?.addEventListener("abort", onAbort, { once: true });
         deps.logger?.info("agent de tâche lancé", { role: spec.role, sessionId: session.id });
         tracer({ kind: "tour-début", prompt, ...(opts.trace?.phase ? { phase: opts.trace.phase } : {}), repris: session.id === aReprendre });
@@ -300,7 +343,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
         if (session && !garder) {
           const id = session.id;
           await session.close().catch(() => undefined);
-          await deps.runtime.deleteSession(id).catch((err: unknown) => deps.logger?.warn("suppression de session impossible", { sessionId: id, error: String(err) }));
+          await supprimer(id);
         }
       }
     },

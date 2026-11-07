@@ -16,7 +16,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
   beforeEach(async () => {
     root = await createProject();
     // Fichier de 55 lignes, comme dans la fixture de §13.2.
-    await put(root, "Sources/Domain/BolusCalculator.swift", Array.from({ length: 55 }, (_, i) => `// ligne ${i + 1}`).join("\n") + "\n");
+    await put(root, "src/domain/bolus-calculator.ts", ["export class BolusCalculator {}", ...Array.from({ length: 54 }, (_, i) => `// ligne ${i + 2}`)].join("\n") + "\n");
     git(root, "commit", "-qam", "calculateur");
     tasksDir = await mkdtemp(join(tmpdir(), "agent-studio-skraft-tasks-"));
   });
@@ -35,7 +35,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
       await put(
         root,
         ".skraft/us-12/research/research.md",
-        researchDoc({ Découvertes: bad ? "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:40-72`." : "Le calcul vit dans `Sources/Domain/BolusCalculator.swift:40-55`." }),
+        researchDoc({ Découvertes: bad ? "Le calcul vit dans `src/domain/bolus-calculator.ts:40-72`." : "Le calcul vit dans `src/domain/bolus-calculator.ts:40-55`." }),
       );
       await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
     };
@@ -58,13 +58,13 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     // Présélection par le code dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
     expect(researchPrompts[0]).toContain("Fichiers utiles (présélection) :");
-    expect(researchPrompts[0]).toContain("Sources/Domain/BolusCalculator.swift");
+    expect(researchPrompts[0]).toContain("src/domain/bolus-calculator.ts");
 
     // Porte citations : rejet précis, relance ciblée, puis questions posées à la fin de RESEARCH.
     await until(async () => (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte")).length === 2);
     expect(researchPrompts).toHaveLength(2);
     expect(researchPrompts[1]).toContain("Rejet précédent :");
-    expect(researchPrompts[1]).toContain("`Sources/Domain/BolusCalculator.swift:40-72` : plage hors du fichier, qui compte 55 lignes.");
+    expect(researchPrompts[1]).toContain("`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes.");
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
     expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
@@ -80,6 +80,11 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     expect(designBrief).toContain("Réponses de l'utilisateur :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
+    // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
+    expect(designBrief).toContain("`BolusCalculator` → `src/domain/bolus-calculator.ts`");
+    // Pile tirée de l'adaptateur, et architecture par défaut faute d'argument (docs/15 §5).
+    expect(designBrief).toContain("Pile du projet : typescript ;");
+    expect(designBrief).toContain("Architecture du projet : clean architecture par défaut, skill `architecture-patterns`.");
 
     await until(async () => stateOf(await app.engine.status(id))?.stage === "DONE", 60_000);
     expect(stateOf(await app.engine.status(id))!.artifacts.RESEARCH.map((a) => [a.path, a.attempt])).toEqual([[".skraft/us-12/research/research.md", 2]]);

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { diagnoseProfile, proposeProfile } from "../src/profile/stack-doctor.js";
 import { parseStackProfile } from "../src/profile/stack-profile.js";
 
-const AUTORISES = ["pytest", "vitest", "swift", "swiftlint", "eslint", "ruff", "muter"];
+const AUTORISES = ["pytest", "vitest", "eslint", "ruff", "stryker"];
 
 describe("proposeProfile — ce que /stack init écrirait", () => {
   it("propose un profil Python quand le projet en porte les marques", () => {
@@ -26,6 +26,10 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
     expect(proposeProfile({ fichiers: ["README.md"], dependances: [] })).toBeNull();
   });
 
+  it("Swift n'est plus pris en charge : `Package.swift` ne fait rien proposer", () => {
+    expect(proposeProfile({ fichiers: ["Package.swift"], dependances: [] })).toBeNull();
+  });
+
   it("ce qui est proposé déclare ses canaris : un profil non vérifiable ne vaut pas d'être écrit", () => {
     for (const indices of [
       { fichiers: ["pyproject.toml"], dependances: [] },
@@ -39,7 +43,6 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
 
   it("ce qui est proposé est toujours un profil valide", () => {
     for (const indices of [
-      { fichiers: ["Package.swift"], dependances: [] },
       { fichiers: ["pyproject.toml"], dependances: [] },
       { fichiers: ["package.json"], dependances: ["vitest"] },
     ]) {

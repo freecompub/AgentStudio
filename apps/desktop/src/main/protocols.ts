@@ -1,4 +1,4 @@
-import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, UserConfirmer } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ModelClass, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import type { EventChannel, EventPayload, InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 
@@ -9,7 +9,7 @@ export interface WorkspaceProvider {
 }
 
 /** Construit le runtime d'agent une fois le jeton obtenu. */
-export type RuntimeFactory = (gitHubToken: string) => AgentRuntime;
+export type RuntimeFactory = (gitHubToken: string, hostname: string) => AgentRuntime;
 
 /** Émission d'événements vers la fenêtre. */
 export interface EventSink {
@@ -57,10 +57,18 @@ export interface WorkspaceServices {
   commands(): CommandListing[];
   /** Hooks `onPreToolUse` des extensions actives, pour l'arbitre de la session principale. */
   hookGuards(): ToolCallGuard[];
+  /** Outils donnés à l'agent principal (`proposer_workflow` si un workflow est actif, ADR 0055). */
+  outilsAgent(): ToolSpec[];
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;
   respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
+  /**
+   * Démarre ce qui touche aux sessions d'agent : purge des sessions orphelines, puis reprise des
+   * tâches. Appelé **après** la libération des services précédents du même projet : sinon leur
+   * purge commune du registre des sessions supprimerait celles que ces services ouvrent.
+   */
+  demarrer?(): Promise<void>;
   dispose(): Promise<void>;
 }
 

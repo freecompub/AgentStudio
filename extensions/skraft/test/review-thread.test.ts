@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { LensVerdict } from "../src/review.js";
 import {
   agentFeedback,
+  allDisputed,
   applyArbitration,
   applyResponses,
   effectiveTarget,
@@ -41,6 +42,23 @@ describe("numberDefects et effectiveTarget", () => {
     // puis il a supprimé le code non testé pour satisfaire la revue.
     const kind = (f: string) => (f.startsWith("tests/") ? "test" : f.startsWith("src/") ? "code" : "deliverable");
     expect(effectiveTarget({ severity: "major", description: "aucun test ne couvre ATPayer", target: "test", file: "src/CalculDuPanier.cs" }, kind)).toEqual({ target: "test" });
+  });
+});
+
+describe("Plafond de gravité de cold-reader (4.4 de docs/15)", () => {
+  // Repris de skraft-plugin v1.6.1, cold-reader-lens : « Maximum severity for this lens is `medium`.
+  // Nothing here is a `blocker`. » La clarté ne bloque jamais seule : le code l'applique, pas le prompt.
+  it("un blocker de cold-reader devient major, un REJECTED devient CHANGES_REQUESTED, et l'écart est noté", () => {
+    const [v] = numberDefects([verdict("cold-reader", [{ severity: "blocker", description: "nom obscur", target: "code" }], "REJECTED")], 1, () => null);
+    expect(v!.verdict).toBe("CHANGES_REQUESTED");
+    expect(v!.defects[0]).toMatchObject({ severity: "major", severityNote: "gravité déclarée « blocker », plafonnée à « major » pour la lentille cold-reader" });
+  });
+
+  it("les autres lentilles gardent leur gravité et leur verdict", () => {
+    const [v] = numberDefects([verdict("test-integrity", [{ severity: "blocker", description: "tautologie", target: "test" }], "REJECTED")], 1, () => null);
+    expect(v!.verdict).toBe("REJECTED");
+    expect(v!.defects[0]!.severity).toBe("blocker");
+    expect(v!.defects[0]).not.toHaveProperty("severityNote");
   });
 });
 
@@ -205,5 +223,26 @@ describe("endTurn", () => {
       { id: "c", lens: "c", severity: "major", description: "z", target: "test", status: "contested", contestation: "r", round: 1 },
     ];
     expect(endTurn(threads, (t) => t.target === "test").map((t) => [t.id, t.status])).toEqual([["a", "fixed"], ["b", "open"], ["c", "contested"]]);
+  });
+});
+
+describe("allDisputed (D7 de docs/12)", () => {
+  const fil = (id: string, extra: Partial<DefectThread> = {}): DefectThread => ({ id, lens: "c", severity: "major", description: "x", target: "code", status: "open", round: 1, ...extra });
+  const dev = (t: DefectThread) => t.target !== "test";
+
+  it("chaque défaut de l'agent contesté ou renvoyé, avec sa raison : vrai", () => {
+    const r = [{ defect: "a", status: "contested", reason: "r" }, { defect: "b", status: "outOfScope", reason: "un test" }] as const;
+    expect(allDisputed([fil("a"), fil("b"), fil("t", { target: "test" })], r, dev)).toBe(true);
+  });
+
+  it("un défaut corrigé, sans réponse ou contesté sans raison : faux, il fallait toucher au code", () => {
+    expect(allDisputed([fil("a"), fil("b")], [{ defect: "a", status: "contested", reason: "r" }, { defect: "b", status: "fixed" }], dev)).toBe(false);
+    expect(allDisputed([fil("a"), fil("b")], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
+    expect(allDisputed([fil("a")], [{ defect: "a", status: "contested", reason: " " }], dev)).toBe(false);
+  });
+
+  it("un défaut maintenu par l'humain ne se conteste plus ; aucun défaut actif : faux", () => {
+    expect(allDisputed([fil("a", { status: "humanMaintained" })], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
+    expect(allDisputed([fil("a", { status: "contested" })], [], dev)).toBe(false);
   });
 });

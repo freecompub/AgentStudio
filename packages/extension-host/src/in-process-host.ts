@@ -149,7 +149,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             // Clé de continuité (ADR 0030) : deux exécutions du même rôle pour la même tâche sont
             // deux tentatives du même travail. Sans taskId, aucune reprise — c'est le cas des
             // agents lancés hors tâche.
-            ...(taskId ? { resumeKey: `${taskId}/${manifest.id}/${name}` } : {}),
+            // Un agent déclaré `memoire: "tour"` n'en a jamais : il repart neuf à chaque appel (ADR 0053).
+            ...(taskId && a.memoire !== "tour" ? { resumeKey: `${taskId}/${manifest.id}/${name}` } : {}),
             // Trace d'exécution (ADR 0032) : tout ce que ce tour échange, et pourquoi il s'arrête.
             ...(taskId ? { trace: { taskId, ...(phase ? { phase } : {}) } } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
@@ -243,6 +244,7 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         return testRuns.run({ source: "gate", ...(opts?.signal ? { signal: opts.signal } : {}), ...(opts?.evidence ? { tag: opts.evidence } : {}) });
       },
       isTestFile: (p) => deps.stack.isTestFile(p),
+      id: deps.stack.id,
       layout: deps.stack.layout,
       infrastructureModules: deps.stack.infrastructureModules,
       async mutation(opts) {

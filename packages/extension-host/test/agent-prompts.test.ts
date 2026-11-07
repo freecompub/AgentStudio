@@ -117,7 +117,7 @@ describe("Composition du prompt : contenu partagé + contrat agent-studio", () =
   it("contrat : les commandes de pile citées par les skills sont neutralisées, pas seulement contredites", () => {
     // Les skills sont reprises telles quelles (ADR 0024 §6) et viennent d'un cadre .NET :
     // `craft-discipline` fait lancer `dotnet test` et `dotnet build`, `test-design-mandates`
-    // cite `[Theory]`. Sur un projet Swift ou TypeScript ces commandes sont fausses. Dire
+    // cite `[Theory]`. Sur un projet TypeScript ces commandes sont fausses. Dire
     // « passe par run_tests » ne suffit pas : ça couvre les tests et laisse la compilation
     // à l'agent, avec une commande qui n'existe pas chez lui. Le contrat, qui prime (§3),
     // doit donc retirer la commande, pas seulement en proposer une autre.

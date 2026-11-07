@@ -31,6 +31,20 @@ export const terminalSchemas = {
       .max(100)
       .optional()
       .describe("Une réponse par défaut de revue qui t'a été transmis"),
+    // Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1) : déclarés par
+    // l'agent, vérifiés et tracés par le code, jugés par la revue.
+    planDeviations: z
+      .array(
+        z.object({
+          criterion: z.string().min(1).max(50).describe("Critère concerné, tel que dans la matrice du plan de test (ex. ac-2)"),
+          planned: z.string().min(1).max(500).describe("Ce que prévoit sa ligne de la matrice : couche et doublure"),
+          actual: z.string().min(1).max(500).describe("Ce que tu as fait à la place : couche et doublure"),
+          rule: z.string().min(1).max(1_000).describe("La règle, d'une skill chargée, qui interdit le choix prévu"),
+        }),
+      )
+      .max(20)
+      .optional()
+      .describe("Seulement si un test s'écarte de la couche ou de la doublure que le plan de test prévoit pour son critère"),
   }),
   submit_plan: z.object({
     steps: z

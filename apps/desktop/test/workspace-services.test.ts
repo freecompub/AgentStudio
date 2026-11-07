@@ -1,4 +1,4 @@
-import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
+import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSessionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
@@ -28,7 +28,7 @@ function fakeWorkspace(): Workspace {
   };
 }
 
-async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntime(), interactionStore = new MemoryInteractionStore()) {
+async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntime(), interactionStore = new MemoryInteractionStore(), taskSessionStore = new MemoryTaskSessionStore()) {
   const usageRecorder = createUsageRecorder(await mkdtemp(join(tmpdir(), "agent-studio-usage-")));
   runtime.behave("diabeo.tdd/tdd-planner", async (t) => {
     t.session.emit({ type: "usage", model: "gpt-5", inputTokens: 1200, outputTokens: 80, multiplier: 1 });
@@ -46,6 +46,7 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     taskStore: store,
     evidenceStore: new MemoryEvidenceStore(),
     interactionStore,
+    taskSessionStore,
     usageRecorder,
     clock: fixedClock(),
     ids: sequentialIds("id-"),
@@ -57,6 +58,8 @@ async function setup(store = new MemoryTaskStore(), runtime = new ScriptedRuntim
     onPost: (ext, md) => posts.push(`${ext}: ${md}`),
     notify: (title, body) => notifications.push(`${title} | ${body}`),
   });
+  // Comme le contrôleur : purge des sessions et reprise des tâches une fois les services construits.
+  await services.demarrer?.();
   return { services, cards, pending, posts, notifications, getLoads: () => runtimeLoads, store };
 }
 
@@ -93,6 +96,7 @@ describe("Services d'un projet (J2)", () => {
       taskStore: new MemoryTaskStore(),
       evidenceStore: new MemoryEvidenceStore(),
       interactionStore: new MemoryInteractionStore(),
+      taskSessionStore: new MemoryTaskSessionStore(),
       clock: fixedClock(),
       ids: sequentialIds("id-"),
     })({
@@ -218,6 +222,7 @@ infrastructureModules: [django]
       taskStore: new MemoryTaskStore(),
       evidenceStore: new MemoryEvidenceStore(),
       interactionStore: new MemoryInteractionStore(),
+      taskSessionStore: new MemoryTaskSessionStore(),
       clock: fixedClock(),
       ids: sequentialIds("id-"),
     })({
@@ -295,6 +300,26 @@ infrastructureModules: [django]
     expect(tasks[0]).toMatchObject({ phase: "PLAN_REVIEW", status: "waiting" });
     const [review] = await second.services.pendingInteractions();
     expect(review?.taskId).toBe(tasks[0]?.id);
+  });
+
+  it("sessions d'agent : celles d'un crash supprimées à l'ouverture, toutes supprimées à la fermeture (ADR 0053)", async () => {
+    // Ouverture après un crash : le registre nomme une session que personne ne libérera plus.
+    const sessions = new MemoryTaskSessionStore([{ key: "t-ancienne/diabeo.tdd/tdd-planner", sessionId: "orpheline" }]);
+    const runtime = new ScriptedRuntime();
+    const { services, pending } = await setup(new MemoryTaskStore(), runtime, new MemoryInteractionStore(), sessions);
+    await until(() => runtime.deleted.includes("orpheline"));
+
+    // Une tâche en attente d'une décision humaine garde la session de son planificateur (ADR 0039)…
+    await services.route("/tdd Plafonner la dose");
+    await until(() => pending.some((p) => p.length === 1));
+    const planificateur = runtime.history.at(-1)!.id;
+    expect(runtime.deleted).not.toContain(planificateur);
+    expect((await sessions.list()).map((e) => e.sessionId)).toEqual([planificateur]);
+
+    // …mais la fermeture normale la supprime comme un crash le ferait.
+    await services.dispose();
+    expect(runtime.deleted).toContain(planificateur);
+    expect(await sessions.list()).toEqual([]);
   });
 
   it("jalons et alertes : consignés dans la conversation et notifiés", async () => {

@@ -1,8 +1,43 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-03",
-  "branch": "feat/suivi-run",
+  "updated": "2026-10-10",
+  "branch": "feat/workflow-rejouable",
   "items": [
+    {
+      "id": "banc-modeles-par-role",
+      "title": "Le banc verrouille les modèles par rôle et détecte les écarts signalés par le SDK",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "35 tests banc verts, typage vert. --modeles-roles appliqué à openSession pour les deux modes, sans Auto pour un rôle absent ; comparaison du modèle usage et annulation si différent, association archivée dans resume.json. Run réel workflow 0b3184b5 DONE, tous les modèles usage conformes : classifier gpt-6-luna, architect-model claude-sonnet-5.5, autres gpt-6.1-sol. Cold-reader fixé à gpt-6.1-sol par décision utilisateur. Avant publication : neuf projets revérifiés (1 279 verts, neuf sautés, deux échecs sous concurrence puis 12/12 verts au rejeu des deux fichiers avec un worker), typage vert."
+    },
+    {
+      "id": "banc-livraison-workflow-reference",
+      "title": "Le banc détecte la livraison d'un workflow avec résultat en clair ou référencé",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "32 tests verts, dont 4 sur la livraison. Réutilise relire du moteur pour résoudre fin.valeur dans contenus ; référence absente = erreur explicite. Résultat réel cffee616 vérifié livré, indicateur du résumé corrigé avec annotation de son ancienne valeur false. Aucun run Copilot nécessaire pour ce correctif."
+    },
+    {
+      "id": "skraft-qualite-diff-precontrole",
+      "title": "Les tests existants bloquent skraft avant tout LLM, la dette de couverture est notifiée et les seuils portent sur le code modifié dans les deux versions",
+      "verify": "TMPDIR=\"$(cd \"$TMPDIR\" && pwd -P)\" pnpm vitest run --project ext-skraft --project workflow-skraft",
+      "passes": true,
+      "notes": "ADR 0060. 659 tests verts, 4 Swift sautés ; pnpm typecheck vert. INIT_BASELINE bloque rouge/ignoré/délai/sortie en erreur avant tout agent ; couverture globale sous seuil notifiée sans bloquer. Lignes de diff produites par Workspace (fichiers nouveaux/non suivis inclus) et détail Cobertura partagés via la plateforme ; seuils par couche sur leur intersection aux portes de scénario et en fin de tâche depuis un checkpoint initial persisté. Dette inchangée exclue, lignes modifiées non couvertes listées. Détail absent explicitement non mesuré ; aucun taux fictif. Tests jumeaux en isolation : baseline rouge sans sessions, avertissement non bloquant, livraison malgré dette, refus sur ligne modifiée. Packages communs vérifiés aussi (un défaut Git préexistant corrigé uniquement dans l'environnement du runner puis sync 11/11). Aucun appel Copilot réel. Une nouvelle tâche sur les tests d'acceptance rouges d'un ancien run est bloquée : --depuis n'est pas une réouverture de tâche."
+    },
+    {
+      "id": "connexion-gh-code-enterprise",
+      "title": "Les deux formats de code gh sont reconnus et l'interface ouvre la page de connexion Enterprise",
+      "verify": "pnpm vitest run --project github-auth --project desktop packages/github-auth/test/gh-auth.test.ts apps/desktop/test/app-controller.test.ts apps/desktop/test/renderer/app.test.tsx",
+      "passes": true,
+      "notes": "ADR 0058 : format gh 2.101 sans terminal (code entre parenthèses) et ancien format, sortie fragmentée, Entrée uniquement si demandée. L'adresse de la connexion en cours remplace github.com pour le bouton de réouverture. À réception du code, ouverture via IPC ; en cas d'échec, erreur et adresse affichées sans perdre le code. 103 tests ciblés réussis. Le parcours OAuth réel dans le navigateur reste à confirmer par l'utilisateur."
+    },
+    {
+      "id": "copilot-enterprise-cloud-hote",
+      "title": "Le runtime reçoit le jeton gh avec son hôte GitHub Enterprise Cloud",
+      "verify": "pnpm vitest run --project runtime-copilot --project desktop packages/runtime-copilot/test/copilot-client.test.ts apps/desktop/test/app-controller.test.ts apps/desktop/test/mode-essai.test.ts",
+      "passes": true,
+      "notes": "ADR 0057 : GH_HOST et gitHubToken associés, sans mode GHES offline. L'application transmet l'hôte courant ou restauré au runtime ; même client dans le banc. Vérifié le 10/10 : 62 tests ciblés ; précontrôle réel sur byb.ghe.com avec le SDK 1.0.14, 23 modèles et création de session réussie. Après confirmation utilisateur de la connexion UI, un prompt minimal réel avec le jeton gh actuel a reçu exactement COPILOT_OK, sans outils ni lecture de fichiers ; session fermée et supprimée. La campagne comparative reste à lancer. — 2026-10-11 : `env` du SDK REMPLACE l'environnement du CLI (`options.env ?? process.env`, SDK 1.0.14) : `{ GH_HOST }` seul privait le CLI de PATH, HOME et du proxy. Corrigé en `{ ...process.env, GH_HOST }`, testé (PATH conservé, GH_HOST hérité écrasé)."
+    },
     {
       "id": "j5-profil-schema",
       "title": "Un profil de stack déclaratif est lu et validé (YAML, O11)",
@@ -19,10 +54,10 @@
     },
     {
       "id": "j5-profils-exemple",
-      "title": "Des profils d'exemple existent pour TypeScript et Swift",
+      "title": "Un profil d'exemple existe pour TypeScript",
       "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
       "passes": true,
-      "notes": "`profiles/typescript.yaml` et `profiles/swift.yaml`, à copier dans `.agent-studio/stack.yaml`. Swift déclare ses quatre canaris depuis que `buildErrors` existe. Reste en dessous des adaptateurs écrits à la main sur deux points : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+      "notes": "`profiles/typescript.yaml`, à copier dans `.agent-studio/stack.yaml`. `profiles/swift.yaml` retiré le 2026-10-11 (ADR 0061) ; le profil TypeScript lisait `muter-json` pour Stryker, il lit `stryker-json`. Reste en dessous de l'adaptateur écrit à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
     },
     {
       "id": "j5-chargement-profil",
@@ -50,7 +85,7 @@
       "title": "Un profil peut fournir l'analyse des imports (règle de dépendance)",
       "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'architecture'",
       "passes": false,
-      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. L'adaptateur Swift sait le faire."
+      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. Depuis le retrait de Swift (ADR 0061), aucun adaptateur ne fournit cette analyse : la porte d'architecture est « non disponible » partout."
     },
     {
       "id": "j5-canaris",
@@ -92,7 +127,7 @@
       "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
       "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
       "passes": false,
-      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, swiftlint-json, muter-json. N'annoncer un format qu'une fois son lecteur écrit."
+      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, stryker-json (swiftlint-json et muter-json retirés avec Swift, ADR 0061). N'annoncer un format qu'une fois son lecteur écrit."
     },
     {
       "id": "j5-stack-init-doctor",
@@ -100,6 +135,293 @@
       "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
       "passes": true,
       "notes": "§8.6 : la vérification PAR EXÉCUTION est faite depuis le 25/09 — `/stack doctor` ouvre un git worktree et y lance les canaris. Manquent encore : proposition par un agent via `submit_stack_profile`, réessai ciblé à budget, relance sur changement du verrou de dépendances."
+    },
+    {
+      "id": "retrait-swift",
+      "title": "Swift est retiré : aucun adaptateur, lecteur, profil ni programme autorisé Swift dans le code",
+      "verify": "! git grep -n -iE \"swift|muter-json|swiftlint\" -- 'packages/*/src' 'apps/desktop/src' 'extensions/*/src' workflows 'profiles/*.yaml' && pnpm vitest run --project stack-adapters --project ext-skraft --project workflow-skraft --project ext-tdd --project desktop --project core",
+      "passes": true,
+      "notes": "ADR 0061, 2026-10-11, à la demande de l'utilisateur : les 4 tests de bout en bout Swift cassaient depuis le précontrôle (ADR 0060). Lecteur JUnit XML déplacé dans src/reports/junit-xml.ts. Pile simulée des tests skraft passée en TypeScript (`fakeStack`). Conséquence : les critères S5 « US-12 livrée » et S6 « bout en bout 13.3 » ne sont plus couverts que par la pile simulée ; un bout en bout sur une vraie chaîne (TypeScript ou .NET) est à écrire. Les chemins `.swift` qui restent dans les tests unitaires de skraft sont des données de texte."
+    },
+    {
+      "id": "corrections-ciblees-fin-deliver",
+      "title": "En fin de DELIVER, aucun échec ne rejoue la phase à vide : correction ciblée (mutation, couverture du diff, suite finale, revue à défauts mineurs) ou escalade sans essai (revue sans défaut, aucun livrable)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D5|source de DISTILL|mutant survivant en fin de DELIVER|revue de DELIVER|mineurs seulement|sans aucun défaut|aucun livrable en fin\"",
+      "passes": true,
+      "notes": "ADR 0062, D5 de docs/12. Extension : CORRECTIONS_DE_FIN et minorThreads (reducer.ts, review-thread.ts) ; workflow : correctionDeFin et minorThreads (livraison.mjs, review-thread.mjs). Tests réducteur + bout en bout dans les deux implémentations, tous vérifiés en échec sans la correction. Reste : délai dépassé pendant la revue → réessai de phase (relance la revue). Non testé en bout en bout dans le workflow : « aucun livrable » (difficile à provoquer : un scénario échoue avant)."
+    },
+    {
+      "id": "trace-d11",
+      "title": "Trace comparable : pas d'étape ROUTE sans question, verdict REJECTED tracé sous « revue », porte « plan de test » distincte de « valeurs »",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D11|aucune étape ROUTE|REJECTED est tracé\"",
+      "passes": true,
+      "notes": "D11 de docs/12, 2026-10-11. Workflow : workflow.mjs (ROUTE conditionnel), revue.mjs (w.rejet avant l'escalade), distillation.mjs ; extension : reducer.ts (rejections + lastRejection sur REJECTED), effects.ts (porte « plan de test »). Le harnais de l'extension a maintenant une trace (app.trace). Rectification de l'audit : sans question, ROUTE n'apparaissait que dans le journal, pas dans la trace du banc. Tests vérifiés en échec sans la correction."
+    },
+    {
+      "id": "question-ou-silence-de-lentille",
+      "title": "Une lentille peut poser une question (à l'humain, phase rejouée sans essai, 2 au plus par phase) ; une lentille muette est relancée seule ; le producteur ne paie plus",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D4|non compté\"",
+      "passes": true,
+      "notes": "ADR 0063, D4 de docs/12. Lentilles avec report_blocker (manifest.ts, workflow.mjs). Extension : LENS_BLOCKED, afterReviewQuestion, reviewQuestions (reducer.ts), runLens (effects.ts). Workflow : reviser/lentille/questionDeRevue (revue.mjs), rejet nonCompte d'essayer (packages/workflow/src/aides.ts). Tests : réducteur (4), essayer (1), bout en bout dans les deux implémentations (4 chacun : question en DESIGN, 3e question, lentille muette, question en DELIVER), vérifiés en échec sans la correction."
+    },
+    {
+      "id": "adr-sans-fantome",
+      "title": "Aucun ADR fantôme : la liste des ADR revient au début de DESIGN avec le dépôt (escalade, relance, saut)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"fantôme|oublié|sauter » DESIGN\"",
+      "passes": true,
+      "notes": "D2 de docs/12, 2026-10-11. Workflow : adrsDuDisque (conception.mjs), appelée à la porte cohérence et dans apresRembobinage. Extension : adrsAvantPhase (model.ts), oublierAdrsDeLaPhase aux rembobinages (failure épuisée, escalate, skip), fusion du GATE_OK de DESIGN sur ce que la porte a lu (reducer.ts). Tests : réducteur (saut) et bout en bout (REJECTED → escalade → relancer / sauter) dans les deux ; les tests du saut vérifiés en échec sans la restauration, ceux de la relance avant toute correction."
+    },
+    {
+      "id": "faits-de-revue-du-run-en-cours",
+      "title": "Les lentilles ne reçoivent ni livrables d'un run effacé par un rembobinage, ni rapports de revue présentés comme livrables",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"run en cours|400 suites\"",
+      "passes": true,
+      "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
+    },
+    {
+      "id": "escalade-de-scenario-test-existant-obsolete",
+      "title": "Un scénario qui échoue sur un test existant devenu rouge escalade en présentant le problème : rejouer DISTILL (DELIVER effacée) ou mettre en pause (puis choix du point de reprise)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"test existant obsolète\"",
+      "passes": false,
+      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations. Point à trancher avant de coder : qui met à jour un test unitaire obsolète (§4 : A recommandée, B, C)."
+    },
+    {
+      "id": "lentilles-recoivent-ce-que-leur-prompt-annonce",
+      "title": "Chaque lentille reçoit ce que son prompt annonce (test-integrity : le code ; architecture : les tests), et cold-reader est plafonnée à major par le code",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"docs/15\"",
+      "passes": true,
+      "notes": "docs/15-agents-face-a-skraft-plugin.md §4.1 à 4.4, extension et workflow. Plafond repris de skraft-plugin v1.6.1 (cold-reader-lens) : blocker → major, REJECTED → CHANGES_REQUESTED, écart noté dans severityNote."
+    },
+    {
+      "id": "portes-de-design-et-distill-reprises-du-plugin",
+      "title": "DESIGN refuse une commande sans événement et une relation entre contextes sans patron ; DISTILL refuse un critère absent de impl-plan.md et un plan de test sans walking skeleton",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option C de docs/15\"",
+      "passes": true,
+      "notes": "docs/15 §4.5, option C. Extension et workflow. Portes G8 et G6 (DESIGN), G6 et G8 (DISTILL) de skraft-plugin v1.6.1, vérifiées par le code."
+    },
+    {
+      "id": "matrice-de-coherence-par-le-code",
+      "title": "La matrice de cohérence de DESIGN est construite par le code : un même nom classé dans deux catégories incompatibles est refusé ; la matrice est écrite et commitée avec DESIGN",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"matrice de cohérence|Matrice de cohérence|incohérence rejetée\"",
+      "passes": true,
+      "notes": "G10 de skraft-plugin v1.6.1, docs/15 §4.5. matriceDeCoherence et matriceMarkdown (design.ts, design.mjs), écrite par la porte cohérence (effects.ts, conception.mjs)."
+    },
+    {
+      "id": "concept-d-adr-present-dans-le-modele",
+      "title": "DESIGN refuse un concept classé dans un nouvel ADR (hors section Alternatives) qui n'existe ni dans event-model.md ni dans domain-model.md",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"Concept d'un ADR absent du modèle\"",
+      "passes": true,
+      "notes": "STRUCTURAL_DRIFT de skraft-plugin v1.6.1, sens ADR → modèle, docs/15 §4.5. Le sens document → ADR est dans les consignes DESIGN de la lentille architecture."
+    },
+    {
+      "id": "methode-de-design-verifiee",
+      "title": "DESIGN refuse un contexte non classé Core/Supporting/Generic, une commande, requête ou un événement sans section dans contracts.md, un dépôt sans couche ou dans l'infrastructure, un engagement du code (bus CQRS, event store, saga) ou une couche anticorruption sans ADR valable",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"Méthode de DESIGN vérifiée par le code|bus de commandes\"",
+      "passes": true,
+      "notes": "docs/15 §4.6, phases 3 à 8 de solution-architect (skraft-plugin v1.6.1). Extension et workflow. Le reste de la méthode est dans les prompts des architectes et les consignes de la lentille architecture."
+    },
+    {
+      "id": "plan-de-test-de-distill",
+      "title": "DISTILL refuse un plan de test sans matrice de couverture (couche et doublure par critère) et un plan d'implémentation dont un critère n'a pas d'étape nommant son test ; en DELIVER, test-integrity vérifie la couche et la doublure prévues",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"docs/15 §4.7|§4 d'acceptance-designer|§5 d'acceptance-designer\"",
+      "passes": true,
+      "notes": "docs/15 §4.7, acceptance-designer §4 et §5 de skraft-plugin v1.6.1. Extension et workflow."
+    },
+    {
+      "id": "gel-garde-apres-commit-de-distill-manque",
+      "title": "Si le commit de DISTILL échoue, relancer le commit ou continuer sans commiter garde l'empreinte du gel et les non-régressions jusqu'à DELIVER",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"commit de DISTILL en échec\"",
+      "passes": true,
+      "notes": "Défaut de l'extension introduit par D19, relevé le 13/10 en préparant docs/skraft-fonctionnement : escalate levait le gel avant de reconnaître une panne de commit. Le workflow n'était pas touché (test de contrôle)."
+    },
+    {
+      "id": "arbitre-de-mutation-muet",
+      "title": "Un arbitre de mutation muet ou hors délai laisse chaque mutant contesté à l'humain, et la livraison continue",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"arbitre muet\"",
+      "passes": true,
+      "notes": "Écart du workflow relevé dans docs/skraft-fonctionnement (ch. 11) ; l'extension se comportait déjà ainsi (contrôle)."
+    },
+    {
+      "id": "recherche-entree-de-design-et-distill",
+      "title": "La porte citations exige l'inventaire de l'existant réutilisable, vérifié dans les fichiers cités ; DESIGN et DISTILL reçoivent conventions et existant dans leur dossier de passation",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"Inventaire de l'existant|Inventaire transmis|Recherche dans le dossier de passation|citation hors limites\"",
+      "passes": true,
+      "notes": "docs/15 §5, lignes 1 et 2 ; repris de skraft-plugin v1.15.1 (solution-researcher, solution-architect, acceptance-designer). Extension et workflow."
+    },
+    {
+      "id": "skill-d-architecture-a-l-appel",
+      "title": "/skraft <story> --archi <skill> désigne la skill d'architecture (clean-architecture-dotnet, -java, -python, -react) ; absente ou inconnue, la clean architecture par défaut ; le dossier de DESIGN, DISTILL et DELIVER la nomme, avec la pile tirée de l'adaptateur",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"Skill d'architecture|skill d'architecture|--nom valeur|/skraft : chemin\"",
+      "passes": true,
+      "notes": "Skills reprises de skraft-plugin v1.15.1 (docs/licences/autorisation-skraft.md). Extension et workflow ; la plateforme accepte « --nom valeur » pour une entrée texte, et l'API des extensions expose l'identifiant de la pile (StackApi.id)."
+    },
+    {
+      "id": "ecarts-au-plan-de-test",
+      "title": "En DELIVER, un écart à la matrice du plan de test se déclare dans report_phase ; le code refuse une déclaration qui ne reprend pas la matrice, garde l'écart avec son pas, le donne à la revue, le commite dans ecarts-au-plan.md et le cite dans le rapport final",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project core -t \"Écarts au plan|écarts au plan|Écart déclaré|écart déclaré\"",
+      "passes": true,
+      "notes": "ADR 0067 ; PLAN_DEVIATION de skraft-plugin v1.15.1. Extension et workflow ; champ planDeviations de report_phase (cœur)."
+    },
+    {
+      "id": "mesures-cout-des-revues",
+      "title": "Le rapport du banc mesure le coût des revues par tour et par lentille, l'économie possible d'une re-revue sélective, les lectures des lentilles et ce que relancent les corrections de DELIVER ; recalculable sur un run enregistré sans requête",
+      "verify": "pnpm vitest run --project banc -t \"Coût des revues et des corrections\"",
+      "passes": true,
+      "notes": "docs/15 §5 : mesures pour décider de la re-revue sélective, du patch partagé et du mode rework. scripts/banc/revues.ts, pnpm banc:revues docs/runs/<run>."
+    },
+    {
+      "id": "lentilles-consignes-de-phase",
+      "title": "En DESIGN et en DISTILL, le dossier de chaque lentille porte des points à examiner propres à la phase ; aucun en DELIVER",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"option A de docs/15\"",
+      "passes": true,
+      "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
+    },
+    {
+      "id": "mesures-revues-sur-runs-copilot",
+      "title": "Au moins deux runs Copilot, extension et workflow, d'une story qui va jusqu'à DELIVER, avec la section « Coût des revues et des corrections » dans leur rapport ; chiffres reportés dans docs/15 §5",
+      "verify": "test $(grep -l \"Coût des revues et des corrections\" docs/runs/*/rapport.md | wc -l) -ge 2",
+      "passes": false,
+      "notes": "À faire, avec l'accord du responsable du projet (runs réels, requêtes premium consommées). Lancer scripts/mesure-skraft.ts en mode extension puis en mode workflow ; pnpm banc:revues recalcule la section sur les runs du 10/10, mais ils sont antérieurs aux évolutions du 14 au 16/10."
+    },
+    {
+      "id": "re-revue-selective",
+      "title": "Re-revue sélective (skraft-plugin v1.15.1) : au tour suivant d'une revue, seules les lentilles qui ont relevé un défaut, ou dont les fichiers ont changé, sont relancées ; les autres gardent leur verdict",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"re-revue sélective\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures (critère mesures-revues-sur-runs-copilot) : économie au plus 8,4 requêtes premium sur 64,3 de revues pour le run extension du 10/10. Extension et workflow."
+    },
+    {
+      "id": "patch-partage-aux-lentilles",
+      "title": "Patch partagé (skraft-plugin v1.15.1) : le diff de la phase est calculé une fois par le code et donné à toutes les lentilles, qui n'ouvrent un fichier entier que si le patch manque de contexte",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"patch partagé\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures : lectures des lentilles (151 et 111 sur les runs du 10/10) et part de leurs tokens d'entrée (31 % et 21 %). Extension et workflow."
+    },
+    {
+      "id": "mode-rework",
+      "title": "Mode rework (skraft-plugin v1.15.1) : après une correction de DELIVER, seules les portes que la correction invalide sont relancées",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"mode rework\"",
+      "passes": false,
+      "notes": "À décider d'après les mesures : après la 1re revue de DELIVER, 4 exécutions de tests (9 s) et 1 revue relancée (17,9 requêtes premium) sur le run extension du 10/10. Extension et workflow."
+    },
+    {
+      "id": "escalade-de-scenario-lignes-non-couvertes",
+      "title": "Un scénario qui échoue sur des lignes non couvertes escalade avec l'option « exempter ces lignes » (dérogation tracée et commitée)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"exempter ces lignes\"",
+      "passes": false,
+      "notes": "ADR 0066 (proposé), docs/13-escalade-de-scenario-selon-sa-cause.md. À faire, dans les deux implémentations ; réutilise derogationsCouverture et sansLignesExemptees à la porte du scénario."
+    },
+    {
+      "id": "couverture-contestee-arbitree-par-l-humain",
+      "title": "En fin de DELIVER, une couverture du diff contestée est tranchée par l'humain : dérogation sur des lignes précises (tracée, commitée) ou à tester",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project stack-adapters e2e-arbitrage-couverture deliver-gates",
+      "passes": true,
+      "notes": "Suite de D22 (ADR 0065), 2026-10-13. lignesSousLeSeuil et sansLignesExemptees (deliver). Workflow : filsDeCouverture, arbitrerCouverture (livraison.mjs), humain arbitrer-couverture. Extension : couvertureThreads (reducer.ts), file d'arbitrage commune (deliver-machine.ts), askMutationArbitration pour la couverture (effects.ts). Bouts en bout dans les deux (source écrite en DISTILL), vérifiés en échec sans la correction. Limite : une ligne écrite pendant un scénario est jugée par la porte du scénario."
+    },
+    {
+      "id": "gel-annonce-quand-il-est-definitif",
+      "title": "Le gel des tests d'acceptance n'est annoncé qu'une fois définitif ; une DISTILL sautée est signalée au début de DELIVER",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft e2e-gel",
+      "passes": true,
+      "notes": "Restes de D1 de docs/12, 2026-10-11. Fait de revue de DISTILL reformulé (review-brief.ts, distillation.mjs). DISTILL sautée : message au début de DELIVER et note aux lentilles (extension : SANS_GEL, sansGel dans deliver-machine.ts, planDeliver ; workflow : planifier dans livraison.mjs). Bouts en bout dans les deux, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "rejets-comptes-et-traces",
+      "title": "Plafond de cycles, nettoyage refusé et relance du classifieur sont comptés et tracés comme rejets, sous les noms de porte du workflow",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D21|nettoyage qui casse\"",
+      "passes": true,
+      "notes": "D21 de docs/12, 2026-10-11. Extension : afterCode (plafond) et nettoyage refusé passent par bumpRetries (deliver-machine.ts) ; relancerClassifieur compte et pose lastRejection « classifieur », effacé par applyDifficulty (reducer.ts). Trace du nettoyage refusé vérifiée dans les deux (e2e-nettoyage). Tests du réducteur vérifiés en échec sans la correction."
+    },
+    {
+      "id": "escalade-de-deliver-oublie-les-sessions",
+      "title": "Une escalade de DELIVER rembobine le scénario ET fait oublier les sessions du testeur et du développeur",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D20\"",
+      "passes": true,
+      "notes": "D20 de docs/12, ADR 0050, 2026-10-11. Extension : rembobinerScenario (deliver-machine.ts) dans l'escalade de scénario et escalateDeliver ; deux anciens tests réécrits pour exiger la paire. Workflow : pas de défaut, test de contrôle (vérifié en échec quand l'oubli de w.rembobiner est désactivé). Tests du réducteur vérifiés en échec sans la correction."
+    },
+    {
+      "id": "commit-de-phase-en-echec",
+      "title": "Un commit de phase en échec ne rembobine pas une phase approuvée : relancer le commit seul, continuer sans commiter (tracé) ou abandonner",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D19\"",
+      "passes": true,
+      "notes": "D19 de docs/12, 2026-10-11. Bibliothèque : commiterLaPhase dans w.phase (rejeu.ts), option commitManque. Workflow : les quatre phases notent vue.nonCommitees, le bilan le dit. Extension : escalade from COMMIT sans rembobinage, retry → commitPhase, continue → phase suivante, rejet « commit » tracé puis effacé au checkpoint suivant, nonCommitees au rapport final. Harness : option commitEchoue. Bouts en bout (relancer, continuer) dans les deux, bibliothèque et réducteur, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "phase-sautee-sans-heritage",
+      "title": "Une phase sautée ne transmet ni son motif de rejet ni ses défauts de revue à la phase suivante",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D18\"",
+      "passes": true,
+      "notes": "D18 de docs/12, 2026-10-11. Extension : decide « skip » vide lastRejection et reviewThreads (reducer.ts) ; « retry » les garde. Workflow : pas de défaut (nouveauSuivi par phase, relance vide après un saut), test de contrôle. Bout en bout (RESEARCH sautée, décideur de DESIGN) dans les deux et réducteur ; celui de l'extension vérifié en échec sans la correction."
+    },
+    {
+      "id": "panne-pendant-les-questions-ouvertes",
+      "title": "Une panne pendant les questions ouvertes (ROUTE) escalade avec relancer ou abandonner ; relancer repose les seules questions non posées",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D17\"",
+      "passes": true,
+      "notes": "D17 de docs/12, 2026-10-11. Workflow : poserLesQuestions (workflow.mjs), Promise.allSettled puis escalade. Extension : escalateFrom ROUTE, effet askQuestion qui rend QUESTION_ASKED (questionsConfirmees, noté à tout stade), réponses acceptées pendant l'escalade (repondre), relance par route (reducer.ts, effects.ts). Bouts en bout dans les deux (US-15, deux questions, la seconde en panne) et réducteur, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "nettoyage-sans-changement-de-comportement",
+      "title": "Un nettoyage qui fait passer l'acceptance du scénario de vert à rouge est refusé : retour au vert, sans reprendre le scénario",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"nettoyage qui casse\"",
+      "passes": true,
+      "notes": "D16 de docs/12, 2026-10-11, option B. Workflow : derouler prend le résultat du nettoyage, porteVerte refuse (livraison.mjs, L.acceptanceVerte). Extension : verifyUnitGreen en mode refactor refuse (deliver-effects.ts, deliver.acceptanceGreen). Bouts en bout dans les deux (pile par marques, niveau challenging), vérifiés en échec sans la correction."
+    },
+    {
+      "id": "panne-en-correction-reprise",
+      "title": "Après une panne pendant une correction de DELIVER, « relancer » reprend la correction, sans rejouer les scénarios ni la revue",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"panne pendant une correction|D14\"",
+      "passes": true,
+      "notes": "D14 de docs/12, 2026-10-11. Workflow : corriger attrape PanneEnvironnement (livraison.mjs). Extension : retryFix (deliver-machine.ts), appelé par decide quand deliver.fixing (reducer.ts). Bouts en bout dans les deux (panne simulée au premier lancement de tests de la correction) et réducteur, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "arbitrage-des-mutants-equivalents",
+      "title": "Un mutant survivant contesté comme équivalent est jugé par l'arbitre de mutation, puis par l'humain ; chaque décision est tracée et les dérogations sont commitées",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow --project task-engine --project stack-adapters -t \"ADR 0065|D22|dérogation|arbitrage|tués et jugés\"",
+      "passes": true,
+      "notes": "ADR 0065, D22 de docs/12, 2026-10-11. Cœur : entrée de trace arbitrage (trace.ts), lue par le moteur dans state.arbitrages (task-engine.ts) ; MutationReport.killed/total/replacement (stryker-report.ts) ; w.arbitrage (packages/workflow). Agent skraft-mutation-arbiter dans les deux. Workflow : filsDeMutation, arbitrerMutants, derogations.md (livraison.mjs). Extension : mutationThreads (reducer.ts), arbitrerMutants et arbitrageEnCours (deliver-machine.ts), effets arbitrateMutants et askMutationArbitration (effects.ts) ; les fils de fin de DELIVER sont désormais dans reviewThreads. Bouts en bout (4 cas) dans les deux, vérifiés en échec avant l'implémentation."
+    },
+    {
+      "id": "reprise-de-correction-coherente",
+      "title": "Une correction ciblée en échec reprend avec la mémoire de son entrée (empreinte, référence des tests) et la cause de l'échec ; une phase relancée reçoit le motif de son escalade",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workflow -t \"D12|D15|correction ciblée\"",
+      "passes": true,
+      "notes": "D12, D15, D23 de docs/12, 2026-10-11. Workflow : corriger restaure L et passe les motifs (livraison.mjs). Bibliothèque : w.phase(nom, (cp, relance) => …), essayer({ motifs }) ; les quatre phases skraft transmettent relance. Extension : scenarioBaseline et scenarioUnitTestsHash pris à l'entrée de la correction (startReviewFix), rendus par repriseDeLEmpreinte (deliver-machine.ts). Tests bout en bout (correction reprise, relancer DESIGN et DELIVER), bibliothèque et réducteur, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "tests-unitaires-existants-ajouts-seulement",
+      "title": "Un test unitaire existant ne s'affaiblit pas en silence : ajouts seulement au pas test, modification au pas fix-test seulement s'il est cité par un défaut",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project workspace -t \"D10|ne peut recevoir|retirées ou remplacées|correction côté tests\"",
+      "passes": true,
+      "notes": "D10 de docs/12, 2026-10-11. Cœur : FileChange.removed (git-checkpoint-store.ts), exposé par changedFiles et fichiersModifies. Workflow : testsRetouches dans porteRouge et porteCorrectionTests (livraison.mjs). Extension : testsRetouches dans verifyUnitRed et verifyFixTests (deliver-effects.ts), editable posé par deliver-machine.ts. Consigne fix-test modifiée dans les deux. Tests bout en bout dans les deux (pas test affaibli, fix-test cité ou non), vérifiés en échec sans la correction. Second point de D10 (preuves des essais effacés) vérifié sans effet : la porte de scénario lance ses tests avant de lire les preuves."
+    },
+    {
+      "id": "motif-garde-apres-question",
+      "title": "Après une question bloquante, l'agent repart avec la réponse et le motif qu'il corrigeait",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"D9\"",
+      "passes": true,
+      "notes": "D9 de docs/12, 2026-10-11, premier point. Extension : lancer (reducer.ts) garde state.retour pour tout lancement du spécialiste, agent (deliver-machine.ts) garde deliver.feedback. Workflow : specialiste (revue.mjs), agentDuPas (livraison.mjs), RESEARCH (workflow.mjs). Tests réducteur (porte, amendement, pas DELIVER) et bout en bout workflow (RESEARCH, DISTILL, DELIVER), vérifiés en échec sans la correction. Second point écarté par décision : les réponses humaines restent gardées et réutilisées après un rembobinage."
+    },
+    {
+      "id": "rapports-de-revue-sans-ecrasement",
+      "title": "Chaque revue d'une phase a son rapport : un amendement n'écrase pas le précédent, une relance ne ressuscite pas ceux du run effacé",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft e2e-s3 -t \"D8\"",
+      "passes": true,
+      "notes": "D8 de docs/12, 2026-10-11. Rapports nommés par le rang de la revue dans la phase, pas par l'essai. Workflow : revue.mjs (tour, ecrireRapports, oublierLeRun) appelé par les trois phases. Extension : writeReview(round) et commitPhase limité au run en cours (effects.ts), debutDesRevues posé par oublierLaPhase (reducer.ts). Défaut présent aussi dans l'extension (l'audit ne citait que le workflow). Tests bout en bout dans les deux (amendement pur, relance), vérifiés en échec sans la correction."
+    },
+    {
+      "id": "correction-toute-contestee",
+      "title": "En correction de DELIVER, un développeur qui conteste ou renvoie chaque défaut n'est pas refusé pour « aucun fichier modifié » ; la lentille arbitre",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"conteste tout|allDisputed|D7\"",
+      "passes": true,
+      "notes": "D7 de docs/12, 2026-10-11. allDisputed (review-thread, les deux). Extension : nothingToChange posé par deliver-machine.ts sur verifyUnitGreen (fix, sans fixTargets), lu par deliver-effects.ts. Workflow : porteVerte (livraison.mjs), fils passés par correction.fils. Tests : pur, réducteur, bout en bout dans les deux, vérifiés en échec sans la correction."
+    },
+    {
+      "id": "adr-statut-a-la-ratification",
+      "title": "Le statut d'un ADR est écrit dans son fichier dès sa ratification ; un ADR décidé ne se réécrit plus",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"aussitôt|gel est passé\"",
+      "passes": true,
+      "notes": "ADR 0064, D3 de docs/12. Extension : applyAdrStatuses à chaque décision (reducer.ts), readOnly des ADR décidés et isNew exclu (effects.ts). Workflow : setAdrStatus dans ratifier et isNew exclu (conception.mjs), lectureSeule des ADR décidés (revue.mjs). Tests : réducteur + bout en bout (accepter ADR-001, amender ADR-002, l'architecte tente de réécrire ADR-001) dans les deux, vérifiés en échec sans la correction. Divergence : l'extension n'annule pas une écriture par shell (le workflow, si : controlerAdrs)."
     },
     {
       "id": "extensions-sans-langage",
@@ -162,6 +484,7 @@
       "title": "La vraie application Electron démarre et ouvre un projet, vérifié en CI",
       "verify": "pnpm build && pnpm e2e",
       "passes": true,
+      "derniereVerification": "2026-10-10 : build et 2 essais Electron réussis après externalisation d'Acorn et d'esbuild (ADR 0056), sans requête Copilot.",
       "notes": "Playwright pilote la VRAIE application : vrai processus principal, vrai préchargement, vrai IPC. Aucune requête à Copilot — le mode d'essai (`mode-essai.ts`) substitue un runtime scripté, et il est IMPOSSIBLE dans une application empaquetée (garde `!app.isPackaged`, testée). Job de CI séparé : il exige le binaire Electron que le job principal ne télécharge pas. Couvre la classe de défauts la plus coûteuse — les trois bugs de câblage du 24/09. Vérifie aussi que le profil utilisateur est jetable (`--user-data-dir`), sans quoi l'essai lirait et écraserait les réglages réels du développeur. PIÈGE ÉVITÉ : la première version affirmait `getByRole(\"textbox\")`, qui matchait un champ de l'écran PROJET — l'essai passait sans avoir ouvert le projet."
     },
     {
@@ -590,6 +913,137 @@
       "verify": "npx tsx scripts/mesure-skraft.ts <dépôt> <story> 1 --en-place",
       "passes": true,
       "notes": "Le banc clonait toujours vers un dossier temporaire, ce qui protège le dépôt mais laisse les livrables hors de vue : après chaque run il fallait aller les chercher dans `/private/var/folders/...`. `--en-place` renverse le choix, avec deux garde-fous puisque le pipeline commite, crée une branche et peut rembobiner : un arbre de travail SALE fait échouer le lancement, en nommant les fichiers concernés ; et le banc annonce en clair que le dépôt SERA modifié. Le rapport final dit lequel des deux modes a servi. Les deux branches sont vérifiées à la main (refus sur arbre sale, acceptation et annonce sur arbre propre) ; pas de test automatisé — `scripts/` n'a pas de suite, il est seulement typechecké depuis aujourd'hui."
+    },
+    {
+      "id": "sessions-orphelines-au-redemarrage",
+      "title": "Après un crash, un redémarrage ou une fermeture, aucune session d’agent ne reste sur le disque (ADR 0053)",
+      "verify": "pnpm vitest run --project core -t \"sessions supprimées au redémarrage\"",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche fix/sessions-orphelines). Chaque session est inscrite dès son ouverture dans un registre par projet (createJsonTaskSessionStore, <tasksDir>/<projet>/sessions/) ; TaskAgentRunner.releaseAll() supprime tout, lancée à l’ouverture du projet et attendue à la fermeture (workspace-services). Test côté application : apps/desktop/test/workspace-services.test.ts « ADR 0053 »."
+    },
+    {
+      "id": "workflow-rejouable",
+      "title": "Un workflow écrit comme un script est rejoué contre son journal : même effet suivant, reprise au bon endroit, non-déterminisme et script modifié refusés (ADR 0052)",
+      "verify": "pnpm vitest run --project workflow",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable) : createWorkflowTask, rejeu (rejeu.ts), magasin de contenus dans l’état, w.phase, essayer, agir ; memoire par agent dans le manifeste (extension-manifest, extension-host). PAS ENCORE : déclaration contributes.workflows, chargement du fichier de workflow par l’hôte, retrait des globaux non déterministes (docs/09 §6.4) — à faire avec l’étape 4."
+    },
+    {
+      "id": "workflow-dossier-chargeur",
+      "title": "Les workflows sont trouvés sur la machine et dans le projet (copie à la main comprise), le projet l'emporte, et un meta non littéral ou trop permissif est refusé avec son motif (docs/11 §11, étape 2)",
+      "verify": "pnpm vitest run --project workflow test/chargeur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-09 : packages/workflow/src/chargeur/ (meta.ts lit le meta avec acorn sans exécuter le script ; schema.ts, zod, fermé ; chargeur.ts, deux emplacements, empreinte de tout le dossier). Pas encore branché dans l’application : étapes 3 à 5."
+    },
+    {
+      "id": "workflow-dossier-isole",
+      "title": "Le script d'un workflow tourne dans un processus isolé dédié, sans heure, hasard, minuteries, réseau ni modules Node, ses appels w.* bornés par le meta (docs/11 §11, étape 3)",
+      "verify": "pnpm vitest run --project workflow test/hote.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : compilation à imports contrôlés, bac à sable node:vm (Date, Math.random, minuteries, eval absents ; w.maintenant() journalisé), processus enfant sous --permission (évasion vers le disque refusée, vérifié en retirant --permission). RÉSERVE : le réseau n’est pas bloqué par Node 22 (même limite que les extensions). Les appels w.* sont déjà bornés par les agents et questions déclarés ; les bornes d’écriture et de Git du meta seront branchées avec le lancement (étape 5)."
+    },
+    {
+      "id": "workflow-dossier-accord",
+      "title": "Accord de l'utilisateur par empreinte du dossier à la première exécution et à chaque modification ; dossier gelé pendant une tâche (docs/11 §11, étape 4)",
+      "verify": "pnpm vitest run --project workflow test/accord.test.ts && pnpm vitest run --project core test/task-agent-guard.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : accords par empreinte (une fois / toujours / refuser), résumé des droits, garde du cœur sur .agent-studio/workflows/ (sans la casse), écriture du script refusée au même endroit, reprise refusée si le dossier a changé. L’accord n’est pas encore demandé par l’application : il le sera au lancement (étape 5)."
+    },
+    {
+      "id": "workflow-dossier-lancement",
+      "title": "Un workflow se lance par sa commande, ou sur proposition de l'agent principal confirmée par l'utilisateur (docs/11 §11, étape 5)",
+      "verify": "pnpm vitest run --project workflow test/activer.test.ts && pnpm vitest run --project desktop apps/desktop/test/workflows.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : commande et arguments d’après le meta, accord, permissions du meta appliquées à chaque appel (écriture, git, tests), workflows trouvés à l’ouverture du projet, outil proposer_workflow de l’agent principal avec confirmation. Non éprouvé dans Electron réel (tests sur le lanceur Node)."
+    },
+    {
+      "id": "workflow-skraft-javascript",
+      "title": "Le workflow skraft en JavaScript, chargé depuis un dossier de projet, passe les jumeaux e2e-s2 à e2e-s6 et le test de reprise ; ADR rattachés à leur US par le slug (docs/11 §11, étape 6)",
+      "verify": "pnpm vitest run --project workflow-skraft",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : workflows/skraft/ (JavaScript, meta littéral, 11 agents, 12 skills) ; tests dans tests/workflow-skraft/ (219, dont jumeaux e2e-s2 à e2e-s6 en vraie chaîne Swift, dialogue de revue, reprise après crash, ADR par story). Le workflow est copié dans .agent-studio/workflows/ du projet d’essai, commité, activé et exécuté isolé."
+    },
+    {
+      "id": "mesure-workflow-rejets-traces",
+      "title": "Chaque rejeu du workflow est tracé avec son étape, sa porte et ses motifs exacts (prérequis P1 de docs/10)",
+      "verify": "pnpm vitest run --project workflow test/aides.test.ts test/rejeu.test.ts && pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/e2e-s5-workflow.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : w.rejet(porte, motifs) journalisé ; essayer l’appelle à chaque essai refusé (porte nommée, « revue », « délai ») ; DELIVER trace pas refusés, scénarios repris, corrections et réessais de phase ; l’état du workflow expose rejections et lastRejection, que le moteur trace déjà. Complété le même jour : le workflow annonce ses étapes par w.etape avec les noms de l’extension (INIT, CLASSIFY, CONFIRM_DIFFICULTY, ROUTE, REVIEW, ARBITRATION, RATIFICATION, BLOCKED, ESCALATED, DONE), et le banc les ramène au découpage commun (scripts/banc/etapes.ts)."
+    },
+    {
+      "id": "mesure-durees-effets",
+      "title": "La trace donne la durée de chaque effet et de chaque transition, pour skraft et skraft-workflow (prérequis P2 de docs/10)",
+      "verify": "pnpm vitest run --project task-engine && pnpm vitest run --project core packages/core/test/run-summary.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10, dans le moteur de tâches donc pour les deux : chaque transition porte sa durée de calcul (duréeMs, rejeu du script compris pour le workflow) ; chaque effet produit une entrée `effet` {effet, phase, duréeMs, issue ok|erreur|attente}. Nouveau crochet optionnel TaskDefinition.estUnEchec(event) : un effet qui rend ERREUR (workflow) compte comme échec. resumerTrace en tire agentsMs, effetsMs, codeMs (effets moins tours d’agent) et moteurMs par étape."
+    },
+    {
+      "id": "mesure-banc-commun",
+      "title": "Le banc de mesure lance l'extension skraft ou le workflow skraft et produit le même rapport par étape (prérequis P3, P5, P6 de docs/10)",
+      "verify": "MANUEL : pnpm tsx scripts/mesure-skraft.ts <projet> stories/US-2.md --workflow (consomme des requêtes Copilot)",
+      "passes": false,
+      "notes": "En partie fait le 2026-10-10 (P3, P5) : --workflow installe, commite, active et exécute le workflow isolé ; répondeur commun pour les deux modes (--reponses) ; plafond --plafond-requetes (350 par défaut), sans limite de durée ; rapport et état final pour les deux. Typé (pnpm typecheck), JAMAIS lancé : il consomme des requêtes. Complété le même jour : resume.json porte `livre` et `comparable` (découpage commun de docs/10 §3, attente humaine retirée, scripts/banc/etapes.ts) ; rapport.md a sa table « Étapes communes ». Reste à le faire tourner, à blanc puis en réel (accord du responsable). Run à blanc impossible sans mode simulé (non développé) : le premier run réel de la campagne servira de vérification. Les 350 requêtes équivalentes SDK ne sont pas 3500 crédits Copilot ; les crédits dépendent du modèle et des tokens."
+    },
+    {
+      "id": "mesure-repondeur-commun",
+      "title": "Un répondeur scripté par fichier donne les mêmes réponses humaines à l'extension skraft et au workflow skraft (prérequis P4 de docs/10)",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : scripts/banc/repondeur.ts (pur), options reconnues par leur action (id, « action:… » ou « …:action ») et non par leur libellé ; questions ouvertes répondues avec du texte (fini les réponses vides) ; escalade relancée deux fois par motif puis abandonnée. Fichier de réponses : docs/runs/reponses-us-2.json. Branché dans le banc le même jour (--reponses)."
+    },
+    {
+      "id": "mesure-rapport-comparaison",
+      "title": "Un script lit les resume.json des runs et produit le rapport de comparaison de docs/10 §7 (prérequis P6)",
+      "verify": "pnpm vitest run --project banc",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 : scripts/banc/comparer.ts, `comparer` pur (synthèse en médiane et valeurs brutes, une ligne par étape et par run, rejeux run par run avec motifs entiers, rejeux mis en regard par famille de porte avec « à expliquer » quand un seul côté rejette, différences assumées de §2). Les deux nommages d’une même porte sont rapprochés par `famille` (DELIVER et pas test (s1) → pas ; DELIVER : mutation → mutation). Commande : tsx scripts/banc/comparer.ts [--story=us-2] [--prix=…] <dossiers de runs>. NON FAIT : durée et coût perdus par rejeu (la trace ne délimite pas un essai), à ajouter si la lecture des runs le demande."
+    },
+    {
+      "id": "comparaison-us-2",
+      "title": "Campagne de quatre runs réels sur US-2 en alternance, rapport de comparaison avec la raison de chaque rejeu, durée et coût par étape (docs/10)",
+      "verify": "MANUEL : voir docs/10-plan-comparaison-skraft-workflow.md",
+      "passes": false,
+      "workflowModelesFixes": "0b3184b5 DONE en 17m58, 335,4 requêtes équivalentes SDK, 29 tours, 111 appels, un rejet ; 24/24 tests indépendants verts. Workflow-2 à 69a9c8a, main inchangé. Tous les modèles effectifs vérifiés conformes à l'association demandée ; exception cold-reader décidée (gpt-6.1-sol fixe). Questions DESIGN désormais posées, mais réponse automatique autorise taux zéro contrairement à l'extension : contrats pas entièrement identiques. Comparaison distincte docs/runs/2026-10-10-comparaison-us-2-modeles-fixes.md. Aucun run actif.",
+      "productionsModelesFixes": "Code/tests et documents comparés en §6 du rapport à modèles fixés : cinq critères satisfaits, workflow plus complet en acceptance (19 exemples, somme positive multi-lignes et invalides), extension plus défensive et teste l'immuabilité. Workflow copie son barème mais n'éprouve pas la mutation source ; extension ne teste pas la somme de deux remises positives. Aucun code ni artefact de run modifié.",
+      "lectureDocuments": "Lecture comparée des deux livraisons contre US-2 consignée en §6 de docs/runs/2026-10-10-comparaison-us-2-extension-600.md. Cinq critères présents ; contrats supplémentaires différents (invariants extension décidés par répondeur automatique). Workflow discrimine AC-3 dès DISTILL et somme multi-lignes après revue ; extension récupère AC-3 seulement en DELIVER, aucun test de somme de deux remises positives dans sa livraison. Aucun artefact des runs ni code modifié par cette analyse.",
+      "essaiExtension600": "c4433175 terminé DONE en 17m35, 35 tours, 128 appels, 232,2 requêtes équivalentes SDK, 4 rejets. Plafond 600 non atteint, consommation inférieure à 350. Extension-2 à 59f2454, main inchangé a7cf6db, arbre propre ; dotnet test indépendant 21/21, ac-1 à ac-5 présents. Rapport, trace, preuves, interactions archivés. Comparaison distincte docs/runs/2026-10-10-comparaison-us-2-extension-600.md. Ancien essai 521f0098 conservé. Aucun run actif. Variabilité des modèles et des choix métier : pas de conclusion causale sur le moteur ni sur l'augmentation du plafond.",
+      "dernierCouple": "Workflow cffee616 livré (264,3 requêtes équivalentes SDK, 55m21). Extension 521f0098 arrêtée au plafond : ABORTED / DISTILL, 352,5 requêtes après franchissement par un appel, 16m48, 22 tours, 99 appels, 3 rejets ; DESIGN avec revues coûte 297. Aucun DELIVER lancé. Branche extension-2 à 8333982, main inchangé a7cf6db. Rapports et preuves archivés ; comparaison docs/runs/2026-10-10-comparaison-us-2.md. Aucun run actif. Modèles non imposés et précisions métier aux blocages potentiellement différentes : résultat préliminaire, pas preuve d'un écart causal du moteur.",
+      "notes": "Campagne incomplète. Essais extension 63e98c3d et eda055a6 abandonnés, conservés ; défauts gel et périmètre couverture corrigés dans les deux versions (ADR 0059/0060). Nouvelle séquence workflow en premier : cffee616 terminé fini / DONE, 55m21, 35 tours, 185 appels, 264,3 requêtes équivalentes SDK, 5 rejets ; écart de réserve 301. Rapport, trace, preuves et interactions : docs/runs/2026-10-10-us-2-workflow-cffee616/. Branche tests/us-2/workflow-1 à b7b6928, main inchangé a7cf6db, arbre propre ; dotnet test indépendant vert 13/13, critères ac-1 à ac-5 présents. Précontrôle avec avertissement de dette historique, correction de revue DISTILL puis gel franchi. Deux silences de 300 s pendant DELIVER, corrections après revue finale. Défaut de mesure à résoudre : resume.json livre=false car fin.valeur est une référence, pas clair.phases accessible directement ; résultat brut conservé, ne pas utiliser cet indicateur dans la comparaison avant correction du banc. Aucun nouveau run extension automatiquement lancé. Plafond 350 requêtes équivalentes SDK, sans limite murale ni taux fixe vers les crédits Copilot."
+    },
+    {
+      "id": "gel-distill-apres-correction-revue",
+      "title": "Un refus de DISTILL lève le gel, les portes valident les tests corrigés et DELIVER reprend leur nouvelle empreinte dans les deux implémentations",
+      "verify": "TMPDIR=\"$(cd \"$TMPDIR\" && pwd -P)\" pnpm vitest run --project ext-skraft --project workflow-skraft extensions/skraft/test/reducer.test.ts extensions/skraft/test/e2e-s4.test.ts tests/workflow-skraft/test/e2e-s4-workflow.test.ts extensions/skraft/test/deliver-gates.test.ts tests/workflow-skraft/test/deliver-gates.test.ts extensions/skraft/test/distill-gates.test.ts tests/workflow-skraft/test/distill-gates.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-10 (ADR 0059). 230 tests ciblés verts et pnpm typecheck. Réducteur : invalidation lors des réessais et escalades de DISTILL, nouvelle empreinte à chaque porte réussie. Workflow : invalidation avant chaque essai, après refus ou exception, et après rembobinage. S4 jumeaux : ajout d'un fichier après refus de revue, nouvelle porte RED, arrivée réelle au premier agent DELIVER sans mismatch. Les non-régressions sont recalculées avec l'empreinte ; les tests purs couvrent timeout, panne, REJECTED et budget épuisé. Un refus de DELIVER conserve le gel ; ses portes restent strictes. TMPDIR canonique nécessaire sur macOS pour éviter le défaut préexistant du compilateur sur les alias /var et /private/var. Validation automatisée sans Copilot. Essai réel de reprise par phase eda055a6 depuis a845e0f terminé : DISTILL approuvé, DELIVER démarré sans mismatch, puis ABORTED sur couverture du scénario ac-2 (CalculDuPanier 75 %, Panier 87,5 %, minimum 90 %), après deux reprises. Rapport docs/runs/2026-10-10-us-2-extension-eda055a6/, 11m43, 32 tours, 113 appels, 113,6 requêtes équivalentes SDK, aucune poussée. Ni réouverture de la tâche ABORTED ni run complet comparable ; ce run ne comporte pas de refus de revue DISTILL."
+    },
+    {
+      "id": "skraft-deliver-en-workflow",
+      "title": "skraft-workflow mène DELIVER et tout le pipeline : jumeaux de e2e-s5 et e2e-s6 (pile simulée, correction de revue, usage sur trois stories) et reprise après un crash au milieu de DELIVER",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s5-workflow.test.ts test/e2e-s6-workflow.test.ts test/e2e-reprise-workflow.test.ts test/deliver-gates.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/livraison.ts : 595 lignes de code, portes comprises (skraft : deliver-machine 299 + deliver-effects 340). Pipeline complet : 1 015 lignes contre 1 624 dans skraft (dont 269 de types d’état, d’événements et d’effets). Divergences assumées : rembobiner fait oublier les agents (ADR 0053, décidé ; le réducteur ne le faisait pas en DELIVER) ; usage par phase (pas d’états CLASSIFY ni REVIEW) ; réessais par phase et `rejections` non comptés ; relancer après escalade pendant une correction de revue reprend la correction (le réducteur repartait du pas « test »). Les tests Swift tournent si la chaîne est installée (~/.cache/agent-studio/swift). Coexistence avec skraft décidée (ADR 0054) ; l’extension s’empaquette et s’installe comme skraft (test/install.test.ts). — 2026-10-11 : les jumeaux sur la vraie chaîne Swift sont retirés avec Swift (ADR 0061) ; restent les tests sur pile simulée."
+    },
+    {
+      "id": "skraft-distill-en-workflow",
+      "title": "skraft-workflow mène DISTILL : portes gherkin et valeurs, RED d'acceptance exécuté par le code, gel des tests d'acceptance, revue (jumeau de e2e-s4, vrai Vitest)",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s4-workflow.test.ts test/distill-gates.test.ts test/gherkin.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable). src/distillation.ts : 64 lignes de code ; la revue est commune à DESIGN et DISTILL (src/revue.ts, 98 lignes). Preuve enregistrée sous DISTILL_RED (w.lancerTests({ etiquette })). Le dernier comptage des tests vient du TestRun rendu au script plutôt que du magasin de preuves (même source, D20)."
+    },
+    {
+      "id": "skraft-design-en-workflow",
+      "title": "skraft-workflow mène DESIGN : porte cohérence, revue à lentilles avec dialogue et arbitrage humain, ratification et amendement (jumeau de e2e-s3, en processus isolé aussi)",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s3-workflow.test.ts test/e2e-revue-workflow.test.ts test/design-gate.test.ts test/review-thread.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), docs/09 §14 étape 5 pour DESIGN. src/conception.ts : 172 lignes de code. Écarts du §13 non tranchés : comportement du réducteur reproduit (budget partagé, amendement sans budget ni modélisation, lentilles sans quality-gates, défaut maintenu par l’humain corrigé malgré le budget). Différences assumées : plusieurs amendements traités ensemble ; isTestFile approché par les emplacements de la stack (w.disposition) ; aucune preuve de tests dans les faits de revue (DESIGN n’en produit pas)."
+    },
+    {
+      "id": "skraft-research-en-workflow",
+      "title": "L'extension indépendante skraft-workflow mène préparation, difficulté, RESEARCH et questions ouvertes en workflow, avec le comportement de /skraft (test jumeau de e2e-s2), dans le processus principal et en processus isolé",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte ; puis, à sa demande, dans une extension totalement indépendante (extensions/skraft-workflow, aucune importation de skraft, vérifiée par test/independance.test.ts ; code pur, agents et tests copiés avec leur provenance). Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
     }
   ]
 }

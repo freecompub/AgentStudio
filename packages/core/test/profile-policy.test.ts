@@ -27,7 +27,7 @@ describe("Profils (D6, §10.3)", () => {
 
     it("souple : lancer les tests est autorisé sans question ; le reste est demandé", async () => {
       const { guard, asked } = arbiter("souple");
-      for (const command of ["npm test", "pnpm test", "pnpm vitest run", "swift test", "npx vitest run --reporter=json"])
+      for (const command of ["npm test", "pnpm test", "pnpm vitest run", "dotnet test", "npx vitest run --reporter=json"])
         expect(await guard.check({ kind: "shell", toolName: "bash", command })).toEqual({ decision: "allow" });
       expect(asked).toEqual([]);
       await guard.check({ kind: "shell", toolName: "bash", command: "npm install left-pad" });

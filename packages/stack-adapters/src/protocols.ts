@@ -30,7 +30,7 @@ export interface TestRun {
 
 /** Couverture de lignes, par fichier. Produite par la même exécution que les tests (§9.7). */
 export interface CoverageReport {
-  files: { file: string; covered: number; total: number; score: number }[];
+  files: { file: string; covered: number; total: number; score: number; lines?: { number: number; covered: boolean }[] }[];
 }
 
 export interface RunTestsOptions {
@@ -45,13 +45,16 @@ export interface RunTestsOptions {
 export interface MutationReport {
   /** Pourcentage de mutants tués, de 0 à 100. */
   score: number;
-  files: { file: string; score: number; survived: { line: number; operator: string }[] }[];
+  /**
+   * `killed` et `total` (mutants jugés) permettent de retirer un mutant du score, quand une
+   * dérogation l'a reconnu équivalent (D22 de docs/12) ; `replacement` : le code du mutant.
+   */
+  files: { file: string; score: number; killed?: number; total?: number; survived: { line: number; operator: string; replacement?: string }[] }[];
 }
 
 /**
  * Rapport du linter du projet. La qualité de forme — longueur des méthodes, imbrication,
- * nombre d'attributs — est jugée par l'outil que le projet a déjà configuré (ESLint, SwiftLint,
- * ruff…), avec ses propres seuils : deux autorités contradictoires sur la même question
+ * nombre d'attributs — est jugée par l'outil que le projet a déjà configuré (ESLint, ruff…), avec ses propres seuils : deux autorités contradictoires sur la même question
  * bloqueraient du code que la CI du projet accepte.
  */
 export interface LintReport {
@@ -87,11 +90,11 @@ export interface StackLayout {
 }
 
 export interface StackAdapter {
-  readonly id: "typescript" | "swift" | "dotnet";
+  readonly id: "typescript" | "dotnet";
   readonly layout: StackLayout;
   /**
    * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
-   * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `SwiftUI` ne veut
+   * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `Microsoft.AspNetCore` ne veut
    * rien dire en Python — donc elle vit ici, et non dans une extension, qui doit rester
    * indépendante des langages (D10).
    */

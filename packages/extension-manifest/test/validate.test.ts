@@ -115,4 +115,15 @@ describe("Agents en fichiers Markdown et skills (D12, D26)", () => {
     expect(avec("strong")).toEqual([]);
     expect(avec("claude-opus-5")).toEqual([expect.stringMatching(/modelClass/)]);
   });
+
+  it("mémoire d'un agent (ADR 0053) : « tache » ou « tour », rien d'autre", () => {
+    const avec = (memoire: unknown) => {
+      const m = base();
+      m.contributes.agents = [{ name: "lecteur", title: "Lecteur", role: "Relis.", output: "report_phase", memoire }];
+      return errorsOf(m);
+    };
+    expect(avec("tache")).toEqual([]);
+    expect(avec("tour")).toEqual([]);
+    expect(avec("toujours")).toEqual([expect.stringMatching(/memoire/)]);
+  });
 });

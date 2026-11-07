@@ -374,8 +374,9 @@ describe("Moteur de tâches — trace", () => {
     attempts: number;
     rejections: number;
     lastRejection: { gate: string; reasons: string[] } | null;
+    arbitrages?: unknown[];
   }
-  type RE = { type: "FAIL"; gate: string; reasons: string[] } | { type: "PASS" };
+  type RE = { type: "FAIL"; gate: string; reasons: string[] } | { type: "PASS" } | { type: "ARBITRE"; a: unknown };
   const rejectingTask = (events: RE[]): TaskDefinition<R, RE, { kind: "work" }, unknown> => ({
     name: "rejets",
     initialState: () => ({ phase: "DESIGN", stage: "SPECIALIST", attempts: 0, rejections: 0, lastRejection: null }),
@@ -383,6 +384,7 @@ describe("Moteur de tâches — trace", () => {
     transition(s, e) {
       if (e.type === "FAIL") return { state: { ...s, attempts: s.attempts + 1, rejections: s.rejections + 1, lastRejection: { gate: e.gate, reasons: e.reasons } }, effects: [{ kind: "work" }] };
       if (e.type === "PASS") return { state: { ...s, phase: "DONE", stage: "DONE" }, effects: [] };
+      if (e.type === "ARBITRE") return { state: { ...s, arbitrages: [...(s.arbitrages ?? []), e.a] }, effects: [{ kind: "work" }] };
       return { state: s, effects: [] };
     },
     runEffect: async () => events.shift(),
@@ -419,6 +421,50 @@ describe("Moteur de tâches — trace", () => {
       expect.objectContaining({ porte: "documents", motifs: ["model.md absent", "decisions.md vide"] }),
       expect.objectContaining({ porte: "documents", motifs: ["model.md absent", "decisions.md vide"] }),
     ]);
+  });
+
+  it("trace chaque effet avec sa durée et son issue, et la durée de chaque transition (docs/10 P2)", async () => {
+    const entries = await run([{ type: "FAIL", gate: "documents", reasons: ["x"] }, { type: "PASS" }]);
+    const effets = entries.filter((e) => e.kind === "effet");
+    expect(effets).toEqual([
+      expect.objectContaining({ effet: "work", phase: "DESIGN", issue: "ok", duréeMs: expect.any(Number) }),
+      expect.objectContaining({ effet: "work", phase: "DESIGN", issue: "ok", duréeMs: expect.any(Number) }),
+    ]);
+    for (const t of entries.filter((e) => e.kind === "transition")) expect(t).toMatchObject({ duréeMs: expect.any(Number) });
+  });
+
+  it("un effet qui attend une réponse humaine, ou qui échoue, le dit dans son issue", async () => {
+    const entries: TraceEntry[] = [];
+    const trace = { append: async (e: TraceEntry) => void entries.push(e), list: async () => entries, archive: async () => undefined };
+    const engine = createTaskEngine({ store: new MemoryTaskStore(), checkpoints: new RecordingCheckpoints(), clock: fixedClock(), ids: sequentialIds("t"), trace });
+    let n = 0;
+    engine.register(
+      {
+        name: "issues",
+        initialState: () => ({ phase: "X" }),
+        initialEffects: () => [{ kind: "casse" }, { kind: "attend" }],
+        transition: (s) => ({ state: s, effects: [] }),
+        runEffect: async (f: { kind: string }) => {
+          n++;
+          if (f.kind === "casse") throw new Error("boum");
+        },
+        isTerminal: () => false,
+      },
+      {},
+    );
+    const id = await engine.start("issues", {});
+    await engine.idle(id);
+    expect(n).toBe(2);
+    expect(entries.filter((e) => e.kind === "effet").map((e) => [(e as { effet: string }).effet, (e as { issue: string }).issue])).toEqual([
+      ["casse", "erreur"],
+      ["attend", "attente"],
+    ]);
+  });
+
+  it("trace chaque arbitrage ajouté à l'état, une fois (D22 de docs/12)", async () => {
+    const a = { porte: "mutation", élément: "src/a.ts:3 (EqualityOperator)", contestation: "équivalent", décision: "dérogation", par: "agent", raison: "même valeur à dose == max" };
+    const entries = await run([{ type: "ARBITRE", a }, { type: "FAIL", gate: "x", reasons: ["y"] }, { type: "PASS" }]);
+    expect(entries.filter((e) => e.kind === "arbitrage")).toEqual([expect.objectContaining({ kind: "arbitrage", ...a })]);
   });
 
   it("un motif conservé d'un rejet précédent ne compte pas comme un nouveau rejet", async () => {

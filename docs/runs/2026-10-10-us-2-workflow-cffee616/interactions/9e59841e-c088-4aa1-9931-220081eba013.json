@@ -1,0 +1,32 @@
+{
+  "id": "9e59841e-c088-4aa1-9931-220081eba013",
+  "taskId": "cffee616-6ba6-4a79-b64a-df8e13c264ed",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Question ouverte (US-2)",
+  "detail": "La remise de quantité se cumule-t-elle avec un code promotionnel, ou le code l'emporte-t-il ? US-3",
+  "options": [
+    {
+      "id": "70:answer",
+      "label": "Répondre"
+    },
+    {
+      "id": "70:defer",
+      "label": "Reporter"
+    }
+  ],
+  "freeText": true,
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T15:10:00.432Z",
+  "status": "answered",
+  "answer": {
+    "option": "70:answer",
+    "comment": "Pas de précision supplémentaire : retiens l'option la plus simple qui respecte les critères d'acceptation.",
+    "answeredAt": "2026-10-10T15:10:00.436Z"
+  }
+}

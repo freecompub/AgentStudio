@@ -39,6 +39,7 @@ function fakeWorkspace(root: string): Workspace & { rolledBack: string[]; diffs:
 function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: CopilotQuota | null; extra?: Partial<Parameters<typeof createAppController>[0]> } = {}) {
   const runtime = new ScriptedRuntime();
   const tokens: string[] = [];
+  const runtimeHosts: (string | undefined)[] = [];
   const emitted: { channel: EventChannel; payload: unknown }[] = [];
   const sink: EventSink = { emit: (channel, payload) => emitted.push({ channel, payload }) };
   const workspaces = new Map<string, ReturnType<typeof fakeWorkspace>>();
@@ -95,16 +96,19 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: Copi
         },
         commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
         hookGuards: () => hookGuards,
+        outilsAgent: () => [],
         tasks: async () => [],
         cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
         pendingInteractions: async () => [],
         respond: async (id, option, _c, by) => void serviceLog.push(`réponse:${id}:${option}${by ? `:${by.role}` : ""}`),
         dispose: async () => void serviceLog.push(`libérés:${args.workspace.root}`),
+        demarrer: async () => void serviceLog.push(`démarrés:${args.workspace.root}`),
       };
       return services;
     },
-    runtimeFactory: (token) => {
+    runtimeFactory: (token, hostname) => {
       tokens.push(token);
+      runtimeHosts.push(hostname);
       return runtime;
     },
     conversations,
@@ -117,7 +121,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: Copi
     systemPrompt: "Rôle.",
     ...opts.extra,
   });
-  return { controller, runtime, tokens, emitted, workspaces, opened, conversations, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
+  return { controller, runtime, tokens, runtimeHosts, emitted, workspaces, opened, conversations, serviceLog, hookGuards, getServicesArgs: () => servicesArgs, getSettings: () => settings };
 }
 
 describe("AppController — authentification", () => {
@@ -132,9 +136,45 @@ describe("AppController — authentification", () => {
     await controller["shell:open-device-page"]({});
     expect(opened).toEqual(["https://github.com/login/device"]);
   });
+
+  it("ouvre la page Enterprise dès le code reçu, avant que la connexion ne termine", async () => {
+    const { controller, opened } = setup({
+      extra: {
+        auth: {
+          status: async () => OAUTH,
+          hostname: () => "github.com",
+          token: async () => "gho_secret",
+          copilotQuota: async () => null,
+          logout: async () => {},
+          login: async (onCode) => {
+            onCode({ code: "AB12-CD34", verificationUrl: "https://byb.ghe.com/login/device" });
+            await controller["shell:open-device-page"]({});
+            return { ...OAUTH, hostname: "byb.ghe.com" };
+          },
+        },
+      },
+    });
+    await controller["auth:login"]({ hostname: "byb.ghe.com" });
+    expect(opened).toEqual(["https://byb.ghe.com/login/device"]);
+  });
 });
 
 describe("AppController — connexion et déconnexion", () => {
+  it("transmet au runtime l'hôte courant après une connexion Enterprise", async () => {
+    const { controller, runtimeHosts } = setup();
+    await controller["auth:login"]({ hostname: "byb.ghe.com" });
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    expect(runtimeHosts).toEqual(["byb.ghe.com"]);
+  });
+
+  it("transmet au runtime l'hôte mémorisé au démarrage", async () => {
+    const { controller, runtimeHosts } = setup({ settings: { authHostname: "byb.ghe.com" } });
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["chat:start"]({});
+    expect(runtimeHosts).toEqual(["byb.ghe.com"]);
+  });
+
   it("se connecter à une instance GitHub Enterprise retient l'hôte", async () => {
     const { controller, getSettings } = setup();
     expect(await controller["auth:login"]({ hostname: "github.exemple.fr" })).toMatchObject({ hostname: "github.exemple.fr" });
@@ -210,7 +250,7 @@ describe("AppController — espaces de travail", () => {
           return {
             route: async () => ({ kind: "chat" as const }),
             commands: () => [{ invocation: "tdd", title: "TDD", description: "d", extensionId: "diabeo.tdd" }],
-            hookGuards: () => [],
+            hookGuards: () => [], outilsAgent: () => [],
             tasks: async () => [],
             cancelTask: async () => {},
             pendingInteractions: async () => [],
@@ -235,8 +275,18 @@ describe("AppController — espaces de travail", () => {
     await controller["workspace:open"]({ path: "/projets/demo" });
     await controller["workspace:close"]({});
 
-    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo"]);
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "libérés:/projets/demo"]);
     expect(await controller["workspace:current"]({})).toBeNull();
+  });
+
+  // Revue de la PR #12 : rouvrir le projet (installation d'une extension) démarrait les nouveaux
+  // services avant de libérer les anciens ; leur purge commune du registre des sessions supprimait
+  // alors les sessions que les nouveaux venaient d'ouvrir.
+  it("rouvrir le projet : les nouveaux services sont construits, les anciens libérés, puis seulement les nouveaux démarrés", async () => {
+    const { controller, serviceLog } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "créés:/projets/demo", "libérés:/projets/demo", "démarrés:/projets/demo"]);
   });
 
   it("clôturer ferme la session de conversation en cours", async () => {
@@ -283,7 +333,7 @@ describe("AppController — espaces de travail", () => {
           return {
             route: async () => ({ kind: "chat" as const }),
             commands: () => [],
-            hookGuards: () => [],
+            hookGuards: () => [], outilsAgent: () => [],
             tasks: async () => [],
             cancelTask: async () => {},
             pendingInteractions: async () => [],
@@ -315,7 +365,7 @@ describe("AppController — espaces de travail", () => {
     await controller["workspace:open"]({ path: "/projets/demo" });
     await controller["workspace:close"]({});
     expect(await controller["workspace:open"]({ path: "/projets/demo" })).toEqual({ root: "/projets/demo", name: "demo" });
-    expect(serviceLog).toEqual(["créés:/projets/demo", "libérés:/projets/demo", "créés:/projets/demo"]);
+    expect(serviceLog).toEqual(["créés:/projets/demo", "démarrés:/projets/demo", "libérés:/projets/demo", "créés:/projets/demo", "démarrés:/projets/demo"]);
   });
 });
 
@@ -620,13 +670,16 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
     await controller["task:cancel"]({ taskId: "t1" });
     await controller["workspace:open"]({ path: "/projets/autre" });
     // Les services du nouveau projet sont construits d'abord : si leur création échoue, le
-    // projet en cours reste utilisable. Les anciens ne sont libérés qu'ensuite.
+    // projet en cours reste utilisable. Les anciens ne sont libérés qu'ensuite, et les nouveaux ne
+    // démarrent (purge des sessions, reprise des tâches) qu'après.
     expect(serviceLog).toEqual([
       "créés:/projets/demo",
+      "démarrés:/projets/demo",
       "réponse:int-1:approve:developpeur",
       "annule:t1",
       "créés:/projets/autre",
       "libérés:/projets/demo",
+      "démarrés:/projets/autre",
     ]);
   });
 });

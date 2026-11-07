@@ -1,0 +1,23 @@
+{
+  "name": "@agent-studio/workflow",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*",
+    "acorn": "^8.18.0",
+    "zod": "^4.6.5",
+    "@agent-studio/extension-host": "workspace:*",
+    "esbuild": "^0.28.2",
+    "yaml": "^2.9.1",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/extension-manifest": "workspace:*",
+    "@agent-studio/core": "workspace:*"
+  },
+  "devDependencies": {}
+}

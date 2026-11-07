@@ -1,8 +1,9 @@
 import type { Evidence } from "@agent-studio/extension-api";
+import { coverageForChanges } from "@agent-studio/extension-api";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkCoverage, checkDependencies, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -10,6 +11,20 @@ const bar = (raw: string | null = null): QualityBar => {
   if ("error" in r) throw new Error(r.error);
   return r.bar;
 };
+
+describe("seuils sur le diff, pas sur la dette historique", () => {
+  const path = "Sources/Domain/Panier.swift";
+  const report = { files: [{ file: path, covered: 1, total: 2, score: 50, lines: [{ number: 8, covered: false }, { number: 20, covered: true }] }] };
+  const b = bar('{"coverage":{"core":90}}');
+  it("l'ancienne ligne non couverte ne bloque pas un ajout couvert", () => {
+    expect(checkCoverage(coverageForChanges(report, [{ path, lines: [20] }]).report, [path], b, true)).toEqual([]);
+  });
+  it("modifier la ligne non couverte déclenche le seuil et donne son numéro exact", () => {
+    expect(checkCoverage(coverageForChanges(report, [{ path, lines: [8, 20] }]).report, [path], b, true)).toEqual([
+      `Couverture du diff : ${path} à 50 % (minimum 90 %), 1 ligne(s) couverte(s) sur 2. Lignes non couvertes : 8.`,
+    ]);
+  });
+});
 
 describe("planScenarios", () => {
   const ids = [
@@ -194,7 +209,7 @@ describe("Barre de qualité hors de portée des agents", () => {
   it("le gel est passé à chaque lancement de spécialiste, pas seulement déclaré", async () => {
     // Une constante que personne ne transmet ne protège rien.
     const src = await readFile(new URL("../src/effects.ts", import.meta.url), "utf8");
-    expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS\]/);
+    expect(src).toMatch(/ctx\.agents\.run<"report_phase">\(effect\.role, brief, \{[^}]*readOnly: \[\.\.\.GELÉS[,\]]/);
   });
 });
 
@@ -493,11 +508,50 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
     const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
     const fin = await phaseEndMutation(inactive.ctx, state);
     expect(inactive.mutations()).toBe(0);
-    expect(fin).toEqual({ reasons: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
   });
 
   it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {
     const { ctx } = ctxWith({ ".agent-studio/quality.yaml": "couverture:\n  domaine: 150\n" }, null);
     await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/couverture\.domaine/);
+  });
+});
+
+describe("mutation et dérogations (D22 de docs/12, ADR 0065)", () => {
+  const F = "Sources/Domain/BolusCapPolicy.swift";
+  const report = { score: 75, files: [{ file: F, score: 75, killed: 3, total: 4, survived: [{ line: 4, operator: "EqualityOperator", replacement: "dose >= max" }] }] };
+
+  it("un mutant accordé en dérogation sort du score : la porte passe", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
+  });
+
+  it("une dérogation ne vaut que pour son mutant", () => {
+    expect(checkMutation(report, [F], bar(), [{ file: F, line: 5, operator: "EqualityOperator" }])).toHaveLength(1);
+  });
+
+  it("score recalculé sans les mutants accordés ; sans total connu, le score mesuré reste", () => {
+    const deux = { score: 50, files: [{ file: F, score: 50, killed: 2, total: 4, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(deux, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 66.7 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+    const sansTotal = { score: 50, files: [{ file: F, score: 50, survived: [{ line: 4, operator: "A" }, { line: 9, operator: "B" }] }] };
+    expect(checkMutation(sansTotal, [F], bar(), [{ file: F, line: 4, operator: "A" }])).toEqual([`Mutation : ${F} à 50 % (minimum 100 %) ; mutants survivants : ligne 9 (B).`]);
+  });
+
+  it("mutantsSousLeSeuil : un par survivant non accordé, dans les fichiers sous le seuil", () => {
+    expect(mutantsSousLeSeuil(report, [F], bar(), [])).toEqual([{ file: F, line: 4, operator: "EqualityOperator", replacement: "dose >= max" }]);
+    expect(mutantsSousLeSeuil(report, [F], bar(), [{ file: F, line: 4, operator: "EqualityOperator" }])).toEqual([]);
+  });
+});
+
+describe("couverture du diff et dérogations (arbitrage humain)", () => {
+  const F = "Sources/Domain/BolusCapPolicy.swift";
+
+  it("lignesSousLeSeuil : les lignes non couvertes de chaque fichier sous son seuil", () => {
+    const report = { files: [{ file: F, covered: 1, total: 3, score: 33.3, lines: [{ number: 2, covered: true }, { number: 3, covered: false }, { number: 5, covered: false }] }] };
+    expect(lignesSousLeSeuil(report, [F], bar('{"coverage":{"core":90}}'))).toEqual([{ file: F, lines: [3, 5] }]);
+  });
+
+  it("sansLignesExemptees : les lignes accordées sortent des lignes modifiées, fichier par fichier", () => {
+    const changes = [{ path: F, status: "modified", lines: [2, 3, 5] }, { path: "autre.swift", status: "added", lines: [3] }];
+    expect(sansLignesExemptees(changes, [{ file: F, line: 3 }])).toEqual([{ path: F, status: "modified", lines: [2, 5] }, { path: "autre.swift", status: "added", lines: [3] }]);
   });
 });

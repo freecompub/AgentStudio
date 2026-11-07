@@ -19,7 +19,6 @@ export function proposeProfile(indices: IndicesDuProjet): string | null {
   const a = (f: string) => indices.fichiers.includes(f);
   const dep = (d: string) => indices.dependances.includes(d);
 
-  if (a("Package.swift")) return MODELES.swift;
   if (dep("vitest")) return MODELES.typescript;
   if (a("pyproject.toml") || a("setup.cfg")) return MODELES.python;
   return null;
@@ -107,44 +106,6 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
 
 /** Modèles proposés. Ils doivent rester valides : un test les relit à chaque exécution. */
 const MODELES = {
-  swift: `id: swift
-detect: [Package.swift]
-tests:
-  command: [swift, test, --parallel, "--xunit-output={rapport}"]
-  report: junit-xml
-lint:
-  command: [swiftlint, lint, --quiet, --reporter, json, "--", "{fichiers}"]
-  report: swiftlint-json
-layout:
-  acceptanceTests: ["Tests/AcceptanceTests/**"]
-  unitTests: ["Tests/**"]
-  sources: ["Sources/**"]
-infrastructureModules: [Infrastructure, Interface, UI, API, SwiftUI, UIKit, AppKit]
-buildErrors:
-  pattern: '^(?<file>[^\\s:]+\\.swift):\\d+:\\d+: error: (?<message>.*)$'
-  missingSymbol: ["cannot find", "no such module", "has no member", "missing argument for parameter", "extra argument"]
-canaries:
-  - kind: passed
-    file: Tests/Canari{marque}Tests.swift
-    content: |
-      import XCTest
-      final class Canari{marque}Tests: XCTestCase { func test{marque}() { XCTAssertEqual(1, 1) } }
-  - kind: assertion
-    file: Tests/Canari{marque}Tests.swift
-    content: |
-      import XCTest
-      final class Canari{marque}Tests: XCTestCase { func test{marque}() { XCTAssertEqual(1, 2) } }
-  - kind: missing_symbol
-    file: Tests/Canari{marque}Tests.swift
-    content: |
-      import XCTest
-      final class Canari{marque}Tests: XCTestCase { func test{marque}() { fonctionAbsente{marque}() } }
-  - kind: syntax
-    file: Tests/Canari{marque}Tests.swift
-    content: |
-      import XCTest
-      final class Canari{marque}Tests: XCTestCase { func test{marque}() { :::
-`,
   typescript: `id: typescript
 detect: [package.json]
 tests:

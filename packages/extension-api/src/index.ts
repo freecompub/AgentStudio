@@ -12,6 +12,7 @@ export const API_VERSION = "0.1.0";
 export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
+export { coverageForChanges, baselineProblems } from "@agent-studio/stack-adapters";
 // Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 
@@ -67,6 +68,12 @@ export interface ManifestAgent {
    * associe chaque classe à un modèle réel. Absente : le modèle du projet, ou le runtime décide.
    */
   modelClass?: "strong" | "standard" | "light";
+  /**
+   * Mémoire de l'agent (ADR 0053) : `tache` (défaut) garde sa session d'un tour à l'autre dans la
+   * même tâche (ADR 0039) ; `tour` repart d'une session neuve à chaque appel — une lentille de
+   * revue qui doit juger sans se souvenir de son verdict précédent. Le script ne peut pas la changer.
+   */
+  memoire?: "tache" | "tour";
 }
 
 /** Skill : dossier contenant `SKILL.md` (ou fichier `.md`), relatif au dossier de l'extension. */
@@ -167,7 +174,7 @@ export interface WorkspaceApi {
   checkpoint(label: string): Promise<{ id: string }>;
   rollback(checkpointId: string): Promise<void>;
   /** Fichiers modifiés depuis un checkpoint. */
-  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted" }[]>;
+  changedFiles(checkpointId: string): Promise<{ path: string; status: "added" | "modified" | "deleted"; lines?: number[]; removed?: number }[]>;
   /** Empreinte des fichiers de test du projet, au sens de l'adaptateur de stack (gel des tests, D21). */
   fingerprintTests(): Promise<string>;
   /** Empreinte des fichiers correspondant aux motifs (`@stack:*` résolus), ex. tests d'acceptance gelés. */
@@ -183,6 +190,8 @@ export interface GitApi {
 }
 
 export interface StackApi {
+  /** Pile du projet, identifiant de son adaptateur (`typescript`, `dotnet`) : l'autorité sur ses commandes. */
+  readonly id: string;
   /** Emplacements de la stack du projet (tests d'acceptance, tests unitaires, sources). */
   readonly layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /**

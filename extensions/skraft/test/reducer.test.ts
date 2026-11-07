@@ -86,7 +86,7 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
   it("INIT + story invalide → escalade avec les raisons", () => {
     const { state, effects } = play([{ type: "INIT_FAILED", reasons: ["aucun critère"] }]);
     expect(state.stage).toBe("ESCALATED");
-    expect(effects).toEqual([{ kind: "askEscalation", reason: "Story invalide : aucun critère", options: ["retry", "abort"] }]);
+    expect(effects).toEqual([{ kind: "askEscalation", reason: "Préparation skraft refusée : aucun critère", options: ["retry", "abort"] }]);
     const retry = play([{ type: "INIT_FAILED", reasons: ["x"] }, DECIDE("retry")]);
     expect(retry.effects).toEqual([{ kind: "init", storyPath: "stories/us-12.md" }]);
   });
@@ -256,6 +256,18 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(answered.effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 1, feedback: [] }]);
   });
 
+  it("D19 (docs/12) : commit en échec, aucun rembobinage ; relancer refait le commit, continuer passe à la suite et trace", () => {
+    const approuve = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))];
+    const panne = play([...approuve, { type: "ENV_FAILURE", reason: "index.lock" } as Ev]);
+    expect(panne.state).toMatchObject({ stage: "ESCALATED", escalation: { from: "COMMIT" } });
+    expect(kinds(panne.effects)).toEqual(["askEscalation"]);
+    expect(kinds(transition(panne.state, DECIDE("retry")).effects)).toEqual(["commitPhase"]);
+    const suite = transition(panne.state, DECIDE("continue"));
+    expect(suite.state).toMatchObject({ phasesCompleted: expect.arrayContaining(["DESIGN"]), nonCommitees: ["DESIGN"], lastRejection: { gate: "commit" } });
+    expect(suite.state.rejections).toBe((panne.state.rejections ?? 0) + 1);
+    expect(transition(suite.state, CP("DISTILL")).state.lastRejection).toBeNull();
+  });
+
   it("REVIEW : APPROVED → COMMIT ; rapport consigné", () => {
     const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED"))]);
     expect(state.stage).toBe("COMMIT");
@@ -307,6 +319,19 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     ]);
   });
 
+  it("D17 (docs/12) : panne en ROUTE, escalade relancer / abandonner ; relancer repose les seules questions non posées", () => {
+    const route = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
+    const panne = play([...route, { type: "QUESTION_ASKED", id: "q1" } as Ev, { type: "ENV_FAILURE", reason: "disque plein" } as Ev]);
+    expect(panne.state.escalation).toEqual({ from: "ROUTE", reason: "disque plein" });
+    expect(panne.effects).toEqual([{ kind: "askEscalation", reason: "disque plein", options: ["retry", "abort"] }]);
+    // q1 a reçu sa réponse pendant l'escalade : elle n'est pas perdue.
+    const repondue = transition(panne.state, DECIDE("answer:q1", "par prise"));
+    expect(repondue.state.openQuestions[0]).toMatchObject({ id: "q1", answer: "par prise" });
+    const relance = transition(repondue.state, DECIDE("retry"));
+    expect(relance.state.stage).toBe("ROUTE");
+    expect(relance.effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
+  });
+
   it("réponse libre ou report ; la phase suivante démarre quand tout est tranché", () => {
     const base = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
     const one = play([...base, DECIDE("answer:q1", "par prise")]);
@@ -352,10 +377,47 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     ]);
   });
 
+  // D3 (docs/12) : pendant l'amendement d'un autre ADR, le fichier d'un ADR décidé le dit déjà.
+  it("chaque décision écrit aussitôt son statut dans le fichier, sans attendre les autres ADR", () => {
+    const deux: Ev = { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Proposed" }, { id: "ADR-009", path: "docs/adr/adr-009-alerte.md", status: "Proposed" }] };
+    const base = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, deux, LENSES(lens("APPROVED"))];
+    const un = play([...base, DECIDE("accept:ADR-008")]);
+    expect(un.state.stage).toBe("RATIFICATION");
+    expect(un.effects).toEqual([{ kind: "applyAdrStatuses", adrs: [{ path: "docs/adr/adr-008-plafond.md", status: "Accepted" }] }]);
+    const amende = play([...base, DECIDE("accept:ADR-008"), DECIDE("amend:ADR-009", "alerte par prise")]);
+    expect(kinds(amende.effects)).toEqual(["runSpecialist"]);
+    const fin = play([...base, DECIDE("accept:ADR-008"), DECIDE("reject:ADR-009")]);
+    expect(fin.effects).toEqual([
+      { kind: "applyAdrStatuses", adrs: [{ path: "docs/adr/adr-009-alerte.md", status: "Rejected" }] },
+      expect.objectContaining({ kind: "commitPhase", phase: "DESIGN" }),
+    ]);
+  });
+
+  // D2 (docs/12) : le rembobinage efface les ADR de la phase ; la liste les oublie aussi.
+  it("escalade puis « sauter » DESIGN : l'ADR proposé et effacé n'est pas ratifié, DESIGN n'est pas commitée", () => {
+    const rejete = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, withAdr, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })];
+    const esc = play(rejete);
+    expect(esc.state.stage).toBe("ESCALATED");
+    expect(esc.state.adrs).toEqual([]);
+    const saute = transition(esc.state, DECIDE("skip"));
+    expect(saute.state.stage).not.toBe("RATIFICATION");
+    expect(kinds(saute.effects)).not.toContain("askRatification");
+    expect(saute.state.skipPhases).toContain("DESIGN");
+  });
+
   it("amend → relance de skraft-architect-decide avec la demande", () => {
     const { state, effects } = play([...toRatification, DECIDE("amend:ADR-008", "préciser le plafond journalier")]);
     expect(state.stage).toBe("SPECIALIST");
     expect(effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 1, feedback: ["Amendement demandé sur ADR-008 : préciser le plafond journalier"] }]);
+  });
+
+  it("D18 (docs/12) : sauter efface le motif et les défauts de la phase ; relancer les garde", () => {
+    const escalated = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, REPORTED, GATE_FAIL, REPORTED, GATE_FAIL]);
+    expect(escalated.state.stage).toBe("ESCALATED");
+    expect(escalated.state.lastRejection).not.toBeNull();
+    const saute = transition({ ...escalated.state, reviewThreads: [{ id: "x#1.1", lens: "x", severity: "major", description: "d", target: "code", status: "open", round: 1 }] }, DECIDE("skip"));
+    expect(saute.state).toMatchObject({ lastRejection: null, reviewThreads: [] });
+    expect(transition(escalated.state, DECIDE("retry")).state.lastRejection).toEqual(escalated.state.lastRejection);
   });
 
   it("ESCALATED : retry relance la phase, skip la saute avec rollback, abort termine", () => {
@@ -393,6 +455,116 @@ const GREEN_OK = (acceptanceGreen: boolean, n = 1, passed: string[] = ["U > old"
 const FAIL = (reason = "motif"): Ev => ({ type: "STEP_FAIL", reason });
 const DISTILL_FROZEN: Ev[] = [CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc" } as Ev, LENSES(lens("APPROVED")), COMMITTED];
 const toDeliver = (level = "medium-hard") => [...toFirstPhase(level), ...researchPhase, ...designPhase, ...DISTILL_FROZEN, CP("DELIVER")];
+
+describe("Écarts au plan de test (ADR 0067, PLAN_DEVIATION de skraft-plugin v1.15.1)", () => {
+  const plan = { "ac-1": { couche: "Application", doublure: "dépôt en mémoire" } };
+  const avecPlan = (): Ev[] => [
+    ...toFirstPhase(), ...researchPhase, ...designPhase,
+    CP("DISTILL"), REPORTED, { ...GATE_OK, acceptanceHash: "acc", planDeTest: plan } as Ev, LENSES(lens("APPROVED")), COMMITTED,
+    CP("DELIVER"), PLANNED, STARTED,
+  ];
+  const ecart = { criterion: "ac-1", planned: "Application, dépôt en mémoire", actual: "Domaine, aucune", rule: "clean-architecture-testing : un invariant se teste dans le domaine" };
+
+  it("DISTILL garde la matrice du plan de test", () => {
+    expect(play(avecPlan()).state.planDeTest).toEqual(plan);
+  });
+
+  it("écart conforme : gardé quand la porte valide le pas, avec son auteur et son scénario", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan).toEqual([{ ...ecart, par: "skraft-test", scenario: "ac-1" }]);
+  });
+
+  it("écart non conforme : le pas est refusé avec le motif, rien n'est gardé", () => {
+    const r = play([...avecPlan(), { ...REP_TEST, planDeviations: [{ ...ecart, criterion: "ac-9" }] } as Ev]);
+    expect(r.state.lastRejection).toEqual({ gate: "DELIVER", reasons: ["Écart au plan pour « ac-9 » : aucun critère de ce nom dans la matrice de test-plan.md."] });
+    expect(r.effects.map((e) => e.kind)).toContain("rollback");
+    expect(r.state.ecartsAuPlan ?? []).toEqual([]);
+  });
+
+  it("scénario repris depuis son début : ses écarts sont effacés avec ses tests", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan).toHaveLength(1);
+    const repris = transition({ ...s, deliver: { ...s.deliver!, attempts: 99 } }, { type: "STEP_FAIL", reason: "vert impossible" } as Ev).state;
+    expect(repris.ecartsAuPlan ?? []).toEqual([]);
+  });
+
+  it("écart d'un pas que sa porte refuse : oublié avec le pas", () => {
+    const s = play([...avecPlan(), { ...REP_TEST, planDeviations: [ecart] } as Ev, { type: "STEP_FAIL", reason: "pas de nouveau test" } as Ev, REP_TEST, RED_OK(1)]).state;
+    expect(s.ecartsAuPlan ?? []).toEqual([]);
+  });
+});
+
+describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le retour qu'il avait", () => {
+  const Q: Ev = { type: "BLOCKER_REPORTED", question: "Par prise ?", choices: [] };
+
+  it("relancé après un rejet de porte : le motif reste", () => {
+    const r = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "RESEARCH", role: "skraft-researcher", attempt: 2, feedback: ["fichier de 55 lignes"] }]);
+  });
+
+  it("relancé pour un amendement : la demande reste", () => {
+    const r = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, { type: "GATE_OK", artifacts: [], adrs: [{ id: "ADR-008", path: "docs/adr/adr-008-plafond.md", status: "Proposed" }] } as Ev, LENSES(lens("APPROVED")), DECIDE("amend:ADR-008", "préciser le plafond journalier"), Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-decide", attempt: 1, feedback: ["Amendement demandé sur ADR-008 : préciser le plafond journalier"] }]);
+  });
+
+  it("DELIVER, pas refusé : le motif reste", () => {
+    const r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, FAIL("tests unitaires modifiés"), Q, DECIDE("oui")]);
+    expect(r.effects).toEqual([{ kind: "runDeliverAgent", step: "dev", scenarioId: "ac-1", attempt: 2, feedback: ["tests unitaires modifiés"] }]);
+  });
+});
+
+describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
+  const toReview = () => [
+    ...toFirstPhase(), ...researchPhase, ...designPhase,
+    CP("DISTILL"), REPORTED,
+    { ...GATE_OK, acceptanceHash: "avant", regressions: ["ancienne"] } as Ev,
+  ];
+
+  it("un refus de revue lève le gel, puis les portes enregistrent l'ensemble corrigé pour DELIVER", () => {
+    const refus = [...toReview(), LENSES(lens("CHANGES_REQUESTED", ["major"]))];
+    expect(play(refus).state).toMatchObject({ stage: "SPECIALIST", phase: "DISTILL", acceptanceHash: null, regressions: [] });
+    const correction = [...refus, REPORTED, { ...GATE_OK, acceptanceHash: "apres", regressions: ["nouvelle"] } as Ev];
+    expect(play(correction).state).toMatchObject({ stage: "REVIEW", acceptanceHash: "apres", regressions: ["nouvelle"] });
+    const approuve = [...correction, LENSES(lens("APPROVED")), COMMITTED, CP("DELIVER"), PLANNED];
+    expect(play(approuve).state.deliver?.acceptanceHash).toBe("apres");
+  });
+
+  it.each([
+    ["délai de revue", TIMEOUT("silence")],
+    ["panne de revue", { type: "ENV_FAILURE", reason: "runtime indisponible" } as Ev],
+    ["rejet définitif", LENSES(lens("REJECTED"))],
+  ])("%s : invalide le gel de DISTILL avant une reprise", (_nom, evenement) => {
+    expect(play([...toReview(), evenement]).state).toMatchObject({ acceptanceHash: null, regressions: [] });
+  });
+
+  // Défaut relevé en préparant docs/skraft-fonctionnement (13/10) : depuis D19, la panne du commit
+  // de DISTILL passait par leverGelDistill avant d'être reconnue comme une panne de commit. La phase
+  // est approuvée : rien ne sera refait, l'empreinte doit rester.
+  it.each(["retry", "continue"])("commit de DISTILL en échec, « %s » : l'empreinte et les non-régressions restent jusqu'à DELIVER", (choix) => {
+    const panne = [...toReview(), LENSES(lens("APPROVED")), { type: "ENV_FAILURE", reason: "index.lock" } as Ev];
+    expect(play(panne).state).toMatchObject({ stage: "ESCALATED", escalation: { from: "COMMIT" }, acceptanceHash: "avant", regressions: ["ancienne"] });
+    const suite = [...panne, DECIDE(choix), ...(choix === "retry" ? [COMMITTED] : []), CP("DELIVER"), PLANNED];
+    const s = play(suite).state;
+    expect(s).toMatchObject({ phase: "DELIVER", acceptanceHash: "avant", regressions: ["ancienne"] });
+    expect(s.deliver?.acceptanceHash).toBe("avant");
+  });
+
+  it("un deuxième refus à budget épuisé lève le gel avant rembobinage", () => {
+    const s = play([
+      ...toReview(), LENSES(lens("CHANGES_REQUESTED", ["major"])), REPORTED,
+      { ...GATE_OK, acceptanceHash: "apres" } as Ev,
+    ]).state;
+    const r = transition({ ...s, attempts: 99 }, LENSES(lens("CHANGES_REQUESTED", ["major"])));
+    expect(r.state).toMatchObject({ stage: "ESCALATED", acceptanceHash: null, regressions: [] });
+    expect(r.effects.map((e) => e.kind)).toContain("rollback");
+  });
+
+  it("un refus de revue en DELIVER conserve le gel d'acceptance", () => {
+    const s = play(toDeliver()).state;
+    const r = transition({ ...s, stage: "REVIEW" }, LENSES(lens("CHANGES_REQUESTED", ["major"])));
+    expect(r.state.acceptanceHash).toBe("acc");
+  });
+});
 
 describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   it("début de DELIVER : plan des scénarios par le code ; les non-régressions sont déjà faites ; empreinte gelée reprise", () => {
@@ -488,6 +660,39 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     ]);
     expect(refused.state.deliver?.attempts).toBe(0);
     expect(refused.state.deliver?.notes).toEqual(["Scénario ac-1 : nettoyage annulé (suite rouge)"]);
+    // D21 (docs/12) : compté et tracé, sous le nom de porte du workflow.
+    expect(refused.state.rejections).toBe((play([...strict, REP_DEV, GREEN_OK(true), REP_DEV]).state.rejections ?? 0) + 1);
+    expect(refused.state.lastRejection).toEqual({ gate: "pas refactor (ac-1)", reasons: ["suite rouge"] });
+  });
+
+  it("D21 (docs/12) : plafond de cycles et relance du classifieur comptés et tracés comme rejets", () => {
+    const cycles = (n: number) => Array.from({ length: n }, () => [REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(false)]).flat();
+    const avant = play([...toDeliver(), PLANNED, STARTED, ...cycles(19), REP_TEST, RED_OK(1), REP_DEV]);
+    const plafond = transition(avant.state, GREEN_OK(false));
+    expect(plafond.state.rejections).toBe((avant.state.rejections ?? 0) + 1);
+    expect(plafond.state.lastRejection).toEqual({ gate: "scénario ac-1", reasons: [expect.stringMatching(/reste rouge après 20 cycles/)] });
+    const inconnu = play([INITIALIZED, PROPOSED("très difficile")]);
+    expect(inconnu.state.rejections).toBe(1);
+    expect(inconnu.state.lastRejection).toEqual({ gate: "classifieur", reasons: ["Niveau de difficulté inconnu : très difficile"] });
+    // Le motif du classifieur n'est pas un « rejet précédent » pour la première phase.
+    expect(play([INITIALIZED, PROPOSED("très difficile"), PROPOSED("medium"), DECIDE("medium")]).state.lastRejection).toBeNull();
+  });
+
+  describe("D20 (docs/12) : une escalade de DELIVER rembobine ET fait oublier les sessions (ADR 0050)", () => {
+    const oubli = { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] };
+
+    it("panne d'environnement pendant un scénario", () => {
+      const r = play([...toDeliver(), PLANNED, STARTED, REP_TEST, { type: "ENV_FAILURE", reason: "Copilot injoignable" } as Ev]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s" }, oubli, expect.objectContaining({ kind: "askEscalation" })]);
+    });
+
+    it("scénario en échec au-delà du budget", () => {
+      const echec: Ev = { type: "SCENARIO_FAIL", reasons: ["acceptance rouge"] };
+      const r = play([...toDeliver(), PLANNED, STARTED, echec, echec, echec]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s" }, oubli, expect.objectContaining({ kind: "askEscalation" })]);
+    });
   });
 
   it("pas refusé : rollback au dernier point sûr, relance ciblée ; budget épuisé en mode tour → scénario repris en sessions séparées", () => {
@@ -510,8 +715,10 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const again = (st: Ev[]) => [...st, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2), { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] } as Ev];
     const esc = play(again(again([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }])));
     expect(esc.state.stage).toBe("ESCALATED");
+    // Rembobiner et oublier vont ensemble (ADR 0050, D20 de docs/12).
     expect(esc.effects).toEqual([
       { kind: "rollback", to: "cp-s" },
+      { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] },
       { kind: "askEscalation", reason: "Scénario ac-1 : Mutation : 95 %", options: ["retry", "skip", "abort"] },
     ]);
     const retried = transition(esc.state, DECIDE("retry"));
@@ -571,17 +778,37 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
       expect(r.effects.at(-1)).toEqual({ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION, "Mutation : 90 %"] });
     });
 
+    it("D14 (docs/12) : panne pendant la correction, « relancer » la reprend, sans replanifier DELIVER", () => {
+      const panne = play([...delivered, major, { type: "ENV_FAILURE", reason: "Copilot injoignable" } as Ev]);
+      expect(panne.state.stage).toBe("ESCALATED");
+      const relance = transition(panne.state, DECIDE("retry"));
+      expect(kinds(relance.effects)).not.toContain("planDeliver");
+      expect(relance.effects).toEqual([expect.objectContaining({ kind: "runDeliverAgent", step: "fix", feedback: expect.arrayContaining([defect]) })]);
+    });
+
     it("blocage pendant la correction : la réponse relance la correction avec ses défauts", () => {
       const blocked = play([...delivered, major, { type: "BLOCKER_REPORTED", question: "Valeur minimale ?", choices: [] }]);
       expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);
     });
 
-    it("changements demandés sans défaut blocker ni major : pas de correction à vide, réessai de la phase avec les verdicts", () => {
-      const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague" }] });
+    // D5 (docs/12) : tout est vert, rejouer la phase ne ferait travailler personne.
+    it("changements demandés avec des défauts mineurs seulement : correction ciblée, comme un majeur", () => {
+      const minorOnly = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "minor", description: "nom vague", target: "code" }] });
       const r = play([...delivered, minorOnly]);
-      expect(r.effects).toEqual([{ kind: "planDeliver" }]);
-      expect(r.state.lastRejection).toEqual({ gate: "revue", reasons: ["Revue « changements demandés » sans défaut bloquant ni majeur à corriger. Verdicts : cold-reader : CHANGES_REQUESTED (nom vague) ; test-integrity : APPROVED ; architecture : APPROVED ; quality-gates : APPROVED."] });
-      expect(r.state.deliver?.step).not.toBe("fix");
+      expect(r.effects).toEqual([
+        { kind: "rollback", to: "cp-s2" },
+        { kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: ["[cold-reader#1.mineur1, minor, code] nom vague", RESPONSE_INSTRUCTION] },
+      ]);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    it("changements demandés sans aucun défaut : personne à qui l'adresser, escalade sans consommer d'essai", () => {
+      const empty = LENSES({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [] });
+      const before = play(delivered).state.attempts;
+      const r = play([...delivered, empty]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.state.attempts).toBe(before);
+      expect(r.state.escalation?.reason).toMatch(/sans défaut à corriger.*cold-reader : CHANGES_REQUESTED/);
     });
   });
 
@@ -600,9 +827,59 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
   it("panne d'environnement pendant un scénario : retour au début du scénario et escalade, sans perdre les scénarios livrés", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), { type: "SCENARIO_OK", notes: [] } as Ev, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev];
     const r = play([...base, REP_TEST, { type: "ENV_FAILURE", reason: "swift introuvable" }]);
-    expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s2" }, { kind: "askEscalation", reason: "swift introuvable", options: ["retry", "skip", "abort"] }]);
+    expect(r.effects).toEqual([
+      { kind: "rollback", to: "cp-s2" },
+      { kind: "forgetSessions", roles: ["skraft-test", "skraft-dev"] },
+      { kind: "askEscalation", reason: "swift introuvable", options: ["retry", "skip", "abort"] },
+    ]);
     expect(r.state.deliver!.scenarios.map((x) => x.status)).toEqual(["done", "in_progress", "done"]);
     expect(transition(r.state, DECIDE("retry")).effects).toEqual([{ kind: "runDeliverAgent", step: "test", scenarioId: "ac-2", attempt: 1, feedback: [] }]);
+  });
+});
+
+/**
+ * D4 (docs/12) : une question de lentille n'est pas un échec du producteur. Elle part à l'humain ;
+ * la phase est rejouée avec la question et la réponse, sans consommer d'essai (DELIVER : seule la
+ * revue est relancée). Au-delà de deux questions de revue dans une phase, escalade.
+ */
+describe("question d'une lentille (D4)", () => {
+  const enRevueDesign = () => [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK];
+  const QUESTION: Ev = { type: "LENS_BLOCKED", lens: "architecture", question: "Le palier s'applique-t-il par ligne ou par commande ?", choices: ["par ligne", "par commande"] };
+
+  it("la question part à l'humain, au nom de la lentille", () => {
+    const r = play([...enRevueDesign(), QUESTION]);
+    expect(r.state.stage).toBe("BLOCKED");
+    expect(r.effects).toEqual([{ kind: "askBlocker", question: "Le palier s'applique-t-il par ligne ou par commande ?", choices: ["par ligne", "par commande"], lens: "architecture" }]);
+  });
+
+  it("la réponse fait rejouer la phase depuis la modélisation, sans consommer d'essai, avec la question et la réponse", () => {
+    const avant = play(enRevueDesign()).state;
+    const r = play([...enRevueDesign(), QUESTION, DECIDE("par ligne")]);
+    const motif = "Question de la revue (architecture) : Le palier s'applique-t-il par ligne ou par commande ? — Réponse de l'utilisateur : par ligne";
+    expect(r.effects).toEqual([{ kind: "runSpecialist", phase: "DESIGN", role: "skraft-architect-model", attempt: avant.attempts + 1, feedback: [motif] }]);
+    expect(r.state).toMatchObject({ stage: "SPECIALIST", attempts: avant.attempts, designStep: "model", blocker: null });
+    expect(r.state.answers).toContainEqual({ question: "Le palier s'applique-t-il par ligne ou par commande ?", answer: "par ligne" });
+    // Tracé comme un rejeu, avec sa vraie cause (docs/10 §4.3).
+    expect(r.state.rejections).toBe((avant.rejections ?? 0) + 1);
+    expect(r.state.lastRejection).toEqual({ gate: "question de revue", reasons: [motif] });
+  });
+
+  it("une troisième question de revue dans la phase : escalade", () => {
+    const tour = [REPORTED, REPORTED, GATE_OK];
+    const r = play([...enRevueDesign(), QUESTION, DECIDE("par ligne"), ...tour, { ...QUESTION, question: "Q2 ?" } as Ev, DECIDE("oui"), ...tour, { ...QUESTION, question: "Q3 ?" } as Ev]);
+    expect(r.state.stage).toBe("ESCALATED");
+    expect(r.state.escalation?.reason).toMatch(/Plus de 2 questions de revue.*Q3 \?/);
+  });
+
+  it("DELIVER : la réponse relance la revue seule, rien n'est rejoué à vide", () => {
+    const passedAll = ["U > old", "U > t1", "A > ac-1", "A > ac-2", "A > ac-3"];
+    const delivered = [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev, GATE_OK,
+    ];
+    const r = play([...delivered, QUESTION, DECIDE("par ligne")]);
+    expect(r.state.stage).toBe("REVIEW");
+    expect(kinds(r.effects)).toEqual(["runReview"]);
   });
 });
 
@@ -790,6 +1067,14 @@ describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les
     const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED"), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
     expect(state.stage).toBe("ESCALATED");
   });
+
+  it("un verdict REJECTED est tracé comme un rejet de la porte « revue », avec les lentilles qui rejettent (D11)", () => {
+    const avant = play([...jusquADistill, REPORTED, GATE_OK]).state.rejections ?? 0;
+    const { state } = play([...jusquADistill, REPORTED, GATE_OK, LENSES(lens("REJECTED", ["blocker"]), { lens: "architecture", verdict: "REJECTED", defects: [] })]);
+    expect(state.rejections).toBe(avant + 1);
+    expect(state.lastRejection).toEqual({ gate: "revue", reasons: ["cold-reader : REJECTED — défaut blocker", "architecture : REJECTED"] });
+    expect(state.escalation?.reason).toBe("Revue : verdict REJECTED (cold-reader : REJECTED — défaut blocker ; architecture : REJECTED)");
+  });
 });
 
 /**
@@ -856,7 +1141,8 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
 
     it("correction côté tests : vérifiée par le code, puis le développeur fait passer les tests rouges et traite ses défauts", () => {
       const verify = play([...delivered, review, { ...REP_TEST, responses: [{ defect: "cold-reader#1.1", status: "fixed" }] } as Ev]);
-      expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object) }]);
+      // Le défaut cite un fichier de test : le testeur peut le renforcer (D10 de docs/12).
+      expect(verify.effects).toEqual([{ kind: "verifyFixTests", scenarioId: "ac-2", since: "cp-s2", baseline: expect.any(Object), editable: ["Tests/GrilleTests.swift"] }]);
       // La réponse attend la validation du pas : un pas refusé est annulé, ses « corrigé » avec lui.
       expect(verify.state.reviewThreads?.find((t) => t.id === "cold-reader#1.1")?.status).toBe("open");
 
@@ -884,6 +1170,27 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       const run = next.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
       expect(run.step).toBe("fix-test");
       expect(run.feedback.join("\n")).toMatch(/aucun test ne couvre ATPayer/);
+    });
+
+    it("D7 (docs/12) : chaque défaut contesté ou renvoyé, sans test rouge à faire passer : le pas peut ne rien modifier", () => {
+      const onlyCode = LENSES({ lens: "quality-gates", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "nom vague", target: "code" }] });
+      const fix = play([...delivered, onlyCode]);
+      const conteste = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "contested", reason: "le contrat l'impose" }] } as Ev);
+      expect(conteste.effects).toEqual([expect.objectContaining({ kind: "verifyUnitGreen", mode: "fix", nothingToChange: true })]);
+      const corrige = transition(fix.state, { ...REP_DEV, responses: [{ defect: "quality-gates#1.1", status: "fixed" }] } as Ev);
+      expect(corrige.effects[0]).not.toHaveProperty("nothingToChange");
+      const muet = transition(fix.state, REP_DEV);
+      expect(muet.effects[0]).not.toHaveProperty("nothingToChange");
+    });
+
+    it("D12, D23 (docs/12) : une correction en échec reprend avec l'empreinte et la référence de son entrée, pas celles de l'essai effacé", () => {
+      const entree = play([...delivered, review]).state.deliver!;
+      const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [...passedAll, "U > t9"], passed: passedAll, unitTestsHash: "h9", fixTargets: ["U > t9"] };
+      const echec = play([...delivered, review, REP_TEST, fixTestOk, REP_DEV, FAIL("a"), REP_DEV, FAIL("b"), REP_DEV, FAIL("c")]);
+      const d = echec.state.deliver!;
+      expect(d.step).toBe("fix-test");
+      expect(d.unitTestsHash).toBe(entree.unitTestsHash);
+      expect(d.baseline).toEqual(entree.baseline);
     });
 
     it("la référence du contrat relevée à la revue accompagne la correction du développeur", () => {
@@ -938,6 +1245,87 @@ describe("Réducteur skraft — fils de défauts de revue (ADR 0046)", () => {
       expect(run.step).toBe("fix-test");
       expect(run.feedback.join("\n")).toMatch(/\[mutation#1\.1, major, test\].*ligne 25.*tue ce mutant/s);
       expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    // D5 (docs/12) : tous les scénarios sont verts, rejouer la phase ne ferait travailler personne.
+    const toutLivre = () => [
+      ...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev,
+      { type: "SCENARIO_STARTED", checkpointId: "cp-s2" } as Ev, { type: "SCENARIO_OK", notes: [] } as Ev,
+    ];
+
+    describe("ADR 0065 : mutant contesté comme équivalent, arbitré puis tracé", () => {
+      const M = { file: "src/Montant.cs", line: 25, operator: "EqualityOperator", replacement: "a >= b" };
+      const echec = (mutants = [M]): Ev => ({ type: "GATE_FAIL", gate: "mutation", reasons: ["Mutation : src/Montant.cs à 75 %."], mutants });
+      const conteste = (ids: string[]): Ev => ({ ...REP_TEST, responses: ids.map((defect) => ({ defect, status: "contested", reason: "équivalent" })) } as Ev);
+      const fixTestOk: Ev = { type: "STEP_OK", checkpointId: "cp-ft", all: [], passed: passedAll, unitTestsHash: "h1", fixTargets: [] };
+      const juge = (decision: "accepted" | "maintained", ids = ["mutation#1.1"]): Ev => ({ type: "MUTANTS_JUDGED", rulings: ids.map((defect) => ({ defect, decision, reason: "r" })) });
+
+      it("un défaut par mutant, qui garde le mutant exact", () => {
+        const r = play([...toutLivre(), echec()]);
+        expect(r.state.reviewThreads).toEqual([expect.objectContaining({ id: "mutation#1.1", mutant: M, target: "test" })]);
+      });
+
+      it("contesté : l'arbitre est appelé ; équivalent : dérogation tracée, la correction reprend", () => {
+        const arb = play([...toutLivre(), echec(), conteste(["mutation#1.1"]), fixTestOk]);
+        expect(arb.state.stage).toBe("ARBITRATION");
+        expect(arb.effects).toEqual([{ kind: "arbitrateMutants", threads: [expect.objectContaining({ id: "mutation#1.1", status: "contested" })] }]);
+        const ok = transition(arb.state, juge("accepted"));
+        expect(ok.state.derogations).toEqual([expect.objectContaining({ file: M.file, line: 25, operator: M.operator, par: "agent" })]);
+        expect(ok.state.arbitrages).toEqual([expect.objectContaining({ décision: "dérogation", par: "agent", élément: "src/Montant.cs:25 (EqualityOperator)" })]);
+        expect(kinds(ok.effects)).toEqual(["scenarioGate"]);
+      });
+
+      it("non équivalent : l'humain tranche ; « corriger » renvoie le testeur, sans recours", () => {
+        const arb = play([...toutLivre(), echec(), conteste(["mutation#1.1"]), fixTestOk, juge("maintained")]);
+        expect(arb.effects).toEqual([{ kind: "askMutationArbitration", thread: expect.objectContaining({ id: "mutation#1.1" }), avis: expect.stringMatching(/non équivalent/) }]);
+        const corr = transition(arb.state, DECIDE("corriger:mutation#1.1", "un test le tue"));
+        expect(corr.state.arbitrages!.map((a) => [a.par, a.décision])).toEqual([["agent", "à corriger"], ["humain", "à corriger"]]);
+        const run = corr.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+        expect(run.step).toBe("fix-test");
+        expect(run.feedback.join("\n")).toMatch(/tranché par l'humain/);
+      });
+
+      it("plafond : au-delà de deux dérogations de l'arbitre, l'humain tranche", () => {
+        const trois = [M, { ...M, line: 26 }, { ...M, line: 27 }];
+        const ids = ["mutation#1.1", "mutation#1.2", "mutation#1.3"];
+        const r = play([...toutLivre(), echec(trois), conteste(ids), fixTestOk, juge("accepted", ids)]);
+        expect(r.state.derogations).toHaveLength(2);
+        expect(r.effects).toEqual([{ kind: "askMutationArbitration", thread: expect.objectContaining({ id: "mutation#1.3" }), avis: expect.stringMatching(/plafond/) }]);
+        const fin = transition(r.state, DECIDE("derogation:mutation#1.3", "équivalent aussi"));
+        expect(fin.state.derogations!.map((x) => x.par)).toEqual(["agent", "agent", "humain"]);
+      });
+    });
+
+    it("couverture du diff insuffisante en fin de DELIVER : défaut adressé au testeur, sans relancer la phase (D5)", () => {
+      const motif = "Couverture du diff : src/Panier.cs à 62 % (minimum 80 %). Lignes non couvertes : 14.";
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "couverture du diff", reasons: [motif] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix-test");
+      expect(run.feedback.join("\n")).toMatch(/\[couverture#1\.1, major, test\].*Lignes non couvertes : 14\..*test qui exerce/s);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+      expect(r.state.attempts).toBe(1);
+    });
+
+    it("suite finale en échec en fin de DELIVER : défaut adressé au développeur, sans relancer la phase (D5)", () => {
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "suite finale", reasons: ["Tests en échec : tests/PanierTests.cs > Total."] }]);
+      const run = r.effects.find((x) => x.kind === "runDeliverAgent") as { step: string; feedback: string[] };
+      expect(run.step).toBe("fix");
+      expect(run.feedback.join("\n")).toMatch(/\[suite finale#1\.1, major, code\].*PanierTests\.cs > Total.*ne modifie pas ce test/s);
+      expect(kinds(r.effects)).not.toContain("planDeliver");
+    });
+
+    it("couverture insuffisante, budget épuisé : escalade, pas de correction de plus", () => {
+      const motif = "Couverture du diff : src/Panier.cs à 62 % (minimum 80 %). Lignes non couvertes : 14.";
+      const epuise = { ...play(toutLivre()).state, attempts: 2 };
+      const r = transition(epuise, { type: "GATE_FAIL", gate: "couverture du diff", reasons: [motif] });
+      expect(r.state.stage).toBe("ESCALATED");
+    });
+
+    it("aucun livrable en fin de DELIVER : personne à qui l'adresser, escalade sans consommer d'essai", () => {
+      const r = play([...toutLivre(), { type: "GATE_FAIL", gate: "livrables", reasons: ["Aucun livrable produit pendant la phase DELIVER."] }]);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.state.attempts).toBe(0);
+      expect(kinds(r.effects)).toContain("askEscalation");
     });
 
     it("mutation réussie en fin de DELIVER : ses faits vont aux lentilles", () => {

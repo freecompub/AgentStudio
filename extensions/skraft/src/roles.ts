@@ -9,7 +9,9 @@
  * PROVENANCE — la substance des lentilles (`agents/skraft-lens-*.agent.md`) est reprise de
  * **skraft-plugin** (GPL-3.0-or-later), fichiers
  * `com.anthropic.claude-code/agents/{cold-reader,test-integrity,architecture-boundaries,quality-gates}-lens.md` ;
- * les skills de `skills/` sont reprises du tag `v1.6.1`. Voir `docs/licences/autorisation-skraft.md`.
+ * les skills de `skills/` sont reprises du tag `v1.6.1`, sauf `architecture-patterns`,
+ * `clean-architecture-testing` et les `clean-architecture-<langage>`, du tag `v1.15.1`. Voir
+ * `docs/licences/autorisation-skraft.md`.
  *
  * ADAPTATION — les portes et seuils de l'original sont nommés là-bas dans le prompt (G4, G7, G11…) ;
  * ici ce sont **le code qui les exécute** et `ctx.stack` qui les mesure, de sorte qu'une lentille
@@ -17,6 +19,10 @@
  * (`contract-fidelity`, `mock-fidelity`) ne sont pas reprises : elles sont conditionnelles et liées
  * à une pile précise, ce que l'extension ne doit pas être.
  */
+import { SKILLS_D_ARCHITECTURE } from "./architecture.js";
+
+// Écarts au plan de test (ADR 0067) : le contenu partagé dit la règle, la consigne dit l'outil.
+const ECARTS_AU_PLAN = "Le plan de test est `.skraft/<slug>/distill/test-plan.md`. Un écart à sa matrice se déclare dans le champ planDeviations de report_phase (ADR 0067) : le code le vérifie contre la matrice et refuse le pas s'il ne reprend pas la ligne du critère.";
 const PASSATION = "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.";
 
 /**
@@ -47,12 +53,14 @@ recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.`,
   test: `${PASSATION}
 ${SKILLS_ARBITRATION}
 Le scénario en cours, son test d'acceptance et les tests déjà écrits sont dans le dossier de passation. Les tests d'acceptance
-sont gelés : toute écriture y est refusée.`,
+sont gelés : toute écriture y est refusée.
+${ECARTS_AU_PLAN}`,
 
   dev: `${PASSATION}
 ${SKILLS_ARBITRATION}
 Le test à faire passer est indiqué dans le dossier de passation. Tous les tests sont gelés pendant ton tour : une modification,
-même hors des outils d'écriture, est détectée par empreinte et annule le tour.`,
+même hors des outils d'écriture, est détectée par empreinte et annule le tour.
+${ECARTS_AU_PLAN}`,
 
   lens: `Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.
 Rends ton verdict avec l'outil submit_lens_verdict.
@@ -60,7 +68,12 @@ Un comportement vérifié par un test d'acceptance n'appelle pas de test unitair
 manquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).
 Donne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois
 un test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :
-accepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.`,
+accepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.
+Si juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec
+report_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.`,
+
+  mutationArbiter: `Rends ta décision avec l'outil submit_lens_verdict : lens « mutation-arbiter », verdict APPROVED, aucun défaut, et pour
+chaque défaut de mutation listé un arbitrage (rulings) : accepted si le mutant est équivalent, maintained sinon, avec ta raison.`,
 };
 
 /**
@@ -90,6 +103,7 @@ export const ROLE_MODEL_CLASS = {
   acceptance: "standard",
   test: "standard",
   dev: "standard",
+  mutationArbiter: "standard",
 } as const;
 
 /** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */
@@ -106,15 +120,19 @@ export const LENS_MODEL_CLASS = {
  */
 export const ROLE_SKILLS = {
   researcher: {},
-  architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions"] },
-  architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns"] },
-  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline"] },
-  test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing"] },
-  dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog"] },
+  architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions", ...SKILLS_D_ARCHITECTURE] },
+  architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns", ...SKILLS_D_ARCHITECTURE] },
+  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
+  test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing", ...SKILLS_D_ARCHITECTURE] },
+  dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog", ...SKILLS_D_ARCHITECTURE] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },
 } as const;
 
-/** Skills reprises de skraft-plugin v1.6.1 (catégories « méthode » et « critères de revue », SPEC-skraft §4.2). */
+/**
+ * Skills reprises de skraft-plugin (catégories « méthode » et « critères de revue », SPEC-skraft §4.2) :
+ * v1.6.1, sauf `architecture-patterns`, `clean-architecture-testing` et les `clean-architecture-<langage>`,
+ * de v1.15.1 (docs/licences/autorisation-skraft.md).
+ */
 export const SKILLS = [
   "architecture-patterns",
   "architecture-decisions",
@@ -125,6 +143,8 @@ export const SKILLS = [
   "craft-discipline",
   "test-refactoring-catalog",
   "clean-architecture-testing",
+  // Reprises de v1.15.1 : l'appel de skraft désigne laquelle charger (`--archi`, `architecture.ts`).
+  ...SKILLS_D_ARCHITECTURE,
   "adversarial-review-lenses",
   "acceptance-review-criteria",
   "architecture-review-criteria",

@@ -45,13 +45,28 @@ describe("Renderer", () => {
   it("demande une reconnexion par navigateur quand le jeton est un PAT classique, et affiche le code", async () => {
     api
       .handle("auth:status", () => ({ loggedIn: true, user: "octo", tokenKind: "classic-pat", copilotCompatible: false, hostname: "github.com" }))
-      .handle("auth:login", () => new Promise(() => {}));
+      .handle("auth:login", () => new Promise(() => {}))
+      .handle("shell:open-device-page", () => undefined);
     render(<App />);
     expect(await screen.findByText(/jeton personnel classique/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Se connecter avec GitHub" }));
     act(() => api.emit("auth:device-code", { code: "AB12-CD34", verificationUrl: "https://github.com/login/device" }));
     expect(await screen.findByText("AB12-CD34")).toBeTruthy();
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "shell:open-device-page", input: {} }));
+  });
+
+  it("si le navigateur ne s'ouvre pas, conserve le code et montre l'adresse Enterprise et l'erreur", async () => {
+    api
+      .handle("auth:status", () => ({ loggedIn: false, hostname: "byb.ghe.com" }))
+      .handle("auth:login", () => new Promise(() => {}))
+      .handle("shell:open-device-page", () => { throw new Error("Navigateur indisponible"); });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Se connecter avec GitHub" }));
+    act(() => api.emit("auth:device-code", { code: "AB12-CD34", verificationUrl: "https://byb.ghe.com/login/device" }));
+    expect(await screen.findByText("AB12-CD34")).toBeTruthy();
+    expect(await screen.findByText("https://byb.ghe.com/login/device")).toBeTruthy();
+    expect(await screen.findByText(/Navigateur indisponible/)).toBeTruthy();
   });
 
   it("propose de choisir un projet quand aucun n'est ouvert", async () => {

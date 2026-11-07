@@ -27,6 +27,13 @@ describe("parseStrykerReport", () => {
     expect(r.files.find((f) => f.file === "src/Tarification.Domaine/GrilleDePaliers.cs")).toMatchObject({ score: 100, survived: [] });
   });
 
+  it("tués et jugés par fichier, et remplacement de chaque survivant : de quoi retirer un mutant du score (D22 de docs/12)", async () => {
+    const montant = parseStrykerReport(await reel(), "/projet").files.find((f) => f.file === "src/Tarification.Domaine/Montant.cs")!;
+    expect(montant).toMatchObject({ killed: 10, total: 15 });
+    expect(montant.survived.every((s) => typeof s.replacement === "string" || s.replacement === undefined)).toBe(true);
+    expect(montant.survived.some((s) => typeof s.replacement === "string" && s.replacement.length > 0)).toBe(true);
+  });
+
   it("un fichier sans mutant testable est absent : rien n'y a été mesuré", async () => {
     // LigneDePanier.cs : trois mutants, tous en erreur de compilation.
     const r = parseStrykerReport(await reel(), "/projet");

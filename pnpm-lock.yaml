@@ -23,6 +23,9 @@ importers:
       '@agent-studio/runtime-copilot':
         specifier: workspace:*
         version: link:packages/runtime-copilot
+      '@agent-studio/workflow':
+        specifier: workspace:*
+        version: link:packages/workflow
       '@agent-studio/workspace':
         specifier: workspace:*
         version: link:packages/workspace
@@ -83,12 +86,21 @@ importers:
       '@agent-studio/task-engine':
         specifier: workspace:*
         version: link:../../packages/task-engine
+      '@agent-studio/workflow':
+        specifier: workspace:*
+        version: link:../../packages/workflow
       '@agent-studio/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
       '@github/copilot-sdk':
         specifier: 1.0.14
         version: 1.0.14
+      acorn:
+        specifier: ^8.18.0
+        version: 8.18.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -123,9 +135,6 @@ importers:
       electron-vite:
         specifier: ^5.0.0
         version: 5.0.0(vite@7.3.6(@types/node@24.13.6)(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1))
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
       jsdom:
         specifier: ^30.1.1
         version: 30.1.1
@@ -301,7 +310,64 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/workflow:
+    dependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../extension-api
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../extension-host
+      '@agent-studio/extension-manifest':
+        specifier: workspace:*
+        version: link:../extension-manifest
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../task-engine
+      acorn:
+        specifier: ^8.18.0
+        version: 8.18.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
   packages/workspace: {}
+
+  tests/workflow-skraft:
+    devDependencies:
+      '@agent-studio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agent-studio/extension-api':
+        specifier: workspace:*
+        version: link:../../packages/extension-api
+      '@agent-studio/extension-host':
+        specifier: workspace:*
+        version: link:../../packages/extension-host
+      '@agent-studio/stack-adapters':
+        specifier: workspace:*
+        version: link:../../packages/stack-adapters
+      '@agent-studio/task-engine':
+        specifier: workspace:*
+        version: link:../../packages/task-engine
+      '@agent-studio/workflow':
+        specifier: workspace:*
+        version: link:../../packages/workflow
+      '@agent-studio/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
 
 packages:
 

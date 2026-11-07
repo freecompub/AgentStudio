@@ -17,6 +17,8 @@ const common = { bundle: true, platform: "node", format: "esm", target: "node22"
 const BUILT_IN = [{ dir: "extensions/tdd", entry: "src/entry.ts", manifest: "src/manifest.ts", exportName: "manifest" }];
 
 await build({ ...common, entryPoints: [join(repo, "packages/extension-host/src/child/entry.ts")], outfile: join(out, "extension-host/extension-child.mjs") });
+// Runtime des processus enfants des workflows en dossier (ADR 0055) : même lanceur, même isolation.
+await build({ ...common, entryPoints: [join(repo, "packages/workflow/src/hote/enfant-entree.ts")], outfile: join(out, "workflow-host/workflow-child.mjs") });
 
 const tmp = await mkdtemp(join(tmpdir(), "agent-studio-manifests-"));
 try {

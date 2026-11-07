@@ -13,6 +13,7 @@
  * Les demandes déjà corrigées restent dans le fil, en rappel : l'agent ne doit pas défaire une
  * correction en satisfaisant la critique suivante.
  */
+import type { MutantSurvivant } from "./deliver.js";
 import type { DefectTarget, LensDefect, LensVerdict } from "./review.js";
 
 export type ThreadStatus =
@@ -36,7 +37,8 @@ export type ThreadStatus =
 export interface DefectThread {
   id: string;
   lens: string;
-  severity: "blocker" | "major";
+  /** `minor` : seulement en fin de DELIVER, quand la revue ne demande rien d'autre (`minorThreads`). */
+  severity: "blocker" | "major" | "minor";
   description: string;
   file?: string;
   line?: number;
@@ -50,6 +52,10 @@ export interface DefectThread {
   round: number;
   /** Déjà renvoyé une fois à l'autre agent (« hors de mon périmètre », ADR 0047). */
   rerouted?: boolean;
+  /** Défaut de la porte de mutation : le mutant exact, que l'arbitrage peut exempter (ADR 0065). */
+  mutant?: MutantSurvivant;
+  /** Défaut de la couverture du diff : le fichier et ses lignes, que l'humain peut exempter. */
+  couverture?: { file: string; lines: number[] };
 }
 
 export interface DefectResponse {
@@ -78,9 +84,26 @@ export function effectiveTarget(d: LensDefect, classify: (file: string) => Defec
   return { target: declared };
 }
 
+/**
+ * Gravité maximale par lentille (4.4 de docs/15). Repris de skraft-plugin v1.6.1, cold-reader-lens :
+ * « Maximum severity for this lens is `medium`. Nothing here is a `blocker`. » La clarté ne bloque
+ * jamais seule une phase : un `blocker` devient `major` et un `REJECTED` un `CHANGES_REQUESTED`.
+ */
+const GRAVITE_MAX: Partial<Record<string, "major">> = { "cold-reader": "major" };
+
+function plafonner(l: LensVerdict): LensVerdict {
+  const max = GRAVITE_MAX[l.lens];
+  if (!max) return l;
+  return {
+    ...l,
+    verdict: l.verdict === "REJECTED" ? "CHANGES_REQUESTED" : l.verdict,
+    defects: l.defects.map((d) => (d.severity === "blocker" ? { ...d, severity: max, severityNote: `gravité déclarée « blocker », plafonnée à « ${max} » pour la lentille ${l.lens}` } : d)),
+  };
+}
+
 /** Identifiants et cibles effectives, attribués par le code : un identifiant inventé par un modèle n'est pas stable. */
 export function numberDefects(lenses: LensVerdict[], round: number, classify: (file: string) => DefectTarget | null): LensVerdict[] {
-  return lenses.map((l) => ({
+  return lenses.map(plafonner).map((l) => ({
     ...l,
     defects: l.defects.map((d, i) => {
       const { target, note } = effectiveTarget(d, classify);
@@ -145,6 +168,29 @@ export function reviewRound(prev: DefectThread[], lenses: LensVerdict[], round: 
 }
 
 /**
+ * Défauts mineurs d'une revue, en fils (D5 de `docs/12`). Une revue de DELIVER « changements
+ * demandés » qui ne relève que des mineurs n'a aucun fil actif : rejouer la phase, où tout est déjà
+ * vert, ne ferait travailler personne. Ses mineurs sont alors corrigés comme des majeurs.
+ */
+export function minorThreads(lenses: LensVerdict[], round: number): DefectThread[] {
+  return lenses.flatMap((l) =>
+    l.defects
+      .filter((d) => d.severity === "minor")
+      .map((d, i) => ({
+        id: `${l.lens}#${round}.mineur${i + 1}`,
+        lens: l.lens,
+        severity: "minor" as const,
+        description: d.description,
+        ...(d.file ? { file: d.file } : {}),
+        ...(d.line ? { line: d.line } : {}),
+        target: d.target ?? "code",
+        status: "open" as const,
+        round,
+      })),
+  );
+}
+
+/**
  * Réponses de l'agent aux fils qui le concernent. Contester sans raison ne vaut rien.
  *
  * « Hors de mon périmètre » (ADR 0047) : le défaut est juste mais revient à l'autre agent.
@@ -167,6 +213,22 @@ export function applyResponses(
     if (r.status === "outOfScope" && reroute && !t.rerouted) return { ...t, target: reroute(t), status: "open", rerouted: true, contestation: reason };
     return { ...t, status: t.status === "maintained" ? "recontested" : "contested", contestation: reason };
   });
+}
+
+/**
+ * Correction où l'agent ne modifie rien (D7 de docs/12) : permis seulement si **chaque** défaut actif
+ * qui le concerne reçoit une contestation ou un renvoi motivés. La lentille arbitrera ; sans cela,
+ * la règle « aucun fichier modifié » refuserait la contestation que sa consigne lui propose.
+ */
+export function allDisputed(threads: DefectThread[], responses: readonly DefectResponse[], concerns: (t: DefectThread) => boolean): boolean {
+  const mine = threads.filter((t) => isActive(t) && concerns(t));
+  return (
+    mine.length > 0 &&
+    mine.every((t) => {
+      const r = responses.find((x) => x.defect === t.id);
+      return t.status !== "humanMaintained" && (r?.status === "contested" || r?.status === "outOfScope") && !!r.reason?.trim();
+    })
+  );
 }
 
 /**

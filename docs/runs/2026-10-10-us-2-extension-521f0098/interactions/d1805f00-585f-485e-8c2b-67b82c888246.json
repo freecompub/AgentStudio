@@ -1,0 +1,32 @@
+{
+  "id": "d1805f00-585f-485e-8c2b-67b82c888246",
+  "taskId": "521f0098-3032-4c26-9846-0f2c530be45b",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question ouverte (US-2)",
+  "detail": "Les paliers sont-ils les mêmes pour toutes les références, ou définis par référence ?",
+  "options": [
+    {
+      "id": "answer:q1",
+      "label": "Répondre"
+    },
+    {
+      "id": "defer:q1",
+      "label": "Reporter"
+    }
+  ],
+  "freeText": true,
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T18:48:46.031Z",
+  "status": "answered",
+  "answer": {
+    "option": "answer:q1",
+    "comment": "Les mêmes paliers s'appliquent à toutes les références.",
+    "answeredAt": "2026-10-10T18:48:46.034Z"
+  }
+}

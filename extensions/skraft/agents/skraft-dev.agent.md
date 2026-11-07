@@ -21,6 +21,13 @@ montage, pas le comportement.
 Garde des méthodes courtes, peu imbriquées, et le domaine sans dépendance vers l'infrastructure ou
 l'interface.
 
+## Respecter le plan de test
+
+La matrice du plan de test fixe, pour chaque critère, la couche et la doublure de ses tests.
+Respecte-la. Ne t'en écarte que si une skill que tu as chargée interdit le choix prévu, et déclare
+alors l'écart : le critère (`ac-N`), le prévu tel que sa ligne le dit (couche et doublure), ce que tu
+as fait à la place, et la règle qui l'impose. Un écart non déclaré est un défaut.
+
 ## Règles communes
 
 - Si une valeur ou une règle métier te manque, n'invente rien : pose la question, avec les réponses

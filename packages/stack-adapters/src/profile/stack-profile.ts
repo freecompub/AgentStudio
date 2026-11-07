@@ -17,7 +17,7 @@ import { JETON_RAPPORT } from "./tokens.js";
  * Lecteurs de rapport fournis par l'application : un profil les désigne, il n'en invente pas.
  * N'y figurent que les formats réellement lus — en ajouter un demande d'écrire son lecteur.
  */
-export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "swiftlint-json", "muter-json", "stryker-json"] as const;
+export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "stryker-json"] as const;
 
 /**
  * Lecteurs de couverture. Cobertura seul pour l'instant, et c'est un choix : `dotnet test`,
@@ -35,8 +35,8 @@ export type ReportReader = (typeof REPORT_READERS)[number];
  */
 const LECTEURS_PAR_SECTION = {
   tests: ["junit-xml", "vitest-json"],
-  lint: ["eslint-json", "swiftlint-json"],
-  mutation: ["muter-json", "stryker-json"],
+  lint: ["eslint-json"],
+  mutation: ["stryker-json"],
 } as const satisfies Record<"tests" | "lint" | "mutation", readonly ReportReader[]>;
 
 const commande = z
@@ -77,7 +77,7 @@ const canari = z
       .refine((f) => !f.split(/[\\/]/).includes(".."), "`file` ne doit pas contenir `..` : un canari s'écrit dans le projet, jamais hors de lui.")
       .refine(
         (f) => f.includes(JETON_MARQUE),
-        // Sans marque dans le nom, `file: Tests/MesTests.swift` écraserait ce fichier pour la
+        // Sans marque dans le nom, `file: test/mes.test.ts` écraserait ce fichier pour la
         // durée du diagnostic puis le supprimerait : les canaris suivants s'exécuteraient contre
         // une suite amputée, et les constats décriraient un projet qui n'est pas celui de l'utilisateur.
         `\`file\` doit contenir la marque ${JETON_MARQUE}, sans quoi le canari écraserait un fichier existant du projet.`,
@@ -95,7 +95,7 @@ const canari = z
 const schema = z
   .object({
     id: z.string().min(1),
-    /** Fichiers dont la présence signale cette stack (`pyproject.toml`, `Package.swift`…). */
+    /** Fichiers dont la présence signale cette stack (`pyproject.toml`, `package.json`…). */
     detect: z.array(z.string().min(1)).min(1),
     tests: commande,
     lint: commande.optional(),

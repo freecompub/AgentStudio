@@ -41,6 +41,12 @@ function refusDeShell(deps: TaskAgentGuardDeps): string {
   return `Le shell est désactivé pour ce rôle, sans exception : aucune commande ne peut être autorisée, même en lecture. Utilise tes outils — ${sorties.join(" ; ")}.`;
 }
 
+/** Chemin relatif sous `.agent-studio/workflows/`, sans tenir compte de la casse (ADR 0055). */
+export function estDossierDeWorkflow(rel: string): boolean {
+  const s = rel.split("/").map((x) => x.toLowerCase());
+  return s[0] === ".agent-studio" && s[1] === "workflows";
+}
+
 export function createTaskAgentGuard(deps: TaskAgentGuardDeps): ToolCallGuard {
   // Chemins réels des deux côtés : un lien sortant placé dans le projet ne doit pas passer.
   const root = realPath(deps.root);
@@ -61,6 +67,10 @@ export function createTaskAgentGuard(deps: TaskAgentGuardDeps): ToolCallGuard {
           // même fichier, et un refus qui ne le reconnaît pas ne refuse rien.
           if (r === null || r === "" || r.split("/").some((seg) => seg.toLowerCase() === ".git"))
             return deny(`Écriture interdite : ${req.path ?? "(chemin inconnu)"}`);
+          // Dossier d'un workflow (ADR 0055) : gelé pour tout agent, sans la casse comme `.git`.
+          // Un agent qui le modifierait changerait les contrôles et les droits qu'on lui applique.
+          if (estDossierDeWorkflow(r))
+            return deny(`Écriture interdite : ${r} appartient au dossier d'un workflow, gelé pendant la tâche — il contient les contrôles et les droits qui te sont appliqués.`);
           if (!matchesAny(deps.writable, r))
             return deny(
               deps.writable.length

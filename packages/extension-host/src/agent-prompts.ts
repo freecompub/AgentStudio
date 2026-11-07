@@ -108,11 +108,11 @@ export function contractBlock(a: {
   if (a.tools.includes("run_tests")) {
     lines.push("- Lance les tests uniquement avec l'outil `run_tests` : son résultat fait foi et il est enregistré comme preuve.");
     // Les skills sont reprises telles quelles (ADR 0024 §6) d'un cadre .NET : elles font lancer
-    // `dotnet test`, `dotnet build`, et citent `[Theory]`. Sur un projet Swift ou TypeScript ces
+    // `dotnet test`, `dotnet build`, et citent `[Theory]`. Sur un projet TypeScript ces
     // commandes n'existent pas. Proposer `run_tests` ne suffit pas — ça couvre les tests et laisse
     // la compilation à l'agent, avec une commande fausse. Le contrat retire donc la commande.
     lines.push(
-      "- N'exécute aucune commande de compilation ou de test toi-même. Celles que citent les skills (`dotnet test`, `dotnet build`, `swift build`…) illustrent d'autres projets et ne valent pas forcément ici : `run_tests` connaît celle de la pile.",
+      "- N'exécute aucune commande de compilation ou de test toi-même. Celles que citent les skills (`dotnet test`, `dotnet build`…) illustrent d'autres projets et ne valent pas forcément ici : `run_tests` connaît celle de la pile.",
     );
   }
   if (a.tools.includes("run_lint"))

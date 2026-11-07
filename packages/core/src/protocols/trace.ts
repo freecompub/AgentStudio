@@ -32,9 +32,19 @@ export type TraceEntry = {
   | { kind: "usage"; modèle?: string; entrée?: number; sortie?: number; nanoAiu?: number }
   | { kind: "contexte"; occupés: number; limite: number; système?: number; conversation?: number; outils?: number; messages?: number }
   /** Transition de la machine à états : l'événement reçu, l'état obtenu, les effets déclenchés. */
-  | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[] }
+  | { kind: "transition"; événement: string; stade?: string; phase?: string; essais?: number; effets: string[]; /** Calcul de la transition : coût du moteur (rejeu compris). */ duréeMs?: number }
+  /**
+   * Effet exécuté (docs/10 P2) : sa durée, et comment il s'est terminé — `attente` quand il a posé
+   * une question à l'humain et rend la main. Sépare le temps des agents de celui du code.
+   */
+  | { kind: "effet"; effet: string; phase?: string; duréeMs: number; issue: "ok" | "erreur" | "attente" }
   /** Rejet par une porte ou une revue, avec ses motifs entiers. */
   | { kind: "rejet"; porte: string; motifs: string[] }
+  /**
+   * Arbitrage d'un défaut de porte contesté (D22 de docs/12, ADR 0065) : qui a tranché (agent ou
+   * humain), quoi (l'élément exact), et pourquoi. Une dérogation exempte cet élément de la porte.
+   */
+  | { kind: "arbitrage"; porte: string; élément: string; contestation: string; décision: "dérogation" | "à corriger"; par: "agent" | "humain"; raison: string }
   /**
    * Livrable archivé **avant** qu'un rollback ne l'efface (ADR 0038).
    *

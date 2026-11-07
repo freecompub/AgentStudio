@@ -1,0 +1,34 @@
+{
+  "id": "4122fb21-14d4-4380-84b1-4091ce3fc80e",
+  "taskId": "c4433175-1600-46f9-98b3-fd407ad00410",
+  "extensionId": "agent-studio.skraft",
+  "kind": "decision",
+  "title": "Question de l'agent (RESEARCH)",
+  "detail": "La portée des paliers n'est pas définie : stories/US-2.md:13-14 demande explicitement s'ils sont communs à toutes les références ou définis par référence. Le modèle actuel ne contient que la référence, la quantité et le prix unitaire (src/Tarification.Domaine/LigneDePanier.cs:4-6), sans configuration permettant de répondre. Quelle règle métier faut-il retenir pour l'US-2 ?",
+  "options": [
+    {
+      "id": "Les mêmes paliers s'appliquent à toutes les références.",
+      "label": "Les mêmes paliers s'appliquent à toutes les références."
+    },
+    {
+      "id": "Chaque référence possède ses propres paliers, sans paliers communs.",
+      "label": "Chaque référence possède ses propres paliers, sans paliers communs."
+    },
+    {
+      "id": "Des paliers communs existent, avec une configuration spécifique par référence ; préciser la règle de priorité.",
+      "label": "Des paliers communs existent, avec une configuration spécifique par référence ; préciser la règle de priorité."
+    }
+  ],
+  "requiredRoles": [
+    "po",
+    "developpeur",
+    "architecte",
+    "administrateur"
+  ],
+  "createdAt": "2026-10-10T19:12:57.228Z",
+  "status": "answered",
+  "answer": {
+    "option": "Les mêmes paliers s'appliquent à toutes les références.",
+    "answeredAt": "2026-10-10T19:12:57.231Z"
+  }
+}

@@ -7,6 +7,7 @@ import {
   createInteractionService,
   createJsonEvidenceStore,
   createJsonInteractionStore,
+  createJsonTaskSessionStore,
   createProgressReporter,
   createJsonlTraceStore,
   createUsageRecorder,
@@ -21,8 +22,10 @@ import {
   type Clock,
   type EvidenceStore,
   type InteractionStore,
+  type TaskSessionStore,
   type IdGenerator,
   type Logger,
+  type ToolSpec,
 } from "@agent-studio/core";
 import type { ExtensionManifest } from "@agent-studio/extension-api";
 import {
@@ -48,6 +51,7 @@ import type { Workspace } from "@agent-studio/workspace";
 import type { UserConfirmer } from "@agent-studio/core";
 import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
 import type { WorkspaceServicesFactory } from "./protocols.js";
+import { activerWorkflow, createJsonAccordStore, syntaxeCommande, trouverWorkflows, type AccordStore } from "@agent-studio/workflow";
 import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 
 /** Extension à activer : dans le principal (tests, J2) ou dans son propre processus (J4). */
@@ -73,6 +77,8 @@ export interface WorkspaceServicesConfig {
   taskStore?: TaskStore;
   evidenceStore?: EvidenceStore;
   interactionStore?: InteractionStore;
+  /** Registre des sessions d'agent ouvertes (ADR 0053). */
+  taskSessionStore?: TaskSessionStore;
   usageRecorder?: UsageRecorder;
   /** Unité d'usage du runtime (`RuntimeCapabilities.usageUnit`). */
   usageUnit?: "requests" | "tokens";
@@ -83,6 +89,11 @@ export interface WorkspaceServicesConfig {
   agentMaxInputTokens?: number;
   /** Fraction de la fenêtre de contexte au-delà de laquelle un tour est coupé (ADR 0031). */
   agentMaxContextFraction?: number;
+  /**
+   * Workflows en dossier (ADR 0055) : ceux de la machine (`machine`) et ceux du projet
+   * (`.agent-studio/workflows/`), exécutés isolés par `launcher` sur `runtimeEntry`.
+   */
+  workflows?: { machine?: string; launcher: ProcessLauncher; runtimeEntry: string; accordsFile?: string };
 }
 
 /** Construit la carte de tâche (§7.2) à partir de l'état persisté et des libellés du manifeste. */
@@ -272,10 +283,29 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       ...(cfg.agentMaxContextFraction !== undefined ? { maxContextFraction: cfg.agentMaxContextFraction } : {}),
       // Trace d'exécution (ADR 0032), un fichier JSONL par tâche, à côté des preuves.
       trace: traceStore,
+      // Chaque session ouverte est inscrite ici : un crash ne la rend plus orpheline (ADR 0053).
+      sessions: cfg.taskSessionStore ?? createJsonTaskSessionStore(join(cfg.tasksDir, projectKey, "sessions")),
       ...(cfg.logger ? { logger: cfg.logger.child({ component: "agents" }) } : {}),
     });
     const hooks = createHookRegistry();
     const handles: ExtensionHandle[] = [];
+    const depsCommunes = () => ({
+      registry,
+      engine,
+      agents,
+      workspace,
+      stack,
+      interactions,
+      evidence,
+      hooks,
+      trace: traceStore,
+      usage,
+      ...(modelFor ? { modelFor } : {}),
+      clock: cfg.clock,
+      ids: cfg.ids,
+      chat: { post: onPost },
+      ...(cfg.logger ? { logger: cfg.logger } : {}),
+    });
     for (const ext of sources) {
       const hostDeps = {
         registry,
@@ -305,9 +335,43 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         onPost(ext.manifest.id, `L'extension ${ext.manifest.id} n'a pas pu être activée : ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    await engine.resumeAll();
-
+    // Workflows en dossier (ADR 0055) : machine puis projet ; avant la reprise des tâches, pour que
+    // celles d'un workflow retrouvent leur définition.
+    /** Workflows activés, pour l'outil `proposer_workflow` de l'agent principal (`docs/11` §6). */
+    const actifs: { nom: string; commande: string; description: string; syntaxe: string; empreinte: string }[] = [];
+    let accordsWorkflows: AccordStore | null = null;
+    if (cfg.workflows) {
+      const recherche = await trouverWorkflows({
+        ...(cfg.workflows.machine ? { machine: cfg.workflows.machine } : {}),
+        projet: join(workspace.root, ".agent-studio", "workflows"),
+      });
+      for (const e of recherche.erreurs) onPost("agent-studio", `**Workflow écarté** (\`${e.dossier}\`) : ${e.motifs.join(" ; ")}`);
+      for (const r of recherche.remplacements) onPost("agent-studio", `Le workflow « ${r.nom} » du projet remplace celui de la machine (\`${r.dossierMachine}\`).`);
+      if (recherche.workflows.length && !confirmer)
+        onPost("agent-studio", "Workflows du projet non activés : l'application n'a aucun moyen de demander ton accord avant de les exécuter.");
+      else if (confirmer) {
+        const accords = createJsonAccordStore(cfg.workflows.accordsFile ?? join(cfg.tasksDir, "accords-workflows.json"));
+        accordsWorkflows = accords;
+        for (const w of recherche.workflows) {
+          const r = await activerWorkflow(w, depsCommunes(), { isolation: { launcher: cfg.workflows.launcher, runtimeEntry: cfg.workflows.runtimeEntry }, accords, confirmer });
+          if (r.ok) {
+            handles.push(r.handle);
+            manifests.push(r.manifest);
+            actifs.push({ nom: w.nom, commande: w.meta.commande, description: w.meta.description, syntaxe: syntaxeCommande(w.meta.commande, w.meta.entrees), empreinte: w.empreinte });
+          } else onPost("agent-studio", `**Workflow écarté** (\`${w.dossier}\`) : ${r.motifs.join(" ; ")}`);
+        }
+      }
+    }
     return {
+      async demarrer() {
+        // Au démarrage, les sessions encore inscrites sont celles d'un crash, d'une fermeture
+        // interrompue ou des services précédents du projet, déjà libérés : on les supprime, et
+        // chaque agent repartira neuf (ADR 0053). Sans attendre : si des sessions restent, cela
+        // démarre le runtime, ce qui ne doit pas bloquer l'ouverture du projet. Le registre est lu
+        // avant toute nouvelle inscription, donc les sessions des tâches reprises ne sont pas visées.
+        void agents.releaseAll().catch((err: unknown) => cfg.logger?.warn("purge des sessions impossible", { error: String(err) }));
+        await engine.resumeAll();
+      },
       async route(text) {
         const intent = routeIntent(registry, text);
         if (intent.kind === "chat") return { kind: "chat" };
@@ -317,6 +381,47 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       },
       commands: () => registry.commands(),
       hookGuards: () => hooks.guards(),
+      // L'agent principal propose ; l'utilisateur confirme avant tout démarrage (`docs/11` §6).
+      outilsAgent: (): ToolSpec[] => {
+        if (!actifs.length || !confirmer) return [];
+        return [
+          {
+            name: "proposer_workflow",
+            description:
+              "Propose à l'utilisateur de lancer un workflow ; rien ne démarre sans sa confirmation. Workflows disponibles :\n" +
+              actifs.map((a) => `- ${a.nom} (${a.syntaxe}) : ${a.description}`).join("\n"),
+            parameters: {
+              type: "object",
+              properties: {
+                nom: { type: "string", enum: actifs.map((a) => a.nom) },
+                arguments: { type: "string", description: "Arguments de la commande, comme l'utilisateur les taperait (ex. stories/us-2.md)." },
+              },
+              required: ["nom", "arguments"],
+              additionalProperties: false,
+            },
+            async handler(raw) {
+              const { nom, arguments: args } = raw as { nom: string; arguments: string };
+              const a = actifs.find((x) => x.nom === nom);
+              if (!a) throw new Error(`Workflow inconnu : ${nom}`);
+              // Une seule demande à l'utilisateur (revue de la PR #12) : tant que l'accord sur le
+              // workflow n'est pas donné pour toujours, la commande le demande, et cette demande vaut
+              // confirmation de la proposition ; sinon, l'outil confirme lui-même.
+              if (await accordsWorkflows?.accorde(a.nom, a.empreinte)) {
+                const r = await confirmer.confirm({ title: `Lancer le workflow « ${nom} » proposé par l'agent ?`, detail: `/${a.commande} ${args}\n\n${a.description}` });
+                if (r === "deny") return "Proposition refusée par l'utilisateur : ne relance pas ce workflow sans qu'il le demande.";
+              }
+              // Ce qui a réellement démarré, et non ce que la commande était censée faire : des
+              // arguments invalides ou un accord refusé ne créent aucune tâche.
+              const avant = new Set((await engine.list()).map((t) => t.id));
+              await registry.command(a.commande)!.handler(args);
+              const lancees = (await engine.list()).filter((t) => !avant.has(t.id));
+              if (!lancees.length)
+                return `Rien n'a démarré : arguments invalides, ou accord sur le workflow refusé par l'utilisateur ; le message de la commande est affiché dans la conversation. Ne dis pas que /${a.commande} tourne.`;
+              return `Workflow lancé : /${a.commande} ${args} (tâche ${lancees[0]!.id}). L'avancement s'affiche dans le panneau des tâches.`;
+            },
+          },
+        ];
+      },
       tasks: async () =>
         (await engine.list())
           .map((r) => toTaskCard(r, manifests, usageRows.has(r.id) ? { unit, rows: usageRows.get(r.id)! } : undefined))
@@ -330,6 +435,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         reporter.dispose();
         offInteractions();
         for (const h of handles) await h.deactivate();
+        // Fermeture normale traitée comme un crash (ADR 0053) : aucune session ne survit au
+        // processus, pas même celles d'une tâche en attente d'une réponse humaine.
+        await agents.releaseAll().catch((err: unknown) => cfg.logger?.warn("libération des sessions impossible", { error: String(err) }));
       },
     };
   };

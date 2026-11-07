@@ -15,7 +15,7 @@ export function tokenKindOf(token: string): TokenKind {
   return "unknown";
 }
 
-const DEVICE_CODE = /one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/;
+const DEVICE_CODE = /one-time code(?:\s*:\s*|\s*\()([A-Z0-9]{4}-[A-Z0-9]{4})/i;
 
 /**
  * Nom d'hôte acceptable : un domaine, rien d'autre. Ce texte vient de l'utilisateur et part en
@@ -114,9 +114,14 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
       // L'hôte visé ne devient l'hôte courant qu'une fois la connexion réussie : un échec
       // laisserait sinon toute la session pointée sur la mauvaise instance.
       const cible = opts?.hostname !== undefined ? verifierHote(opts.hostname) : host;
-      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"]);
+      // L'application ouvre elle-même la page de connexion (écran d'authentification) : l'Entrée que
+      // gh attend lui ferait l'ouvrir une seconde fois. Son navigateur devient une commande sans
+      // effet, sans toucher à son attente ni à son sondage (revue de la PR #12).
+      const sansNavigateur = process.platform === "win32" ? "cmd /c exit 0" : "true";
+      const proc = deps.spawner.spawn("gh", ["auth", "login", "--hostname", cible, "--git-protocol", "https", "--web"], { env: { GH_BROWSER: sansNavigateur } });
       let buffer = "";
       let sent = false;
+      let inviteValidee = false;
       const vu = new Promise<void>((resolve) => {
         proc.onOutput((chunk) => {
           buffer += chunk;
@@ -124,8 +129,11 @@ export function createGhAuth(deps: GhAuthDeps): GitHubAuth {
           if (m?.[1] && !sent) {
             sent = true;
             onCode({ code: m[1], verificationUrl: `https://${cible}/login/device` });
-            proc.write("\n"); // valide « Press Enter to open … in your browser »
             resolve();
+          }
+          if (sent && !inviteValidee && /Press Enter/i.test(buffer)) {
+            inviteValidee = true;
+            proc.write("\n");
           }
         });
       });

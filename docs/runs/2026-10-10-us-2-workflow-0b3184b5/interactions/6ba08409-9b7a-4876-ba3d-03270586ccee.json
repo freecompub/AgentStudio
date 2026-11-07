@@ -1,0 +1,28 @@
+{
+  "id": "6ba08409-9b7a-4876-ba3d-03270586ccee",
+  "taskId": "0b3184b5-d4af-4a9a-8c97-101af6d61ecf",
+  "extensionId": "workflow.skraft-workflow",
+  "kind": "decision",
+  "title": "Difficulté de US-2 : Assez difficile ?",
+  "detail": "Je confirme le niveau : la remise par palier de quantité soulève une question métier ouverte, malgré seulement deux modules touchés et aucune intégration externe.",
+  "options": [
+    {
+      "id": "20:medium-hard",
+      "label": "Confirmer : Assez difficile"
+    },
+    {
+      "id": "20:challenging",
+      "label": "Difficile"
+    },
+    {
+      "id": "20:medium",
+      "label": "Moyenne"
+    }
+  ],
+  "createdAt": "2026-10-10T19:52:38.716Z",
+  "status": "answered",
+  "answer": {
+    "option": "20:medium-hard",
+    "answeredAt": "2026-10-10T19:52:38.720Z"
+  }
+}

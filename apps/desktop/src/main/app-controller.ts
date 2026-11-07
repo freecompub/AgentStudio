@@ -73,9 +73,8 @@ export type AppController = {
   askConsent(req: import("@agent-studio/extension-installer").ConsentRequest): Promise<boolean>;
 };
 
-const DEVICE_PAGE = "https://github.com/login/device";
-
 export function createAppController(deps: AppControllerDeps): AppController {
+  let devicePage = `https://${deps.auth.hostname()}/login/device`;
   const confirmer = createIpcConfirmer(deps.sink);
   const permissionRules = deps.permissionRules ?? createMemoryPermissionRules();
   const consent = createIpcConsent(deps.sink);
@@ -173,6 +172,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
     workspace = ws;
     services = prets;
     await anciens?.dispose();
+    // Les sessions ne se purgent et les tâches ne reprennent qu'une fois les anciens services
+    // libérés : les deux partagent le registre des sessions du projet (revue de la PR #12).
+    await prets.demarrer?.();
   }
 
   async function activate(ws: Workspace): Promise<WorkspaceInfoDto> {
@@ -232,7 +234,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       throw new Error(
         "Votre connexion GitHub utilise un jeton personnel classique, refusé par Copilot. Reconnectez-vous via le navigateur (bouton « Se connecter »).",
       );
-    const rt = deps.runtimeFactory(await deps.auth.token());
+    const rt = deps.runtimeFactory(await deps.auth.token(), deps.auth.hostname());
     await rt.start();
     runtime = rt;
     return rt;
@@ -247,7 +249,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     "auth:login": async ({ hostname }) => {
       const status = await deps.auth.login(
-        (code) => deps.sink.emit("auth:device-code", code),
+        (code) => {
+          devicePage = code.verificationUrl;
+          deps.sink.emit("auth:device-code", code);
+        },
         ...(hostname ? [{ hostname }] : []),
       );
       await oublierRuntime();
@@ -265,7 +270,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
       await deps.auth.logout();
     },
 
-    "shell:open-device-page": () => deps.external.open(DEVICE_PAGE),
+    "shell:open-device-page": () => deps.external.open(devicePage),
 
     "workspace:current": async () => {
       // Le renderer peut appeler ce canal plusieurs fois en parallèle (React <StrictMode> monte
@@ -365,6 +370,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
         workspaceRoot: ws.root,
         systemPrompt: deps.systemPrompt,
         ...(modele ? { model: modele } : {}),
+        // `proposer_workflow` si un workflow est actif dans ce projet (ADR 0055).
+        tools: services?.outilsAgent() ?? [],
         // Arbitre unique : politique du cœur → hooks des extensions → règles → question (D27).
         guard: createPermissionArbiter({
           root: ws.root,

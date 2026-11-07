@@ -109,7 +109,7 @@ test("ouvrir un projet mène à la conversation, sans erreur d'IPC", async () =>
   // `chat:start` sous <StrictMode>, le 24/09.
   await expect(fenetre.getByText(basename(projet))).toBeVisible();
 
-  // Le dépôt jetable ne porte ni `Package.swift` ni `package.json` : aucun adaptateur ne le
+  // Le dépôt jetable ne porte pas de `package.json` : aucun adaptateur ne le
   // reconnaît, et l'application doit le DIRE dans la conversation. Ce message est posté avant
   // qu'une conversation existe, donc mis en attente puis versé au démarrage — un mécanisme ajouté
   // le 24/09 et jamais vu fonctionner dans la vraie application jusqu'ici.

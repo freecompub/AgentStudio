@@ -50,6 +50,7 @@ export function parseCoberturaReport(brut: string, root: string): CoverageReport
       covered: e.atteintes.size,
       total: e.vues.size,
       score: Math.round((e.atteintes.size / e.vues.size) * 1000) / 10,
+      lines: [...e.vues].sort((a, b) => a - b).map((number) => ({ number, covered: e.atteintes.has(number) })),
     }));
 
   return { files };

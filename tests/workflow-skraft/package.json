@@ -1,0 +1,16 @@
+{
+  "name": "@agent-studio/tests-workflow-skraft",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "devDependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-api": "workspace:*",
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/task-engine": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
+    "@agent-studio/workspace": "workspace:*"
+  }
+}

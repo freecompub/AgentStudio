@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acOf, checkAcceptanceRed, checkValues, featureScenarios } from "../src/distill.js";
+import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios, planDeTest, verifierEcarts } from "../src/distill.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { parseStory } from "../src/story.js";
 import { US12 } from "./story.test.js";
@@ -187,5 +187,84 @@ describe("Porte RED : reconnaître ses tests par leur marqueur, pas par leur ran
     expect(motif).toMatch(/NOM/);
     expect(motif).toContain("Tarification.Tests.RemiseParPalierAcceptanceTests."); // ce qu'elle a vu
     expect(motif).not.toMatch(/n'a été exécuté/);
+  });
+});
+
+describe("Porte plan de test : plans de DISTILL (option C de docs/15 §4.5, §4.7)", () => {
+  // Repris de skraft-plugin v1.6.1 : acceptance-designer-reviewer, G6 (« chaque scénario a sa place
+  // dans le plan d'implémentation ») et G8 (« au moins un walking skeleton ») ; acceptance-designer,
+  // §4 (matrice de couverture : couche, doublure, walking skeleton) et §5 (étapes qui nomment le test).
+  const ENTETE = "| Scénario | Cas d'usage | Couche | Doublure | Walking skeleton |\n|---|---|---|---|---|\n";
+  const ligne = (n: number, couche = "Application", doublure = "dépôt en mémoire", ws = n === 1 ? "oui" : "non") => `| @ac-${n} | \`CapBolus\` | ${couche} | ${doublure} | ${ws} |\n`;
+  const testPlan = `# Plan de test\n\n${ENTETE}${ligne(1)}${ligne(2)}${ligne(3, "Domaine", "aucune")}`;
+  const etape = (n: number) => `## Étape ${n} — ac-${n}\n- Test : \`tests/acceptance/plafond.test.ts\`\n- Entre par : \`CapBolus\`\n\n`;
+  const implPlan = `${etape(1)}${etape(2)}${etape(3)}`;
+
+  it("plans complets : aucun rejet", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan })).toEqual([]);
+  });
+
+  it("un critère absent du plan d'implémentation : rejet (G6)", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan: `${etape(1)}${etape(3)}` })).toEqual([
+      "impl-plan.md ne cite pas le critère 2 (ac-2) : chaque critère y a sa place dans l'ordre de livraison.",
+    ]);
+  });
+
+  it("une étape qui ne nomme pas son fichier de test : rejet (§5 d'acceptance-designer)", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan: `${etape(1)}## Étape 2 — ac-2\n- Entre par : \`CapBolus\`\n\n${etape(3)}` })).toEqual([
+      "impl-plan.md : aucune étape du critère 2 (ac-2) ne nomme son fichier de test (« - Test : `chemin` »).",
+    ]);
+  });
+
+  it("plan d'implémentation absent : rejet", () => {
+    expect(checkPlans({ criteria, testPlan, implPlan: null })).toEqual(["Plan d'implémentation absent : impl-plan.md."]);
+  });
+
+  it("aucun walking skeleton désigné : rejet (G8)", () => {
+    const sans = `${ENTETE}${ligne(1, "Application", "aucune", "non")}${ligne(2)}${ligne(3)}`;
+    expect(checkPlans({ criteria, testPlan: sans, implPlan })).toEqual([
+      "test-plan.md ne désigne aucun walking skeleton : au moins une ligne de la matrice porte « oui », ou sa stratégie, dans la colonne Walking skeleton.",
+    ]);
+  });
+
+  it("pas de matrice de couverture : rejet (§4 d'acceptance-designer)", () => {
+    expect(checkPlans({ criteria, testPlan: "# Plan\n- @ac-1 : walking skeleton — de bout en bout.\n", implPlan })).toEqual([
+      "test-plan.md n'a pas de matrice de couverture : un tableau aux colonnes Scénario, Cas d'usage, Couche, Doublure, Walking skeleton, une ligne par critère.",
+    ]);
+  });
+
+  it("un critère sans ligne, sans couche ou sans doublure dans la matrice : rejet", () => {
+    const plan = `${ENTETE}${ligne(1)}${ligne(2, "quelque part")}${ligne(3, "Application", "")}`;
+    expect(checkPlans({ criteria, testPlan: plan, implPlan })).toEqual([
+      "test-plan.md : le critère 2 (ac-2) n'indique pas sa couche (Domaine, Application ou Infrastructure).",
+      "test-plan.md : le critère 3 (ac-3) n'indique pas sa doublure (« aucune » si son test n'en utilise pas).",
+    ]);
+    expect(checkPlans({ criteria, testPlan: `${ENTETE}${ligne(1)}${ligne(3)}`, implPlan })).toEqual(["test-plan.md : aucune ligne de la matrice pour le critère 2 (ac-2)."]);
+  });
+});
+
+describe("Écarts au plan de test (PLAN_DEVIATION de skraft-plugin v1.15.1)", () => {
+  // Plugin, software-engineer : « Deviate only when a loaded skill forbids the planned choice, and
+  // record PLAN_DEVIATION: {row} — {planned} → {actual} — {rule} ». Ici, l'écart est déclaré dans
+  // report_phase et le code le vérifie contre la matrice gardée depuis DISTILL.
+  const ENTETE = "| Scénario | Cas d'usage | Couche | Doublure | Walking skeleton |\n|---|---|---|---|---|\n";
+  const plan = planDeTest(`${ENTETE}| @ac-1 | \`CapBolus\` | Application | dépôt en mémoire | oui |\n| @ac-2 | \`CapBolus\` | Domaine | aucune | non |\n`);
+
+  it("la matrice est lue par critère : couche et doublure", () => {
+    expect(plan).toEqual({ "ac-1": { couche: "Application", doublure: "dépôt en mémoire" }, "ac-2": { couche: "Domaine", doublure: "aucune" } });
+    expect(planDeTest("# Plan sans matrice\n")).toEqual({});
+  });
+
+  it("un écart conforme : critère de la matrice, prévu fidèle à sa ligne, règle donnée", () => {
+    expect(verifierEcarts([{ criterion: "ac-1", planned: "Application, dépôt en mémoire", actual: "Domaine, aucune", rule: "clean-architecture-testing : un invariant se teste dans le domaine" }], plan)).toEqual([]);
+  });
+
+  it("critère absent de la matrice, prévu infidèle : refus avec le motif", () => {
+    expect(verifierEcarts([{ criterion: "ac-9", planned: "Application", actual: "Domaine", rule: "r" }], plan)).toEqual([
+      "Écart au plan pour « ac-9 » : aucun critère de ce nom dans la matrice de test-plan.md.",
+    ]);
+    expect(verifierEcarts([{ criterion: "ac-1", planned: "Infrastructure, base réelle", actual: "Domaine", rule: "r" }], plan)).toEqual([
+      "Écart au plan pour ac-1 : le prévu « Infrastructure, base réelle » ne reprend pas la ligne de la matrice (Application, dépôt en mémoire).",
+    ]);
   });
 });

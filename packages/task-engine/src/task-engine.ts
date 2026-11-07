@@ -29,6 +29,8 @@ interface TracedState {
   attempts?: unknown;
   rejections?: unknown;
   lastRejection?: { gate?: unknown; reasons?: unknown } | null;
+  /** Arbitrages de défauts de porte, en ajout seul : chaque nouvel élément est tracé (ADR 0065). */
+  arbitrages?: unknown;
 }
 
 const effectKind = (f: unknown): string => {
@@ -99,16 +101,26 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
 
   async function apply(t: Live, event: TaskEvent<{ type: string }>): Promise<void> {
     const before = t.record.state as TracedState | null;
+    const debutTransition = Date.now();
     const { state, effects } = await t.def.transition(t.record.state, event);
+    const dureeTransition = Date.now() - debutTransition;
     t.record.state = state;
     if (event.type === "ABORT") t.record.pending = [];
     t.record.pending.push(...effects);
     deps.logger?.debug("transition", { taskId: t.record.id, event: event.type, effects: effects.length });
     await persist(t);
-    await traceTransition(t, event, before, effects);
+    await traceTransition(t, event, before, effects, dureeTransition);
   }
 
-  async function traceTransition(t: Live, event: { type: string }, before: TracedState | null, effects: unknown[]): Promise<void> {
+  /** La trace raconte, elle n'atteste rien : son échec ne doit jamais arrêter la tâche. */
+  async function tracer(t: Live, b: TraceBody): Promise<void> {
+    if (!deps.trace) return;
+    await deps.trace.append({ taskId: t.record.id, at: now(), ...b } as Parameters<TraceStore["append"]>[0]).catch((err: unknown) => {
+      deps.logger?.warn("trace : écriture impossible", { taskId: t.record.id, error: String(err) });
+    });
+  }
+
+  async function traceTransition(t: Live, event: { type: string }, before: TracedState | null, effects: unknown[], dureeMs: number): Promise<void> {
     if (!deps.trace) return;
     const after = t.record.state as TracedState | null;
     const bodies: TraceBody[] = [
@@ -119,6 +131,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
         ...(typeof after?.stage === "string" ? { stade: after.stage } : {}),
         ...(typeof after?.attempts === "number" ? { essais: after.attempts } : {}),
         effets: effects.map(effectKind),
+        duréeMs: dureeMs,
       },
     ];
     const n = (s: TracedState | null) => (typeof s?.rejections === "number" ? s.rejections : 0);
@@ -128,6 +141,19 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
         kind: "rejet",
         porte: typeof r?.gate === "string" ? r.gate : "?",
         motifs: Array.isArray(r?.reasons) ? r.reasons.map(String) : [],
+      });
+    }
+    const liste = (s: TracedState | null) => (Array.isArray(s?.arbitrages) ? (s.arbitrages as Record<string, unknown>[]) : []);
+    for (const a of liste(after).slice(liste(before).length)) {
+      const texte = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : "?");
+      bodies.push({
+        kind: "arbitrage",
+        porte: texte("porte"),
+        élément: texte("élément"),
+        contestation: texte("contestation"),
+        décision: a.décision === "dérogation" ? "dérogation" : "à corriger",
+        par: a.par === "humain" ? "humain" : "agent",
+        raison: texte("raison"),
       });
     }
     for (const b of bodies) {
@@ -165,6 +191,7 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
       let next: TaskEvent<{ type: string }> | void;
       const phase = await phaseOfState(t);
       const effectStart = Date.now();
+      let leve = false;
       try {
         next = await t.def.runEffect(effect, t.deps, {
           taskId: t.record.id,
@@ -172,11 +199,15 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
           signal: t.abort.signal,
         });
       } catch (err) {
+        leve = true;
         next = toSystemEvent(err);
         deps.logger?.warn("effet en échec", { taskId: t.record.id, event: next.type, reason: "reason" in next ? next.reason : "" });
       }
       t.record.inflight = null;
-      void deps.usage?.add(t.record.id, phase, { durationMs: Date.now() - effectStart, effects: 1 }).catch(() => undefined);
+      const dureeEffet = Date.now() - effectStart;
+      void deps.usage?.add(t.record.id, phase, { durationMs: dureeEffet, effects: 1 }).catch(() => undefined);
+      const issue = leve || (next && t.def.estUnEchec?.(next)) ? "erreur" : next ? "ok" : "attente";
+      await tracer(t, { kind: "effet", effet: effectKind(effect), phase, duréeMs: dureeEffet, issue });
       if (t.abort.signal.aborted) {
         t.record.pending = [];
         await persist(t);

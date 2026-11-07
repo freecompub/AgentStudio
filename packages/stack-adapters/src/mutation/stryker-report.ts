@@ -14,6 +14,7 @@ const schema = z.object({
       mutants: z.array(
         z.object({
           mutatorName: z.string(),
+          replacement: z.string().optional(),
           status: z.string(),
           location: z.object({ start: z.object({ line: z.number() }) }),
         }),
@@ -51,9 +52,12 @@ export function parseStrykerReport(raw: unknown, root: string): MutationReport {
     files.push({
       file: relatifDepuis(root, chemin),
       score: (detectes / juges) * 100,
+      killed: detectes,
+      total: juges,
       survived: nonDetectes.map((m) => ({
         line: m.location.start.line,
         operator: m.status === "NoCoverage" ? `${m.mutatorName} (non couvert)` : m.mutatorName,
+        ...(m.replacement !== undefined ? { replacement: m.replacement } : {}),
       })),
     });
   }
