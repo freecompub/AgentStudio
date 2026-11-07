@@ -76,3 +76,16 @@ export function ecrirePileDansProjet(existant: string | null, pile: string): str
   doc.set("pile", doc.createNode(parseYaml(pile)));
   return doc.toString();
 }
+
+/**
+ * Écrit la section `composants` de `projet.yaml` (`/stack init`, ADR 0074), en gardant le reste du
+ * fichier, commentaires compris ; une section `pile` est retirée, les deux ne vont pas ensemble.
+ */
+export function ecrireComposantsDansProjet(existant: string | null, composants: string): string | { error: string } {
+  const doc = parseDocument(existant ?? "");
+  if (doc.errors.length) return { error: `\`${FICHIER_PROJET}\` n'est pas du YAML valide, rien n'a été écrit : ${doc.errors[0]!.message.split("\n")[0]}` };
+  if (doc.contents === null) doc.contents = doc.createNode({}) as never;
+  doc.delete("pile");
+  doc.set("composants", doc.createNode(parseYaml(composants)));
+  return doc.toString();
+}

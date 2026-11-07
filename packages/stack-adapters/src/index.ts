@@ -14,6 +14,6 @@ export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile
 export { createComposedAdapter, type Composant } from "./composants.js";
 export { detecte, libelleDetect, type ElementDetect } from "./profile/detect.js";
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "./profile/quality-bar.js";
-export { ecrirePileDansProjet, FICHIER_PROJET, lireFichierProjet, type ComposantDeclare } from "./profile/fichier-projet.js";
+export { ecrireComposantsDansProjet, ecrirePileDansProjet, FICHIER_PROJET, lireFichierProjet, type ComposantDeclare } from "./profile/fichier-projet.js";
 export { diagnoseProfile, proposeProfile, type Constat, type DiagnosticDeps, type Gravite, type IndicesDuProjet } from "./profile/stack-doctor.js";
 export { jugerCanari, runCanaries, type CanaryObservation, type CanaryRun, type RunCanariesDeps } from "./profile/canaries.js";

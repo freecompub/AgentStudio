@@ -52,7 +52,11 @@ ne cherche aucun dossier.
      sont sous sa racine ; un composant sans l'outil le dit pour ses fichiers (non mesuré).
 4. **Seuls les composants touchés** par le pas ou la phase sont lancés aux portes de pas et de
    scénario ; la porte de fin de DELIVER et la référence de début de DELIVER lancent tous les
-   composants (rien ne doit casser ailleurs).
+   composants (rien ne doit casser ailleurs). **Reporté le 07/11 par le responsable**, après une
+   mesure sur un vrai dépôt mixte : en attendant, chaque porte lance tous les composants, ce qui est
+   toujours juste. Le faire demande, dans les deux implémentations, de fusionner la liste des tests
+   verts au lieu de la remplacer (sinon une régression d'un composant non lancé n'est plus vue) et de
+   lancer toujours le composant du test d'acceptance du scénario en cours.
 5. **`/stack init`** détecte chaque sous-projet (un manifeste par dossier, jusqu'à 4 niveaux sous la racine,
    dossiers cachés et de dépendances exclus), propose un composant par sous-projet reconnu, et
    écrit `composants` après confirmation, comme il écrit `pile` aujourd'hui. `/stack doctor`

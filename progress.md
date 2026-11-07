@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Composants (ADR 0074), brique 2 : /stack, /stack doctor, /stack init, serveur MCP
+
+- `/stack` dit les composants (nom, pile, racine) ; `/stack doctor` en fait un diagnostic chacun,
+  relu dans sa racine (emplacements, fichiers de détection), canaris dans la racine du composant au
+  sein de la copie isolée.
+- `/stack init` cherche les sous-projets jusqu'à **4 niveaux** (dépendances installées et dossiers
+  cachés écartés : `node_modules`, `bin`, `obj`, `target`, `dist`, `vendor`, `.*`). Un seul reconnu à
+  la racine : la section `pile`, comme avant ; plusieurs, ou un seul hors de la racine : la section
+  `composants`, montrée, confirmée en nommant les programmes, écrite par
+  `ecrireComposantsDansProjet` (commentaires et `qualite` gardés, `pile` retirée). Composants déjà
+  déclarés : rien n'est écrasé.
+- Lecture des composants unifiée (`profilsDesComposants`, `pileComposee`) : projet, `/stack` et pile
+  fournie par le client passent par les mêmes contrôles. L'argument `pile` du serveur MCP accepte
+  `composants:`.
+- **Limite connue** : `proposeProfile` ne reconnaît toujours que TypeScript (Vitest) et Python ; un
+  sous-projet .NET n'est pas proposé (`exemple-dotnet-tdd` a son profil écrit à la main).
+- Tests vus rouges puis verts (`stack-command`, `workspace-services`, `pile`).
+
 ## 07/11 — Composants (ADR 0074), brique 1 : adaptateur composé, section composants, branchement
 
 - `createComposedAdapter` (`stack-adapters/src/composants.ts`) : les composants derrière le port
@@ -22,7 +40,8 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   composant, et la détection reprend la main. `pile()` donne les composants (nom, racine, id).
 - Tests vus rouges puis verts. Trois branches de l'adaptateur (format, mutation, imports) codées avant
   leur test : chacun vu rouge en cassant la ligne qu'il protège.
-- **Reste** : composants touchés seulement aux portes de pas et de scénario ; `/stack init` et
+- **Reporté par le responsable** : composants touchés seulement aux portes (une économie de temps ;
+  piège noté dans l'ADR : la liste des tests verts est remplacée à chaque pas). **Reste** : `/stack init` et
   `/stack doctor` par composant ; argument `pile` du serveur MCP au format composants ; écriture de
   `pile` par `/stack init` quand le projet a des composants.
 

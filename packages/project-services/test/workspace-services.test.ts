@@ -195,6 +195,41 @@ infrastructureModules: [django]
     await cleanup();
   });
 
+  it("/stack init sur un dépôt mixte (ADR 0074) : un composant par sous-projet reconnu, jusqu'à 4 niveaux ; dépendances et dossiers cachés écartés ; la section qualite gardée", async () => {
+    const fichiers = [
+      "services/api/pyproject.toml",
+      "web/package.json",
+      "a/b/c/d/pyproject.toml",
+      "a/b/c/d/e/pyproject.toml",
+      "node_modules/x/pyproject.toml",
+      ".git/hooks/pyproject.toml",
+      "README.md",
+    ];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, projet: "qualite:\n  couverture:\n    reste: 70\n" });
+    // `web/package.json` n'est pas sur le disque : sans dépendance `vitest` lisible, `web` n'est pas reconnu.
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    const ecrit = ecrits[0]!;
+    expect(ecrit).toMatch(/^\.agent-studio\/projet\.yaml\n/);
+    expect(ecrit).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
+    expect(ecrit).not.toMatch(/^pile:/m);
+    expect([...ecrit.matchAll(/racine: (\S+)/g)].map((m) => m[1])).toEqual(["a/b/c/d", "services/api"]);
+    await cleanup();
+  });
+
+  it("/stack doctor sur un projet à composants : chaque composant diagnostiqué dans sa racine (ADR 0074)", async () => {
+    const pile = ["id: python", "detect: [pyproject.toml]", "tests:", '  command: [pytest, "--junit-xml={rapport}"]', "  report: junit-xml", "layout:", '  unitTests: ["tests/**"]', '  sources: ["src/**"]'];
+    const projet = `composants:\n  - nom: api\n    racine: api\n    pile:\n${pile.map((l) => `      ${l}`).join("\n")}\n`;
+    const { services, posts, cleanup } = await ouvrir({ confirmer: "allow-once", allowedPrograms: ["pytest"], fichiers: ["api/pyproject.toml", "api/tests/test_a.py", "api/src/a.py"], projet });
+    await services.route("/stack doctor");
+    const rapport = posts.at(-1)!;
+    expect(rapport).toMatch(/## Composant `api` \(`api`\) — profil `python`/);
+    // Les emplacements sont cherchés sous la racine du composant : `api/tests/test_a.py` correspond à `tests/**`.
+    expect(rapport).toMatch(/`unitTests` : tests\/\*\*\./);
+    expect(rapport).not.toMatch(/aucun fichier ne correspond à tests/);
+    await cleanup();
+  });
+
   it("sans confirmateur, /stack n'est pas enregistrée : mieux vaut pas de commande qu'une écriture sans accord", async () => {
     const { services, cleanup } = await ouvrir({});
     expect(services.commands().map((c) => c.invocation)).not.toContain("stack");

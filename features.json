@@ -180,10 +180,17 @@
     },
     {
       "id": "composants-d-un-projet",
-      "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port, et les portes ne lancent que les composants touchés (ADR 0074)",
+      "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port ; /stack, /stack doctor et /stack init les connaissent ; le serveur MCP les accepte (ADR 0074)",
+      "verify": "pnpm vitest run --project stack-adapters test/composants.test.ts test/projet-composants.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/stack-command.test.ts test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "ADR 0074 accepté le 07/11. Fait le 07/11 : adaptateur composé (identifiants préfixés par la racine, chemins ramenés à la racine du projet, chaque outil sur les fichiers de son composant), section composants (exclusive de pile, racines sans chevauchement), /stack, /stack doctor par composant, /stack init sur 4 niveaux, pile fournie au format composants. Chaque porte lance encore tous les composants (voir composants-touches-seulement). Limite : /stack init ne reconnaît que TypeScript (Vitest) et Python."
+    },
+    {
+      "id": "composants-touches-seulement",
+      "title": "Les portes de pas et de scénario ne lancent que les composants touchés (et celui du test d'acceptance du scénario), sans perdre la détection des régressions des autres (ADR 0074, point 4)",
       "verify": "",
       "passes": false,
-      "notes": "ADR 0074 accepté le 07/11. Aujourd'hui une seule pile par projet : un dépôt mixte n'est jugé qu'en partie."
+      "notes": "REPORTÉ le 07/11 par le responsable, après une mesure sur un vrai dépôt mixte. Piège : la liste des tests verts est remplacée à chaque pas, dans l'extension et le workflow ; il faut la fusionner, sinon une régression d'un composant non lancé n'est plus vue."
     },
     {
       "id": "bdd-par-composant",
