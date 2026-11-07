@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Fichier de projet `.agent-studio/projet.yaml` (ADR 0071), brique 1 : lecture
+
+- Branche `feat/fichier-projet`, partie de `main` après la fusion de la PR #13.
+- Décidé par le responsable : regrouper `stack.yaml` et `quality.yaml` dans **un seul**
+  `.agent-studio/projet.yaml`, avec **deux sections validées chacune selon ses règles** (`pile` :
+  schéma du profil et programmes autorisés ; `qualite` : schéma strict de la barre). Revient sur les
+  points 1 et 2 de l'ADR 0049 ; le reste de l'ADR 0049 tient.
+- `lireFichierProjet` (`stack-adapters`) sépare les sections (clé de premier niveau inconnue
+  refusée, nommée) ; `parseQualityBar({ projet })` lit la section `qualite` en priorité.
+- **Transition** : sans `projet.yaml`, `stack.yaml` et `quality.yaml` (puis `.skraft/quality.json`)
+  sont lus avec un avertissement « regroupe-le dans projet.yaml » ; avec `projet.yaml`, les anciens
+  fichiers sont ignorés, et c'est dit s'ils sont encore là. Messages d'erreur : fichier **et section**.
+- Branché partout : pile (`project-services`, `lireSourceDuProfil`), barre (workflow `livraison.mjs`,
+  extension `deliver-effects.ts`), `GELÉS` (deux côtés).
+- Conséquence voulue : une barre lue dans l'ancien `quality.yaml` porte désormais un avertissement ;
+  deux tests qui l'attendaient sans (un test de mutation de l'extension, et e2e-s5 des deux côtés) ont
+  été adaptés — e2e-s5 passe au nouveau format plutôt que d'attendre l'avertissement.
+- Reste : `/stack init` écrit la section `pile` de `projet.yaml` ; la porte de format.
+
 ## 07/11 — Runtime Claude : mémoire automatique coupée, version minimale du CLI
 
 - **Vérifié par un mot-témoin** (projet jetable, `haiku`) : avec nos arguments du 06/11, la

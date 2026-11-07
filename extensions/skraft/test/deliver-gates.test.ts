@@ -204,6 +204,8 @@ describe("Seuils de couverture", () => {
 describe("Barre de qualité hors de portée des agents", () => {
   it("`.skraft/quality.json` est gelé", () => {
     expect(GELÉS).toContain(".skraft/quality.json");
+    // Fichier de projet (ADR 0071) : la pile et la barre, hors d'atteinte des agents.
+    expect(GELÉS).toContain(".agent-studio/projet.yaml");
   });
 
   it("le gel est passé à chaque lancement de spécialiste, pas seulement déclaré", async () => {
@@ -508,7 +510,16 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
     const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
     const fin = await phaseEndMutation(inactive.ctx, state);
     expect(inactive.mutations()).toBe(0);
-    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    // Lue dans l'ancien quality.yaml : l'avertissement de transition s'ajoute (ADR 0071).
+    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: [expect.stringMatching(/regroupe-la dans .*projet\.yaml/), "Mutation désactivée par la barre de qualité du projet."] });
+  });
+
+  it("barre lue dans la section qualite de projet.yaml (ADR 0071) ; invalide, la porte s'arrête en nommant la section", async () => {
+    const inactive = ctxWith({ ".agent-studio/projet.yaml": "qualite:\n  mutation:\n    active: false\n" }, survivant);
+    expect(await phaseEndMutation(inactive.ctx, state)).toMatchObject({ reasons: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    expect(inactive.mutations()).toBe(0);
+    const { ctx } = ctxWith({ ".agent-studio/projet.yaml": "qualite:\n  couverture:\n    domaine: 150\n" }, null);
+    await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/projet\.yaml.*section qualite.*couverture\.domaine/);
   });
 
   it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {

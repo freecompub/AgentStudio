@@ -21,6 +21,8 @@ interface Run {
 /** Barre de qualité du projet (ADR 0049), et son ancien emplacement relu le temps de la transition. */
 export const QUALITY = ".agent-studio/quality.yaml";
 export const QUALITY_LEGACY = ".skraft/quality.json";
+/** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
+export const PROJET = ".agent-studio/projet.yaml";
 const fail = (reason: string): Ev => ({ type: "STEP_FAIL", reason });
 const firstLine = (msg?: string) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs: string[]) => [...new Set(xs)];
@@ -345,7 +347,7 @@ function suiteProblems(results: TestResult[], pending: string[], isAcceptance: (
  * Une barre invalide est une panne d'environnement : la juger à moitié serait attester à tort.
  */
 export async function loadQualityBar(ctx: ExtensionContext): Promise<{ bar: QualityBar; notes: string[] }> {
-  const q = parseQualityBar({ yaml: await readOr(ctx, QUALITY), legacyJson: await readOr(ctx, QUALITY_LEGACY) });
+  const q = parseQualityBar({ projet: await readOr(ctx, PROJET), yaml: await readOr(ctx, QUALITY), legacyJson: await readOr(ctx, QUALITY_LEGACY) });
   if ("error" in q) throw new EnvFailureError(q.error);
   const sources = (await ctx.workspace.listFiles()).filter((f) => matchesAny(ctx.stack.layout.sources, f));
   // Seules les couches déclarées : un projet sans couche « application », et qui n'a rien déclaré,

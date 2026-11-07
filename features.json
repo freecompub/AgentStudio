@@ -312,6 +312,13 @@
       "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). À faire : relais MCP vers notre processus, reprise de session, interruption, choix du runtime, usage en dollars."
     },
     {
+      "id": "fichier-projet",
+      "title": "Un seul fichier .agent-studio/projet.yaml, sections pile et qualite validées chacune selon ses règles ; les anciens stack.yaml, quality.yaml et .skraft/quality.json relus pendant la transition, avec un avertissement ; projet.yaml gelé pour les agents ; /stack init écrit la section pile",
+      "verify": "pnpm vitest run --project stack-adapters test/fichier-projet.test.ts && pnpm vitest run --project project-services test/pile.test.ts && pnpm vitest run --project workflow-skraft test/fichier-projet.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts",
+      "passes": false,
+      "notes": "ADR 0071 (07/11). Lecture faite (pile, barre, GELÉS) ; reste : /stack init qui écrit la section pile de projet.yaml, et la porte de format."
+    },
+    {
       "id": "refutateur-mesure-us2",
       "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
       "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",

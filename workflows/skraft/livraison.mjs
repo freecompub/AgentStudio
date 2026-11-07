@@ -18,6 +18,8 @@ import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
 const QUALITY = ".agent-studio/quality.yaml";
 const QUALITY_LEGACY = ".skraft/quality.json";
+/** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
+const PROJET = ".agent-studio/projet.yaml";
 const MAX_CYCLES = 20;
 const GELES_TESTEUR = ["@stack:acceptanceTests"];
 const GELES_DEV = ["@stack:acceptanceTests", "@stack:unitTests"];
@@ -125,7 +127,7 @@ function natures(disp) {
 }
 /** Barre de qualité du projet (ADR 0049) ; invalide, c'est une panne : la juger à moitié serait attester à tort. */
 export async function barreDeQualite(w, disp) {
-  const q = parseQualityBar({ yaml: await lireOu(w, QUALITY), legacyJson: await lireOu(w, QUALITY_LEGACY) });
+  const q = parseQualityBar({ projet: await lireOu(w, PROJET), yaml: await lireOu(w, QUALITY), legacyJson: await lireOu(w, QUALITY_LEGACY) });
   if ("error" in q)
     throw new PanneEnvironnement(q.error);
   const sources = (await w.listerFichiers()).filter((f) => matchesAny(disp.sources, f));

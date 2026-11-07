@@ -35,7 +35,7 @@ export function repositoryShape(files) {
 * Fichiers qu'aucun agent n'écrit, quel que soit son périmètre : la barre de qualité sur laquelle
 * le travail est jugé (ADR 0049). Un agent ne doit pas pouvoir abaisser son propre critère.
 */
-export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml"];
+export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml", ".agent-studio/projet.yaml"];
 /** Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037). */
 export const dossiersDeLaStory = (slug) => [
   `.skraft/${slug}/research`,
