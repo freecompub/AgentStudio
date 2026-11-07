@@ -8,7 +8,8 @@
   `scripts/essai-mcp-skraft.ts --runtime=claude --base=a7cf6db`.
 - Projet : clone de `github.com/freecompub/exemple-dotnet-tdd`, **même commit de départ** que les
   runs du 05/11 et du 06/11 (`a7cf6db`). Ce commit a encore `.agent-studio/stack.yaml` et
-  `.skraft/quality.json` : lus avec l'avertissement de transition de l'ADR 0071.
+  `.skraft/quality.json` : lus avec l'avertissement de transition de l'ADR 0071. Branche du run
+  poussée : **`tests/us-2/mcp-claude-2`** (`5fe93b0`).
 - Modèles par classe (défaut Claude) : `strong` → opus, `standard` → sonnet, `light` → haiku.
 - Réponses humaines : `reponses-us-2.json` (copie de `docs/runs/reponses-us-2.json`), répondeur
   commun, profil `architecte`.

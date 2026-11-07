@@ -18,7 +18,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - `passation.md` : 5 réponses écrites et commitées ; une seule question bloquante dans tout le run.
   Disjoncteur : sans effet (le refus répété tombait au 3e essai, celui du budget). Réfutateur : 2
   appels, aucune réfutation.
-- Branche du run **non poussée** sur `exemple-dotnet-tdd` (clone : `/tmp/essai-mcp-skraft-XFWURU/projet`).
+- Branche du run poussée sur `exemple-dotnet-tdd` : `tests/us-2/mcp-claude-2` (`5fe93b0`).
 
 ## 07/11 — Questions ouvertes tranchées ; réponses humaines citables (passation.md)
 
