@@ -44,6 +44,9 @@ import {
   globToRegExp,
   runCanaries,
   parseStackProfile,
+  FICHIER_PROJET,
+  ecrirePileDansProjet,
+  lireFichierProjet,
   selectStackAdapter,
   type StackAdapter,
 } from "@agent-studio/stack-adapters";
@@ -189,7 +192,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
     const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
     const manifests = sources.map((e) => e.manifest);
-    if (declare) onPost("agent-studio", `Stack du projet : **${declare.id}**, d'après le profil \`${PROFIL_PROJET}\`.`);
+    if (declare) onPost("agent-studio", `Stack du projet : **${declare.id}**, d'après le profil déclaré par le projet.`);
     if (source === "repli") {
       cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
       // Dit dans la conversation, pas seulement dans le journal : le repli change ce que font
@@ -517,8 +520,41 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
   };
 }
 
-/** Emplacement du profil, dans le dépôt : il décrit le projet et se versionne avec lui. */
+/** Ancien emplacement du profil (avant l'ADR 0071), relu le temps de la transition. */
 const PROFIL_PROJET = ".agent-studio/stack.yaml";
+
+/** Où est le profil de pile du projet, et ce qu'il faut en dire (ADR 0071). */
+interface SourceDuProfil {
+  /** Nom à donner dans les messages : `projet.yaml` (section pile) ou l'ancien `stack.yaml`. */
+  libelle: string;
+  /** Profil en YAML ; `null` : le fichier de projet n'a pas de section `pile`. */
+  brut: string | null;
+  erreur?: string;
+  avertissements: string[];
+}
+
+async function lireOuNul(chemin: string): Promise<string | null> {
+  try {
+    return await readFile(chemin, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** `projet.yaml` fait foi (ADR 0071) ; sinon l'ancien `stack.yaml`, avec un avertissement. */
+async function lireSourceDuProfil(root: string): Promise<SourceDuProfil | null> {
+  const projet = await lireOuNul(join(root, FICHIER_PROJET));
+  const ancien = await lireOuNul(join(root, PROFIL_PROJET));
+  if (projet !== null) {
+    const avertissements = ancien !== null ? [`\`${PROFIL_PROJET}\` est ignoré : \`${FICHIER_PROJET}\` fait foi, supprime-le (ADR 0071).`] : [];
+    const p = lireFichierProjet(projet);
+    if ("error" in p) return { libelle: `\`${FICHIER_PROJET}\``, brut: null, erreur: p.error, avertissements };
+    return { libelle: `\`${FICHIER_PROJET}\` (section pile)`, brut: p.pile ?? null, avertissements };
+  }
+  if (ancien !== null)
+    return { libelle: `\`${PROFIL_PROJET}\``, brut: ancien, avertissements: [`Profil de pile lu dans \`${PROFIL_PROJET}\` : regroupe-le dans \`${FICHIER_PROJET}\`, section pile (ADR 0071).`] };
+  return null;
+}
 
 /**
  * Lit le profil déclaré par le projet, s'il existe. Un profil refusé n'interrompt pas
@@ -527,13 +563,12 @@ const PROFIL_PROJET = ".agent-studio/stack.yaml";
  * l'agent peut modifier : les programmes qu'il nomme sont soumis à la liste de l'administrateur.
  */
 async function lireProfilDeclare(root: string, allowedPrograms: readonly string[]): Promise<ProfilDeclare> {
-  let brut: string;
-  try {
-    brut = await readFile(join(root, PROFIL_PROJET), "utf8");
-  } catch {
-    return null; // pas de profil : la détection s'applique, sans rien dire
-  }
-  return parseStackProfile(brut, { allowedPrograms });
+  const src = await lireSourceDuProfil(root);
+  if (!src) return null; // pas de profil : la détection s'applique, sans rien dire
+  if (src.erreur) return { error: src.erreur };
+  if (src.brut === null) return null;
+  const lu = parseStackProfile(src.brut, { allowedPrograms });
+  return "error" in lu ? { error: `${src.libelle} : ${lu.error}` } : lu;
 }
 
 async function lireProfilDuProjet(
@@ -542,11 +577,13 @@ async function lireProfilDuProjet(
   onPost: (extensionId: string, markdown: string) => void,
   logger?: Logger,
 ): Promise<StackAdapter | null> {
+  const src = await lireSourceDuProfil(root);
+  for (const a of src?.avertissements ?? []) onPost("agent-studio", a);
   const lu = await lireProfilDeclare(root, allowedPrograms);
   if (lu === null) return null;
   if ("error" in lu) {
     logger?.warn("profil de stack refusé", { root, error: lu.error });
-    onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez \`${PROFIL_PROJET}\` puis rouvrez le projet.`);
+    onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez ${src?.libelle ?? `\`${FICHIER_PROJET}\``} puis rouvrez le projet.`);
     return null;
   }
   return createProfileAdapter(lu.profile);
@@ -569,12 +606,18 @@ function stackCommandDeps(args: {
   const fichiers = () => workspace.files.list();
 
   return {
-    chemin: PROFIL_PROJET,
+    // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
+    chemin: FICHIER_PROJET,
     profilDeclare: () => lireProfilDeclare(workspace.root, allowedPrograms),
     stackActive: () => ({ id: stack.id, declaree }),
     post: (markdown) => onPost("agent-studio", markdown),
     confirmer: (req) => confirmer.confirm(req),
-    ecrireProfil: (yaml) => workspace.files.write(PROFIL_PROJET, yaml),
+    async ecrireProfil(yaml) {
+      const existant = await workspace.files.read(FICHIER_PROJET).catch(() => null);
+      const r = ecrirePileDansProjet(existant, yaml);
+      if (typeof r !== "string") throw new Error(r.error);
+      await workspace.files.write(FICHIER_PROJET, r);
+    },
 
     async indices() {
       const tous = await fichiers();

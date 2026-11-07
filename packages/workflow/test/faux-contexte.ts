@@ -97,6 +97,7 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
       mutation: async () => null,
       architecture: async (regles: unknown) => ({ modules: [], violations: [], regles }),
       lint: async () => null,
+      format: async () => null,
     },
     interactions: {
       async request(req: (typeof demandes)[number]) {

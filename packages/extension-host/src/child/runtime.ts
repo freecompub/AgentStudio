@@ -139,6 +139,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
         mutation: (opts) => call("stack.mutation", [], opts?.signal),
         architecture: (rules) => call("stack.architecture", [rules]),
         lint: (opts) => call("stack.lint", [opts?.files ? { files: opts.files } : undefined], opts?.signal),
+        format: (opts) => call("stack.format", [opts?.files ? { files: opts.files } : undefined], opts?.signal),
       },
       tasks: {
         register(def) {

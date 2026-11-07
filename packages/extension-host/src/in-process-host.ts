@@ -267,6 +267,16 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           ...(opts?.signal ? { signal: opts.signal } : {}),
         });
       },
+      async format(opts) {
+        // L'outil de format est un programme du projet, comme le linter (ADR 0071).
+        perm.require("shell:test");
+        if (!deps.stack.format) return null;
+        return deps.stack.format({
+          root: deps.workspace.root,
+          ...(opts?.files ? { files: opts.files } : {}),
+          ...(opts?.signal ? { signal: opts.signal } : {}),
+        });
+      },
     },
 
     trace: {

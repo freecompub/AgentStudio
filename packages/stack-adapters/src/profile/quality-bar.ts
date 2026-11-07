@@ -1,15 +1,17 @@
 /**
- * Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`. PUR.
+ * Barre de qualité du projet (ADR 0049, 0071) : section `qualite` de `.agent-studio/projet.yaml`
+ * (l'ancien `quality.yaml` pendant la transition). PUR.
  *
  * Elle dit **ce qui est exigé** — seuils de couverture et de mutation par couche, ce qu'est le cœur
- * (domaine, application), si l'on mute, règles de dépendance. `stack.yaml` dit **comment** lancer
- * les outils : une commande y est vérifiée contre les programmes autorisés et son écriture confirmée
+ * (domaine, application), si l'on mute, règles de dépendance. La section `pile` dit **comment**
+ * lancer les outils : une commande y est vérifiée contre les programmes autorisés et son écriture confirmée
  * par l'utilisateur ; la barre ne lance rien. Elle est commune aux extensions (skraft, tdd).
  *
  * Le cœur se définit par des **chemins**, plus par des noms de couches : `Domain` comme segment ne
  * reconnaissait pas `Tarification.Domaine`, et tout le domaine passait au seuil du reste (03/10).
  */
 import { parse as parseYaml } from "yaml";
+import { FICHIER_PROJET, lireFichierProjet } from "./fichier-projet.js";
 import { z } from "zod";
 import { matchesAnyIgnoringCase } from "../glob.js";
 import type { DependencyRule } from "../protocols.js";
@@ -24,7 +26,7 @@ export interface QualityBar {
   dependencyRules: DependencyRule[];
 }
 
-export type QualityBarSource = ".agent-studio/quality.yaml" | ".skraft/quality.json" | "défaut";
+export type QualityBarSource = ".agent-studio/projet.yaml" | ".agent-studio/quality.yaml" | ".skraft/quality.json" | "défaut";
 
 /** Noms usuels des couches, français compris, seuls ou préfixés (`Tarification.Domaine`). */
 const DEFAULT_CORE = {
@@ -59,17 +61,19 @@ const legacySchema = z.object({
   dependencyRules: z.array(z.object({ module: z.string(), forbidden: z.array(z.string()) })).optional(),
 });
 
-const issues = (file: string, e: z.ZodError) => `\`${file}\` invalide : ${e.issues.map((i) => `${i.path.join(".") || "(racine)"} ${i.message}`).join("; ")}`;
+/** `libelle` : le fichier tel qu'il doit être nommé, section comprise (« `projet.yaml` (section qualite) »). */
+const issues = (libelle: string, e: z.ZodError) => `${libelle} invalide : ${e.issues.map((i) => `${i.path.join(".") || "(racine)"} ${i.message}`).join("; ")}`;
 /** Seuils déclarés seulement : une clé absente n'est pas exigée, elle ne vaut pas `undefined`. */
 const defined = (o: Record<Layer, number | undefined>): Partial<Record<Layer, number>> =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<Record<Layer, number>>;
 
 /**
- * Barre du projet : le nouveau fichier s'il existe, sinon l'ancien (converti, avec un avertissement),
- * sinon les valeurs par défaut. Une clé inconnue ou un seuil hors bornes est **refusé**, jamais
+ * Barre du projet : la section `qualite` de `projet.yaml` s'il existe (ADR 0071), sinon
+ * `quality.yaml`, sinon l'ancien `.skraft/quality.json` (converti), chacun avec un avertissement de
+ * transition, sinon les valeurs par défaut. Une clé inconnue ou un seuil hors bornes est **refusé**, jamais
  * ignoré : une barre mal écrite qu'on appliquerait à moitié attesterait d'une exigence qu'elle n'a pas.
  */
-export function parseQualityBar(files: { yaml?: string | null; legacyJson?: string | null }):
+export function parseQualityBar(files: { projet?: string | null; yaml?: string | null; legacyJson?: string | null }):
   | {
       bar: QualityBar;
       source: QualityBarSource;
@@ -78,43 +82,68 @@ export function parseQualityBar(files: { yaml?: string | null; legacyJson?: stri
       declaredCore: ("domaine" | "application")[];
     }
   | { error: string } {
-  if (files.yaml != null) {
-    let data: unknown;
-    try {
-      data = parseYaml(files.yaml) ?? {};
-    } catch (err) {
-      return { error: `\`.agent-studio/quality.yaml\` n'est pas du YAML valide : ${err instanceof Error ? err.message.split("\n")[0] : String(err)}` };
-    }
-    const r = schema.safeParse(data);
-    if (!r.success) return { error: issues(".agent-studio/quality.yaml", r.error) };
-    const q = r.data;
-    return {
-      source: ".agent-studio/quality.yaml",
-      warnings: [],
-      declaredCore: [...(q.coeur?.domaine ? ["domaine" as const] : []), ...(q.coeur?.application ? ["application" as const] : [])],
-      bar: {
-        core: { domain: q.coeur?.domaine ?? DEFAULT_CORE.domain, application: q.coeur?.application ?? DEFAULT_CORE.application },
-        coverage: defined({ domain: q.couverture?.domaine, application: q.couverture?.application, rest: q.couverture?.reste }),
-        mutation: {
-          active: q.mutation?.active ?? DEFAULT_MUTATION.active,
-          domain: q.mutation?.domaine ?? DEFAULT_MUTATION.domain,
-          application: q.mutation?.application ?? DEFAULT_MUTATION.application,
-          rest: q.mutation?.reste ?? DEFAULT_MUTATION.rest,
-          moment: q.mutation?.moment === "scenario" ? "scenario" : "phase-end",
-        },
-        dependencyRules: (q.dependances ?? []).map((d) => ({ module: d.module, forbidden: d.interdits })),
-      },
-    };
+  // `projet.yaml` fait foi (ADR 0071) : sa section `qualite`, sinon les valeurs par défaut.
+  if (files.projet != null) {
+    const p = lireFichierProjet(files.projet);
+    if ("error" in p) return p;
+    const r = lireBarre(p.qualite ?? "", `\`${FICHIER_PROJET}\` (section qualite)`, ".agent-studio/projet.yaml");
+    if ("error" in r) return r;
+    const anciens = [...(files.yaml != null ? ["`.agent-studio/quality.yaml`"] : []), ...(files.legacyJson != null ? ["`.skraft/quality.json`"] : [])];
+    return anciens.length ? { ...r, warnings: [`${anciens.join(" et ")} ignorés : \`${FICHIER_PROJET}\` fait foi, supprime-les (ADR 0071).`] } : r;
   }
-  if (files.legacyJson != null) {
+  if (files.yaml != null) {
+    const r = lireBarre(files.yaml, "`.agent-studio/quality.yaml`", ".agent-studio/quality.yaml");
+    if ("error" in r) return r;
+    return { ...r, warnings: [`Barre lue dans \`.agent-studio/quality.yaml\` : regroupe-la dans \`${FICHIER_PROJET}\`, section qualite (ADR 0071).`] };
+  }
+  return lireAncienneBarre(files.legacyJson);
+}
+
+/** Barre au format YAML (section `qualite` ou ancien `quality.yaml`) ; `libelle` nomme le fichier dans les erreurs. */
+function lireBarre(yaml: string, libelle: string, source: QualityBarSource):
+  | { bar: QualityBar; source: QualityBarSource; warnings: string[]; declaredCore: ("domaine" | "application")[] }
+  | { error: string } {
+  let data: unknown;
+  try {
+    data = parseYaml(yaml) ?? {};
+  } catch (err) {
+    return { error: `${libelle} n'est pas du YAML valide : ${err instanceof Error ? err.message.split("\n")[0] : String(err)}` };
+  }
+  const r = schema.safeParse(data);
+  if (!r.success) return { error: issues(libelle, r.error) };
+  const q = r.data;
+  return {
+    source,
+    warnings: [],
+    declaredCore: [...(q.coeur?.domaine ? ["domaine" as const] : []), ...(q.coeur?.application ? ["application" as const] : [])],
+    bar: {
+      core: { domain: q.coeur?.domaine ?? DEFAULT_CORE.domain, application: q.coeur?.application ?? DEFAULT_CORE.application },
+      coverage: defined({ domain: q.couverture?.domaine, application: q.couverture?.application, rest: q.couverture?.reste }),
+      mutation: {
+        active: q.mutation?.active ?? DEFAULT_MUTATION.active,
+        domain: q.mutation?.domaine ?? DEFAULT_MUTATION.domain,
+        application: q.mutation?.application ?? DEFAULT_MUTATION.application,
+        rest: q.mutation?.reste ?? DEFAULT_MUTATION.rest,
+        moment: q.mutation?.moment === "scenario" ? "scenario" : "phase-end",
+      },
+      dependencyRules: (q.dependances ?? []).map((d) => ({ module: d.module, forbidden: d.interdits })),
+    },
+  };
+}
+
+/** Ancien `.skraft/quality.json`, converti, ou les valeurs par défaut. */
+function lireAncienneBarre(legacyJson: string | null | undefined):
+  | { bar: QualityBar; source: QualityBarSource; warnings: string[]; declaredCore: ("domaine" | "application")[] }
+  | { error: string } {
+  if (legacyJson != null) {
     let data: unknown;
     try {
-      data = JSON.parse(files.legacyJson);
+      data = JSON.parse(legacyJson);
     } catch {
       return { error: "`.skraft/quality.json` n'est pas du JSON valide." };
     }
     const r = legacySchema.safeParse(data);
-    if (!r.success) return { error: issues(".skraft/quality.json", r.error) };
+    if (!r.success) return { error: issues("`.skraft/quality.json`", r.error) };
     const q = r.data;
     const layers = q.mutation?.coreLayers;
     const globsOf = (names: string[]) => names.flatMap((n) => [`**/${n}/**`, `**/*.${n}/**`]);
@@ -124,7 +153,7 @@ export function parseQualityBar(files: { yaml?: string | null; legacyJson?: stri
     return {
       source: ".skraft/quality.json",
       declaredCore: [],
-      warnings: ["Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/quality.yaml` (ADR 0049)."],
+      warnings: ["Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/projet.yaml`, section qualite (ADR 0071)."],
       bar: {
         core,
         coverage: defined({ domain: q.coverage?.core, application: q.coverage?.core, rest: q.coverage?.edge }),

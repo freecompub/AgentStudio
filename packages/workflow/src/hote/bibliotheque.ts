@@ -24,7 +24,7 @@ export const bibliotheque = Object.freeze({
   /** Le chemin correspond-il à l'un des motifs (`**`, `*`) ? */
   correspond: (motifs: readonly string[], chemin: string): boolean => matchesAny(motifs, chemin),
   lireYaml: (texte: string): unknown => parseYaml(texte),
-  /** Barre de qualité du projet (ADR 0049), depuis `.agent-studio/quality.yaml` ou l'ancien `.skraft/quality.json`. */
+  /** Barre de qualité du projet : section `qualite` de `.agent-studio/projet.yaml` (ADR 0071), ou les anciens `quality.yaml` et `.skraft/quality.json`. */
   lireBarreDeQualite: parseQualityBar,
   couchesManquantes: coreFilesMissing,
   coucheDe: layerOf,

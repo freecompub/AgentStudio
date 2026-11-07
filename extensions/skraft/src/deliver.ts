@@ -4,7 +4,7 @@
  * mesurables. Aucune I/O : les effets leur passent le contenu lu par le code.
  */
 import { layerOf } from "@agent-studio/extension-api";
-import type { ArchitectureReport, CoverageReport, DependencyRule, Evidence, LintReport, MutationReport, QualityBar } from "@agent-studio/extension-api";
+import type { ArchitectureReport, CoverageReport, DependencyRule, Evidence, FormatReport, LintReport, MutationReport, QualityBar } from "@agent-studio/extension-api";
 import { acOf } from "./distill.js";
 
 export type Granularity = "turn-per-scenario" | "session-per-step";
@@ -84,8 +84,9 @@ export function checkRedGreenSequence(evidence: Evidence[], unitTests: string[])
 }
 
 // ---------- barre de qualité (configurable par projet) ---------------------------------
-// La barre vit dans `.agent-studio/quality.yaml`, commune aux extensions (ADR 0049) : lue par
-// `parseQualityBar` de `@agent-studio/extension-api`. L'ancien `.skraft/quality.json` est relu, converti.
+// La barre vit dans la section `qualite` de `.agent-studio/projet.yaml`, commune aux extensions
+// (ADR 0049, 0071) : lue par `parseQualityBar` de `@agent-studio/extension-api`. Pendant la
+// transition, `.agent-studio/quality.yaml` puis l'ancien `.skraft/quality.json` sont relus.
 
 /**
  * Règles appliquées quand le projet n'en déclare aucune : le domaine n'importe pas ce que la
@@ -216,4 +217,17 @@ export function checkLint(report: LintReport | null): string[] {
   return report.violations.map(
     (v) => `Lint : ${v.file}${v.line !== undefined ? `:${v.line}` : ""} — ${v.rule} : ${v.message}`,
   );
+}
+
+/**
+ * Porte de format (ADR 0071, point 6) : le code de sortie de la commande `format` de la pile suffit.
+ * Un écart est une correction pour le développeur ; une commande absente ou muette n'atteste de rien.
+ */
+export function checkFormat(report: FormatReport | null, scenarioId: string): { motifs: string[]; faits: string[]; notes: string[] } {
+  if (!report) return { motifs: [], faits: [], notes: ["Format non mesuré : la pile du projet ne déclare pas de commande `format`."] };
+  if (!report.available) return { motifs: [], faits: [], notes: ["Format non mesuré : la commande de format du projet n'a pas pu s'exécuter."] };
+  const outil = report.tool ?? "la commande de format";
+  if (report.ok) return { motifs: [], faits: [`Format (${scenarioId}) : ${outil} sans écart.`], notes: [] };
+  const motif = `Format : ${outil} signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.`;
+  return { motifs: [report.sortie ? `${motif}\n${report.sortie}` : motif], faits: [], notes: [] };
 }

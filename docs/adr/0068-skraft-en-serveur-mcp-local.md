@@ -66,10 +66,11 @@ par rôle, et le serveur ne voit pas les écritures de l'hôte.
 
 8. **Pile du projet.** Le serveur reprend le
    choix de l'application (`packages/project-services/src/workspace-services.ts`), dans cet ordre :
-   - le **profil du projet** `.agent-studio/stack.yaml`, versionné avec le dépôt ;
+   - le **profil du projet** : section `pile` de `.agent-studio/projet.yaml` (ADR 0071 ; l'ancien
+     `.agent-studio/stack.yaml` pendant la transition), versionné avec le dépôt ;
    - sinon la **détection automatique** par les adaptateurs (TypeScript aujourd'hui) ;
    - sinon le **profil fourni par le client** dans son appel (argument `pile` de `skraft_demarrer`),
-     au même format que `.agent-studio/stack.yaml`.
+     au même format que la section `pile`.
 
    Un profil fourni par le client passe les **mêmes contrôles** qu'un profil du projet : validation
    du schéma, et chaque programme qu'il nomme doit figurer dans la liste de l'administrateur

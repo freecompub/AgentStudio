@@ -3,7 +3,7 @@ import { access, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
-import type { LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
+import type { FormatReport, LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
@@ -158,6 +158,26 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
             } catch {
               return { available: false, violations: [] };
             }
+          },
+        }
+      : {}),
+
+    ...(profile.format
+      ? {
+          async format(opts): Promise<FormatReport> {
+            const c = profile.format!;
+            const r = await runner
+              .run(c.command[0]!, substituer(c.command.slice(1), "", opts.files ?? []), {
+                cwd: opts.root,
+                timeoutMs: opts.timeoutMs ?? 5 * 60_000,
+                ...(opts.signal ? { signal: opts.signal } : {}),
+              })
+              .catch(() => null);
+            // Outil absent ou trop lent : rien n'a été vérifié, ce qui ne vaut pas « au format ».
+            if (!r || r.timedOut || r.exitCode === null) return { available: false, ok: false };
+            if (r.exitCode === 0) return { available: true, ok: true, tool: c.command[0]! };
+            const sortie = `${r.stdout}\n${r.stderr}`.trim().slice(-4_000);
+            return { available: true, ok: false, tool: c.command[0]!, ...(sortie ? { sortie } : {}) };
           },
         }
       : {}),

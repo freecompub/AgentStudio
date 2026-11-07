@@ -513,7 +513,7 @@ Tout ce qui dépend du langage ou de l'outillage d'un projet est **externalisé 
 
 ### 8.2 Format du profil
 
-Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON Schema `stack-profile@1` (publié par `packages/stack-profiles`).
+Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON Schema `stack-profile@1` (publié par `packages/stack-profiles`). *Depuis l'ADR 0071 : section `pile` de `.agent-studio/projet.yaml` ; `stack.yaml` n'est plus relu que pendant la transition.*
 
 ```yaml
 schema: agent-studio/stack-profile@1
@@ -584,7 +584,7 @@ Chaque section du profil est une capacité : `tests` (obligatoire), `mutation`, 
 
 ### 8.5 Résolution et sécurité
 
-1. Profil du projet (`.agent-studio/stack.yaml`), s'il existe.
+1. Profil du projet (section `pile` de `.agent-studio/projet.yaml`, ADR 0071 ; l'ancien `.agent-studio/stack.yaml` pendant la transition), s'il existe.
 2. Sinon, profil contribué par une extension de type « pack de stack », choisi par `detect`.
 3. Sinon, profil minimal : l'utilisateur fournit seulement la commande de test produisant du JUnit XML.
 

@@ -315,6 +315,7 @@ describe("skraft — critères de sortie de S1", () => {
     expect(s.deliver?.notes).toEqual([
       "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+      "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
     ]);

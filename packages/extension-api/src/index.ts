@@ -3,7 +3,7 @@
  * Une extension ne voit que `ExtensionContext` : aucun objet du SDK, aucune session (D10).
  */
 import type { Evidence, TerminalOutput, TerminalToolName } from "@agent-studio/core";
-import type { ArchitectureReport, DependencyRule, LintReport, MutationReport, TestRun } from "@agent-studio/stack-adapters";
+import type { ArchitectureReport, DependencyRule, FormatReport, LintReport, MutationReport, TestRun } from "@agent-studio/stack-adapters";
 import type { SystemEvent, TaskDefinition } from "@agent-studio/task-engine";
 
 export const API_VERSION = "0.1.0";
@@ -17,7 +17,7 @@ export { coverageForChanges, baselineProblems } from "@agent-studio/stack-adapte
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 
 export type { Evidence, TerminalOutput, TerminalToolName, TestRun, SystemEvent, TaskDefinition };
-export type { ArchitectureReport, CoverageReport, DependencyRule, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
+export type { ArchitectureReport, CoverageReport, DependencyRule, FormatReport, LintReport, MutationReport, TestResult } from "@agent-studio/stack-adapters";
 export type { TaskEvent, EffectContext } from "@agent-studio/task-engine";
 
 // ---------- Manifeste (§5.1) ------------------------------------------------------
@@ -215,6 +215,11 @@ export interface StackApi {
    * qu'un lanceur de tests. L'appeler sans l'avoir déclarée lève, comme pour `mutation`.
    */
   lint(opts?: { files?: string[]; signal?: AbortSignal }): Promise<LintReport | null>;
+  /**
+   * Mise en forme vérifiée par l'outil du projet, sans rien modifier (ADR 0071) ; `null` si le
+   * profil n'en déclare pas. Même permission que le lint (`shell:test`).
+   */
+  format(opts?: { files?: string[]; signal?: AbortSignal }): Promise<FormatReport | null>;
 }
 
 /** Appel d'outil soumis aux hooks (forme normalisée, indépendante du runtime). */

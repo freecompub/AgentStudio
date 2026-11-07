@@ -92,7 +92,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
           .string()
           .max(20_000)
           .optional()
-          .describe("Profil de pile en YAML, au format de .agent-studio/stack.yaml, si le projet n'en a pas et qu'aucun adaptateur ne le reconnaît. Ses programmes doivent être autorisés par l'administrateur."),
+          .describe("Profil de pile en YAML, au format de la section pile de .agent-studio/projet.yaml (ADR 0071), si le projet n'en a pas et qu'aucun adaptateur ne le reconnaît. Ses programmes doivent être autorisés par l'administrateur."),
         accord: z.enum(["une-fois", "toujours"]).optional().describe("Accord de l'utilisateur sur le workflow, après lui avoir montré le résumé rendu par un premier appel."),
         projet,
       },

@@ -3,7 +3,7 @@ import { coverageForChanges } from "@agent-studio/extension-api";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { GELÉS } from "../src/effects.js";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../src/deliver.js";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -151,6 +151,30 @@ describe("Qualité de forme : le linter du projet, pas un analyseur maison", () 
 });
 
 /**
+ * Porte de format (ADR 0071, point 6) : le code de sortie de la commande `format` de la pile suffit.
+ * Un écart est une correction pour le développeur ; une commande absente ou muette n'atteste de rien.
+ */
+describe("Porte de format : la commande du projet, à côté du lint", () => {
+  it("au format : un fait, aucun motif", () => {
+    expect(checkFormat({ available: true, ok: true, tool: "prettier" }, "ac-1")).toEqual({ motifs: [], faits: ["Format (ac-1) : prettier sans écart."], notes: [] });
+  });
+
+  it("hors format : un motif qui dit quoi faire, avec la sortie de l'outil", () => {
+    expect(checkFormat({ available: true, ok: false, tool: "dotnet", sortie: "src/A.cs(3,1): WHITESPACE" }, "ac-1")).toEqual({
+      motifs: ["Format : dotnet signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.\nsrc/A.cs(3,1): WHITESPACE"],
+      faits: [],
+      notes: [],
+    });
+    expect(checkFormat({ available: true, ok: false }, "ac-1").motifs).toEqual(["Format : la commande de format signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet."]);
+  });
+
+  it("non déclarée ou muette : non mesurée, et c'est noté", () => {
+    expect(checkFormat(null, "ac-1")).toEqual({ motifs: [], faits: [], notes: ["Format non mesuré : la pile du projet ne déclare pas de commande `format`."] });
+    expect(checkFormat({ available: false, ok: false }, "ac-1")).toEqual({ motifs: [], faits: [], notes: ["Format non mesuré : la commande de format du projet n'a pas pu s'exécuter."] });
+  });
+});
+
+/**
  * Couverture de lignes (§7.4). Elle n'est pas redondante avec la mutation : elle en est le
  * **plancher**. La mutation juge si un test sert à quelque chose, la couverture seulement si le
  * code est atteint — mais elle est peu coûteuse et presque toujours disponible, là où un outil de
@@ -204,6 +228,8 @@ describe("Seuils de couverture", () => {
 describe("Barre de qualité hors de portée des agents", () => {
   it("`.skraft/quality.json` est gelé", () => {
     expect(GELÉS).toContain(".skraft/quality.json");
+    // Fichier de projet (ADR 0071) : la pile et la barre, hors d'atteinte des agents.
+    expect(GELÉS).toContain(".agent-studio/projet.yaml");
   });
 
   it("le gel est passé à chaque lancement de spécialiste, pas seulement déclaré", async () => {
@@ -453,7 +479,7 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
   const { scenarioGate, phaseEndMutation } = await import("../src/deliver-effects.js");
   const { initialState } = await import("../src/reducer.js");
 
-  function ctxWith(files: Record<string, string>, mutation: unknown) {
+  function ctxWith(files: Record<string, string>, mutation: unknown, format: unknown = null) {
     let mutations = 0;
     const ctx = {
       workspace: {
@@ -471,6 +497,7 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
         runTests: async () => ({ timedOut: false, results: [{ id: "A.Ac1_x", file: "A", name: "x", status: "passed" }] }),
         mutation: async () => (mutations++, mutation),
         lint: async () => null,
+        format: async () => format,
         architecture: async () => null,
         infrastructureModules: [],
       },
@@ -485,6 +512,15 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
     deliver: { scenarios: [{ id: "ac-1", acceptanceTestId: "A.Ac1_x" }], baseline: { all: [], passed: [] } },
   } as never;
   const survivant = { score: 80, files: [{ file: "Tarification.Domaine/Montant.cs", score: 80, survived: [{ line: 25, operator: "ArithmeticOperatorReplacement" }] }] };
+
+  it("porte de format : un écart rejette le scénario ; sans commande, c'est noté (ADR 0071)", async () => {
+    const gate = (ctx: never) => scenarioGate({ kind: "scenarioGate", scenarioId: "ac-1", since: "cp", unitTests: [], pending: [] } as never, { ctx, state, taskId: "t", signal: new AbortController().signal });
+    const ko = await gate(ctxWith({}, null, { available: true, ok: false, tool: "dotnet" }).ctx);
+    expect(ko).toEqual({ type: "SCENARIO_FAIL", reasons: [expect.stringMatching(/^Format : dotnet signale du code hors format/)] });
+    const ok = await gate(ctxWith({}, null, { available: true, ok: true, tool: "dotnet" }).ctx);
+    expect(ok).toMatchObject({ type: "SCENARIO_OK", facts: expect.arrayContaining(["Format (ac-1) : dotnet sans écart."]) });
+    expect(await gate(ctxWith({}, null).ctx)).toMatchObject({ notes: expect.arrayContaining(["Format non mesuré : la pile du projet ne déclare pas de commande `format`."]) });
+  });
 
   it("par défaut, la mutation ne tourne pas à chaque scénario", async () => {
     const { ctx, mutations } = ctxWith({}, survivant);
@@ -508,7 +544,16 @@ describe("barre de qualité du projet (ADR 0049)", async () => {
     const inactive = ctxWith({ ".agent-studio/quality.yaml": "mutation:\n  active: false\n" }, survivant);
     const fin = await phaseEndMutation(inactive.ctx, state);
     expect(inactive.mutations()).toBe(0);
-    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    // Lue dans l'ancien quality.yaml : l'avertissement de transition s'ajoute (ADR 0071).
+    expect(fin).toEqual({ reasons: [], mutants: [], facts: [], notes: [expect.stringMatching(/regroupe-la dans .*projet\.yaml/), "Mutation désactivée par la barre de qualité du projet."] });
+  });
+
+  it("barre lue dans la section qualite de projet.yaml (ADR 0071) ; invalide, la porte s'arrête en nommant la section", async () => {
+    const inactive = ctxWith({ ".agent-studio/projet.yaml": "qualite:\n  mutation:\n    active: false\n" }, survivant);
+    expect(await phaseEndMutation(inactive.ctx, state)).toMatchObject({ reasons: [], notes: ["Mutation désactivée par la barre de qualité du projet."] });
+    expect(inactive.mutations()).toBe(0);
+    const { ctx } = ctxWith({ ".agent-studio/projet.yaml": "qualite:\n  couverture:\n    domaine: 150\n" }, null);
+    await expect(phaseEndMutation(ctx, state)).rejects.toThrow(/projet\.yaml.*section qualite.*couverture\.domaine/);
   });
 
   it("une barre invalide arrête la porte : la juger à moitié serait attester à tort", async () => {

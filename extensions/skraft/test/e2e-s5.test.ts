@@ -25,7 +25,7 @@ describe("skraft — porte de fin de scénario (pile simulée)", () => {
 
   it("mutation sous le seuil du domaine : scénario refusé avec les survivants, repris en sessions séparées, puis livré", async () => {
     // Mutation par scénario, demandée par la barre du projet (ADR 0049) ; par défaut elle tourne en fin de DELIVER.
-    await put(root, ".agent-studio/quality.yaml", "mutation:\n  moment: scenario\n");
+    await put(root, ".agent-studio/projet.yaml", "qualite:\n  mutation:\n    moment: scenario\n");
     git(root, "add", "-A");
     git(root, "commit", "-qm", "barre de qualité : mutation par scénario");
     const roles: string[] = [];
@@ -64,6 +64,7 @@ describe("skraft — porte de fin de scénario (pile simulée)", () => {
       "Scénario ac-1 : repris en sessions séparées après un échec.",
       "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+      "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
     ]);
     // Après la reprise : sessions séparées pour le vert puis le nettoyage.
     const deliverRoles = roles.filter((r) => r === "skraft-test" || r === "skraft-dev");

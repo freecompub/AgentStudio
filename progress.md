@@ -5,6 +5,73 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Fichier de projet (ADR 0071) : l'exemple livré au nouveau format
+
+- `profiles/typescript.yaml` est désormais un `projet.yaml` complet : section `pile` (l'ancien
+  profil, plus `format: [prettier, --check, "{fichiers}"]`) et section `qualite` commentée (cœur,
+  couverture, mutation, dépendances). Le README de `profiles/` décrit les deux sections, la
+  transition et la porte de format ; SPEC (profil de stack) renvoie à l'ADR 0071.
+- **`prettier` ajouté aux programmes autorisés par défaut** (`admin-config`), sans quoi l'exemple
+  serait refusé. Choix fait ici, à signaler : un outil de format peut réécrire les fichiers du
+  projet (`--write`), comme `eslint --fix` déjà autorisé ; il ne sort pas du projet. Les autres
+  formateurs courants passent par un programme déjà autorisé (`dotnet format`, `cargo fmt`,
+  `ruff format`). Un test vérifie maintenant que la copie de la liste dans les tests de
+  `stack-adapters` reste égale à la vraie (elle avait pu diverger sans que rien ne le dise).
+- Les trois tests qui lisent l'exemple livré (profils, lint et canaris contre les vrais outils)
+  passent par `test/support/profil-livre.ts`.
+- Documentation alignée : ADR 0049 (points 1 et 2 revus par 0071), ADR 0068 (pile du serveur
+  MCP) et description de l'argument `pile` de `skraft_demarrer`, SPEC §8.5, `docs/16`, en-têtes de
+  `quality-bar.ts` et des deux `deliver`. Les plans et bilans datés restent tels qu'écrits.
+- `/stack init`, quand rien n'est reconnu, ne parle plus de « deux exemples » (il n'en reste qu'un
+  depuis le retrait de Swift).
+
+## 07/11 — Fichier de projet (ADR 0071), brique 3 : porte de format
+
+- Profil de pile : commande facultative `format` (`dotnet format --verify-no-changes`,
+  `prettier --check "{fichiers}"`), sans rapport ; son programme est vérifié contre la liste
+  autorisée comme les autres. L'adaptateur ne lit que le **code de sortie** : 0 au format, autre
+  hors format (fin de la sortie jointe, 4000 caractères) ; outil absent, délai ou code nul : non
+  mesuré (`available: false`), jamais « au format ».
+- Exposée comme le lint : `ctx.stack.format` (permission `shell:test`, `null` si la pile n'en
+  déclare pas), hôte isolé (`stack.format`), workflow (`w.format`, appel journalisé `format`).
+- `checkFormat(report, scenarioId)` → `{ motifs, faits, notes }`, en deux copies (`deliver.ts`,
+  `deliver.mjs`), appelée en fin de scénario juste après le lint. Un écart est un motif de rejet du
+  scénario, donc une correction pour le développeur ; sans commande, la note « Format non mesuré ».
+- Piège : les e2e comparent la liste exacte des notes ; la nouvelle note s'y ajoute (e2e-s1, e2e-s5
+  des deux côtés). Pas d'outil ajouté pour les agents : le code juge, l'agent reformate.
+- Prochaine étape : exemples de `profiles/` au format `projet.yaml` ; pousser `feat/fichier-projet`.
+
+## 07/11 — Fichier de projet (ADR 0071), brique 2 : `/stack init` écrit la section pile
+
+- `ecrirePileDansProjet(existant, pile)` (`stack-adapters`, pur) : ajoute ou remplace la section
+  `pile` de `projet.yaml` avec l'API `Document` de `yaml`, en gardant le reste **commentaires
+  compris** ; un fichier existant illisible n'est pas écrasé (erreur, rien d'écrit).
+- `/stack init` (dépendances de `project-services`) écrit `.agent-studio/projet.yaml` et nomme ce
+  fichier dans ses messages ; toujours après confirmation de l'utilisateur.
+- Tests vus rouges puis verts : écriture pure (3), `/stack init` (emplacement, et section `qualite`
+  d'un `projet.yaml` existant gardée). Le faux Workspace du test lit désormais le disque.
+- Non fait : les exemples commentés de `profiles/` restent au format de l'ancien `stack.yaml` (une
+  section `pile` sans l'en-tête).
+
+## 07/11 — Fichier de projet `.agent-studio/projet.yaml` (ADR 0071), brique 1 : lecture
+
+- Branche `feat/fichier-projet`, partie de `main` après la fusion de la PR #13.
+- Décidé par le responsable : regrouper `stack.yaml` et `quality.yaml` dans **un seul**
+  `.agent-studio/projet.yaml`, avec **deux sections validées chacune selon ses règles** (`pile` :
+  schéma du profil et programmes autorisés ; `qualite` : schéma strict de la barre). Revient sur les
+  points 1 et 2 de l'ADR 0049 ; le reste de l'ADR 0049 tient.
+- `lireFichierProjet` (`stack-adapters`) sépare les sections (clé de premier niveau inconnue
+  refusée, nommée) ; `parseQualityBar({ projet })` lit la section `qualite` en priorité.
+- **Transition** : sans `projet.yaml`, `stack.yaml` et `quality.yaml` (puis `.skraft/quality.json`)
+  sont lus avec un avertissement « regroupe-le dans projet.yaml » ; avec `projet.yaml`, les anciens
+  fichiers sont ignorés, et c'est dit s'ils sont encore là. Messages d'erreur : fichier **et section**.
+- Branché partout : pile (`project-services`, `lireSourceDuProfil`), barre (workflow `livraison.mjs`,
+  extension `deliver-effects.ts`), `GELÉS` (deux côtés).
+- Conséquence voulue : une barre lue dans l'ancien `quality.yaml` porte désormais un avertissement ;
+  deux tests qui l'attendaient sans (un test de mutation de l'extension, et e2e-s5 des deux côtés) ont
+  été adaptés — e2e-s5 passe au nouveau format plutôt que d'attendre l'avertissement.
+- Reste : la porte de format (brique 3).
+
 ## 07/11 — Runtime Claude : mémoire automatique coupée, version minimale du CLI
 
 - **Vérifié par un mot-témoin** (projet jetable, `haiku`) : avec nos arguments du 06/11, la

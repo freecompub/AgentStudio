@@ -8,7 +8,7 @@
 */
 import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -18,6 +18,8 @@ import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
 const QUALITY = ".agent-studio/quality.yaml";
 const QUALITY_LEGACY = ".skraft/quality.json";
+/** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
+const PROJET = ".agent-studio/projet.yaml";
 const MAX_CYCLES = 20;
 const GELES_TESTEUR = ["@stack:acceptanceTests"];
 const GELES_DEV = ["@stack:acceptanceTests", "@stack:unitTests"];
@@ -125,7 +127,7 @@ function natures(disp) {
 }
 /** Barre de qualité du projet (ADR 0049) ; invalide, c'est une panne : la juger à moitié serait attester à tort. */
 export async function barreDeQualite(w, disp) {
-  const q = parseQualityBar({ yaml: await lireOu(w, QUALITY), legacyJson: await lireOu(w, QUALITY_LEGACY) });
+  const q = parseQualityBar({ projet: await lireOu(w, PROJET), yaml: await lireOu(w, QUALITY), legacyJson: await lireOu(w, QUALITY_LEGACY) });
   if ("error" in q)
     throw new PanneEnvironnement(q.error);
   const sources = (await w.listerFichiers()).filter((f) => matchesAny(disp.sources, f));
@@ -565,6 +567,11 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
       if (omis.length > 0)
         notes.push(`Qualité de forme non mesurée sur ${omis.join(", ")} : le linter du projet ne les examine pas.`);
     }
+    // Format (ADR 0071) : la commande de la pile, à côté du lint ; un écart revient au développeur.
+    const format = checkFormat(await w.format(sources), sc.id);
+    motifs.push(...format.motifs);
+    faits.push(...format.faits);
+    notes.push(...format.notes);
   }
   const regles = barre.dependencyRules.length ? barre.dependencyRules : defaultDependencyRules(L.disp.infrastructureModules);
   if (regles.length === 0)

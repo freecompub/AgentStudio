@@ -99,6 +99,11 @@ const schema = z
     detect: z.array(z.string().min(1)).min(1),
     tests: commande,
     lint: commande.optional(),
+    /**
+     * Vérification de la mise en forme, sans rien modifier (ADR 0071) : le code de sortie suffit,
+     * aucun rapport à lire. `{fichiers}` reçoit les fichiers à vérifier.
+     */
+    format: z.object({ command: z.array(z.string().min(1)).min(1, "`command` doit nommer un programme et ses arguments.") }).strict().optional(),
     mutation: commande.optional(),
     layout: z
       .object({
@@ -192,6 +197,11 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
         error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` n'a pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
       };
   }
+
+  // Le format lance un programme lui aussi : même liste que les autres sections.
+  const format = parsed.data.format?.command[0];
+  if (format !== undefined && !autorises.has(format))
+    return { error: `Profil de stack refusé : « ${format} » (format) n'est pas un programme autorisé.` };
 
   // Le motif est compilé dès la lecture, pour que son refus soit expliqué à l'auteur du profil
   // plutôt que découvert au milieu d'une porte.

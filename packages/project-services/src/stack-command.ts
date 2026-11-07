@@ -158,7 +158,7 @@ async function init(deps: StackCommandDeps): Promise<void> {
     return deps.post(
       `**Rien de reconnu dans ce projet**, et je préfère ne rien proposer plutôt que de deviner. ` +
         `Les marques cherchées sont \`pyproject.toml\`, \`setup.cfg\`, et la dépendance \`vitest\`.\n\n` +
-        `Vous pouvez écrire \`${deps.chemin}\` à la main : \`profiles/\` en contient deux exemples commentés.`,
+        `Vous pouvez écrire \`${deps.chemin}\` à la main : \`profiles/typescript.yaml\` en est un exemple commenté, à ce format.`,
     );
 
   const programmes = programmesDe(yaml);

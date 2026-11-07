@@ -3,7 +3,7 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { coverageForChanges } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { checkCoverage, checkDependencies, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -147,6 +147,30 @@ describe("Qualité de forme : le linter du projet, pas un analyseur maison", () 
   it("sans linter, rien n'est reproché : la porte ne juge pas ce qu'elle n'a pas mesuré", () => {
     expect(checkLint({ available: false, violations: [] })).toEqual([]);
     expect(checkLint(null)).toEqual([]);
+  });
+});
+
+/**
+ * Porte de format (ADR 0071, point 6) : le code de sortie de la commande `format` de la pile suffit.
+ * Un écart est une correction pour le développeur ; une commande absente ou muette n'atteste de rien.
+ */
+describe("Porte de format : la commande du projet, à côté du lint", () => {
+  it("au format : un fait, aucun motif", () => {
+    expect(checkFormat({ available: true, ok: true, tool: "prettier" }, "ac-1")).toEqual({ motifs: [], faits: ["Format (ac-1) : prettier sans écart."], notes: [] });
+  });
+
+  it("hors format : un motif qui dit quoi faire, avec la sortie de l'outil", () => {
+    expect(checkFormat({ available: true, ok: false, tool: "dotnet", sortie: "src/A.cs(3,1): WHITESPACE" }, "ac-1")).toEqual({
+      motifs: ["Format : dotnet signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet.\nsrc/A.cs(3,1): WHITESPACE"],
+      faits: [],
+      notes: [],
+    });
+    expect(checkFormat({ available: true, ok: false }, "ac-1").motifs).toEqual(["Format : la commande de format signale du code hors format ; reformate les fichiers modifiés avec l'outil du projet."]);
+  });
+
+  it("non déclarée ou muette : non mesurée, et c'est noté", () => {
+    expect(checkFormat(null, "ac-1")).toEqual({ motifs: [], faits: [], notes: ["Format non mesuré : la pile du projet ne déclare pas de commande `format`."] });
+    expect(checkFormat({ available: false, ok: false }, "ac-1")).toEqual({ motifs: [], faits: [], notes: ["Format non mesuré : la commande de format du projet n'a pas pu s'exécuter."] });
   });
 });
 

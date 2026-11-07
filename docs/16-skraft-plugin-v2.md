@@ -401,7 +401,7 @@ Copilot, isolés.
    ne devons pas perdre en reprenant des éléments v2.
 8. **Désaccords de doctrine à trancher avant toute reprise** : « NEVER ask » (v2 : une lentille ne
    pose pas de question, `inconclusive` bloque) contre nos questions de revue (ADR 0063) ; REJECTED
-   supprimé ; seuils de mutation non configurables (nous : `.agent-studio/quality.yaml`, ADR 0049,
+   supprimé ; seuils de mutation non configurables (nous : section `qualite` de `.agent-studio/projet.yaml`, ADR 0049 et 0071,
    avec dérogations arbitrées, ADR 0065).
 
 ---

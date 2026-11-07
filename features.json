@@ -57,7 +57,7 @@
       "title": "Un profil d'exemple existe pour TypeScript",
       "verify": "pnpm vitest run --project stack-adapters test/profils-livres.test.ts",
       "passes": true,
-      "notes": "`profiles/typescript.yaml`, à copier dans `.agent-studio/stack.yaml`. `profiles/swift.yaml` retiré le 2026-10-11 (ADR 0061) ; le profil TypeScript lisait `muter-json` pour Stryker, il lit `stryker-json`. Reste en dessous de l'adaptateur écrit à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
+      "notes": "`profiles/typescript.yaml`, à copier dans `.agent-studio/projet.yaml` (sections pile et qualite, ADR 0071, depuis le 07/11). `profiles/swift.yaml` retiré le 2026-10-11 (ADR 0061) ; le profil TypeScript lisait `muter-json` pour Stryker, il lit `stryker-json`. Reste en dessous de l'adaptateur écrit à la main : voir j5-profil-detection-par-contenu et j5-profil-architecture. Jamais essayé contre un vrai lanceur : voir canaris-contre-un-vrai-lanceur."
     },
     {
       "id": "j5-chargement-profil",
@@ -310,6 +310,13 @@
       "verify": "pnpm vitest run --project runtime-claude",
       "passes": false,
       "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). À faire : relais MCP vers notre processus, reprise de session, interruption, choix du runtime, usage en dollars."
+    },
+    {
+      "id": "fichier-projet",
+      "title": "Un seul fichier .agent-studio/projet.yaml, sections pile et qualite validées chacune selon ses règles ; les anciens stack.yaml, quality.yaml et .skraft/quality.json relus pendant la transition, avec un avertissement ; projet.yaml gelé pour les agents ; /stack init écrit la section pile ; porte de format en fin de scénario (écart → correction du développeur, sans commande → noté)",
+      "verify": "pnpm vitest run --project stack-adapters test/fichier-projet.test.ts test/format.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/workspace-services.test.ts && pnpm vitest run --project workflow-skraft test/fichier-projet.test.ts && pnpm vitest run --project workflow-skraft test/deliver-gates.test.ts test/e2e-s5-workflow.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts test/e2e-s5.test.ts",
+      "passes": true,
+      "notes": "ADR 0071 (07/11), trois briques : lecture (pile, barre, GELÉS), écriture de la section pile par /stack init, porte de format (checkFormat, des deux côtés). profiles/typescript.yaml est un projet.yaml complet (pile avec format prettier, qualite) ; prettier ajouté aux programmes autorisés par défaut."
     },
     {
       "id": "refutateur-mesure-us2",

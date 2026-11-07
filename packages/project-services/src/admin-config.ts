@@ -12,15 +12,17 @@ import { z } from "zod";
  * Programmes qu'un profil de stack peut nommer sans que l'administrateur intervienne (D47, O12).
  *
  * Un profil vient du dépôt du projet, donc d'un fichier que l'agent peut modifier : sans cette
- * liste, il ferait exécuter n'importe quoi. N'y figurent que des lanceurs de tests, des linters
- * et des outils de mutation — jamais un interpréteur (`bash`, `node`), un client réseau (`curl`)
- * ni un outil capable d'écrire hors du projet.
+ * liste, il ferait exécuter n'importe quoi. N'y figurent que des lanceurs de tests, des linters,
+ * des outils de format et de mutation — jamais un interpréteur (`bash`, `node`), un client réseau
+ * (`curl`) ni un outil capable d'écrire hors du projet.
  */
 export const DEFAULT_ALLOWED_PROGRAMS = [
   // tests
   "pytest", "go", "cargo", "gradle", "mvn", "dotnet", "vitest", "jest", "phpunit", "rspec",
   // qualité de forme
   "eslint", "ruff", "flake8", "pylint", "ktlint", "rubocop", "phpcs",
+  // format (ADR 0071) ; `dotnet format`, `cargo fmt`, `ruff format` passent par leur programme
+  "prettier",
   // mutation
   "stryker", "mutmut", "pitest",
 ] as const;

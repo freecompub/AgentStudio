@@ -71,6 +71,20 @@ export interface LintReport {
   violations: { file: string; line?: number; rule: string; message: string }[];
 }
 
+/**
+ * Vérification de la mise en forme (ADR 0071), par l'outil du projet en mode vérification : le
+ * code de sortie dit si le code est au format. `available` faux : outil absent, muet ou trop
+ * lent — rien n'a été vérifié, ce qui ne vaut jamais « au format ».
+ */
+export interface FormatReport {
+  available: boolean;
+  ok: boolean;
+  /** Programme employé, cité dans les faits de la revue. */
+  tool?: string;
+  /** Sortie de l'outil quand le code n'est pas au format : ce qu'il faut corriger. */
+  sortie?: string;
+}
+
 /** Règle de dépendance : un module ne doit pas importer certains modules (§9.7). */
 export interface DependencyRule {
   module: string;
@@ -114,6 +128,8 @@ export interface StackAdapter {
    * renvoie `available: false`, pour que la porte le dise au lieu de conclure.
    */
   lint?(opts: { root: string; files?: string[]; timeoutMs?: number; signal?: AbortSignal }): Promise<LintReport>;
+  /** Mise en forme vérifiée sans rien modifier (ADR 0071) ; absente si le projet n'en déclare pas. */
+  format?(opts: { root: string; files?: string[]; timeoutMs?: number; signal?: AbortSignal }): Promise<FormatReport>;
 }
 
 // ---------- Exécution de processus ------------------------------------------------

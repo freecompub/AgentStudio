@@ -461,7 +461,7 @@ async function runGate(ctx: ExtensionContext, state: SkraftState, phase: Phase, 
  * lequel il allait être jugé, et la porte l'aurait validé en toute bonne foi. C'est le contraire du
  * principe du projet — le LLM propose, le code décide et vérifie.
  */
-export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml"] as const;
+export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml", ".agent-studio/projet.yaml"] as const;
 
 /**
  * Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037).

@@ -70,7 +70,7 @@ describe("parseQualityBar", () => {
     const r = parseQualityBar({ legacyJson: legacy });
     if ("error" in r) throw new Error(r.error);
     expect(r.source).toBe(".skraft/quality.json");
-    expect(r.warnings).toEqual([expect.stringMatching(/ancien emplacement.*\.agent-studio\/quality\.yaml/)]);
+    expect(r.warnings).toEqual([expect.stringMatching(/ancien emplacement.*\.agent-studio\/projet\.yaml/)]);
     expect(r.bar.coverage).toEqual({ domain: 90, application: 90, rest: 70 });
     expect(r.bar.mutation).toMatchObject({ domain: 100, application: 100, rest: 90 });
     expect(layerOf("src/Domain/A.cs", r.bar)).toBe("domain");

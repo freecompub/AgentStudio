@@ -29,12 +29,11 @@ layout:
   sources: ["src/**"]
 `;
 
-async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fournie?: string; sansRepli?: boolean }) {
+async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProjet?: string; fournie?: string; sansRepli?: boolean }) {
   const root = await mkdtemp(join(base, "projet-"));
-  if (o.profilProjet) {
-    await mkdir(join(root, ".agent-studio"), { recursive: true });
-    await writeFile(join(root, ".agent-studio", "stack.yaml"), o.profilProjet);
-  }
+  if (o.profilProjet || o.fichierProjet) await mkdir(join(root, ".agent-studio"), { recursive: true });
+  if (o.profilProjet) await writeFile(join(root, ".agent-studio", "stack.yaml"), o.profilProjet);
+  if (o.fichierProjet) await writeFile(join(root, ".agent-studio", "projet.yaml"), o.fichierProjet);
   const posts: string[] = [];
   const services = await workspaceServicesFactory({
     extensions: [],
@@ -68,6 +67,33 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
     const c = await ouvrir({ fournie: profil("python-client"), sansRepli: true });
     expect(c.services.pile()).toEqual({ id: "python-client", source: "client" });
     for (const x of [a, b, c]) await x.services.dispose();
+  });
+
+  it("projet.yaml (ADR 0071) : la section pile fait foi, avant l'ancien stack.yaml, qui est signalé comme ignoré", async () => {
+    const indente = (t: string) => t.trim().split("\n").map((l) => `  ${l}`).join("\n");
+    const a = await ouvrir({ fichierProjet: `pile:\n${indente(profil("python-projet"))}\n`, profilProjet: profil("python-ancien"), detecte: true });
+    expect(a.services.pile()).toEqual({ id: "python-projet", source: "projet" });
+    expect(a.posts.join("\n")).toMatch(/stack\.yaml.*ignoré.*projet\.yaml/s);
+    await a.services.dispose();
+  });
+
+  it("projet.yaml sans section pile : la détection s'applique ; section pile refusée : nommée, puis détection", async () => {
+    const a = await ouvrir({ fichierProjet: "qualite:\n  couverture:\n    reste: 70\n", detecte: true });
+    expect(a.services.pile()).toEqual({ id: "typescript", source: "detection" });
+    await a.services.dispose();
+    const indente = (t: string) => t.trim().split("\n").map((l) => `  ${l}`).join("\n");
+    const b = await ouvrir({ fichierProjet: `pile:\n${indente(profil("python-projet", "curl"))}\n`, detecte: true });
+    expect(b.services.pile().source).toBe("detection");
+    expect(b.posts.join("\n")).toMatch(/projet\.yaml.*section pile.*refus|refus.*projet\.yaml.*section pile/s);
+    expect(b.posts.join("\n")).toMatch(/curl/);
+    await b.services.dispose();
+  });
+
+  it("ancien stack.yaml seul : encore lu, avec un avertissement qui dit de le regrouper dans projet.yaml", async () => {
+    const a = await ouvrir({ profilProjet: profil("python-ancien"), detecte: true });
+    expect(a.services.pile()).toEqual({ id: "python-ancien", source: "projet" });
+    expect(a.posts.join("\n")).toMatch(/regroupe.*projet\.yaml/s);
+    await a.services.dispose();
   });
 
   it("pile fournie ignorée parce que le projet a la sienne : c'est dit", async () => {
