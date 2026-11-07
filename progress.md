@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Distribution et mise à jour du serveur MCP : paquet npm (décidé, pas fait)
+
+- **Constat** : le serveur MCP tourne depuis `apps/mcp-skraft/dist/`, non versionné (`.gitignore`),
+  fabriqué par `pnpm --filter @agent-studio/mcp-skraft build`. Ce build **recopie**
+  `workflows/skraft/` dans `dist/workflows/skraft/`, et le serveur charge le workflow depuis cette
+  copie. Un `dist/` déjà construit garde donc l'ancien workflow tant qu'on ne relance pas le build,
+  puis le client MCP (Claude Code, Copilot CLI). Rien ne signale un `dist/` en retard.
+- **Décidé par le responsable** : distribuer le serveur en **paquet npm versionné**, sur GitHub
+  Packages, privé à l'organisation `freecompub`. Le client le déclare une fois :
+  `npx -y @freecompub/mcp-skraft@1`. Mise à jour : une nouvelle version publiée ; `npx` prend la
+  dernière `1.x` au démarrage suivant du client (ou une version fixée pour la figer). Écartés : une
+  archive dans les releases GitHub (mise à jour manuelle, facile à oublier) ; le serveur livré avec
+  l'application de bureau (elle n'a pas encore de mise à jour).
+- **À faire, dans l'ordre** :
+  1. fixer la licence du reste du paquet (le workflow est GPL-3.0-or-later, livré en sources) ;
+  2. `package.json` : nom `@freecompub/mcp-skraft`, retirer `"private": true`, champ `files`
+     (`dist/`), version semver ;
+  3. le serveur dit sa version (journal et `skraft_etat`) ; aujourd'hui `0.0.0` ;
+  4. CI : build puis publication à chaque tag de version ;
+  5. README : installation par `npx`, mise à jour, version fixée ;
+  6. ADR qui consigne ce choix.
+
 ## 07/11 — Escalade d'un scénario selon sa cause (ADR 0066, accepté et révisé)
 
 - **Décisions du responsable** : option A (aucun agent ne réécrit un test existant), puis, plutôt que
