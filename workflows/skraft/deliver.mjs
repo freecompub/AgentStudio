@@ -71,8 +71,9 @@ export function checkRedGreenSequence(evidence, unitTests) {
   return reasons;
 }
 // ---------- barre de qualité (configurable par projet) ---------------------------------
-// La barre vit dans `.agent-studio/quality.yaml`, commune aux extensions (ADR 0049) : lue par
-// `parseQualityBar` de `@agent-studio/extension-api`. L'ancien `.skraft/quality.json` est relu, converti.
+// La barre vit dans la section `qualite` de `.agent-studio/projet.yaml`, commune aux extensions
+// (ADR 0049, 0071) : lue par `parseQualityBar` de `@agent-studio/extension-api`. Pendant la
+// transition, `.agent-studio/quality.yaml` puis l'ancien `.skraft/quality.json` sont relus.
 /**
 * Règles appliquées quand le projet n'en déclare aucune : le domaine n'importe pas ce que la
 * stack tient pour de l'infrastructure. Les noms viennent de `ctx.stack`, jamais d'ici.

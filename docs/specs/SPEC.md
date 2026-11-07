@@ -584,7 +584,7 @@ Chaque section du profil est une capacité : `tests` (obligatoire), `mutation`, 
 
 ### 8.5 Résolution et sécurité
 
-1. Profil du projet (`.agent-studio/stack.yaml`), s'il existe.
+1. Profil du projet (section `pile` de `.agent-studio/projet.yaml`, ADR 0071 ; l'ancien `.agent-studio/stack.yaml` pendant la transition), s'il existe.
 2. Sinon, profil contribué par une extension de type « pack de stack », choisi par `detect`.
 3. Sinon, profil minimal : l'utilisateur fournit seulement la commande de test produisant du JUnit XML.
 

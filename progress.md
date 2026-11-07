@@ -19,6 +19,9 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   `stack-adapters` reste égale à la vraie (elle avait pu diverger sans que rien ne le dise).
 - Les trois tests qui lisent l'exemple livré (profils, lint et canaris contre les vrais outils)
   passent par `test/support/profil-livre.ts`.
+- Documentation alignée : ADR 0049 (points 1 et 2 revus par 0071), ADR 0068 (pile du serveur
+  MCP) et description de l'argument `pile` de `skraft_demarrer`, SPEC §8.5, `docs/16`, en-têtes de
+  `quality-bar.ts` et des deux `deliver`. Les plans et bilans datés restent tels qu'écrits.
 - `/stack init`, quand rien n'est reconnu, ne parle plus de « deux exemples » (il n'en reste qu'un
   depuis le retrait de Swift).
 

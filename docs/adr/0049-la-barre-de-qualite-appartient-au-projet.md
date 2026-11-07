@@ -1,7 +1,9 @@
 # ADR 0049 — La barre de qualité appartient au projet
 
 - Statut : **décidé**, 2026-10-03 (demandé par le responsable du projet ; commande de mutation
-  dans `stack.yaml` et mutation en fin de DELIVER retenues sur recommandation)
+  dans `stack.yaml` et mutation en fin de DELIVER retenues sur recommandation). **Points 1 et 2
+  revus par l'ADR 0071** (2026-11-07) : la barre est la section `qualite` de
+  `.agent-studio/projet.yaml`, la pile sa section `pile` ; les autres points restent valables.
 - Contexte amont : SPEC-skraft §7.4 (portes de fin de scénario), ADR 0028 (la lentille
   `quality-gates` confronte aux faits), ADR 0034 (la barre n'est pas modifiable par ceux qu'elle
   juge), ADR 0046 (correction de revue routée)

@@ -1,9 +1,10 @@
 /**
- * Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`. PUR.
+ * Barre de qualité du projet (ADR 0049, 0071) : section `qualite` de `.agent-studio/projet.yaml`
+ * (l'ancien `quality.yaml` pendant la transition). PUR.
  *
  * Elle dit **ce qui est exigé** — seuils de couverture et de mutation par couche, ce qu'est le cœur
- * (domaine, application), si l'on mute, règles de dépendance. `stack.yaml` dit **comment** lancer
- * les outils : une commande y est vérifiée contre les programmes autorisés et son écriture confirmée
+ * (domaine, application), si l'on mute, règles de dépendance. La section `pile` dit **comment**
+ * lancer les outils : une commande y est vérifiée contre les programmes autorisés et son écriture confirmée
  * par l'utilisateur ; la barre ne lance rien. Elle est commune aux extensions (skraft, tdd).
  *
  * Le cœur se définit par des **chemins**, plus par des noms de couches : `Domain` comme segment ne
