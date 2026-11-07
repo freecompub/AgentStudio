@@ -5,6 +5,7 @@
  * ici évite que le dossier embarque des modules, et garde le rejeu exact.
  */
 import { baselineProblems, coverageForChanges, coreFilesMissing, layerOf, matchesAny, parseQualityBar } from "@agent-studio/stack-adapters";
+import { disjoncte, memeRefus } from "@agent-studio/core";
 import { parse as parseYaml } from "yaml";
 import { agir, essayer, motifsInterruption } from "../aides.js";
 import { empreinteDe } from "../contenus.js";
@@ -30,6 +31,9 @@ export const bibliotheque = Object.freeze({
   coucheDe: layerOf,
   couvertureDuDiff: coverageForChanges,
   problemesTestsExistants: baselineProblems,
+  /** Disjoncteur des réessais (ADR 0073) : même porte, mêmes motifs ; et le préfixe de l'escalade. */
+  memeRefus,
+  disjoncte,
 });
 
 export type Bibliotheque = typeof bibliotheque;

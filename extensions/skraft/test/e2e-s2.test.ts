@@ -98,6 +98,8 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     await app.registry.command("skraft")!.handler("--auto stories/us-12.md");
     await until(async () => stateOf((await app.engine.list())[0] ?? null)?.stage === "ESCALATED", 60_000);
     const s = stateOf((await app.engine.list())[0]!)!;
-    expect(s.lastRejection).toEqual({ gate: "citations", reasons: ["Document de recherche absent : .skraft/us-12/research/research.md"] });
+    // Le même refus deux fois de suite : le disjoncteur escalade au deuxième essai (ADR 0073).
+    expect(s.lastRejection).toEqual({ gate: "citations", reasons: ["Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md"] });
+    expect(s.attempts).toBe(2);
   }, 60_000);
 });

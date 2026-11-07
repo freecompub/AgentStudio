@@ -6,6 +6,7 @@ import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftSt
 import type { MutantSurvivant } from "./deliver.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
+import { disjoncte, memeRefus } from "@agent-studio/extension-api";
 import { bumpRetries, deciderSelonLaCause, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
@@ -581,11 +582,20 @@ function leverGelDistill(s: SkraftState): SkraftState {
     : s;
 }
 
-function failure(etat: SkraftState, gate: string, reasons: string[], essaiGaranti = false): Out {
+function failure(etat: SkraftState, gate: string, motifs: string[], essaiGaranti = false): Out {
   const s0 = leverGelDistill(etat);
-  const s = s0.phase ? bumpRetries(s0, s0.phase) : s0;
-  const attempts = s.attempts + 1;
-  const epuise = attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti;
+  const s1 = s0.phase ? bumpRetries(s0, s0.phase) : s0;
+  const attempts = s1.attempts + 1;
+  // Disjoncteur (ADR 0073) : le même refus que l'essai **précédent** de la phase (même numéro
+  // d'essai, rien entre les deux), le suivant le referait. Un délai se réessaie, un essai garanti
+  // ne compte pas : ni l'un ni l'autre n'est retenu, et l'un comme l'autre rompt la suite.
+  const avant = s1.dernierRefusDePhase;
+  const compte = gate !== "délai" && !essaiGaranti;
+  const disjoncteur = compte && avant?.phase === s1.phase && avant.essai === s1.attempts && memeRefus({ porte: avant.gate, motifs: avant.reasons }, { porte: gate, motifs });
+  const reasons = disjoncteur ? disjoncte(motifs) : motifs;
+  const { dernierRefusDePhase: _, ...sansRefus } = s1;
+  const s: SkraftState = compte && s1.phase ? { ...s1, dernierRefusDePhase: { phase: s1.phase, essai: attempts, gate, reasons: motifs } } : sansRefus;
+  const epuise = (attempts >= s.budget.maxAttemptsPerPhase && !essaiGaranti) || disjoncteur;
   const rollback: SkraftEffect[] = epuise ? rembobiner(s) : [];
   const lastRejection = { gate, reasons };
   if (epuise) {

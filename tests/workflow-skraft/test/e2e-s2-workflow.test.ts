@@ -463,7 +463,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");
   }, 120_000);
 
-  it("recherche sans document : rejet explicite, escalade après le budget", async () => {
+  it("recherche sans document : rejet explicite ; le même deux fois de suite, escalade (disjoncteur, ADR 0073)", async () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-researcher": async (t) => void (await t.callTool("report_phase", { summary: "rien", files: [] })),
     });
@@ -471,7 +471,8 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase RESEARCH")), 60_000);
     const [escalade] = await app.interactions.pending();
-    expect(escalade!.title).toBe("Phase RESEARCH : Document de recherche absent : .skraft/us-12/research/research.md");
+    expect(escalade!.title).toBe("Phase RESEARCH : Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md");
+    expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role.endsWith("skraft-researcher"))).toHaveLength(2);
     expect(escalade!.requiredRoles).toEqual(["developpeur", "architecte", "administrateur"]);
   }, 60_000);
 });

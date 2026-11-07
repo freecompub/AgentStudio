@@ -214,8 +214,9 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("GATE_FAIL, budget épuisé → ESCALATED", () => {
-    const fail = [REPORTED, GATE_FAIL];
-    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail, ...fail, ...fail]);
+    // Motifs différents à chaque essai : deux refus identiques déclencheraient le disjoncteur (ADR 0073).
+    const fail = (n: string) => [REPORTED, { ...GATE_FAIL, reasons: [n] } as Ev];
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail("a"), ...fail("b"), ...fail("fichier de 55 lignes")]);
     expect(state.stage).toBe("ESCALATED");
     expect(state.attempts).toBe(3);
     // Le dépôt est rembobiné ET la mémoire des agents de la phase est oubliée (ADR 0050) : les
@@ -225,6 +226,21 @@ describe("Réducteur skraft — phases (§5.2)", () => {
       { kind: "forgetSessions", roles: ["skraft-researcher"] },
       { kind: "askEscalation", reason: "citations : fichier de 55 lignes", options: ["retry", "skip", "abort"] },
     ]);
+  });
+
+  it("disjoncteur (ADR 0073) : le même refus deux fois de suite escalade aussitôt, sans attendre le budget", () => {
+    const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, REPORTED, GATE_FAIL]);
+    expect(state).toMatchObject({ stage: "ESCALATED", attempts: 2 });
+    expect(effects.at(-1)).toEqual({ kind: "askEscalation", reason: "citations : Même refus deux fois de suite : fichier de 55 lignes", options: ["retry", "skip", "abort"] });
+  });
+
+  it("disjoncteur : un motif différent, ou un délai entre deux refus identiques, ne le déclenche pas ; deux délais non plus", () => {
+    const autre: Ev = { ...GATE_FAIL, reasons: ["autre motif"] } as Ev;
+    expect(play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, REPORTED, autre]).state.stage).toBe("SPECIALIST");
+    const delai: Ev = { type: "TIMEOUT", reason: "silence" };
+    // Avec un budget de 3, l'escalade qui suit est celle du budget, pas du disjoncteur.
+    expect(play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_FAIL, delai, REPORTED, GATE_FAIL]).state.escalation?.reason).not.toMatch(/Même refus/);
+    expect(play([...toFirstPhase(), CP("RESEARCH"), delai, delai]).state.stage).toBe("SPECIALIST");
   });
 
   it("TIMEOUT d'un agent : même relance qu'un GATE_FAIL, mais sans annuler le travail (ADR 0029)", () => {
@@ -688,8 +704,9 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     });
 
     it("scénario en échec au-delà du budget", () => {
-      const echec: Ev = { type: "SCENARIO_FAIL", reasons: ["acceptance rouge"] };
-      const r = play([...toDeliver(), PLANNED, STARTED, echec, echec, echec]);
+      // Motifs différents : deux échecs identiques déclencheraient le disjoncteur (ADR 0073).
+      const echec = (n: number): Ev => ({ type: "SCENARIO_FAIL", reasons: [`acceptance rouge ${n}`] });
+      const r = play([...toDeliver(), PLANNED, STARTED, echec(1), echec(2), echec(3)]);
       expect(r.state.stage).toBe("ESCALATED");
       expect(r.effects).toEqual([{ kind: "rollback", to: "cp-s" }, oubli, expect.objectContaining({ kind: "askEscalation" })]);
     });
@@ -712,8 +729,9 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const gate = [...toDeliver("challenging"), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2)];
     const fail1 = play([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }]);
     expect(fail1.effects).toEqual([{ kind: "rollback", to: "cp-s" }, { kind: "runDeliverAgent", step: "test", scenarioId: "ac-1", attempt: 1, feedback: ["Mutation : 95 %"] }]);
-    const again = (st: Ev[]) => [...st, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2), { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] } as Ev];
-    const esc = play(again(again([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 95 %"] }])));
+    // Score différent à chaque reprise : le même deux fois déclencherait le disjoncteur (ADR 0073).
+    const again = (st: Ev[], score: string) => [...st, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true), REP_DEV, GREEN_OK(true, 2), { type: "SCENARIO_FAIL", reasons: [`Mutation : ${score}`] } as Ev];
+    const esc = play(again(again([...gate, { type: "SCENARIO_FAIL", reasons: ["Mutation : 90 %"] }], "93 %"), "95 %"));
     expect(esc.state.stage).toBe("ESCALATED");
     // Rembobiner et oublier vont ensemble (ADR 0050, D20 de docs/12).
     expect(esc.effects).toEqual([
@@ -1053,7 +1071,8 @@ describe("Réducteur skraft — la revue n'hérite pas d'un budget vidé par les
   const CHANGES = LENSES(lens("CHANGES_REQUESTED", ["major"]));
   // DISTILL, la phase du run : deux rejets de la porte des valeurs, puis la porte passe.
   const jusquADistill = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL")];
-  const épuiser = [...jusquADistill, REPORTED, GATE_FAIL, REPORTED, GATE_FAIL];
+  // Deux rejets différents : deux identiques déclencheraient le disjoncteur (ADR 0073).
+  const épuiser = [...jusquADistill, REPORTED, GATE_FAIL, REPORTED, { ...GATE_FAIL, reasons: ["valeur absente du Gherkin"] } as Ev];
 
   it("budget à zéro, première revue défavorable : un essai est accordé, pas une escalade", () => {
     const { state, effects } = play([...épuiser, REPORTED, GATE_OK, CHANGES]);
@@ -1373,8 +1392,8 @@ describe("Réducteur skraft — le dépôt et la mémoire reviennent au même po
   const paire = (e: SkraftEffect[]) => e.filter((x) => x.kind === "rollback" || x.kind === "forgetSessions").map((x) => x.kind);
 
   it("budget épuisé : le rollback est immédiatement suivi de l'oubli", () => {
-    const fail = [REPORTED, GATE_FAIL];
-    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail, ...fail, ...fail]);
+    const fail = (n: string) => [REPORTED, { ...GATE_FAIL, reasons: [n] } as Ev];
+    const { effects } = play([...toFirstPhase(), CP("RESEARCH"), ...fail("a"), ...fail("b"), ...fail("c")]);
     expect(paire(effects)).toEqual(["rollback", "forgetSessions"]);
     expect(effects).toContainEqual(oubli(["skraft-researcher"]));
   });
@@ -1393,8 +1412,8 @@ describe("Réducteur skraft — le dépôt et la mémoire reviennent au même po
   it("DESIGN a DEUX rôles : les deux sont oubliés, pas seulement celui du tour en cours", () => {
     // L'architecte modélise puis décide. Escalader en n'oubliant que le second laisserait au
     // premier la mémoire de fichiers effacés.
-    const fail = [REPORTED, REPORTED, GATE_FAIL];
-    const { effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), ...fail, ...fail, ...fail]);
+    const fail = (n: string) => [REPORTED, REPORTED, { ...GATE_FAIL, reasons: [n] } as Ev];
+    const { effects } = play([...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), ...fail("a"), ...fail("b"), ...fail("c")]);
     expect(effects).toContainEqual(oubli(["skraft-architect-model", "skraft-architect-decide"]));
   });
 

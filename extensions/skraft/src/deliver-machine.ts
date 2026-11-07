@@ -1,3 +1,4 @@
+import { disjoncte, memeRefus } from "@agent-studio/extension-api";
 import { causeDEchec, optionsSelonLaCause, texteDeLaCause } from "./deliver.js";
 import { verifierEcarts } from "./distill.js";
 import { phaseRoles } from "./config.js";
@@ -189,7 +190,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
         const r = afterCode(rejete, { ...dc, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
         return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
       }
-      return stepFailure(s, dc, [reason]);
+      return stepFailure(s, dc, [reason], e.type === "TIMEOUT");
     }
 
     case "SCENARIO_OK": {
@@ -291,9 +292,13 @@ function nextScenario(s: SkraftState, d: DeliverState): Out {
   return { state: { ...s, stage: "SPECIALIST", deliver: nd }, effects: [{ kind: "startScenario", scenarioId: scenarios[i]!.id }] };
 }
 
-function stepFailure(s0: SkraftState, d: DeliverState, reasons: string[]): Out {
+function stepFailure(s0: SkraftState, d: DeliverState, reasons: string[], interrompu = false): Out {
   const s = bumpRetries(s0, "DELIVER");
   const attempts = d.attempts + 1;
+  // Disjoncteur (ADR 0073) : le même refus que l'essai précédent de ce pas, le suivant le referait.
+  // Un tour interrompu se réessaie : il ne compte pas, et `lastRejection` le dit (motif d'interruption).
+  if (!interrompu && d.attempts > 0 && memeRefus(s0.lastRejection ? { porte: s0.lastRejection.gate, motifs: s0.lastRejection.reasons } : null, { porte: "DELIVER", motifs: reasons }))
+    return scenarioFailure(s, d, disjoncte(reasons));
   if (attempts >= s.budget.maxAttemptsPerPhase) return scenarioFailure(s, d, reasons);
   const r = agent({ ...s, lastRejection: { gate: "DELIVER", reasons } }, { ...d, attempts }, reasons);
   return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
@@ -315,6 +320,9 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
   // Le scénario repart de son début : ses tests sont effacés, et les écarts au plan qu'ils portaient avec eux (ADR 0067).
   const s = s1.ecartsAuPlan?.some((x) => x.scenario === sc.id) ? { ...s1, ecartsAuPlan: s1.ecartsAuPlan.filter((x) => x.scenario !== sc.id) } : s1;
   const failures = d.scenarioFailures + 1;
+  // Disjoncteur (ADR 0073) : le scénario échoue comme à sa reprise précédente ; on escalade.
+  const disjoncteur = d.scenarioFailures > 0 && memeRefus({ porte: "scénario", motifs: d.dernierEchecDuScenario ?? [] }, { porte: "scénario", motifs: reasons });
+  if (disjoncteur) reasons = disjoncte(reasons);
   const restart: DeliverState = {
     ...d,
     step: "test",
@@ -328,11 +336,12 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     ...repriseDeLEmpreinte(d),
     stepCheckpoint: d.scenarioCheckpoint,
     feedback: reasons,
+    dernierEchecDuScenario: reasons,
   };
   const rollback: SkraftEffect[] = d.scenarioCheckpoint ? [{ kind: "rollback", to: d.scenarioCheckpoint }] : [];
   const lastRejection = { gate: `scénario ${sc.id}`, reasons };
   // Correction de revue : relancée depuis son point de départ, dans la limite du budget.
-  if (d.fixing && failures < s.budget.maxAttemptsPerPhase) {
+  if (d.fixing && failures < s.budget.maxAttemptsPerPhase && !disjoncteur) {
     // Le rollback ramène le code à l'entrée en correction : les fils y reviennent aussi, et le
     // premier pas dépend des défauts actifs — pas des lignes de rappel du retour.
     const threads = d.threadsAtFixStart ?? s.reviewThreads ?? [];
@@ -347,7 +356,7 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     const r = agent({ ...s, lastRejection }, nd, reasons);
     return { state: r.state, effects: [...rollback, ...r.effects] };
   }
-  if (failures >= s.budget.maxAttemptsPerPhase) {
+  if (failures >= s.budget.maxAttemptsPerPhase || disjoncteur) {
     // La cause choisit ce qui peut réussir (ADR 0066) : déclarer un test obsolète, exempter des lignes.
     const reason = [`Scénario ${sc.id} : ${reasons.join(" ; ")}`, ...texteDeLaCause(d.derniereCause)].join("\n\n");
     return {
