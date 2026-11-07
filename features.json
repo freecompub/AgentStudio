@@ -125,9 +125,9 @@
     {
       "id": "j5-lecteur-tap",
       "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
-      "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
-      "passes": false,
-      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, stryker-json (swiftlint-json et muter-json retirés avec Swift, ADR 0061). N'annoncer un format qu'une fois son lecteur écrit."
+      "verify": "pnpm vitest run --project stack-adapters test/tap.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 (07/11) : `report: tap` (section tests), TAP 13 et 14, sous-tests indentés (blocs `describe` écartés, titres des parents dans l'identifiant), SKIP et TODO ignorés, `Bail out!` en échec, message et fichier tirés du bloc YAML (`location`). Lu dans `{rapport}` si la commande le nomme, sinon sur la sortie standard. Éprouvé sur une vraie sortie de `node --test` (Node 22.22) et contre le vrai lanceur. Lecteurs : junit-xml, vitest-json, tap, eslint-json, stryker-json."
     },
     {
       "id": "j5-stack-init-doctor",

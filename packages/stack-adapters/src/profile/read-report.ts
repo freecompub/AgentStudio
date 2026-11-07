@@ -1,5 +1,6 @@
 import type { LintReport, TestResult } from "../protocols.js";
 import { parseXunit } from "../reports/junit-xml.js";
+import { parseTap } from "../reports/tap.js";
 import { classifyFailure, parseVitestReport } from "../typescript/vitest-report.js";
 import { parseEslintReport } from "../typescript/eslint-report.js";
 import type { StackProfile } from "./stack-profile.js";
@@ -20,6 +21,7 @@ export function lireTests(reader: StackProfile["tests"]["report"], brut: string,
       ...(c.status === "failed" ? { failureKind: classifyFailure(c.message ?? ""), ...(c.message ? { message: c.message } : {}) } : {}),
     }));
   if (reader === "vitest-json") return parseVitestReport(JSON.parse(brut), root);
+  if (reader === "tap") return parseTap(brut, root);
   throw new Error(`Le format « ${reader} » ne décrit pas des résultats de tests.`);
 }
 

@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Profils de pile (ADR 0072), brique 2 : lecteur TAP
+
+- `parseTap` (`reports/tap.ts`), `report: tap` pour la section `tests`. Écrit d'après une **vraie
+  sortie** de `node --test --test-reporter=tap` (Node 22.22), gardée en `fixtures/node-test.tap`.
+- Constats sur cette sortie, qui ont fixé le lecteur : les blocs `describe` sont aussi des lignes de
+  résultat, écrites **après** leurs enfants (écartés : un résultat qui a des enfants n'est pas un
+  test) ; `location` n'est donné **qu'aux échecs** (un test sans fichier prend celui du bloc parent
+  qui le donne, sinon vide) ; un symbole absent arrive en `ReferenceError … is not defined`. La
+  classification passe `name: message` à `classifyFailure`.
+- TAP lu sur la **sortie standard** quand la commande ne nomme pas `{rapport}` (`prove`, `bats`).
+- **Piège** : `node --test tests/` (un dossier) échoue sous Node 22 (« Cannot find module ») ; sans
+  chemin, node trouve les fichiers lui-même. Noté dans le README des profils, avec le fait que
+  `node` n'est pas autorisé par défaut (interpréteur).
+- Tests vus rouges puis verts, dont un contre le vrai `node --test`.
+
 ## 07/11 — Profils de pile (ADR 0072), brique 1 : détection au contenu
 
 - `detect` accepte `{ fichier, contient }` en plus d'un nom de fichier : le fichier existe et

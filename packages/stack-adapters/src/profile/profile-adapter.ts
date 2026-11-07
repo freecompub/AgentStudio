@@ -7,7 +7,7 @@ import type { FormatReport, LintReport, ProcessRunner, StackAdapter } from "../p
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
-import { substituer } from "./tokens.js";
+import { JETON_RAPPORT, substituer } from "./tokens.js";
 import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
@@ -96,7 +96,9 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     },
 
     async runTests(opts) {
-      const rapport = fichierTemporaire(profile.tests.report === "junit-xml" ? "xml" : "json");
+      const rapport = fichierTemporaire({ "junit-xml": "xml", tap: "tap" }[profile.tests.report as string] ?? "json");
+      // TAP sans `{rapport}` dans la commande : `prove`, `bats` n'écrivent que sur la sortie standard (ADR 0072).
+      const surLaSortie = profile.tests.report === "tap" && !profile.tests.command.some((a) => a.includes(JETON_RAPPORT));
       // Même exécution pour les deux : mesurer la couverture ne doit pas coûter un second passage
       // de toute la suite. L'outil écrit où le profil le lui dit, via `{couverture}`.
       const couverture = profile.tests.coverage ? fichierTemporaire("couverture") : "";
@@ -111,7 +113,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
         });
         const output = `${r.stdout}${r.stderr}`.slice(-20_000);
         if (r.timedOut) return { results: [], exitCode: r.exitCode, timedOut: true, output, durationMs: r.durationMs };
-        const brut = await readFile(rapport, "utf8").catch(() => null);
+        const brut = surLaSortie ? r.stdout : await readFile(rapport, "utf8").catch(() => null);
         if (brut === null) {
           // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent — la
           // compilation s'arrête avant d'exécuter quoi que ce soit. Le profil dit comment lire ces

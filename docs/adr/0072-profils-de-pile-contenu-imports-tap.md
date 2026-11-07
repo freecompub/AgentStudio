@@ -61,10 +61,14 @@ chemins), comme pour `buildErrors`.
      un rouge) ; `Bail out!` : un échec pour la suite ;
    - identifiant : les titres du test et de ses parents, joints par ` > ` ;
    - fichier : le champ `location` (ou `file`) du bloc YAML de diagnostic s'il existe, rendu
-     relatif à la racine ; sinon vide — le classement acceptance / unitaire passe alors par
-     l'identifiant seul ;
+     relatif à la racine ; `node --test` ne le donne qu'aux échecs : un test sans fichier prend
+     celui du bloc parent qui le donne, sinon il reste vide — le classement acceptance / unitaire
+     passe alors par l'identifiant seul ;
    - message : `message`, sinon `error`, du bloc YAML ; classé comme pour JUnit (assertion, symbole
-     manquant, autre).
+     manquant, autre) ;
+   - le rapport est lu dans `{rapport}` si la commande le nomme (`node --test
+     --test-reporter-destination={rapport}`), sinon sur la **sortie standard** : `prove` et `bats`
+     n'écrivent qu'à cet endroit.
 
 ## Conséquences
 

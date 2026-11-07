@@ -17,7 +17,7 @@ import { JETON_RAPPORT } from "./tokens.js";
  * Lecteurs de rapport fournis par l'application : un profil les désigne, il n'en invente pas.
  * N'y figurent que les formats réellement lus — en ajouter un demande d'écrire son lecteur.
  */
-export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "stryker-json"] as const;
+export const REPORT_READERS = ["junit-xml", "vitest-json", "tap", "eslint-json", "stryker-json"] as const;
 
 /**
  * Lecteurs de couverture. Cobertura seul pour l'instant, et c'est un choix : `dotnet test`,
@@ -34,7 +34,7 @@ export type ReportReader = (typeof REPORT_READERS)[number];
  * façon le lecteur de mutation — le lecteur annoncé n'était jamais honoré, et rien ne le disait.
  */
 const LECTEURS_PAR_SECTION = {
-  tests: ["junit-xml", "vitest-json"],
+  tests: ["junit-xml", "vitest-json", "tap"],
   lint: ["eslint-json"],
   mutation: ["stryker-json"],
 } as const satisfies Record<"tests" | "lint" | "mutation", readonly ReportReader[]>;

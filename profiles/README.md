@@ -42,6 +42,23 @@ detect:
 Un élément qui correspond suffit. La sous-chaîne n'est pas une expression régulière, et le chemin
 est relatif à la racine, sans `..`.
 
+## Les rapports de tests
+
+`tests.report` nomme le lecteur : `junit-xml`, `vitest-json` ou `tap` (ADR 0072). Un rapport TAP
+est lu dans `{rapport}` si la commande le nomme, sinon sur la sortie standard (`prove`, `bats`).
+
+```yaml
+tests:
+  command: [node, --test, --test-reporter=tap, "--test-reporter-destination={rapport}"]
+  report: tap
+```
+
+Deux pièges vus avec `node --test` (Node 22) : il ne prend pas un dossier en argument (sans chemin,
+il trouve lui-même les fichiers `*.test.*`) ; et il ne donne le fichier d'un test qu'en cas
+d'échec — un test réussi prend celui de son bloc parent, s'il le donne. `node` est un
+interpréteur : il ne figure pas dans la liste des programmes autorisés par défaut, l'administrateur
+doit l'y ajouter.
+
 ## Les canaris
 
 La section `canaries` est ce qui rend un profil **vérifiable**. Ce sont des tests dont la bonne
