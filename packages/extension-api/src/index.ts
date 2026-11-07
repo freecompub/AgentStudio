@@ -13,6 +13,7 @@ export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, Turn
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
 export { coverageForChanges, baselineProblems } from "@agent-studio/stack-adapters";
+export { disjoncte, MEME_REFUS, memeRefus, type Refus } from "@agent-studio/core";
 // Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
 

@@ -6,7 +6,7 @@
 * correction ciblée des défauts (ADR 0046, 0047). Reproduit `deliver-machine.ts` et
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
-import { problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
+import { disjoncte, memeRefus, problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
 import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
@@ -95,6 +95,8 @@ async function phase(w, d, s, cpPhase, lentilles, max, relance) {
   let tentatives = 0;
   // Relancée après une escalade : le premier pas reçoit son motif (D15 de docs/12).
   let motifs = relance;
+  /** Dernier refus compté de la phase et son numéro d'essai, pour le disjoncteur (ADR 0073). */
+  let precedent = null;
   for (;;) {
     let rejet;
     try {
@@ -114,7 +116,15 @@ async function phase(w, d, s, cpPhase, lentilles, max, relance) {
     }
     // Réessai de toute la phase : tracé avec sa cause (docs/10 §4.3).
     await w.rejet(`DELIVER : ${rejet.porte ?? "phase"}`, rejet.motifs);
+    // Disjoncteur (ADR 0073) : le même refus que l'essai précédent, sans rien entre les deux (une
+    // correction consomme un essai). Un délai se réessaie, un essai garanti ne compte pas.
+    const compte = rejet.porte !== "délai" && !rejet.garanti;
+    const refus = { porte: rejet.porte ?? "phase", motifs: rejet.motifs };
+    const disjoncteur = compte && precedent?.essai === tentatives && memeRefus(precedent.refus, refus);
     tentatives++;
+    precedent = compte ? { refus, essai: tentatives } : null;
+    if (disjoncteur)
+      throw new Escalade(disjoncte(rejet.motifs));
     if (tentatives >= max && !rejet.garanti)
       throw new Escalade(rejet.motifs);
     motifs = rejet.motifs;
@@ -199,6 +209,8 @@ async function scenario(w, d, L, i, motifs, max) {
   const baseScenario = L.baseline;
   let echecs = 0;
   let retour = motifs;
+  /** Motifs du dernier échec du scénario, pour le disjoncteur (ADR 0073). */
+  let echecPrecedent = null;
   for (;;) {
     L.baseline = baseScenario;
     try {
@@ -218,17 +230,24 @@ async function scenario(w, d, L, i, motifs, max) {
       await w.rembobiner(cpScenario);
       await creerDossiers(w, d.slug);
       retour = e instanceof ScenarioEchoue ? e.motifs : [];
+      // Disjoncteur (ADR 0073) : le scénario échoue comme à sa reprise précédente ; on escalade.
+      const refus = panne ? null : { porte: "scénario", motifs: retour };
+      const disjoncteur = echecs > 1 && memeRefus(echecPrecedent, refus ?? { porte: "", motifs: [] });
+      echecPrecedent = refus;
+      if (disjoncteur)
+        retour = disjoncte(retour);
       if (!panne && L.granularity === "turn-per-scenario") {
         L.granularity = "session-per-step";
         L.notes = [...L.notes, `Scénario ${sc.id} : repris en sessions séparées après un échec.`];
         continue;
       }
-      if (panne || echecs >= max) {
+      if (panne || echecs >= max || disjoncteur) {
         // La cause choisit ce qui peut réussir (ADR 0066) : déclarer un test obsolète, exempter des lignes.
         const cause = panne ? undefined : causeDEchec({ rouges: e.cause.rouges, avantDeliver: L.avantDeliver, lignes: e.cause.lignes });
         const avis = await escaladeScenario(w, panne ? e.message : `Scénario ${sc.id} : ${retour.join(" ; ")}`, { d, sc, cause });
         retour = [...retour, ...avis];
         echecs = 0;
+        echecPrecedent = null;
       }
     }
   }
@@ -325,6 +344,8 @@ async function derouler(w, d, L, i, cpScenario, motifs, max) {
 */
 async function pas(w, d, L, i, etape, depuis, motifs, max, unitTests, nouveau, correction) {
   let retour = motifs;
+  /** Dernier refus de ce pas, pour le disjoncteur (ADR 0073) ; un tour interrompu rompt la suite. */
+  let precedent = null;
   for (let essais = 1;; essais++) {
     try {
       const sortie = await agentDuPas(w, d, L, i, etape, retour, unitTests, nouveau, correction);
@@ -344,12 +365,15 @@ async function pas(w, d, L, i, etape, depuis, motifs, max, unitTests, nouveau, c
       if (motif === null)
         throw e;
       const rouges = e instanceof PasRefuse ? e.rouges : [];
+      const refus = e instanceof PasRefuse ? { porte: etape, motifs: [motif] } : null;
+      const disjoncteur = memeRefus(precedent, refus ?? { porte: "", motifs: [] });
+      precedent = refus;
       // Pas refusé par sa porte, ou tour interrompu : tracé, puis rembobiné et relancé.
       await w.rejet(`pas ${etape} (${L.scenarios[i].id})`, [motif]);
       await w.rembobiner(depuis);
       await creerDossiers(w, d.slug);
-      if (essais >= max)
-        throw new ScenarioEchoue([motif], { rouges });
+      if (essais >= max || disjoncteur)
+        throw new ScenarioEchoue(disjoncteur ? disjoncte([motif]) : [motif], { rouges });
       retour = [motif];
     }
   }
@@ -883,6 +907,8 @@ async function corriger(w, d, L, s, max) {
   await w.rembobiner(depart);
   await creerDossiers(w, d.slug);
   let motifs = [];
+  /** Motifs du dernier échec de la correction, pour le disjoncteur (ADR 0073). */
+  let echecPrecedent = null;
   for (let echecs = 1;; echecs++) {
     try {
       await deroulerCorrection(w, d, L, s, i, depart, max, motifs);
@@ -910,10 +936,17 @@ async function corriger(w, d, L, s, max) {
       Object.assign(L, memoire);
       // La reprise connaît la cause de l'échec (D15 de docs/12).
       motifs = e.motifs;
-      if (echecs >= max) {
+      // Disjoncteur (ADR 0073) : la correction échoue comme à sa reprise précédente.
+      const refus = { porte: "correction", motifs };
+      const disjoncteur = memeRefus(echecPrecedent, refus);
+      echecPrecedent = refus;
+      if (disjoncteur)
+        motifs = disjoncte(motifs);
+      if (echecs >= max || disjoncteur) {
         const cause = causeDEchec({ rouges: e.cause.rouges, avantDeliver: L.avantDeliver, lignes: e.cause.lignes });
-        motifs = [...motifs, ...(await escaladeScenario(w, `Scénario ${L.scenarios[i].id} : ${e.motifs.join(" ; ")}`, { d, sc: L.scenarios[i], cause }))];
+        motifs = [...motifs, ...(await escaladeScenario(w, `Scénario ${L.scenarios[i].id} : ${motifs.join(" ; ")}`, { d, sc: L.scenarios[i], cause }))];
         echecs = 0;
+        echecPrecedent = null;
       }
     }
   }

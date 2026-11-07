@@ -4,6 +4,7 @@
  */
 import { Escalade, TourInterrompu } from "./erreurs.js";
 import type { OptionsAgent, W } from "./protocols.js";
+import { disjoncte, memeRefus, type Refus } from "@agent-studio/core";
 
 /**
  * Rejet d'un essai : des motifs de porte, ou les défauts d'une revue (ADR 0042, 0046). `garanti`
@@ -52,6 +53,8 @@ export async function essayer(
 ): Promise<void> {
   let motifs: readonly string[] = opts.motifs ?? [];
   let revues = 0;
+  /** Dernier refus compté, pour le disjoncteur (ADR 0073). */
+  let precedent: Refus | null = null;
   for (let essai = 1; ; essai++) {
     let rejet: Rejet;
     let interrompu = false;
@@ -73,10 +76,17 @@ export async function essayer(
     }
     // Chaque essai refusé est tracé, avec sa cause : c'est ce qui dira, après un run, pourquoi
     // un travail a été refait (docs/10 §4.3).
-    await w.rejet(objet?.porte ?? (interrompu ? "délai" : revue ? "revue" : "porte"), m);
+    const porte = objet?.porte ?? (interrompu ? "délai" : revue ? "revue" : "porte");
+    await w.rejet(porte, m);
     if (revue) revues++;
     const demande = Array.isArray(rejet) ? undefined : (rejet as { garanti?: boolean }).garanti;
     const garanti = demande ?? (opts.premiereRevueGarantie === true && revue && revues === 1);
+    // Disjoncteur (ADR 0073) : deux refus identiques de suite, le suivant referait la même erreur.
+    // Un tour interrompu se réessaie (SPEC §6), et un essai garanti ne compte pas : l'un comme
+    // l'autre rompt la suite.
+    const refus = interrompu || garanti ? null : { porte, motifs: m };
+    if (refus && memeRefus(precedent, refus)) throw new Escalade(disjoncte(m));
+    precedent = refus;
     if (essai >= opts.max && !garanti) throw new Escalade(m);
     motifs = m;
   }

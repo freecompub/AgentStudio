@@ -89,6 +89,8 @@ export interface DeliverState {
   avantDeliver?: string[];
   /** Cause du dernier refus du scénario, connue du code : elle choisit les options de l'escalade (ADR 0066). */
   derniereCause?: CauseDEchec;
+  /** Motifs du dernier échec du scénario, pour le disjoncteur (ADR 0073). */
+  dernierEchecDuScenario?: string[];
   /** Empreinte des tests unitaires au même point que `scenarioBaseline` : rendue à chaque reprise (D12 de docs/12). */
   scenarioUnitTestsHash?: string | null;
   /** Tests unitaires ajoutés pendant le scénario, et celui qui attend son vert. */
@@ -225,6 +227,8 @@ export interface SkraftState {
    * portes jusqu'à la fin du cycle ; le bilan rappelle de les mettre à jour.
    */
   testsObsoletes?: { test: string; scenario: string; raison: string }[];
+  /** Dernier refus compté d'une phase, avec son numéro d'essai : le disjoncteur compare au suivant (ADR 0073). */
+  dernierRefusDePhase?: { phase: string; essai: number; gate: string; reasons: string[] };
   /** Toutes les décisions d'arbitrage, en ajout seul : le moteur trace chaque nouvelle (ADR 0065). */
   arbitrages?: ArbitrageRecord[];
   /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */

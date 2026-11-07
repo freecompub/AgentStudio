@@ -63,6 +63,36 @@ describe("essayer : budget d'essais appliqué par le code (D24)", () => {
     expect((r as Escalade).motifs).toEqual(["rejet 3"]);
   });
 
+  it("disjoncteur (ADR 0073) : deux refus identiques de suite, escalade aussitôt, sans attendre le budget", async () => {
+    let essais = 0;
+    const r = await essayer(w, { max: 5 }, async () => (essais++, { motifs: ["Section « Découvertes » absente."], porte: "documents" })).catch((e: unknown) => e);
+    expect(essais).toBe(2);
+    expect(r).toBeInstanceOf(Escalade);
+    expect((r as Escalade).motifs).toEqual(["Même refus deux fois de suite : Section « Découvertes » absente."]);
+  });
+
+  it("disjoncteur : un motif qui change, ou un refus identique séparé par un autre, ne le déclenche pas", async () => {
+    let essais = 0;
+    const issues = [["a"], ["b"], ["a"], ["c"], []];
+    await essayer(w, { max: 5 }, async () => issues[essais++]!);
+    expect(essais).toBe(5);
+  });
+
+  it("disjoncteur : ni un tour interrompu, ni une première revue garantie ne comptent", async () => {
+    let essais = 0;
+    await essayer(w, { max: 5 }, async () => {
+      essais++;
+      if (essais <= 2) throw new TourInterrompu("silence");
+      return essais === 3 ? [] : [];
+    });
+    expect(essais).toBe(3);
+    let revues = 0;
+    const r = await essayer(w, { max: 5, premiereRevueGarantie: true }, async () => (revues++, { motifs: ["défaut D-1"], revue: true as const })).catch((e: unknown) => e);
+    // La première ronde garantie ne compte pas : le disjoncteur se déclenche à la troisième.
+    expect(revues).toBe(3);
+    expect((r as Escalade).motifs[0]).toMatch(/^Même refus deux fois de suite/);
+  });
+
   it("première revue garantie (ADR 0042) : un essai de plus, une seule fois", async () => {
     const issues = [["porte"], { motifs: ["défaut D-1"], revue: true as const }, { motifs: ["défaut D-2"], revue: true as const }];
     let essais = 0;

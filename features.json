@@ -179,6 +179,13 @@
       "notes": "D6 de docs/12, 2026-10-11. Workflow : enregistrerLivrables ignore /reviews/ (revue.mjs) ; suivi.livrables vidé dans apresRembobinage de DESIGN, DISTILL, DELIVER. Extension : pasUnRapport dans les portes (effects.ts) ; debutDuRun (model.ts) posé par oublierLaPhase (reducer.ts), lu par artifactsDuRun (review-brief.ts, brief.ts, effects.ts) — artifacts reste en ajout seul (invariant 4). Tests bout en bout dans les deux (CHANGES_REQUESTED, REJECTED, relancer), les deux moitiés vérifiées en échec sans la correction."
     },
     {
+      "id": "disjoncteur-des-reessais",
+      "title": "Deux refus identiques de suite (même porte, mêmes motifs) escaladent aussitôt, sans épuiser le budget : portes de phase, pas de DELIVER, reprises de scénario, dans l'extension et le workflow (ADR 0073)",
+      "verify": "pnpm vitest run --project core test/meme-refus.test.ts && pnpm vitest run --project workflow test/aides.test.ts && pnpm vitest run --project ext-skraft test/reducer.test.ts test/e2e-disjoncteur.test.ts && pnpm vitest run --project workflow-skraft test/e2e-disjoncteur-workflow.test.ts",
+      "passes": true,
+      "notes": "Repris de l'idée de skraft-plugin v2 (lot [1] du comparatif du 06/11). memeRefus et disjoncte dans le cœur, une seule fois (extension par extension-api, workflow par sa bibliothèque). Un tour interrompu et un essai garanti ne comptent pas et rompent la suite. Les tests qui épuisaient un budget en répétant le même refus ont reçu des motifs différents."
+    },
+    {
       "id": "escalade-de-scenario-test-existant-obsolete",
       "title": "Un scénario qui échoue sur un test existant devenu rouge escalade en présentant le problème : l'humain le déclare obsolète, il sort des portes, le cycle se termine, et le bilan rappelle de le mettre à jour (ADR 0066 révisé)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft -t \"test existant obsolète\"",

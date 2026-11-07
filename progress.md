@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Disjoncteur des réessais (ADR 0073, proposé)
+
+- Repris de l'idée de skraft-plugin v2 (lot [1]) : deux refus **identiques de suite** — même porte,
+  même ensemble de motifs, à l'ordre et aux espaces près — escaladent aussitôt, motif préfixé
+  « Même refus deux fois de suite : » (une seule fois, même quand il remonte du pas au scénario).
+- Où : portes de phase (workflow `essayer` et boucle de phase de DELIVER ; extension `failure`), pas
+  de DELIVER (`pas` ; `stepFailure`), reprises de scénario et de correction (`scenario`, correction ;
+  `scenarioFailure`). Ne comptent pas et **rompent la suite** : un tour interrompu (délai) et un essai
+  garanti. Côté extension, « de suite » s'appuie sur le numéro d'essai (`dernierRefusDePhase`),
+  côté workflow sur l'oubli du refus précédent.
+- `memeRefus` et `disjoncte` vivent une fois dans le cœur (`packages/core/src/retries`) : l'extension
+  les a par `extension-api`, le workflow par sa bibliothèque (`bibliotheque.ts`, `pour-les-scripts.ts`).
+- **Piège** : sept tests (réducteur, e2e-s2 des deux côtés) épuisaient un budget en répétant le même
+  refus. Ceux qui visaient le budget ont reçu des motifs différents ; e2e-s2 attend maintenant
+  l'escalade au deuxième essai, ce que voulait le changement.
+- Test du workflow vu rouge en remettant l'ancien `livraison.mjs`, puis vert.
+- ADR 0073 (portée ci-dessus) : **accepté** par le responsable le 07/11.
+
 ## 07/11 — Profils de pile (ADR 0072), brique 3 : analyse des imports
 
 - Section `architecture` du profil : `fichiers`, motif `import` (groupe `module`, appliqué ligne à
