@@ -2,7 +2,7 @@ import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/e
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief, lignePile } from "./brief.js";
 import { SANS_GEL, sansGel } from "./deliver-machine.js";
-import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, mutantsSousLeSeuil, parseQualityBar, planScenarios, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, parseQualityBar, planScenarios, sansLignesExemptees, sansTestsObsoletes, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
 import { declaredIdentifiers } from "./text-analysis.js";
@@ -23,7 +23,15 @@ export const QUALITY = ".agent-studio/quality.yaml";
 export const QUALITY_LEGACY = ".skraft/quality.json";
 /** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
 export const PROJET = ".agent-studio/projet.yaml";
-const fail = (reason: string): Ev => ({ type: "STEP_FAIL", reason });
+const fail = (reason: string, rouges?: string[]): Ev => ({ type: "STEP_FAIL", reason, ...(rouges?.length ? { rouges } : {}) });
+
+/**
+ * Tests de DELIVER, sans ceux que l'humain a déclarés obsolètes (ADR 0066) : aucune porte ne les
+ * juge plus jusqu'à la fin du cycle. Les preuves, elles, gardent l'exécution complète.
+ */
+async function lancerTests(ctx: ExtensionContext, state: SkraftState, opts: Parameters<ExtensionContext["stack"]["runTests"]>[0]) {
+  return sansTestsObsoletes(await ctx.stack.runTests(opts), (state.testsObsoletes ?? []).map((x) => x.test));
+}
 const firstLine = (msg?: string) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs: string[]) => [...new Set(xs)];
 
@@ -77,7 +85,7 @@ async function readOr(ctx: ExtensionContext, path: string): Promise<string | nul
 export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<Ev> {
   if (sansGel(state)) ctx.chat.post(SANS_GEL);
   if (!(await acceptanceFrozen(ctx, state))) throw new EnvFailureError("Les tests d'acceptance ont changé depuis DISTILL alors qu'ils sont gelés : restaurez-les avant de relancer.");
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_BASELINE" } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase: "DELIVER_BASELINE" } });
   if (run.timedOut) throw new EnvFailureError("Les tests ont dépassé le délai avant le début de DELIVER.");
   const k = kinds(ctx);
   const broken = run.results.filter((r) => r.status === "failed" && !k.acceptanceResult(r));
@@ -166,7 +174,7 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
       `À ce pas, un test unitaire existant ne peut recevoir que des ajouts : ${retouches.join(", ")}. Pour renforcer un test, ajoutes-en un plus strict ; ne modifie ni ne retire les tests existants.`,
     );
 
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le nouveau test boucle-t-il ?");
   const known = new Set(e.baseline.all);
   const fresh = run.results.filter((r) => !known.has(r.id) && !k.acceptanceResult(r));
@@ -177,7 +185,7 @@ export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId
   if (t.status === "skipped") return fail(`Le nouveau test « ${t.id} » est ignoré.`);
   if (t.failureKind === "other_error") return fail(`Le nouveau test échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${firstLine(t.message)}`);
   const regressions = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
-  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`, regressions.map((r) => r.id));
 
   const unitTestsHash = await ctx.workspace.fingerprint(["@stack:unitTests"]);
   await ctx.git.commit(`test(${state.slug}): ${e.scenarioId}, ${t.id}`);
@@ -222,7 +230,7 @@ async function coveredByAcceptance(e: Fx<"verifyUnitRed">, changed: number, { ct
   if (changed > 0) return fail("Tu as déclaré le comportement couvert par l'acceptance : aucun fichier ne doit alors être modifié. Écris un test unitaire, ou ne déclare rien.");
   if (!concerns(sc.acceptanceTestId, e.coveredBy!))
     return fail(`« ${e.coveredBy} » n'est pas le test d'acceptance du scénario : seul ${sc.acceptanceTestId} peut tenir lieu de test rouge à ce pas.`);
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase: "DELIVER_RED", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai.");
   const own = run.results.find((r) => concerns(r.id, sc.acceptanceTestId));
   if (!own) return fail(`Le test d'acceptance ${sc.acceptanceTestId} est introuvable dans les résultats.`);
@@ -230,7 +238,7 @@ async function coveredByAcceptance(e: Fx<"verifyUnitRed">, changed: number, { ct
   if (own.status !== "failed" || own.failureKind === "other_error")
     return fail(`Le test d'acceptance échoue pour une mauvaise raison (ni assertion, ni symbole manquant) : ${firstLine(own.message)}`);
   const regressions = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
-  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`);
+  if (regressions.length) return fail(`Des tests qui passaient ne passent plus : ${regressions.map((r) => r.id).join(", ")}.`, regressions.map((r) => r.id));
   const unitTestsHash = await ctx.workspace.fingerprint(["@stack:unitTests"]);
   const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : couvert par l'acceptance ${e.scenarioId}`);
   return { type: "STEP_OK", checkpointId: cp.id, all: e.baseline.all, passed: e.baseline.passed, newTest: sc.acceptanceTestId, unitTestsHash, viaAcceptance: true };
@@ -253,13 +261,13 @@ export async function verifyFixTests(e: Fx<"verifyFixTests">, { ctx, state, task
   const retouches = testsRetouches(changed, e.editable ?? []);
   if (retouches.length)
     return fail(`Un test unitaire existant ne peut recevoir que des ajouts, sauf s'il est cité par un défaut ci-dessus : ${retouches.join(", ")}. Ajoute plutôt un test plus strict.`);
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_FIX_TEST", stepId: e.scenarioId } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase: "DELIVER_FIX_TEST", stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : un test ajouté boucle-t-il ?");
   const ids = new Set(run.results.map((r) => r.id));
   const gone = e.baseline.all.filter((id) => !ids.has(id) && !run.results.some((r) => concerns(r.id, id)));
   if (gone.length) return fail(`Des tests existants ont disparu : ${gone.join(", ")}. Ajoute des tests, ne retire ni ne renomme les existants.`);
   const broken = run.results.filter((r) => e.baseline.passed.includes(r.id) && r.status === "failed");
-  if (broken.length) return fail(`Des tests qui passaient ne passent plus : ${broken.map((r) => r.id).join(", ")}. Ne modifie pas les tests existants.`);
+  if (broken.length) return fail(`Des tests qui passaient ne passent plus : ${broken.map((r) => r.id).join(", ")}. Ne modifie pas les tests existants.`, broken.map((r) => r.id));
   const fresh = run.results.filter((r) => !e.baseline.all.includes(r.id) && !k.acceptanceResult(r));
   const skipped = fresh.filter((r) => r.status === "skipped");
   if (skipped.length) return fail(`Tests ajoutés ignorés (interdit) : ${skipped.map((r) => r.id).join(", ")}.`);
@@ -298,10 +306,10 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   }
 
   const phase = e.mode === "refactor" ? "DELIVER_REFACTOR" : "DELIVER_GREEN";
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase, stepId: e.scenarioId } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase, stepId: e.scenarioId } });
   if (run.timedOut) return fail("Les tests ont dépassé le délai : le code boucle-t-il ?");
   const suite = suiteProblems(run.results, e.pending, k.acceptanceResult);
-  if (suite.length) return fail(suite.join(" "));
+  if (suite.length) return fail(suite.join(" "), rougesDeLaSuite(run.results, e.pending));
   // Un nettoyage ne change pas le comportement : l'acceptance du scénario, verte, le reste (D16 de docs/12).
   const acceptanceTestId = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!.acceptanceTestId;
   if (e.mode === "refactor" && state.deliver?.acceptanceGreen && run.results.find((r) => r.id === acceptanceTestId)?.status !== "passed")
@@ -328,6 +336,11 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
     passed: run.results.filter((r) => r.status === "passed").map((r) => r.id),
     acceptanceGreen: run.results.some((r) => r.id === acceptanceTestId && r.status === "passed"),
   };
+}
+
+/** Tests en échec de la suite, hors acceptance des scénarios pas encore livrés : la cause d'un refus (ADR 0066). */
+function rougesDeLaSuite(results: TestResult[], pending: string[]): string[] {
+  return results.filter((r) => r.status === "failed" && !pending.some((p) => concerns(r.id, p))).map((r) => r.id);
 }
 
 /** Suite complète : verte, sauf les tests d'acceptance des scénarios pas encore livrés ; aucun test ignoré. */
@@ -410,11 +423,14 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
 
   const k = kinds(ctx);
   const sc = state.deliver!.scenarios.find((x) => x.id === e.scenarioId)!;
-  const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DELIVER_SCENARIO", stepId: e.scenarioId } });
+  const run = await lancerTests(ctx, state, { signal, evidence: { taskId, phase: "DELIVER_SCENARIO", stepId: e.scenarioId } });
   if (run.timedOut) return { type: "SCENARIO_FAIL", reasons: ["Les tests ont dépassé le délai à la fin du scénario."] };
   const own = run.results.find((r) => r.id === sc.acceptanceTestId);
   if (own?.status !== "passed") reasons.push(`Le test d'acceptance du scénario n'est pas vert : ${sc.acceptanceTestId}.`);
   reasons.push(...suiteProblems(run.results, e.pending, k.acceptanceResult));
+  // Cause du refus, si refus il y a (ADR 0066) : tests rouges de la suite, lignes non couvertes.
+  const rouges = rougesDeLaSuite(run.results, e.pending);
+  const lignes: { file: string; lines: number[] }[] = [];
 
   const evidence = (await ctx.evidence.list(taskId)).filter((x) => x.stepId === e.scenarioId);
   reasons.push(...checkRedGreenSequence(evidence, e.unitTests));
@@ -436,9 +452,12 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     // rapport, on le DIT — c'est ce que la lentille `quality-gates` croyait acquis alors qu'aucun
     // fait n'était jamais produit.
     if (run.coverage) {
-      const diff = coverageForChanges(run.coverage, changed.filter((f) => sources.includes(f.path)));
+      // Lignes exemptées par l'humain (ADR 0065, et à l'escalade d'un scénario, ADR 0066) : hors du calcul.
+      const diff = coverageForChanges(run.coverage, sansLignesExemptees(changed.filter((f) => sources.includes(f.path)), state.derogationsCouverture ?? []));
       notes.push(...diff.notes);
-      reasons.push(...checkCoverage(diff.report, sources, bar, true));
+      const couverture = checkCoverage(diff.report, sources, bar, true);
+      reasons.push(...couverture);
+      if (couverture.length) lignes.push(...lignesSousLeSeuil(diff.report, sources, bar));
       for (const f of diff.report.files)
         facts.push(`Couverture du diff (${e.scenarioId}) : ${f.file} à ${Math.round(f.score * 10) / 10} %, ${f.covered} ligne(s) sur ${f.total}.`);
     } else notes.push("Couverture non mesurée : la commande de test du projet n'en produit pas.");
@@ -476,6 +495,6 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     } else notes.push("Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.");
   }
 
-  if (reasons.length) return { type: "SCENARIO_FAIL", reasons };
+  if (reasons.length) return { type: "SCENARIO_FAIL", reasons, ...(rouges.length ? { rouges } : {}), ...(lignes.length ? { lignes } : {}) };
   return { type: "SCENARIO_OK", notes, facts };
 }

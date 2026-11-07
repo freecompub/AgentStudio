@@ -5,6 +5,31 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Escalade d'un scénario selon sa cause (ADR 0066, accepté et révisé)
+
+- **Décisions du responsable** : option A (aucun agent ne réécrit un test existant), puis, plutôt que
+  « rejouer DISTILL » ou « mettre en pause », le principe des défauts hors du changement : l'humain
+  déclare le test obsolète, il sort des portes, le cycle se termine, le bilan rappelle de le mettre à
+  jour. **Piège évité** : la pause aurait laissé l'humain corriger, puis un retour au début de DELIVER
+  (rollback Git : `read-tree --reset`, `clean`) aurait effacé sa correction.
+- **Cause connue du code**, dans les deux implémentations : chaque refus porte les tests en échec vus
+  (`rouges`) et, à la porte du scénario, les lignes sous le seuil (`lignes`). Un rouge qui passait au
+  début de DELIVER (`avantDeliver`) est candidat à l'obsolescence. Fonctions pures en deux copies :
+  `causeDEchec`, `optionsSelonLaCause`, `texteDeLaCause`, `sansTestsObsoletes`.
+- **Escalade** : « Déclarer ces tests obsolètes et continuer » (`obsolete`), « Exempter ces lignes et
+  continuer » (`exempt` / `exempter` dans le workflow), puis relancer, sauter, abandonner. Le scénario
+  reprend ; l'agent reçoit l'avis « tests déclarés obsolètes : ne les modifie pas ».
+- **Effets** : tests obsolètes retirés des résultats que lisent les portes de DELIVER (les preuves
+  gardent l'exécution complète). **Piège trouvé par le test** : la porte « suite finale » lit aussi le
+  code de sortie, resté à 1 ; il est rendu à 0 quand les seuls échecs retirés étaient obsolètes. Les
+  lignes exemptées sortent désormais du calcul **à la porte du scénario** aussi (avant : fin de
+  DELIVER seulement). `derogations.md` a une section « Tests existants déclarés obsolètes » ; le bilan,
+  un rappel « À corriger après le cycle ».
+- **Trace** : troisième décision d'arbitrage, « obsolète » (cœur, moteur de tâches, workflow) ; avant,
+  le moteur rangeait toute décision inconnue en « à corriger ».
+- Rembobinage de toute la phase DELIVER : tests obsolètes oubliés avec les dérogations.
+- Le chemin de correction de revue escalade avec les mêmes options, dans les deux implémentations.
+
 ## 07/11 — Runtime Claude, brique D : documentation ; critère rempli
 
 - ADR 0070 : section « Mise en œuvre dans l'application » (réglage, connexion sans GitHub,

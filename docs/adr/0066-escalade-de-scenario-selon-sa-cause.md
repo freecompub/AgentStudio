@@ -2,8 +2,10 @@
 
 ## Statut
 
-**Proposé** le 2026-10-13, à valider par le responsable du projet. Concerne l'extension `skraft` et
-le workflow `workflows/skraft/`, avec le même comportement.
+**Proposé** le 2026-10-13. **Accepté, révisé,** le 2026-11-07 par le responsable du projet, branche
+`feat/escalade-scenario`. La révision remplace « rejouer DISTILL » et « mettre en pause » (voir
+« Révision du 07/11 »). Concerne l'extension `skraft` et le workflow `workflows/skraft/`, donc aussi le
+serveur MCP, avec le même comportement.
 
 ## Contexte
 
@@ -22,40 +24,49 @@ Deux causes ne peuvent pas être résolues par ces options.
 
 ## Décision
 
-1. **La cause est connue du code.** Au moment de l'escalade, le dernier refus dit :
-   - quels tests rouges **existaient et passaient avant DELIVER** (référence prise au début de la
-     phase), donc la cause 1 ;
-   - quelles lignes du scénario restent non couvertes, donc la cause 2.
+1. **La cause est connue du code.** Chaque refus porte les tests en échec qu'il a vus et, à la porte
+   du scénario, les lignes non couvertes. Au moment de l'escalade :
+   - un test en échec qui **passait au début de DELIVER** (référence prise à la planification) est
+     un test que la story rend obsolète, ou qu'elle casse : cause 1 ;
+   - des lignes du scénario sous le seuil de couverture : cause 2.
 
-   La question posée à l'humain présente le problème en clair, avec les tests ou les lignes.
-2. **Test existant devenu rouge.** Les options sont :
-   - **« Rejouer DISTILL »** : DELIVER est rembobinée et ses sessions oubliées (ADR 0050). DISTILL
-     est rejouée avec le problème en motif, puis DELIVER est refaite entièrement ;
-   - **« Mettre en pause »** : la tâche attend que l'humain corrige lui-même. À la reprise, on lui
-     demande d'où repartir : « ce scénario », « toute la phase DELIVER » ou « DISTILL » ;
-   - « relancer », « sauter » et « abandonner » restent proposés.
-3. **Lignes non couvertes.** En plus de « relancer », « sauter » et « abandonner », une option
-   **« exempter ces lignes »** accorde la même dérogation qu'en fin de DELIVER (ADR 0065) : lignes
-   hors du calcul, décision tracée et commitée. Le scénario est ensuite relancé.
-4. Chaque choix est tracé (entrée `arbitrage` ou rejet), comme les autres décisions humaines.
+   La question posée à l'humain présente le problème en clair, avec les tests ou les lignes, et ce
+   que chaque option fera.
+2. **Test existant devenu rouge** : option **« Déclarer ces tests obsolètes et continuer »**. Comme
+   les défauts hors du changement de la story (06/11) :
+   - les tests nommés **sortent des portes** de DELIVER jusqu'à la fin du cycle (retirés des
+     résultats que lisent les portes ; les preuves gardent l'exécution complète) ;
+   - le scénario reprend, et le cycle peut se terminer ;
+   - la décision est **tracée** (arbitrage « tests existants », décision « obsolète »), écrite dans
+     `.skraft/<slug>/deliver/derogations.md` et commitée avec la livraison ;
+   - le **bilan rappelle** « À corriger après le cycle : mettre à jour <test> ».
 
-## Point à trancher avant de coder
+   Aucun agent ne modifie un test existant : c'est l'humain qui le met à jour, après le cycle.
+3. **Lignes non couvertes** : option **« Exempter ces lignes et continuer »**. La même dérogation
+   qu'en fin de DELIVER (ADR 0065) : lignes hors du calcul, à la porte du scénario comme à celle de
+   fin de DELIVER ; décision tracée et commitée. Le scénario reprend.
+4. « Relancer », « sauter » et « abandonner » restent proposés. Un rembobinage de toute la phase
+   DELIVER efface ces décisions avec le code ; les arbitrages, eux, restent dans la trace.
 
-**Qui met à jour un test unitaire obsolète quand on « rejoue DISTILL » ?** L'agent d'acceptance
-n'écrit que les tests d'acceptance, les sources et `.skraft/`. Trois possibilités :
+## Révision du 07/11
 
-- **A.** Rejouer DISTILL ne sert qu'aux tests **d'acceptance** obsolètes. Pour un test
-  **unitaire**, seule « mettre en pause » est proposée : l'humain le met à jour lui-même.
-- **B.** Le temps de ce rejeu, l'agent d'acceptance reçoit le droit d'écrire **le seul fichier**
-  du test obsolète cité, avec sa justification dans `test-plan.md`.
-- **C.** Pas de rejeu de DISTILL pour un test unitaire. Après confirmation de l'humain que le test
-  est obsolète, le testeur de DELIVER le met à jour (le même droit, limité à ce fichier).
+La proposition du 13/10 offrait, pour un test obsolète, « rejouer DISTILL » (DELIVER effacée) et
+« mettre en pause » (l'humain corrige, puis choisit d'où repartir). Deux difficultés :
+
+- revenir au début de DELIVER, ou à DISTILL, se fait par un rollback Git, qui aurait **effacé la
+  correction** faite par l'humain pendant la pause ;
+- personne ne pouvait mettre à jour un test unitaire pendant le rejeu de DISTILL ; le point à
+  trancher retenait l'option A (l'humain le fait).
+
+Le responsable a retenu le principe des défauts hors du changement : le problème est signalé,
+l'humain décide, le cycle se termine, et la correction se fait après. Le workflow n'a donc pas à
+revenir de DELIVER à DISTILL.
 
 ## Conséquences
 
 - Une escalade de scénario ne se termine plus, pour ces deux causes, sur des options qui ne
   peuvent pas réussir.
-- « Mettre en pause » introduit une reprise avec choix du point de départ : un nouveau type de
-  question dans les deux implémentations.
-- Le workflow doit pouvoir revenir de DELIVER à DISTILL : `workflow.mjs` enchaîne aujourd'hui les
-  phases sans retour en arrière.
+- Un test déclaré obsolète reste rouge dans le dépôt jusqu'à ce que l'humain le mette à jour ; le
+  bilan et `derogations.md` le disent.
+- La trace accepte une troisième décision d'arbitrage, « obsolète » (cœur, moteur de tâches,
+  workflow).

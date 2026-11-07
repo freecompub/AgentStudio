@@ -151,7 +151,8 @@ export function createTaskEngine(deps: TaskEngineDeps): TaskEngine {
         porte: texte("porte"),
         élément: texte("élément"),
         contestation: texte("contestation"),
-        décision: a.décision === "dérogation" ? "dérogation" : "à corriger",
+        // « obsolète » : un test existant que l'humain sort des portes (ADR 0066).
+        décision: a.décision === "dérogation" || a.décision === "obsolète" ? a.décision : "à corriger",
         par: a.par === "humain" ? "humain" : "agent",
         raison: texte("raison"),
       });

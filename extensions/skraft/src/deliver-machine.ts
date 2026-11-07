@@ -1,3 +1,4 @@
+import { causeDEchec, optionsSelonLaCause, texteDeLaCause } from "./deliver.js";
 import { verifierEcarts } from "./distill.js";
 import { phaseRoles } from "./config.js";
 import { levelEffects } from "./difficulty.js";
@@ -50,6 +51,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
       stepCheckpoint: null,
       baseline,
       scenarioBaseline: baseline,
+      avantDeliver: e.passed,
       unitTests: [],
       newTest: null,
       acceptanceGreen: false,
@@ -176,15 +178,18 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     case "STEP_FAIL":
     case "TIMEOUT": {
       const reason = e.reason;
-      if (d.step === "scenario-gate") return scenarioFailure(s, d, [reason]);
+      // Cause connue du code (ADR 0066) : elle choisira les options si le scénario escalade.
+      s = { ...s, deliver: { ...d, derniereCause: causeDEchec({ rouges: e.type === "STEP_FAIL" ? (e.rouges ?? []) : [], avantDeliver: d.avantDeliver ?? [] }) } };
+      const dc = s.deliver!;
+      if (d.step === "scenario-gate") return scenarioFailure(s, dc, [reason]);
       // Nettoyage refusé : retour au vert, sans escalade (SPEC.md §8.3). Compté et tracé comme
       // rejet, sous le nom de porte du workflow (D21 de docs/12).
       if (d.step === "refactor") {
         const rejete = { ...bumpRetries(s, "DELIVER"), lastRejection: { gate: `pas refactor (${scenario.id})`, reasons: [reason] } };
-        const r = afterCode(rejete, { ...d, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
+        const r = afterCode(rejete, { ...dc, notes: [...d.notes, `Scénario ${scenario.id} : nettoyage annulé (${reason})`] }, d.acceptanceGreen);
         return { state: r.state, effects: [{ kind: "rollback", to: d.stepCheckpoint! }, ...r.effects] };
       }
-      return stepFailure(s, d, [reason]);
+      return stepFailure(s, dc, [reason]);
     }
 
     case "SCENARIO_OK": {
@@ -194,7 +199,7 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     }
 
     case "SCENARIO_FAIL":
-      return scenarioFailure(s, d, e.reasons);
+      return scenarioFailure(s, { ...d, derniereCause: causeDEchec({ rouges: e.rouges ?? [], avantDeliver: d.avantDeliver ?? [], ...(e.lignes ? { lignes: e.lignes } : {}) }) }, e.reasons);
   }
   return null;
 }
@@ -343,10 +348,11 @@ function scenarioFailure(s0: SkraftState, d: DeliverState, reasons: string[]): O
     return { state: r.state, effects: [...rollback, ...r.effects] };
   }
   if (failures >= s.budget.maxAttemptsPerPhase) {
-    const reason = `Scénario ${sc.id} : ${reasons.join(" ; ")}`;
+    // La cause choisit ce qui peut réussir (ADR 0066) : déclarer un test obsolète, exempter des lignes.
+    const reason = [`Scénario ${sc.id} : ${reasons.join(" ; ")}`, ...texteDeLaCause(d.derniereCause)].join("\n\n");
     return {
       state: { ...s, stage: "ESCALATED", deliver: restart, lastRejection, escalation: { from: "PHASE", reason } },
-      effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: ["retry", "skip", "abort"] }],
+      effects: [...rembobinerScenario(d), { kind: "askEscalation", reason, options: [...optionsSelonLaCause(d.derniereCause), "retry", "skip", "abort"] }],
     };
   }
   const r = agent({ ...s, lastRejection }, restart, reasons);
@@ -400,6 +406,32 @@ export function retryFix(s: SkraftState): Out {
     stepCheckpoint: d.scenarioCheckpoint,
   };
   return agent({ ...s, stage: "SPECIALIST", escalation: null, reviewThreads: threads }, nd, s.lastRejection?.reasons ?? []);
+}
+
+/**
+ * Décision de l'humain sur la cause d'un scénario escaladé (ADR 0066), puis le scénario reprend :
+ * - « obsolete » : les tests nommés sortent des portes jusqu'à la fin du cycle ; le bilan rappellera
+ *   de les mettre à jour (comme les défauts hors du changement) ;
+ * - « exempt » : les lignes non couvertes sortent du calcul de la couverture du diff (ADR 0065).
+ * Chaque décision est tracée en arbitrage.
+ */
+export function deciderSelonLaCause(s: SkraftState, decision: "obsolete" | "exempt", comment: string | undefined): Out {
+  const d = s.deliver!;
+  // Comme « relancer » : pendant une correction de revue, c'est elle qui reprend (D14 de docs/12).
+  const reprendre = (x: SkraftState) => (d.fixing ? retryFix(x) : retryDeliver(x));
+  const sc = d.scenarios[d.current]!;
+  const cause = d.derniereCause ?? { testsObsoletes: [], lignes: [] };
+  const raison = comment ?? "";
+  if (decision === "obsolete") {
+    const tests = cause.testsObsoletes.map((test) => ({ test, scenario: sc.id, raison }));
+    const arbitrages = tests.map((t) => ({ porte: "tests existants", élément: t.test, contestation: "", décision: "obsolète" as const, par: "humain" as const, raison }));
+    const ns: SkraftState = { ...s, testsObsoletes: [...(s.testsObsoletes ?? []), ...tests], arbitrages: [...(s.arbitrages ?? []), ...arbitrages] };
+    const avis = `Tests déclarés obsolètes par l'humain : ${cause.testsObsoletes.join(", ")}. Ils ne comptent plus dans les portes ; ne les modifie pas.`;
+    return reprendre({ ...ns, lastRejection: { gate: s.lastRejection?.gate ?? `scénario ${sc.id}`, reasons: [...(s.lastRejection?.reasons ?? []), avis] } });
+  }
+  const lignes = cause.lignes.flatMap((l) => l.lines.map((line) => ({ file: l.file, line, raison, contestation: "", defaut: `scénario ${sc.id}` })));
+  const arbitrages = cause.lignes.map((l) => ({ porte: "couverture du diff", élément: `${l.file}:${l.lines.join(", ")}`, contestation: "", décision: "dérogation" as const, par: "humain" as const, raison }));
+  return reprendre({ ...s, derogationsCouverture: [...(s.derogationsCouverture ?? []), ...lignes], arbitrages: [...(s.arbitrages ?? []), ...arbitrages] });
 }
 
 export function retryDeliver(s: SkraftState): Out {

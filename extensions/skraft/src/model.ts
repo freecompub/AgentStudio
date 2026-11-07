@@ -4,7 +4,7 @@
  */
 import type { EcartDeclare, LigneDuPlan } from "./distill.js";
 import { z } from "zod";
-import type { DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
+import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
@@ -85,6 +85,10 @@ export interface DeliverState {
   /** Tests connus et tests verts au dernier point sûr, et au point de reprise (début du scénario ou de la correction). */
   baseline: { all: string[]; passed: string[] };
   scenarioBaseline: { all: string[]; passed: string[] };
+  /** Tests verts au début de DELIVER : un test de cette liste devenu rouge est un candidat à l'obsolescence (ADR 0066). */
+  avantDeliver?: string[];
+  /** Cause du dernier refus du scénario, connue du code : elle choisit les options de l'escalade (ADR 0066). */
+  derniereCause?: CauseDEchec;
   /** Empreinte des tests unitaires au même point que `scenarioBaseline` : rendue à chaque reprise (D12 de docs/12). */
   scenarioUnitTestsHash?: string | null;
   /** Tests unitaires ajoutés pendant le scénario, et celui qui attend son vert. */
@@ -143,7 +147,7 @@ export interface ArbitrageRecord {
   porte: string;
   élément: string;
   contestation: string;
-  décision: "dérogation" | "à corriger";
+  décision: "dérogation" | "à corriger" | "obsolète";
   par: "agent" | "humain";
   raison: string;
 }
@@ -216,6 +220,11 @@ export interface SkraftState {
   derogations?: Derogation[];
   /** Lignes exemptées de la couverture du diff par l'humain, pour le run en cours de DELIVER. */
   derogationsCouverture?: { file: string; line: number; raison: string; contestation: string; defaut: string }[];
+  /**
+   * Tests existants déclarés obsolètes par l'humain à l'escalade d'un scénario (ADR 0066) : hors des
+   * portes jusqu'à la fin du cycle ; le bilan rappelle de les mettre à jour.
+   */
+  testsObsoletes?: { test: string; scenario: string; raison: string }[];
   /** Toutes les décisions d'arbitrage, en ajout seul : le moteur trace chaque nouvelle (ADR 0065). */
   arbitrages?: ArbitrageRecord[];
   /** ADR connus à l'entrée de la phase en cours : la liste y revient au rembobinage (D2 de docs/12). */
@@ -309,9 +318,9 @@ export type SkraftEvent =
       /** Correction côté tests : tests ajoutés encore rouges, à faire passer par le développeur (ADR 0046). */
       fixTargets?: string[];
     }
-  | { type: "STEP_FAIL"; reason: string }
+  | { type: "STEP_FAIL"; reason: string; rouges?: string[] }
   | { type: "SCENARIO_OK"; notes: string[]; facts?: string[] }
-  | { type: "SCENARIO_FAIL"; reasons: string[] };
+  | { type: "SCENARIO_FAIL"; reasons: string[]; rouges?: string[]; lignes?: { file: string; lines: number[] }[] };
 
 export type SkraftEffect =
   | { kind: "init"; storyPath: string }
@@ -326,7 +335,7 @@ export type SkraftEffect =
   /** `lens` : question d'une lentille de revue (D4 de docs/12). */
   | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
   | { kind: "askQuestion"; id: string; text: string }
-  | { kind: "askEscalation"; reason: string; options: ("retry" | "skip" | "continue" | "abort")[] }
+  | { kind: "askEscalation"; reason: string; options: ("obsolete" | "exempt" | "retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "arbitrateMutants"; threads: DefectThread[] }
   | { kind: "askMutationArbitration"; thread: DefectThread; avis: string }

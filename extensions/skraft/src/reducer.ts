@@ -6,7 +6,7 @@ import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftSt
 import type { MutantSurvivant } from "./deliver.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
-import { bumpRetries, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
+import { bumpRetries, deciderSelonLaCause, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
 
 export type Ev = TaskEvent<SkraftEvent>;
 type Out = { state: SkraftState; effects: SkraftEffect[] };
@@ -272,7 +272,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         // Escalade en ROUTE : une question déjà posée peut recevoir sa réponse entre-temps (D17 de docs/12).
         const ns = s.escalation.from === "ROUTE" ? repondre(s, e.decision, e.comment) : null;
         if (ns) return { state: ns, effects: [] };
-        return decide(s, e.decision);
+        return decide(s, e.decision, e.comment);
       }
       break;
 
@@ -571,7 +571,7 @@ function oublierLaPhase(s: SkraftState): SkraftState {
     ? { ...s, debutDuRun: { ...s.debutDuRun, [s.phase]: s.artifacts[s.phase].length }, debutDesRevues: { ...s.debutDesRevues, [s.phase]: s.reviews[s.phase].length } }
     : s;
   // Le code effacé emporte les mutants exemptés (ADR 0065) ; les arbitrages, eux, restent tracés.
-  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [], ecartsAuPlan: [] } : sansLivrables;
+  const sansDerogations = s.phase === "DELIVER" ? { ...sansLivrables, derogations: [], derogationsCouverture: [], ecartsAuPlan: [], testsObsoletes: [] } : sansLivrables;
   return s.adrsAvantPhase ? { ...sansDerogations, adrs: s.adrsAvantPhase } : sansDerogations;
 }
 
@@ -620,9 +620,11 @@ function escalateFrom(s: SkraftState, from: "INIT" | "CLASSIFY" | "ROUTE" | "COM
   return { state: { ...s, stage: "ESCALATED", escalation: { from, reason } }, effects: [{ kind: "askEscalation", reason, options }] };
 }
 
-function decide(s: SkraftState, decision: string): Out {
+function decide(s: SkraftState, decision: string, comment?: string): Out {
   const from = s.escalation!.from;
   if (decision === "abort") return { state: { ...s, stage: "ABORTED" }, effects: [] };
+  // Options proposées selon la cause d'un scénario escaladé (ADR 0066).
+  if ((decision === "obsolete" || decision === "exempt") && s.phase === "DELIVER" && s.deliver) return deciderSelonLaCause({ ...s, escalation: null }, decision, comment);
   if (from === "COMMIT" && s.phase) {
     // Le commit seul est refait ; ou la phase continue sans commit, choix tracé (rejet « commit »).
     if (decision === "retry") return commit({ ...s, escalation: null });

@@ -44,7 +44,7 @@ export type TraceEntry = {
    * Arbitrage d'un défaut de porte contesté (D22 de docs/12, ADR 0065) : qui a tranché (agent ou
    * humain), quoi (l'élément exact), et pourquoi. Une dérogation exempte cet élément de la porte.
    */
-  | { kind: "arbitrage"; porte: string; élément: string; contestation: string; décision: "dérogation" | "à corriger"; par: "agent" | "humain"; raison: string }
+  | { kind: "arbitrage"; porte: string; élément: string; contestation: string; décision: "dérogation" | "à corriger" | "obsolète"; par: "agent" | "humain"; raison: string }
   /**
    * Livrable archivé **avant** qu'un rollback ne l'efface (ADR 0038).
    *

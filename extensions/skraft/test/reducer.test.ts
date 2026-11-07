@@ -786,6 +786,18 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
       expect(relance.effects).toEqual([expect.objectContaining({ kind: "runDeliverAgent", step: "fix", feedback: expect.arrayContaining([defect]) })]);
     });
 
+    it("ADR 0066 : correction escaladée sur un test qui passait avant DELIVER ; « déclarer obsolète » reprend la correction, sans replanifier", () => {
+      let r = play([...delivered, major]);
+      const rouge: Ev = { type: "STEP_FAIL", reason: "Tests en échec : U > old.", rouges: ["U > old"] };
+      for (let n = 0; n < 20 && r.state.stage !== "ESCALATED"; n++) r = transition(transition(r.state, REP_DEV).state, rouge);
+      expect(r.state.stage).toBe("ESCALATED");
+      expect(r.effects.at(-1)).toMatchObject({ kind: "askEscalation", options: ["obsolete", "retry", "skip", "abort"] });
+      const suite = transition(r.state, { type: "HUMAN_DECISION", decision: "obsolete", comment: "comportement changé" });
+      expect(suite.state.testsObsoletes).toEqual([{ test: "U > old", scenario: "ac-2", raison: "comportement changé" }]);
+      expect(kinds(suite.effects)).not.toContain("planDeliver");
+      expect(suite.effects).toEqual([expect.objectContaining({ kind: "runDeliverAgent", step: "fix", feedback: expect.arrayContaining([defect]) })]);
+    });
+
     it("blocage pendant la correction : la réponse relance la correction avec ses défauts", () => {
       const blocked = play([...delivered, major, { type: "BLOCKER_REPORTED", question: "Valeur minimale ?", choices: [] }]);
       expect(transition(blocked.state, DECIDE("0")).effects).toEqual([{ kind: "runDeliverAgent", step: "fix", scenarioId: "ac-2", attempt: 1, feedback: [defect, RESPONSE_INSTRUCTION] }]);

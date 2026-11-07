@@ -81,35 +81,28 @@ donc aux sources écrites hors des scénarios.
 
 ---
 
-## 4. Point à trancher
+## 4. Point tranché, et révision (07/11)
 
-**Qui met à jour un test unitaire obsolète quand on « rejoue DISTILL » ?**
-
-| Option | Principe | Risque |
-|---|---|---|
-| **A** (recommandée) | « Rejouer DISTILL » ne sert qu'aux tests **d'acceptance** obsolètes. Pour un test **unitaire**, seule « mettre en pause » est proposée : l'humain le met à jour | Aucun agent ne réécrit un test existant |
-| **B** | Pendant ce rejeu, l'agent d'acceptance reçoit le droit d'écrire **ce seul fichier** de test, avec une justification dans `test-plan.md` | Un agent modifie un test existant ; la garde doit être limitée au fichier cité |
-| **C** | Pas de rejeu de DISTILL. Une fois l'obsolescence confirmée par l'humain, le testeur de DELIVER met le test à jour (droit limité à ce fichier) | Même risque que B, plus tard dans le pipeline |
+Le responsable a retenu l'option A (aucun agent ne réécrit un test existant), puis remplacé
+« rejouer DISTILL » et « mettre en pause » par le principe des défauts hors du changement : l'humain
+déclare le test obsolète, il sort des portes, le cycle se termine, et le bilan rappelle de le mettre
+à jour. Raison : un retour au début de DELIVER, ou à DISTILL, passe par un rollback Git qui effacerait
+la correction faite par l'humain pendant la pause. Voir ADR 0066.
 
 ---
 
-## 5. Plan de mise en œuvre (une fois le §4 tranché)
+## 5. Mise en œuvre (07/11)
 
-1. **Référence des tests d'avant DELIVER** : la garder (workflow : `planifier` ; extension :
-   `DELIVER_PLANNED`) pour reconnaître un test existant devenu rouge.
-2. **Cause structurée du dernier refus** : tests existants rouges, lignes non couvertes. Elle est
-   portée jusqu'à l'escalade du scénario (workflow : `ScenarioEchoue` ; extension : `scenarioFailure`).
-3. **Escalade selon la cause** : options et texte de la question ; traces.
-4. **Exempter des lignes** : réutiliser `derogationsCouverture` et `sansLignesExemptees` à la porte
-   du scénario.
-5. **Rejouer DISTILL** :
-   - workflow : `workflow.mjs` doit pouvoir revenir de DELIVER à DISTILL (aujourd'hui, les phases
-     s'enchaînent sans retour) ;
-   - extension : un retour de DELIVER à DISTILL dans le réducteur (rembobinage, oubli des sessions,
-     DISTILL relancée avec le motif, gel recalculé).
-6. **Mettre en pause** : une question d'attente, puis la question « d'où repartir ? ».
-7. **Tests**, de bout en bout dans les deux implémentations, chacun vérifié en échec avant le
-   correctif :
-   - test existant obsolète : « rejouer DISTILL », « mettre en pause » puis chaque point de reprise ;
-   - lignes non couvertes dans un scénario : « exempter ces lignes » ;
-   - traces de chaque choix.
+1. **Référence des tests d'avant DELIVER** : `avantDeliver` (extension : `DELIVER_PLANNED` ;
+   workflow : `planifier`).
+2. **Cause portée par chaque refus** : tests en échec (`rouges`) et, à la porte du scénario, lignes
+   non couvertes (`lignes`) — extension : `STEP_FAIL`, `SCENARIO_FAIL`, `derniereCause` ; workflow :
+   `PasRefuse`, `ScenarioEchoue.cause`.
+3. **Fonctions pures, en deux copies** (`deliver.ts`, `deliver.mjs`) : `causeDEchec`,
+   `optionsSelonLaCause`, `texteDeLaCause`, `sansTestsObsoletes`.
+4. **Escalade selon la cause** : options « Déclarer ces tests obsolètes et continuer » et
+   « Exempter ces lignes et continuer », avant relancer, sauter, abandonner ; chaque décision tracée.
+5. **Effets** : tests obsolètes retirés des résultats que lisent les portes (et code de sortie rendu à
+   0 si leurs échecs étaient les seuls) ; lignes exemptées hors du calcul à la porte du scénario ;
+   `derogations.md` et rappel au bilan.
+6. **Tests de bout en bout** dans les deux implémentations : `e2e-escalade-cause`.
