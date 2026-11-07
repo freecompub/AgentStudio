@@ -40,6 +40,7 @@ import {
 import {
   createNodeProcessRunner,
   createProfileAdapter,
+  detecte,
   diagnoseProfile,
   globToRegExp,
   runCanaries,
@@ -659,7 +660,8 @@ function stackCommandDeps(args: {
           const re = globToRegExp(glob);
           return tous.some((f) => re.test(f));
         },
-        fichiersDeDetectionPresents: profile.detect.some((d) => tous.includes(d)),
+        // Même règle que l'adaptateur : un élément au contenu se vérifie dans le fichier (ADR 0072).
+        fichiersDeDetectionPresents: await detecte(profile.detect, workspace.root),
       });
     },
   };

@@ -76,16 +76,16 @@
     {
       "id": "j5-profil-detection-par-contenu",
       "title": "Un profil peut détecter une stack au contenu d'un fichier, pas seulement à son existence",
-      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts -t 'detect'",
-      "passes": false,
-      "notes": "L'adaptateur TypeScript vérifie que `vitest` figure dans les dépendances du package.json ; un profil ne sait dire que « ce fichier existe », ce qui est plus fragile."
+      "verify": "pnpm vitest run --project stack-adapters test/detection-contenu.test.ts test/profils-livres.test.ts test/stack-doctor.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 (07/11) : un élément de `detect` est un nom de fichier (il existe) ou `{ fichier, contient }` (sous-chaîne, pas d'expression régulière ; chemin relatif sans `..` ; fichier lu jusqu'à 1 Mo). Même règle pour l'adaptateur et pour `/stack doctor`. `profiles/typescript.yaml` et la proposition de `/stack init` exigent `\"vitest\"` dans package.json."
     },
     {
       "id": "j5-profil-architecture",
       "title": "Un profil peut fournir l'analyse des imports (règle de dépendance)",
-      "verify": "pnpm vitest run --project stack-adapters test/profile-adapter.test.ts -t 'architecture'",
-      "passes": false,
-      "notes": "Pas de section dans le schéma : avec un profil, `ctx.stack.architecture()` renvoie null et la porte dit qu'elle n'a rien vérifié. Depuis le retrait de Swift (ADR 0061), aucun adaptateur ne fournit cette analyse : la porte d'architecture est « non disponible » partout."
+      "verify": "pnpm vitest run --project stack-adapters test/architecture-profil.test.ts test/profils-livres.test.ts test/stack-doctor.test.ts test/build-errors.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 (07/11) : section `architecture` (fichiers, motif `import` ligne à ligne avec groupe `module`, modules par motifs de chemin). Règle par nom de module ou par chemin ; interdit égal, préfixe suivi de `.`/`/`/`:`, ou segment égal ; import relatif résolu depuis le fichier. Motif gardé comme `buildErrors` (garde commune `motif-sur.ts`). Exemple TypeScript livré avec la section ; `/stack doctor` avertit sans elle. Analyse textuelle : un import en commentaire compte."
     },
     {
       "id": "j5-canaris",
@@ -125,9 +125,9 @@
     {
       "id": "j5-lecteur-tap",
       "title": "Le format TAP est lu, ce qui couvre la plupart des lanceurs de tests",
-      "verify": "pnpm vitest run --project stack-adapters test/tap-report.test.ts",
-      "passes": false,
-      "notes": "Lecteurs existants : junit-xml, vitest-json, eslint-json, stryker-json (swiftlint-json et muter-json retirés avec Swift, ADR 0061). N'annoncer un format qu'une fois son lecteur écrit."
+      "verify": "pnpm vitest run --project stack-adapters test/tap.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 (07/11) : `report: tap` (section tests), TAP 13 et 14, sous-tests indentés (blocs `describe` écartés, titres des parents dans l'identifiant), SKIP et TODO ignorés, `Bail out!` en échec, message et fichier tirés du bloc YAML (`location`). Lu dans `{rapport}` si la commande le nomme, sinon sur la sortie standard. Éprouvé sur une vraie sortie de `node --test` (Node 22.22) et contre le vrai lanceur. Lecteurs : junit-xml, vitest-json, tap, eslint-json, stryker-json."
     },
     {
       "id": "j5-stack-init-doctor",

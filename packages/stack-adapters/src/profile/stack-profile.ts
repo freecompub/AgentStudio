@@ -1,6 +1,7 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { compileBuildErrorSpec } from "./build-errors.js";
+import { compilerMotifSur } from "./motif-sur.js";
 import { JETON_RAPPORT } from "./tokens.js";
 
 /**
@@ -17,7 +18,7 @@ import { JETON_RAPPORT } from "./tokens.js";
  * Lecteurs de rapport fournis par l'application : un profil les désigne, il n'en invente pas.
  * N'y figurent que les formats réellement lus — en ajouter un demande d'écrire son lecteur.
  */
-export const REPORT_READERS = ["junit-xml", "vitest-json", "eslint-json", "stryker-json"] as const;
+export const REPORT_READERS = ["junit-xml", "vitest-json", "tap", "eslint-json", "stryker-json"] as const;
 
 /**
  * Lecteurs de couverture. Cobertura seul pour l'instant, et c'est un choix : `dotnet test`,
@@ -34,7 +35,7 @@ export type ReportReader = (typeof REPORT_READERS)[number];
  * façon le lecteur de mutation — le lecteur annoncé n'était jamais honoré, et rien ne le disait.
  */
 const LECTEURS_PAR_SECTION = {
-  tests: ["junit-xml", "vitest-json"],
+  tests: ["junit-xml", "vitest-json", "tap"],
   lint: ["eslint-json"],
   mutation: ["stryker-json"],
 } as const satisfies Record<"tests" | "lint" | "mutation", readonly ReportReader[]>;
@@ -63,6 +64,14 @@ export type CanaryKind = (typeof CANARY_KINDS)[number];
 /** Marque unique injectée par le code, qui permet de retrouver les résultats du canari. */
 export const JETON_MARQUE = "{marque}";
 
+/** Chemin relatif à la racine, sans `..` : un profil ne désigne rien hors du projet. */
+const cheminDuProjet = (champ: string) =>
+  z
+    .string()
+    .min(1)
+    .refine((f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f), `\`${champ}\` doit être un chemin relatif à la racine du projet.`)
+    .refine((f) => !f.split(/[\\/]/).includes(".."), `\`${champ}\` ne doit pas contenir \`..\` : il désigne un fichier du projet, jamais hors de lui.`);
+
 const canari = z
   .object({
     kind: z.enum(CANARY_KINDS),
@@ -70,11 +79,7 @@ const canari = z
      * Où écrire le canari, relativement à la racine. Ce fichier est réellement créé sur le
      * disque : un chemin absolu ou remontant écrirait hors de la copie isolée.
      */
-    file: z
-      .string()
-      .min(1)
-      .refine((f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f), "`file` doit être un chemin relatif à la racine du projet.")
-      .refine((f) => !f.split(/[\\/]/).includes(".."), "`file` ne doit pas contenir `..` : un canari s'écrit dans le projet, jamais hors de lui.")
+    file: cheminDuProjet("file")
       .refine(
         (f) => f.includes(JETON_MARQUE),
         // Sans marque dans le nom, `file: test/mes.test.ts` écraserait ce fichier pour la
@@ -95,8 +100,13 @@ const canari = z
 const schema = z
   .object({
     id: z.string().min(1),
-    /** Fichiers dont la présence signale cette stack (`pyproject.toml`, `package.json`…). */
-    detect: z.array(z.string().min(1)).min(1),
+    /**
+     * Ce qui signale cette stack : un fichier présent (`pyproject.toml`), ou un fichier qui contient
+     * une sous-chaîne (`{ fichier: package.json, contient: '"vitest"' }`, ADR 0072). Un élément suffit.
+     */
+    detect: z
+      .array(z.union([z.string().min(1), z.object({ fichier: cheminDuProjet("fichier"), contient: z.string().min(1) }).strict()]))
+      .min(1),
     tests: commande,
     lint: commande.optional(),
     /**
@@ -130,6 +140,21 @@ const schema = z
         pattern: z.string().min(1),
         /** Sous-chaînes désignant un symbole absent — le seul échec de compilation légitime. */
         missingSymbol: z.array(z.string().min(1)).default([]),
+      })
+      .strict()
+      .optional(),
+    /**
+     * Analyse des imports (ADR 0072) : ce qui rend la règle de dépendance vérifiable. `import` est
+     * appliqué ligne à ligne aux `fichiers` ; son groupe `module` donne ce qui est importé ; chaque
+     * fichier appartient au premier module dont un motif lui correspond.
+     */
+    architecture: z
+      .object({
+        fichiers: z.array(z.string().min(1)).min(1),
+        import: z.string().min(1),
+        modules: z
+          .record(z.string().min(1), z.array(z.string().min(1)).min(1, "un module doit avoir au moins un motif de chemin."))
+          .refine((m) => Object.keys(m).length > 0, "`modules` doit nommer au moins un module."),
       })
       .strict()
       .optional(),
@@ -203,8 +228,12 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
   if (format !== undefined && !autorises.has(format))
     return { error: `Profil de stack refusé : « ${format} » (format) n'est pas un programme autorisé.` };
 
-  // Le motif est compilé dès la lecture, pour que son refus soit expliqué à l'auteur du profil
+  // Les motifs sont compilés dès la lecture, pour que leur refus soit expliqué à l'auteur du profil
   // plutôt que découvert au milieu d'une porte.
+  if (parsed.data.architecture) {
+    const c = compilerMotifSur("architecture.import", parsed.data.architecture.import, ["module"]);
+    if ("error" in c) return { error: `Profil de stack refusé : ${c.error}` };
+  }
   if (parsed.data.buildErrors) {
     const compile = compileBuildErrorSpec(parsed.data.buildErrors);
     if ("error" in compile) return { error: `Profil de stack refusé : ${compile.error}` };

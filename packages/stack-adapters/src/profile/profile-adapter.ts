@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { access, mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
@@ -7,10 +7,13 @@ import type { FormatReport, LintReport, ProcessRunner, StackAdapter } from "../p
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
-import { substituer } from "./tokens.js";
+import { JETON_RAPPORT, substituer } from "./tokens.js";
 import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
+import { detecte } from "./detect.js";
+import { analyserImports } from "./architecture.js";
+import { compilerMotifSur } from "./motif-sur.js";
 
 /**
  * Adaptateur bâti sur un profil déclaratif (J5). Il ne connaît aucun langage : il exécute les
@@ -26,7 +29,6 @@ export interface ProfileAdapterDeps {
   defaultTimeoutMs?: number;
 }
 
-const existe = (p: string) => access(p).then(() => true, () => false);
 
 /**
  * Couverture, si le profil déclare un lecteur. Un rapport absent ou illisible rend `undefined` :
@@ -75,6 +77,9 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   /** Pour le GEL des tests : insensible à la casse (ADR 0035), sinon une majuscule le contourne. */
   const motifsSansCasse = (globs: readonly string[]) => globs.map((g) => globToRegExp(g, "i"));
   const testGlobs = [...profile.layout.unitTests, ...profile.layout.acceptanceTests];
+  // Motif d'import compilé une fois ; le profil a déjà été validé à la lecture (`parseStackProfile`).
+  const compile = profile.architecture ? compilerMotifSur("architecture.import", profile.architecture.import, ["module"]) : null;
+  const architecture = compile && "re" in compile ? compile.re : null;
 
   return {
     // L'identifiant du port reste fermé tant que d'autres stacks ne sont pas déclarées ailleurs.
@@ -92,12 +97,13 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     isTestFile: (p) => motifsSansCasse(testGlobs).some((re) => re.test(p.replaceAll("\\", "/"))),
 
     async detect(root) {
-      for (const f of profile.detect) if (await existe(join(root, f))) return true;
-      return false;
+      return detecte(profile.detect, root);
     },
 
     async runTests(opts) {
-      const rapport = fichierTemporaire(profile.tests.report === "junit-xml" ? "xml" : "json");
+      const rapport = fichierTemporaire({ "junit-xml": "xml", tap: "tap" }[profile.tests.report as string] ?? "json");
+      // TAP sans `{rapport}` dans la commande : `prove`, `bats` n'écrivent que sur la sortie standard (ADR 0072).
+      const surLaSortie = profile.tests.report === "tap" && !profile.tests.command.some((a) => a.includes(JETON_RAPPORT));
       // Même exécution pour les deux : mesurer la couverture ne doit pas coûter un second passage
       // de toute la suite. L'outil écrit où le profil le lui dit, via `{couverture}`.
       const couverture = profile.tests.coverage ? fichierTemporaire("couverture") : "";
@@ -112,7 +118,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
         });
         const output = `${r.stdout}${r.stderr}`.slice(-20_000);
         if (r.timedOut) return { results: [], exitCode: r.exitCode, timedOut: true, output, durationMs: r.durationMs };
-        const brut = await readFile(rapport, "utf8").catch(() => null);
+        const brut = surLaSortie ? r.stdout : await readFile(rapport, "utf8").catch(() => null);
         if (brut === null) {
           // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent — la
           // compilation s'arrête avant d'exécuter quoi que ce soit. Le profil dit comment lire ces
@@ -159,6 +165,13 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
               return { available: false, violations: [] };
             }
           },
+        }
+      : {}),
+
+    // Analyse des imports déclarée (ADR 0072) : la règle de dépendance devient vérifiable.
+    ...(architecture
+      ? {
+          architecture: ({ root, rules }) => analyserImports(profile.architecture!, architecture, root, rules),
         }
       : {}),
 

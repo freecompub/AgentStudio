@@ -1,5 +1,6 @@
 import type { Constat } from "./constat.js";
 import type { StackProfile } from "./stack-profile.js";
+import { libelleDetect } from "./detect.js";
 
 /**
  * Outillage des profils (J5) : proposer un profil d'après ce qu'un projet porte, et diagnostiquer
@@ -47,11 +48,11 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
   const constats: Constat[] = [];
 
   if (deps.fichiersDeDetectionPresents)
-    constats.push({ gravite: "ok", message: `Le projet porte bien ${profile.detect.join(" ou ")}.` });
+    constats.push({ gravite: "ok", message: `Le projet porte bien ${profile.detect.map(libelleDetect).join(" ou ")}.` });
   else
     constats.push({
       gravite: "probleme",
-      message: `Aucun des fichiers de \`detect\` n'est présent (${profile.detect.join(", ")}) : ce profil ne reconnaîtrait pas ce projet.`,
+      message: `Aucun des fichiers de \`detect\` n'est présent (${profile.detect.map(libelleDetect).join(", ")}) : ce profil ne reconnaîtrait pas ce projet.`,
     });
 
   for (const [section, c] of [
@@ -95,6 +96,8 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
           ? "Aucun canari déclaré : le classement des échecs ne sera pas vérifié, alors que les portes RED en dépendent."
           : `Canaris manquants : ${manquants.map((k) => `\`${k}\``).join(", ")}. Sans eux, ce que ces genres éprouvent n'est pas vérifié — \`syntax\` en particulier est le seul à prouver qu'une erreur de compilation ne passe pas pour un rouge légitime.`,
     });
+  if (!profile.architecture)
+    constats.push({ gravite: "avertissement", message: "Pas de section `architecture` : la règle de dépendance ne sera pas vérifiée (aucune analyse des imports)." });
   if (profile.infrastructureModules.length === 0)
     constats.push({
       gravite: "avertissement",
@@ -107,7 +110,7 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
 /** Modèles proposés. Ils doivent rester valides : un test les relit à chaque exécution. */
 const MODELES = {
   typescript: `id: typescript
-detect: [package.json]
+detect: [{ fichier: package.json, contient: '"vitest"' }]
 tests:
   command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
   report: vitest-json

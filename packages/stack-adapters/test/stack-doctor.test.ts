@@ -20,6 +20,8 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
     const yaml = proposeProfile({ fichiers: ["package.json"], dependances: ["vitest"] });
     const r = parseStackProfile(yaml!, { allowedPrograms: AUTORISES });
     expect("error" in r ? r.error : r.profile.id).toBe("typescript");
+    // Détecté au contenu, comme l'adaptateur écrit à la main (ADR 0072) : un projet Node sans Vitest ne correspond pas.
+    expect("error" in r ? null : r.profile.detect).toEqual([{ fichier: "package.json", contient: '"vitest"' }]);
   });
 
   it("ne propose rien plutôt que de deviner", () => {
@@ -69,6 +71,11 @@ describe("diagnoseProfile — ce que /stack doctor rapporte", () => {
     expect(d.filter((x) => x.gravite === "probleme")).toEqual([]);
     // Le modèle Python ne déclare pas d'outil de mutation : c'est dit, sans bloquer.
     expect(d.some((x) => x.gravite === "avertissement" && /mutation/.test(x.message))).toBe(true);
+  });
+
+  it("sans section `architecture`, la règle de dépendance ne sera pas vérifiée : avertissement (ADR 0072)", () => {
+    const d = diagnoseProfile(BON, { programmeTrouvable: () => true, cheminExiste: () => true, fichiersDeDetectionPresents: true });
+    expect(d).toContainEqual({ gravite: "avertissement", message: "Pas de section `architecture` : la règle de dépendance ne sera pas vérifiée (aucune analyse des imports)." });
   });
 
   it("un programme introuvable est un problème, et on dit lequel", () => {

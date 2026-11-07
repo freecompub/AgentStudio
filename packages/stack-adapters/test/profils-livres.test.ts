@@ -14,6 +14,8 @@ describe("Profils d'exemple livrés", () => {
     const p = charger(nom);
     expect(p.id).toBe(nom);
     expect(p.layout.sources.length).toBeGreaterThan(0);
+    // Détection au contenu (ADR 0072) : la présence d'un fichier de configuration ne suffit plus.
+    expect(p.detect).toContainEqual({ fichier: "package.json", contient: '"vitest"' });
   });
 
   it("chacun est un projet.yaml complet : pile et qualite valides (ADR 0071)", () => {
@@ -45,9 +47,18 @@ describe("Profils d'exemple livrés", () => {
     }
   });
 
-  it("ce qu'un profil ne sait pas encore exprimer reste absent, plutôt que faux", () => {
-    // L'analyse des imports n'a pas de section dans le schéma : avec un profil, la règle de
-    // dépendance n'est pas vérifiée, et la porte le dit — elle n'invente pas un résultat.
-    expect(createProfileAdapter(charger("typescript")).architecture).toBeUndefined();
+  it("l'exemple TypeScript déclare l'analyse des imports : la règle de sa section qualite est vérifiable (ADR 0072)", async () => {
+    const { mkdtemp, mkdir, rm, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const racine = await mkdtemp(join(tmpdir(), "profil-livre-"));
+    await mkdir(join(racine, "src/domain"), { recursive: true });
+    await writeFile(join(racine, "src/domain/plafond.ts"), 'import { db } from "../infrastructure/db.js";\nimport { Dose } from "./dose.js";\n');
+    const barre = parseQualityBar({ projet: lire("typescript") });
+    if ("error" in barre) throw new Error(barre.error);
+    const a = createProfileAdapter(charger("typescript"));
+    const r = await a.architecture!({ root: racine, rules: barre.bar.dependencyRules });
+    expect(r.violations).toEqual([{ module: "Domain", file: "src/domain/plafond.ts", imported: "src/infrastructure/db.js" }]);
+    await rm(racine, { recursive: true, force: true });
   });
 });

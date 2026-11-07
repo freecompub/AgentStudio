@@ -28,6 +28,61 @@ Les programmes nommés doivent figurer dans la liste autorisée par l'administra
 D47/O12). La liste par défaut couvre les lanceurs de tests, linters et outils de mutation
 courants ; ni interpréteur, ni client réseau.
 
+## La détection
+
+`detect` dit à quoi l'on reconnaît la pile. Un élément est un nom de fichier, qui doit exister, ou
+un fichier qui doit contenir une sous-chaîne (ADR 0072) :
+
+```yaml
+detect:
+  - { fichier: package.json, contient: '"vitest"' }
+  - pyproject.toml
+```
+
+Un élément qui correspond suffit. La sous-chaîne n'est pas une expression régulière, et le chemin
+est relatif à la racine, sans `..`.
+
+## Les rapports de tests
+
+`tests.report` nomme le lecteur : `junit-xml`, `vitest-json` ou `tap` (ADR 0072). Un rapport TAP
+est lu dans `{rapport}` si la commande le nomme, sinon sur la sortie standard (`prove`, `bats`).
+
+```yaml
+tests:
+  command: [node, --test, --test-reporter=tap, "--test-reporter-destination={rapport}"]
+  report: tap
+```
+
+Deux pièges vus avec `node --test` (Node 22) : il ne prend pas un dossier en argument (sans chemin,
+il trouve lui-même les fichiers `*.test.*`) ; et il ne donne le fichier d'un test qu'en cas
+d'échec — un test réussi prend celui de son bloc parent, s'il le donne. `node` est un
+interpréteur : il ne figure pas dans la liste des programmes autorisés par défaut, l'administrateur
+doit l'y ajouter.
+
+## L'analyse des imports
+
+La section facultative `architecture` (ADR 0072) rend vérifiables les règles de dépendance (« le
+domaine n'importe pas l'infrastructure ») : celles de la section `qualite`, ou à défaut celle que
+la pile déduit de `infrastructureModules`.
+
+```yaml
+architecture:
+  fichiers: ["src/**/*.cs"]
+  import: '^\s*using\s+(?<module>[\w.]+)\s*;'
+  modules:
+    Domain: ["src/Tarification.Domaine/**"]
+```
+
+- le motif s'applique **ligne à ligne** ; son groupe `module` est ce qui est importé. Il vient du
+  dépôt : mêmes gardes que `buildErrors` (300 caractères, pas de quantificateur imbriqué) ;
+- un import relatif (`../infrastructure/db.js`) est résolu depuis le fichier ;
+- une règle vise un module par son nom, ou un dossier par son chemin (`src/domain`) ;
+- un import est interdit s'il est égal à l'interdit, commence par lui suivi de `.`, `/` ou `:`, ou
+  si l'un de ses segments lui est égal ; jamais par simple sous-chaîne ;
+- les dossiers cachés et de dépendances (`node_modules`, `bin`, `obj`, `target`, `dist`, `vendor`)
+  ne sont pas lus, ni un fichier de plus de 1 Mo. L'analyse est textuelle : un import en
+  commentaire compte.
+
 ## Les canaris
 
 La section `canaries` est ce qui rend un profil **vérifiable**. Ce sont des tests dont la bonne
@@ -86,12 +141,6 @@ symbole manque.
 Ces limites sont réelles : un profil est aujourd'hui **moins capable** qu'un adaptateur écrit à la
 main. Elles sont inscrites dans `features.json`.
 
-- **La détection ne regarde que l'existence de fichiers**, jamais leur contenu. L'adaptateur
-  TypeScript, lui, vérifie que `vitest` figure dans les dépendances du `package.json` ; le profil
-  se rabat sur la présence d'un `vitest.config.ts`, ce qui est plus fragile.
-- **L'analyse des imports n'a pas de section.** Avec un profil, `ctx.stack.architecture()` renvoie
-  `null` : la règle de dépendance n'est pas vérifiée, et la porte de fin de scénario le dit au
-  lieu d'inventer un résultat. Aucun adaptateur ne le fait depuis le retrait de Swift (ADR 0061).
 - **La classification des échecs est générique.** Le lecteur `junit-xml` déduit la raison d'un
   rouge — assertion, symbole manquant, autre — de motifs communs à plusieurs langages. Les
   adaptateurs écrits à la main connaissent leur outil et sont plus précis.

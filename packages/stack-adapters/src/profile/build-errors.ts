@@ -1,5 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import type { FailureKind, TestResult } from "../protocols.js";
+import { compilerMotifSur, LIGNE_MAX, LIGNES_MAX } from "./motif-sur.js";
 
 /**
  * Erreurs de compilation déclarées par un profil (J5, §8.3).
@@ -29,42 +30,15 @@ export interface CompiledBuildErrorSpec {
   readonly missingSymbol: readonly string[];
 }
 
-/** Au-delà, une ligne n'est pas un message de compilateur : on ne la soumet pas au moteur. */
-const LIGNE_MAX = 1000;
-/** Lignes examinées au plus ; une sortie de compilation utile tient largement dedans. */
-const LIGNES_MAX = 20_000;
 /** Fichiers en erreur rapportés au plus : au-delà, la porte n'a plus rien à apprendre. */
 const FICHIERS_MAX = 200;
-const MOTIF_MAX = 300;
-
-/**
- * Quantificateur appliqué à un groupe qui en contient déjà un — `(\w+)+`, `(a*)*`, `(.+)*`. C'est
- * la forme qui fait revenir le moteur sur ses pas de façon exponentielle. Heuristique, donc
- * imparfaite : elle écarte les cas connus, elle ne prouve pas l'absence de tout risque. Les bornes
- * d'exécution ci-dessus sont là pour ce qu'elle laisse passer.
- */
-const QUANTIFICATEUR_IMBRIQUE = /\([^)]*[+*}][^)]*\)\s*[+*]|\([^)]*[+*][^)]*\)\s*\{\d/;
 
 export function compileBuildErrorSpec(spec: { pattern: string; missingSymbol?: readonly string[] }):
   | { spec: CompiledBuildErrorSpec }
   | { error: string } {
-  if (spec.pattern.length > MOTIF_MAX) return { error: `\`buildErrors.pattern\` est trop long (${spec.pattern.length} caractères, maximum ${MOTIF_MAX}).` };
-  if (QUANTIFICATEUR_IMBRIQUE.test(spec.pattern))
-    return {
-      error:
-        "`buildErrors.pattern` contient un quantificateur imbriqué (de la forme `(…+)+`) : " +
-        "cette construction fait revenir le moteur sur ses pas de façon exponentielle et figerait l'application.",
-    };
-  if (!spec.pattern.includes("(?<file>") || !spec.pattern.includes("(?<message>"))
-    return { error: "`buildErrors.pattern` doit comporter les groupes nommés `(?<file>…)` et `(?<message>…)`." };
-
-  let re: RegExp;
-  try {
-    re = new RegExp(spec.pattern);
-  } catch (err) {
-    return { error: `\`buildErrors.pattern\` n'est pas une expression régulière valide : ${err instanceof Error ? err.message : String(err)}` };
-  }
-  return { spec: { re, missingSymbol: spec.missingSymbol ?? [] } };
+  const c = compilerMotifSur("buildErrors.pattern", spec.pattern, ["file", "message"]);
+  if ("error" in c) return c;
+  return { spec: { re: c.re, missingSymbol: spec.missingSymbol ?? [] } };
 }
 
 const relatif = (root: string, chemin: string) => (isAbsolute(chemin) ? relative(root, chemin) : chemin).replaceAll("\\", "/");

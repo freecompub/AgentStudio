@@ -6,9 +6,10 @@
 pile:
   id: typescript
 
-  # Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
-  # existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
-  detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
+  # Ce qui signale cette stack : ici, `vitest` dans les dépendances de package.json (ADR 0072).
+  # Un élément peut aussi être un simple nom de fichier, qui doit alors exister. Un élément suffit.
+  detect:
+    - { fichier: package.json, contient: '"vitest"' }
 
   tests:
     command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
@@ -32,8 +33,19 @@ pile:
     unitTests: ["tests/**", "src/**/*.test.ts"]
     sources: ["src/**"]
 
-  # Ce qu'un domaine ne doit pas importer.
+  # Ce qu'un domaine ne doit pas importer, quand le projet ne déclare pas ses propres règles.
   infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+
+  # Analyse des imports (ADR 0072) : ce qui rend vérifiables les règles de dépendance de la
+  # section qualite. Le motif s'applique ligne à ligne ; son groupe `module` est ce qui est
+  # importé ; un import relatif est résolu depuis le fichier. Chaque fichier appartient au premier
+  # module dont un motif lui correspond. Analyse textuelle : un import en commentaire compte.
+  architecture:
+    fichiers: ["src/**/*.ts"]
+    import: 'from\s+["''](?<module>[^"'']+)["'']'
+    modules:
+      Domain: ["src/domain/**"]
+      Application: ["src/application/**"]
 
   # Canaris de `/stack doctor` : des tests dont la bonne réponse est connue d'avance. Le code les
   # écrit un par un dans une copie isolée du projet, lance la commande ci-dessus, et vérifie que
