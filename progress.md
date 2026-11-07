@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Run de mesure US-2 avec Claude (`docs/runs/2026-11-07-us-2-mcp-claude/`)
+
+- But : mesurer le réfutateur (ADR 0069), le disjoncteur (ADR 0073) et `passation.md`. Même départ que
+  les runs du 05/11 et du 06/11 (`a7cf6db`), serveur MCP reconstruit le jour même, runtime Claude.
+- Résultat : **fini**, 26m10, 40 tours, 7 rejets, **13,83 $**, `dotnet test` 10/10 ; aucun ADR au final.
+  Le 06/11 : 18m24, 34 tours, 4 rejets ; son coût (2,27 $) était sous-estimé, pas comparable.
+- **DESIGN coûte 10,4 $ sur 13,8** : 8 essais, une escalade au budget, une correction de revue. La porte
+  de cohérence refuse 4 fois pour des noms cités dans `contracts.md` ou un ADR et absents des modèles :
+  les deux architectes ne restent pas alignés. C'est la piste d'économie principale, avant les revues
+  (2,26 $, 20 tours dont le réfutateur).
+- `passation.md` : 5 réponses écrites et commitées ; une seule question bloquante dans tout le run.
+  Disjoncteur : sans effet (le refus répété tombait au 3e essai, celui du budget). Réfutateur : 2
+  appels, aucune réfutation.
+- Branche du run poussée sur `exemple-dotnet-tdd` : `tests/us-2/mcp-claude-2` (`5fe93b0`).
+
 ## 07/11 — Questions ouvertes tranchées ; réponses humaines citables (passation.md)
 
 - **Décisions du responsable** : (1) gel des tests d'acceptance **absolu**, aucune retouche même

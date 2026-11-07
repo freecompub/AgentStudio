@@ -344,7 +344,7 @@
       "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
       "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",
       "passes": false,
-      "notes": "À faire avec l'accord du responsable (requêtes premium). Référence : docs/runs/2026-11-05-us-2-mcp (≈ 374 requêtes, 20 tours dont 11 de lentilles, aucun défaut sérieux en revue sur ce run)."
+      "notes": "À faire avec l'accord du responsable (requêtes premium). Référence : docs/runs/2026-11-05-us-2-mcp (≈ 374 requêtes, 20 tours dont 11 de lentilles, aucun défaut sérieux en revue sur ce run). — 07/11 : run de mesure fait avec le runtime **Claude** (pas Copilot), docs/runs/2026-11-07-us-2-mcp-claude/ : réfutateur appelé 2 fois, aucune réfutation ; critère laissé à false, il vise un run Copilot."
     },
     {
       "id": "serveur-mcp-skraft",
