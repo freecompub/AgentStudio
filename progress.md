@@ -46,7 +46,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   qui ne comparait que des noms) ; `libelleDetect` pour les messages du doctor.
 - `profiles/typescript.yaml` et le modèle TypeScript de `/stack init` exigent `"vitest"` dans
   `package.json`, comme l'adaptateur écrit à la main.
-- ADR 0072 **proposé** (forme des trois sections) : à confirmer par le responsable.
+- ADR 0072 (forme des trois sections) : **accepté** par le responsable le 07/11, après la PR #17.
 - Tests vus rouges puis verts (`detection-contenu.test.ts`, modèles livrés).
 
 ## 07/11 — Distribution et mise à jour du serveur MCP : paquet npm (décidé, pas fait)

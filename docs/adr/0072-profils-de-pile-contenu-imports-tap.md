@@ -2,10 +2,10 @@
 
 ## Statut
 
-**Proposé** le 2026-11-07, branche `feat/profils-pile`, à confirmer par le responsable du projet.
-Le responsable a demandé de combler les trois manques des profils (critères
-`j5-profil-detection-par-contenu`, `j5-profil-architecture`, `j5-lecteur-tap`) ; la forme des
-sections ci-dessous est un choix de mise en œuvre.
+**Accepté** le 2026-11-07 par le responsable du projet (« Ok »), après sa mise en œuvre sur la
+branche `feat/profils-pile` (PR #17). Le responsable a demandé de combler les trois manques des
+profils (critères `j5-profil-detection-par-contenu`, `j5-profil-architecture`, `j5-lecteur-tap`),
+puis a validé la forme des sections ci-dessous.
 
 ## Contexte
 
