@@ -2,9 +2,9 @@
 
 ## Statut
 
-**Proposé** le 2026-11-07, branche `feat/disjoncteur`. Le responsable a demandé de reprendre le
-disjoncteur de skraft-plugin v2 (comparatif du 06/11, `progress.md`, lot [1]) ; sa portée ci-dessous
-est un choix de mise en œuvre. Concerne l'extension `skraft` et le workflow `workflows/skraft/`.
+**Accepté** le 2026-11-07 par le responsable du projet, branche `feat/disjoncteur`. Le responsable a
+demandé de reprendre le disjoncteur de skraft-plugin v2 (comparatif du 06/11, `progress.md`, lot [1]),
+puis a validé sa portée ci-dessous. Concerne l'extension `skraft` et le workflow `workflows/skraft/`.
 
 ## Contexte
 

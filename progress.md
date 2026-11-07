@@ -21,7 +21,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   refus. Ceux qui visaient le budget ont reçu des motifs différents ; e2e-s2 attend maintenant
   l'escalade au deuxième essai, ce que voulait le changement.
 - Test du workflow vu rouge en remettant l'ancien `livraison.mjs`, puis vert.
-- ADR 0073 **proposé** (portée ci-dessus) : à confirmer par le responsable.
+- ADR 0073 (portée ci-dessus) : **accepté** par le responsable le 07/11.
 
 ## 07/11 — Profils de pile (ADR 0072), brique 3 : analyse des imports
 
