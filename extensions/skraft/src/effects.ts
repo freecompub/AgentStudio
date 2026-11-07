@@ -14,14 +14,14 @@ import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./disti
 import { checkGherkin } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
-import { artifactsDuRun, latestArtifacts, lensBrief, reviewFacts, type LensFiles } from "./review-brief.js";
+import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
 import { parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees } from "./deliver.js";
-import { lensHistory, numberDefects } from "./review-thread.js";
-import type { LensVerdict } from "./review.js";
+import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects, rangerHorsChangement, verifierOccurrences } from "./review-thread.js";
+import type { LensDefect, LensVerdict } from "./review.js";
 
 const LEVEL_LABELS: Record<Difficulty, string> = {
   simple: "Simple",
@@ -213,7 +213,15 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const raw = runs.map((r) => ("verdict" in r ? r.verdict : null)).filter((v): v is LensVerdict => v !== null);
       // Identifiants et cibles effectives attribués par le code, d'après la nature du fichier cité.
       const round = state.reviews[effect.phase].length + 1;
-      const verdicts = numberDefects(raw, round, defectTargetOf(ctx));
+      const existants = new Set(await ctx.workspace.listFiles());
+      const existe = (p: string) => existants.has(p);
+      // Hors du changement de la phase : notés, sans renvoyer le travail ; avant le réfutateur, pour
+      // ne pas payer un appel sur une note.
+      const cp = state.checkpoints[effect.phase];
+      const changements = cp ? (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted" && pasUnRapport(f)) : [];
+      const ranges = rangerHorsChangement(verifierOccurrences(numberDefects(raw, round, defectTargetOf(ctx)), existe), changements.map((f) => ({ path: f.path, ...(f.lines ? { lines: f.lines } : {}) })));
+      signalerBloquantsHorsChangement(ctx, state, ranges);
+      const verdicts = await refuter(ctx, state, effect.phase, ranges, files, allFacts, signal, existe);
       const reportPath = await writeReview(ctx, state.slug, effect.phase, round, effect.attempt, verdicts);
       // DELIVER : référence de la garde du contrat ratifié, relevée sur le code que la revue a jugé.
       const contractSymbols = effect.phase === "DELIVER" ? await contractSymbolsPresent(ctx, state.slug) : [];
@@ -597,6 +605,68 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, planDeTest: planDeTest(testPlan) };
 }
 
+/** Notes hors du changement de toutes les revues du run, une fois chacune. */
+function notesDuRun(state: SkraftState, extra: LensVerdict[] = []): { lens: string; note: LensDefect }[] {
+  const vues = new Set<string>();
+  const toutes: { lens: string; note: LensDefect }[] = [];
+  for (const l of [...Object.values(state.reviews).flat().flatMap((r) => r.lenses), ...extra])
+    for (const note of l.notes ?? []) {
+      const cle = `${l.lens}|${note.file}:${note.line ?? ""}|${note.description}`;
+      if (vues.has(cle)) continue;
+      vues.add(cle);
+      toutes.push({ lens: l.lens, note });
+    }
+  return toutes;
+}
+
+const ouNote = (n: LensDefect) => `${n.file}${n.line ? `:${n.line}` : ""}`;
+
+/**
+ * Un blocker hors du changement est signalé tout de suite, une seule fois : il n'est pas dû à la
+ * story, mais il ne doit pas passer inaperçu ; sa correction attend la fin du cycle.
+ */
+function signalerBloquantsHorsChangement(ctx: ExtensionContext, state: SkraftState, lenses: LensVerdict[]): void {
+  const deja = new Set(notesDuRun(state).map((x) => `${x.lens}|${ouNote(x.note)}|${x.note.description}`));
+  for (const { lens, note } of notesDuRun(state, lenses)) {
+    if (note.severity !== "blocker" || deja.has(`${lens}|${ouNote(note)}|${note.description}`)) continue;
+    ctx.chat.post(`**Défaut bloquant hors du changement de la story** (lentille ${lens}) : \`${ouNote(note)}\` — ${note.description}\nIl n'est pas dû à cette story et ne renvoie pas le travail. Pour le corriger, fais-le après la fin du cycle skraft.`);
+  }
+}
+
+/** Notes hors du changement, pour le bilan : les bloquants d'abord, à corriger après le cycle. */
+function notesDuBilan(state: SkraftState): string[] {
+  const ligne = (x: { lens: string; note: LensDefect }) => `- ${ouNote(x.note)} (${x.lens}, ${x.note.severity}) : ${x.note.description}`;
+  const toutes = notesDuRun(state);
+  const bloquants = toutes.filter((x) => x.note.severity === "blocker");
+  const autres = toutes.filter((x) => x.note.severity !== "blocker");
+  return [
+    ...(bloquants.length ? ["**À corriger après le cycle** — défauts bloquants hors du changement de la story :", ...bloquants.map(ligne)] : []),
+    ...(autres.length ? ["Remarques hors du changement de la story :", ...autres.map(ligne)] : []),
+  ];
+}
+
+/**
+ * Réfutateur (ADR 0069) : un appel par lentille qui a des défauts blocker ou major, en parallèle, avec
+ * les entrées de cette lentille. Le code décide de ce qui tombe (`appliquerRefutations`). Un
+ * réfutateur muet ou interrompu ne réfute rien : les défauts restent, comme dans le doute.
+ */
+async function refuter(ctx: ExtensionContext, state: SkraftState, phase: Phase, verdicts: LensVerdict[], files: LensFiles, facts: string[], signal: AbortSignal, existe: (path: string) => boolean): Promise<LensVerdict[]> {
+  const lots = defautsARefuter(verdicts);
+  if (!lots.length) return verdicts;
+  const reponses = await Promise.all(
+    lots.map(async (x) => {
+      try {
+        const r = await ctx.agents.run<"submit_lens_verdict">("skraft-finding-refuter", refuterBrief(x.lens as LensName, state, phase, files, facts, x.defects), { signal });
+        return { lens: x.lens, rulings: r.output?.rulings ?? [] };
+      } catch (err) {
+        if (signal.aborted) throw err;
+        return { lens: x.lens, rulings: [] };
+      }
+    }),
+  );
+  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, existe, r.lens), verdicts);
+}
+
 /**
  * Rapports d'une revue, nommés par son rang dans la phase (`reviews` ne fait que grandir) : un
  * amendement, qui ne consomme pas d'essai, n'écrase plus la revue précédente (D8 de docs/12).
@@ -713,6 +783,7 @@ function finalReport(s: SkraftState): string {
           ...s.ecartsAuPlan.map((x) => `- ${x.criterion} (${x.par}) : ${x.planned} → ${x.actual} — ${x.rule}`),
         ]
       : []),
+    ...notesDuBilan(s),
     `Identifiant de suivi : ${randomUUID().slice(0, 8)}.`,
   ].join("\n");
 }

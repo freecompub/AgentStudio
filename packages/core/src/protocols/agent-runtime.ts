@@ -136,6 +136,8 @@ export type AgentEvent =
        * rendu que dans le résumé de fin de session (`ShutdownModelMetricUsage`), pas ici.
        */
       nanoAiu?: number;
+      /** Coût en dollars, quand le runtime le rend (Claude par le CLI, ADR 0070). */
+      costUsd?: number;
     }
   /**
    * Occupation de la fenêtre de contexte, telle que le runtime la mesure (ADR 0031).

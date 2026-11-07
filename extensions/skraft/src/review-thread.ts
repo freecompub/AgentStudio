@@ -14,7 +14,7 @@
  * correction en satisfaisant la critique suivante.
  */
 import type { MutantSurvivant } from "./deliver.js";
-import type { DefectTarget, LensDefect, LensVerdict } from "./review.js";
+import type { DefectTarget, LensDefect, LensRuling, LensVerdict } from "./review.js";
 
 export type ThreadStatus =
   /** Signalé, sans réponse de l'agent pour l'instant. */
@@ -50,6 +50,10 @@ export interface DefectThread {
   ruling?: string;
   /** Tour de revue où le défaut a été signalé. */
   round: number;
+  /** Pourquoi cette gravité, selon la lentille. */
+  severityReason?: string;
+  /** Autres endroits où le même défaut se répète (`chemin:ligne`). */
+  occurrences?: string[];
   /** Déjà renvoyé une fois à l'autre agent (« hors de mon périmètre », ADR 0047). */
   rerouted?: boolean;
   /** Défaut de la porte de mutation : le mutant exact, que l'arbitrage peut exempter (ADR 0065). */
@@ -153,7 +157,9 @@ export function reviewRound(prev: DefectThread[], lenses: LensVerdict[], round: 
         description: d.description,
         ...(d.file ? { file: d.file } : {}),
         ...(d.line ? { line: d.line } : {}),
-        target: d.target ?? "code",
+        ...(d.severityReason ? { severityReason: d.severityReason } : {}),
+          ...(d.occurrences?.length ? { occurrences: d.occurrences } : {}),
+          target: d.target ?? "code",
         status: "open" as const,
         round,
       })),
@@ -261,7 +267,7 @@ export function agentFeedback(threads: DefectThread[], concerns: (t: DefectThrea
   const mine = threads.filter(concerns);
   const active = mine.filter(isActive);
   const lines = active.map((t) => {
-    const head = `[${t.id}, ${t.severity}, ${t.target}] ${t.description}${where(t)}`;
+    const head = `[${t.id}, ${t.severity}, ${t.target}] ${t.description}${where(t)}${precisions(t)}`;
     if (t.status === "maintained") return `${head} — maintenu par la lentille après ta contestation (${t.ruling ?? "sans raison donnée"}) : à corriger.`;
     if (t.status === "humanMaintained") return `${head} — tranché par l'humain en faveur de la lentille : à corriger, sans recours.`;
     return head;
@@ -315,5 +321,97 @@ export function lensesAfterThreads(lenses: LensVerdict[], threads: DefectThread[
     // c'est le fil qui dit qu'elle n'avait plus que lui à réclamer.
     const removed = kept.length < l.defects.length || threads.some((t) => t.lens === l.lens && dropped.has(t.id));
     return { ...l, defects, verdict: serious ? "CHANGES_REQUESTED" : removed ? "APPROVED" : l.verdict };
+  });
+}
+
+/** Gravités soumises au réfutateur : un mineur n'empêche pas l'approbation (ADR 0069). */
+const A_REFUTER: readonly LensDefect["severity"][] = ["blocker", "major"];
+
+/**
+ * Défauts à soumettre au réfutateur (ADR 0069), par lentille : ses blocker et major. Une lentille
+ * REJECTED n'est pas soumise : son rejet escalade à l'humain de toute façon.
+ */
+export function defautsARefuter(lenses: LensVerdict[]): { lens: string; defects: LensDefect[] }[] {
+  return lenses
+    .filter((l) => l.verdict !== "REJECTED")
+    .map((l) => ({ lens: l.lens, defects: l.defects.filter((d) => A_REFUTER.includes(d.severity)) }))
+    .filter((x) => x.defects.length > 0);
+}
+
+/** Passages `chemin:ligne` cités dans une raison (guillemets inversés acceptés). */
+const CITATION = /([\w./-]+\.[\w]+):(\d+)/g;
+
+/**
+ * Arbitrages du réfutateur appliqués aux verdicts (ADR 0069). Le code décide de ce qui tombe : une
+ * réfutation (`accepted`) n'est retenue que si sa raison cite un passage `chemin:ligne` d'un fichier
+ * qui existe ; sinon, ou sans arbitrage, le défaut est maintenu. Les défauts réfutés restent dans
+ * `refuted`, avec la raison, pour le rapport. Une lentille CHANGES_REQUESTED à qui il ne reste ni
+ * blocker ni major n'avait réclamé qu'eux : elle approuve. `lens` borne les arbitrages à une lentille.
+ */
+export function appliquerRefutations(lenses: LensVerdict[], rulings: LensRuling[], existe: (path: string) => boolean, lens?: string): LensVerdict[] {
+  const cite = (raison: string | undefined) => [...(raison ?? "").matchAll(CITATION)].some((m) => existe(m[1]!));
+  return lenses.map((l) => {
+    if (l.verdict === "REJECTED" || (lens !== undefined && l.lens !== lens)) return l;
+    const tombe = (d: LensDefect) => A_REFUTER.includes(d.severity) && rulings.some((r) => r.defect === d.id && r.decision === "accepted" && cite(r.reason));
+    const refutes = l.defects.filter(tombe).map((d) => ({ ...d, refutation: rulings.find((r) => r.defect === d.id)!.reason ?? "" }));
+    if (!refutes.length) return l;
+    const defects = l.defects.filter((d) => !tombe(d));
+    const serieux = defects.some((d) => A_REFUTER.includes(d.severity));
+    return { ...l, defects, refuted: [...(l.refuted ?? []), ...refutes], verdict: l.verdict === "CHANGES_REQUESTED" && !serieux ? "APPROVED" : l.verdict };
+  });
+}
+
+/** Raison de la gravité et autres endroits du même défaut, quand la lentille les donne. */
+export const precisions = (d: { severityReason?: string | undefined; occurrences?: string[] | undefined }): string =>
+  `${d.severityReason ? ` — gravité : ${d.severityReason}` : ""}${d.occurrences?.length ? ` — aussi : ${d.occurrences.join(", ")}` : ""}`;
+
+/**
+ * Occurrences vérifiées par le code : un endroit qui vise un fichier absent du dépôt est retiré,
+ * et le retrait est noté. Un défaut ne doit pas renvoyer le producteur vers un fichier qui n'existe pas.
+ */
+export function verifierOccurrences(lenses: LensVerdict[], existe: (path: string) => boolean): LensVerdict[] {
+  return lenses.map((l) => ({
+    ...l,
+    defects: l.defects.map((d) => {
+      if (!d.occurrences?.length) return d;
+      const absentes = d.occurrences.filter((o) => !existe(o.slice(0, o.lastIndexOf(":"))));
+      if (!absentes.length) return d;
+      const { occurrences: _, ...reste } = d;
+      const gardees = d.occurrences.filter((o) => !absentes.includes(o));
+      return { ...reste, ...(gardees.length ? { occurrences: gardees } : {}), occurrencesNote: `occurrence retirée, fichier introuvable : ${absentes.join(", ")}` };
+    }),
+  }));
+}
+
+/** Autour d'une ligne modifiée, ce qui compte encore comme le changement : le contexte d'un diff. */
+export const TOLERANCE_HORS_CHANGEMENT = 3;
+
+/**
+ * Défauts hors du changement de la phase, rangés en notes (06/11, idée de skraft-plugin v2). Un
+ * défaut dont aucun emplacement (sa ligne, ses occurrences) n'est à `tolerance` lignes d'une ligne
+ * modifiée n'est pas dû à la story : noté, il ne renvoie pas le travail. Un défaut sans fichier ne se
+ * situe pas : il reste. `changements` : fichiers modifiés depuis le checkpoint de la phase, et leurs
+ * lignes ; sans lignes connues, tout le fichier compte. Une lentille REJECTED n'est pas touchée ;
+ * une lentille CHANGES_REQUESTED à qui il ne reste ni blocker ni major approuve.
+ */
+export function rangerHorsChangement(lenses: LensVerdict[], changements: readonly { path: string; lines?: number[] | undefined }[], tolerance = TOLERANCE_HORS_CHANGEMENT): LensVerdict[] {
+  const parFichier = new Map(changements.map((c) => [c.path, c.lines]));
+  const dans = (file: string, line: number | undefined) => {
+    if (!parFichier.has(file)) return false;
+    const lignes = parFichier.get(file);
+    return line === undefined || !lignes || lignes.some((l) => Math.abs(l - line) <= tolerance);
+  };
+  const situe = (d: LensDefect) => [
+    { file: d.file!, line: d.line },
+    ...(d.occurrences ?? []).map((o) => ({ file: o.slice(0, o.lastIndexOf(":")), line: Number(o.slice(o.lastIndexOf(":") + 1)) })),
+  ];
+  const horsChangement = (d: LensDefect) => d.file !== undefined && !situe(d).some((x) => dans(x.file, x.line));
+  return lenses.map((l) => {
+    if (l.verdict === "REJECTED") return l;
+    const notes = l.defects.filter(horsChangement);
+    if (!notes.length) return l;
+    const defects = l.defects.filter((d) => !horsChangement(d));
+    const serieux = defects.some((d) => d.severity === "blocker" || d.severity === "major");
+    return { ...l, defects, notes: [...(l.notes ?? []), ...notes], verdict: l.verdict === "CHANGES_REQUESTED" && !serieux ? "APPROVED" : l.verdict };
   });
 }

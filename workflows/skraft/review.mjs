@@ -1,4 +1,5 @@
 // Converti en JavaScript le 2026-10-10 depuis extensions/skraft-workflow/src/review.ts (ADR 0055).
+import { precisions } from "./review-thread.mjs";
 // Copie de extensions/skraft/src/review.ts (2026-10-08) : skraft-workflow est indépendante de skraft
 // et n'en importe rien ; une correction de l'une ne se reporte pas seule dans l'autre.
 /**
@@ -99,9 +100,15 @@ export function reviewReport(phase, attempt, lenses) {
     if (!v.defects.length)
       lines.push("Aucun défaut.", "");
     for (const d of v.defects)
-      lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+      lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}${precisions(d)}`);
     for (const r of v.rulings ?? [])
       lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Hors du changement de la phase : notés, sans fil ouvert.
+    for (const d of v.notes ?? [])
+      lines.push(`- note (hors du changement) : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+    // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
+    for (const d of v.refuted ?? [])
+      lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
     lines.push("");
   }
   return lines.join("\n");
@@ -117,10 +124,7 @@ function lireVerdicts(brut) {
     return v;
   };
   if (!Array.isArray(brut)) throw new Error("Rapport de revue illisible : liste attendue");
-  return brut.map((l) => ({
-    lens: texte(l.lens, "lens"),
-    verdict: parmi(l.verdict, ["APPROVED", "CHANGES_REQUESTED", "REJECTED"], "verdict"),
-    defects: (Array.isArray(l.defects) ? l.defects : []).map((d) => ({
+  const defaut = (d) => ({
       severity: parmi(d.severity, ["blocker", "major", "minor"], "severity"),
       description: texte(d.description, "description"),
       ...(typeof d.file === "string" ? { file: d.file } : {}),
@@ -129,7 +133,17 @@ function lireVerdicts(brut) {
       ...(typeof d.id === "string" ? { id: d.id } : {}),
       ...(typeof d.targetNote === "string" ? { targetNote: d.targetNote } : {}),
       ...(typeof d.severityNote === "string" ? { severityNote: d.severityNote } : {}),
-    })),
+      ...(typeof d.severityReason === "string" ? { severityReason: d.severityReason } : {}),
+      ...(Array.isArray(d.occurrences) ? { occurrences: d.occurrences.map((o) => texte(o, "occurrences")) } : {}),
+      ...(typeof d.occurrencesNote === "string" ? { occurrencesNote: d.occurrencesNote } : {}),
+  });
+  return brut.map((l) => ({
+    lens: texte(l.lens, "lens"),
+    verdict: parmi(l.verdict, ["APPROVED", "CHANGES_REQUESTED", "REJECTED"], "verdict"),
+    ...(Array.isArray(l.notes) ? { notes: l.notes.map(defaut) } : {}),
+    // Défauts réfutés avant la synthèse (ADR 0069).
+    ...(Array.isArray(l.refuted) ? { refuted: l.refuted.map((d) => ({ ...defaut(d), refutation: texte(d.refutation, "refutation") })) } : {}),
+    defects: (Array.isArray(l.defects) ? l.defects : []).map(defaut),
     ...(Array.isArray(l.rulings)
       ? { rulings: l.rulings.map((r) => ({ defect: texte(r.defect, "defect"), decision: parmi(r.decision, ["accepted", "maintained"], "decision"), ...(typeof r.reason === "string" ? { reason: r.reason } : {}) })) }
       : {}),

@@ -1,7 +1,7 @@
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 /** Dossiers des lentilles du workflow (§9.2) : chacune reçoit ce que son prompt annonce (docs/15 §4). */
 import { describe, expect, it } from "vitest";
-import { lensBrief } from "../../../workflows/skraft/review-brief.mjs";
+import { lensBrief, refuterBrief } from "../../../workflows/skraft/review-brief.mjs";
 
 const c = { criteria: [{ n: 1, text: "Plafond de 10 U" }], adrs: [{ id: "ADR-001", path: "docs/adr/adr-001-plafond.md" }] };
 const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["src/domain/plafond.ts"], tests: ["test/domain/plafond.test.ts"] };
@@ -57,5 +57,23 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     expect(t).toContain("Points à examiner en DELIVER :");
     expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
     expect(lensBrief("quality-gates", { ...c, slug: "us-12" }, "DELIVER", f, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
+  });
+});
+
+describe("Dossier du réfutateur (ADR 0069)", () => {
+  const defauts = [{ id: "cold-reader#1.1", severity: "major", description: "Nom flou.", file: "src/domain/plafond.ts", line: 3 }];
+  it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
+    const b = refuterBrief("cold-reader", c, "DELIVER", files, facts, [{ ...defauts[0], severityReason: "Le nom cache la règle.", occurrences: ["src/b.ts:12"] }]);
+    expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (src/domain/plafond.ts:3) — gravité : Le nom cache la règle. — aussi : src/b.ts:12");
+    for (const vu of ["src/domain/plafond.ts", "test/domain/plafond.test.ts", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
+    // Pas plus que la lentille : cold-reader ne reçoit ni faits, ni critères, ni ADR.
+    for (const cache of ["Fait A.", "Plafond de 10 U", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);
+  });
+  it("test-integrity : critères et faits ; architecture : ADR et faits ; quality-gates : faits et livrables seulement", () => {
+    expect(refuterBrief("test-integrity", c, "DELIVER", files, facts, defauts)).toContain("1. Plafond de 10 U");
+    expect(refuterBrief("architecture", c, "DELIVER", files, facts, defauts)).toContain("ADR-001 : docs/adr/adr-001-plafond.md");
+    const q = refuterBrief("quality-gates", c, "DELIVER", files, facts, defauts);
+    expect(q).toContain("Fait A.");
+    expect(q).not.toContain("test/domain/plafond.test.ts");
   });
 });

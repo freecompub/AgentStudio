@@ -1,4 +1,5 @@
 // Converti en JavaScript le 2026-10-10 depuis extensions/skraft-workflow/src/review-brief.ts (ADR 0055).
+import { precisions } from "./review-thread.mjs";
 const short = (h) => h.slice(0, 12);
 /** Livrables du dernier essai validé, dernière empreinte par chemin. */
 export function latestArtifacts(records) {
@@ -107,5 +108,32 @@ export function lensBrief(lens, c, phase, files, facts, history = []) {
       break;
   }
   lines.push(...list(`Points à examiner en ${phase} :`, (CONSIGNES_DE_PHASE[phase]?.[lens] ?? []).map((x) => x.replace("<slug>", c.slug ?? "<slug>"))));
+  return lines.join("\n");
+}
+/**
+* Dossier du réfutateur (ADR 0069) : les défauts à juger, numérotés par le code, puis les **mêmes
+* entrées** que la lentille qui les a signalés — ni plus, ni moins, et sans ses consignes.
+*/
+export function refuterBrief(lens, c, phase, files, facts, defects) {
+  const ou = (d) => (d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : "");
+  const lines = [
+    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}${precisions(d)}`)),
+    "Entrées de la lentille :",
+  ];
+  const faits = list("Faits établis par le code :", facts);
+  switch (lens) {
+    case "cold-reader":
+      lines.push(...list("Livrables :", files.artifacts), ...list("Code :", files.code), ...list("Tests :", files.tests));
+      break;
+    case "test-integrity":
+      lines.push(...list("Critères d'acceptation :", c.criteria.map((x) => `${x.n}. ${x.text}`)), ...list("Tests :", files.tests), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...faits);
+      break;
+    case "architecture":
+      lines.push(...list("ADR ratifiés :", c.adrs.map((a) => `${a.id} : ${a.path}`)), ...list("Code :", files.code), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...faits);
+      break;
+    case "quality-gates":
+      lines.push(...faits, ...list("Livrables :", files.artifacts));
+      break;
+  }
   return lines.join("\n");
 }

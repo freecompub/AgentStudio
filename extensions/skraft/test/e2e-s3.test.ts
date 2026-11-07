@@ -354,7 +354,7 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
       const n = (parLentille[lens] = (parLentille[lens] ?? 0) + 1);
       if (lens === "architecture") prompts.push(t.prompt);
       const verdict = relance ? "APPROVED" : n === 1 && lens === "architecture" ? "CHANGES_REQUESTED" : n === 2 && (lens === "architecture" || lens === "test-integrity") ? "REJECTED" : "APPROVED";
-      const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", description: "contrat incomplet", target: "deliverable" }] : [];
+      const defects = verdict === "CHANGES_REQUESTED" ? [{ severity: "major", severityReason: "raison d’essai", description: "contrat incomplet", target: "deliverable" }] : [];
       await t.callTool("submit_lens_verdict", { lens, verdict, defects });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {

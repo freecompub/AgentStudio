@@ -12,3 +12,4 @@ export { bibliotheque, type Bibliotheque } from "./hote/bibliotheque.js";
 export { lancerEnfantWorkflow } from "./hote/enfant.js";
 export { createJsonAccordStore, resumeAccord, verifierAccord, type AccordStore } from "./accord/accords.js";
 export { activerWorkflow, lireEntrees, manifesteDuWorkflow, syntaxeCommande, type OptionsActivation } from "./hote/activer.js";
+export { rapportDuWorkflow, type RapportWorkflow } from "./rapport.js";

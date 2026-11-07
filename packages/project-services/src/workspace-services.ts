@@ -16,6 +16,7 @@ import {
   type UsageRecorder,
   type UsageRow,
   createLazyRuntime,
+  resumerTrace,
   createRegistry,
   createTaskAgentRunner,
   routeIntent,
@@ -49,9 +50,9 @@ import {
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import type { UserConfirmer } from "@agent-studio/core";
-import type { InteractionDto, TaskCardDto } from "../shared/ipc-contract.js";
-import type { WorkspaceServicesFactory } from "./protocols.js";
-import { activerWorkflow, createJsonAccordStore, syntaxeCommande, trouverWorkflows, type AccordStore } from "@agent-studio/workflow";
+import type { InteractionDto, TaskCardDto } from "./dto.js";
+import type { SourcePile, WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
+import { activerWorkflow, createJsonAccordStore, lireEntrees, rapportDuWorkflow, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type EtatWorkflow, type WorkflowTrouve } from "@agent-studio/workflow";
 import { createStackCommand, type ProfilDeclare, type StackCommandDeps } from "./stack-command.js";
 
 /** Extension à activer : dans le principal (tests, J2) ou dans son propre processus (J4). */
@@ -64,6 +65,12 @@ export interface WorkspaceServicesConfig {
   stacks: StackAdapter[];
   /** Programmes qu'un profil de stack peut lancer (D47, O12) ; vide = aucun profil n'est accepté. */
   allowedPrograms?: readonly string[];
+  /**
+   * Aucune pile (ni profil, ni détection, ni pile fournie) est une erreur, au lieu du repli averti
+   * sur le premier adaptateur : un repli ferait échouer toutes les portes pour une mauvaise raison
+   * (serveur MCP, ADR 0068, point 8).
+   */
+  sansRepli?: boolean;
   /** Obligatoire dès qu'une extension est isolée. */
   isolation?: { launcher: ProcessLauncher; runtimeEntry: string };
   /** Dossier des tâches ; un sous-dossier par projet. */
@@ -149,18 +156,41 @@ function usageDto(unit: "requests" | "tokens", rows: UsageRow[], retries: Record
   return { unit, rows: merged, total: { phase: "total", label: "Total", requests: t.requests, inputTokens: t.inputTokens, outputTokens: t.outputTokens, retries: t.retries, durationMs: t.durationMs } };
 }
 
+/** Aucune pile pour le projet, et pas de repli permis (`sansRepli`). */
+export class AucunePile extends Error {
+  override name = "AucunePile";
+}
+
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor }) => {
-    const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
-    const manifests = sources.map((e) => e.manifest);
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
     const declare = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
-    const stack = detected ?? cfg.stacks[0];
+    let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
+    let choisie = detected;
+    if (pileFournie !== undefined) {
+      if (choisie)
+        onPost("agent-studio", `La pile fournie par l'appelant est ignorée : le projet a la sienne, **${choisie.id}** (${declare ? `profil \`${PROFIL_PROJET}\`` : "détection automatique"}).`);
+      else {
+        // Même contrôle qu'un profil du projet : schéma, et programmes de la liste de l'administrateur.
+        const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
+        if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
+        choisie = createProfileAdapter(lu.profile);
+        source = "client";
+        onPost("agent-studio", `Stack du projet : **${choisie.id}**, fournie par l'appelant.`);
+      }
+    }
+    if (!choisie && cfg.sansRepli)
+      throw new AucunePile(
+        `Aucune pile pour ce projet : ni profil \`${PROFIL_PROJET}\`, ni adaptateur qui le reconnaisse (${cfg.stacks.map((s) => s.id).join(", ") || "aucun"}). Fournis une pile au format de \`${PROFIL_PROJET}\`.`,
+      );
+    const stack = choisie ?? cfg.stacks[0];
     if (!stack) throw new Error("Aucun adaptateur de stack configuré");
+    const sources = typeof cfg.extensions === "function" ? await cfg.extensions() : cfg.extensions;
+    const manifests = sources.map((e) => e.manifest);
     if (declare) onPost("agent-studio", `Stack du projet : **${declare.id}**, d'après le profil \`${PROFIL_PROJET}\`.`);
-    if (!detected) {
+    if (source === "repli") {
       cfg.logger?.warn("aucun adaptateur ne reconnaît le projet", { root: workspace.root, fallback: stack.id });
       // Dit dans la conversation, pas seulement dans le journal : le repli change ce que font
       // les portes et les commandes, et l'utilisateur doit savoir pourquoi.
@@ -168,7 +198,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         "agent-studio",
         `**Ce projet n'est reconnu par aucun adaptateur.** L'application se rabat sur \`${stack.id}\`, dont les commandes de test et les emplacements de fichiers ne correspondent probablement pas. Les commandes qui exécutent des tests risquent d'échouer.`,
       );
-    } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id });
+    } else cfg.logger?.info("adaptateur de stack retenu", { root: workspace.root, stack: stack.id, source });
     const projectKey = createHash("sha256").update(workspace.root).digest("hex").slice(0, 16);
     const usage = cfg.usageRecorder ?? createUsageRecorder(join(cfg.tasksDir, projectKey, "usage"));
     // Une seule trace pour la tâche : l'exécuteur d'agents y écrit les tours, l'extension y archive
@@ -177,6 +207,9 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const usageRows = new Map<string, UsageRow[]>();
     const engine = createTaskEngine({
       usage,
+      // Transitions, effets, rejets et arbitrages (ADR 0032) : sans elle, la trace n'avait que les
+      // tours d'agent, et un rejet ne se lisait nulle part (run réel du 05/11).
+      trace: traceStore,
       store: cfg.taskStore ?? createJsonTaskStore(join(cfg.tasksDir, projectKey)),
       checkpoints: workspace.checkpoints,
       clock: cfg.clock,
@@ -338,8 +371,18 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     // Workflows en dossier (ADR 0055) : machine puis projet ; avant la reprise des tâches, pour que
     // celles d'un workflow retrouvent leur définition.
     /** Workflows activés, pour l'outil `proposer_workflow` de l'agent principal (`docs/11` §6). */
-    const actifs: { nom: string; commande: string; description: string; syntaxe: string; empreinte: string }[] = [];
+    const actifs: { nom: string; commande: string; description: string; syntaxe: string; workflow: WorkflowTrouve }[] = [];
     let accordsWorkflows: AccordStore | null = null;
+    // Accord donné d'avance par l'appelant de `lancerWorkflow` (ADR 0068) : il répond à la seule
+    // demande d'accord de ce lancement, puis tombe, qu'elle ait eu lieu ou non.
+    let accordPonctuel: "allow-once" | "allow-always" | null = null;
+    const confirmerWorkflows = confirmer && {
+      confirm: (r: { title: string; detail: string }) => {
+        const a = accordPonctuel;
+        accordPonctuel = null;
+        return a ? Promise.resolve(a) : confirmer.confirm(r);
+      },
+    };
     if (cfg.workflows) {
       const recherche = await trouverWorkflows({
         ...(cfg.workflows.machine ? { machine: cfg.workflows.machine } : {}),
@@ -353,15 +396,32 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         const accords = createJsonAccordStore(cfg.workflows.accordsFile ?? join(cfg.tasksDir, "accords-workflows.json"));
         accordsWorkflows = accords;
         for (const w of recherche.workflows) {
-          const r = await activerWorkflow(w, depsCommunes(), { isolation: { launcher: cfg.workflows.launcher, runtimeEntry: cfg.workflows.runtimeEntry }, accords, confirmer });
+          const r = await activerWorkflow(w, depsCommunes(), { isolation: { launcher: cfg.workflows.launcher, runtimeEntry: cfg.workflows.runtimeEntry }, accords, confirmer: confirmerWorkflows! });
           if (r.ok) {
             handles.push(r.handle);
             manifests.push(r.manifest);
-            actifs.push({ nom: w.nom, commande: w.meta.commande, description: w.meta.description, syntaxe: syntaxeCommande(w.meta.commande, w.meta.entrees), empreinte: w.empreinte });
+            actifs.push({ nom: w.nom, commande: w.meta.commande, description: w.meta.description, syntaxe: syntaxeCommande(w.meta.commande, w.meta.entrees), workflow: w });
           } else onPost("agent-studio", `**Workflow écarté** (\`${w.dossier}\`) : ${r.motifs.join(" ; ")}`);
         }
       }
     }
+    const lancerWorkflow: WorkspaceServices["lancerWorkflow"] = async (nom, args, o = {}) => {
+      const a = actifs.find((x) => x.nom === nom);
+      if (!a) return { ok: false, motif: `Workflow inconnu : ${nom}` };
+      const lu = lireEntrees(a.workflow.meta.entrees, args, a.commande);
+      if (!lu.ok) return { ok: false, motif: lu.usage };
+      // Ce qui a réellement démarré, et non ce que la commande était censée faire : un accord
+      // refusé ne crée aucune tâche.
+      const avant = new Set((await engine.list()).map((t) => t.id));
+      accordPonctuel = o.accord === "toujours" ? "allow-always" : o.accord === "une-fois" ? "allow-once" : null;
+      try {
+        await registry.command(a.commande)!.handler(args);
+      } finally {
+        accordPonctuel = null;
+      }
+      const lancee = (await engine.list()).find((t) => !avant.has(t.id));
+      return lancee ? { ok: true, taskId: lancee.id } : { ok: false, motif: `Workflow « ${nom} » non lancé : accord refusé.` };
+    };
     return {
       async demarrer() {
         // Au démarrage, les sessions encore inscrites sont celles d'un crash, d'une fermeture
@@ -406,22 +466,36 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
               // Une seule demande à l'utilisateur (revue de la PR #12) : tant que l'accord sur le
               // workflow n'est pas donné pour toujours, la commande le demande, et cette demande vaut
               // confirmation de la proposition ; sinon, l'outil confirme lui-même.
-              if (await accordsWorkflows?.accorde(a.nom, a.empreinte)) {
+              if (await accordsWorkflows?.accorde(a.nom, a.workflow.empreinte)) {
                 const r = await confirmer.confirm({ title: `Lancer le workflow « ${nom} » proposé par l'agent ?`, detail: `/${a.commande} ${args}\n\n${a.description}` });
                 if (r === "deny") return "Proposition refusée par l'utilisateur : ne relance pas ce workflow sans qu'il le demande.";
               }
-              // Ce qui a réellement démarré, et non ce que la commande était censée faire : des
-              // arguments invalides ou un accord refusé ne créent aucune tâche.
-              const avant = new Set((await engine.list()).map((t) => t.id));
-              await registry.command(a.commande)!.handler(args);
-              const lancees = (await engine.list()).filter((t) => !avant.has(t.id));
-              if (!lancees.length)
-                return `Rien n'a démarré : arguments invalides, ou accord sur le workflow refusé par l'utilisateur ; le message de la commande est affiché dans la conversation. Ne dis pas que /${a.commande} tourne.`;
-              return `Workflow lancé : /${a.commande} ${args} (tâche ${lancees[0]!.id}). L'avancement s'affiche dans le panneau des tâches.`;
+              const r = await lancerWorkflow(nom, args);
+              if (!r.ok) return `Rien n'a démarré : ${r.motif}\n\nNe dis pas que /${a.commande} tourne.`;
+              return `Workflow lancé : /${a.commande} ${args} (tâche ${r.taskId}). L'avancement s'affiche dans le panneau des tâches.`;
             },
           },
         ];
       },
+      workflows: async () =>
+        Promise.all(
+          actifs.map(async (a) => ({
+            nom: a.nom,
+            commande: a.commande,
+            description: a.description,
+            syntaxe: a.syntaxe,
+            accordRetenu: (await accordsWorkflows?.accorde(a.nom, a.workflow.empreinte)) ?? false,
+            accord: resumeAccord(a.workflow),
+          })),
+        ),
+      pile: () => ({ id: stack.id, source }),
+      lancerWorkflow,
+      async rapportWorkflow(taskId) {
+        const r = (await engine.list()).find((t) => t.id === taskId);
+        // Les tâches de workflow sont celles des déclarations `workflow.<nom>` (manifesteDuWorkflow).
+        return r && r.name.startsWith("workflow.") ? rapportDuWorkflow(r.state as EtatWorkflow) : null;
+      },
+      etapesDuRun: async (taskId) => resumerTrace(await traceStore.list(taskId).catch(() => [])).etapes,
       tasks: async () =>
         (await engine.list())
           .map((r) => toTaskCard(r, manifests, usageRows.has(r.id) ? { unit, rows: usageRows.get(r.id)! } : undefined))

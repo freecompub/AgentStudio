@@ -113,9 +113,15 @@ export const meta = {
       classe: "standard",
       sortie: "submit_lens_verdict",
     },
+    "skraft-finding-refuter": {
+      prompt: "agents/skraft-finding-refuter.agent.md",
+      consignes: "Rends ta décision avec l'outil submit_lens_verdict : lens « finding-refuter », verdict APPROVED, aucun défaut, et pour\nchaque défaut listé un arbitrage (rulings) : accepted s'il est réfuté, avec le passage `chemin:ligne` qui le montre dans ta raison ;\nmaintained sinon, avec ta raison.",
+      classe: "strong",
+      sortie: "submit_lens_verdict",
+    },
     "skraft-lens-cold-reader": {
       prompt: "agents/skraft-lens-cold-reader.agent.md",
-      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
+      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Pour chaque défaut, dis pourquoi il a cette gravité (severityReason, une phrase) ;\ns'il se répète ailleurs, donne les autres endroits (occurrences, chemin:ligne) au lieu d'un défaut par endroit. Un défaut sur une ligne que la phase n'a pas modifiée est noté pour l'humain,\nsans renvoyer le travail. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
       classe: "standard",
       sortie: "submit_lens_verdict",
       outils: ["report_blocker"],
@@ -123,7 +129,7 @@ export const meta = {
     },
     "skraft-lens-test-integrity": {
       prompt: "agents/skraft-lens-test-integrity.agent.md",
-      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
+      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Pour chaque défaut, dis pourquoi il a cette gravité (severityReason, une phrase) ;\ns'il se répète ailleurs, donne les autres endroits (occurrences, chemin:ligne) au lieu d'un défaut par endroit. Un défaut sur une ligne que la phase n'a pas modifiée est noté pour l'humain,\nsans renvoyer le travail. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
       classe: "standard",
       sortie: "submit_lens_verdict",
       outils: ["report_blocker"],
@@ -131,7 +137,7 @@ export const meta = {
     },
     "skraft-lens-architecture": {
       prompt: "agents/skraft-lens-architecture.agent.md",
-      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
+      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Pour chaque défaut, dis pourquoi il a cette gravité (severityReason, une phrase) ;\ns'il se répète ailleurs, donne les autres endroits (occurrences, chemin:ligne) au lieu d'un défaut par endroit. Un défaut sur une ligne que la phase n'a pas modifiée est noté pour l'humain,\nsans renvoyer le travail. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
       classe: "standard",
       sortie: "submit_lens_verdict",
       outils: ["report_blocker"],
@@ -139,7 +145,7 @@ export const meta = {
     },
     "skraft-lens-quality-gates": {
       prompt: "agents/skraft-lens-quality-gates.agent.md",
-      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
+      consignes: "Tu fais partie d'une revue à plusieurs lentilles ; chacune travaille isolée et la synthèse est calculée par le code.\nRends ton verdict avec l'outil submit_lens_verdict.\nUn comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test\nmanquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).\nDonne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois\nun test et le code. Pour chaque défaut, dis pourquoi il a cette gravité (severityReason, une phrase) ;\ns'il se répète ailleurs, donne les autres endroits (occurrences, chemin:ligne) au lieu d'un défaut par endroit. Un défaut sur une ligne que la phase n'a pas modifiée est noté pour l'humain,\nsans renvoyer le travail. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :\naccepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.\nSi juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec\nreport_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.",
       classe: "light",
       sortie: "submit_lens_verdict",
       outils: ["report_blocker"],
@@ -265,6 +271,19 @@ export default async function skraft(w, entree) {
     livraison: vue.livraison ?? null,
   };
 }
+/**
+* Défauts relevés hors du changement de la story (06/11) : les bloquants d'abord, à corriger après
+* la fin du cycle, puis les autres remarques.
+*/
+function notesDuBilan(notes) {
+  const ligne = (n) => `- ${n.file}${n.line ? `:${n.line}` : ""} (${n.lens}, ${n.severity}) : ${n.description}`;
+  const bloquants = notes.filter((n) => n.severity === "blocker");
+  const autres = notes.filter((n) => n.severity !== "blocker");
+  return [
+    ...(bloquants.length ? ["**À corriger après le cycle** — défauts bloquants hors du changement de la story :", ...bloquants.map(ligne)] : []),
+    ...(autres.length ? ["Remarques hors du changement de la story :", ...autres.map(ligne)] : []),
+  ];
+}
 function bilan(d, confirmee) {
   const adrs = d.adrs.map((a) => `${a.id} (${a.status})`).join(", ") || "aucun";
   return [
@@ -282,6 +301,7 @@ function bilan(d, confirmee) {
     ...(d.ecartsAuPlan?.length
       ? [`Écarts au plan de test : ${d.ecartsAuPlan.length} (détail dans .skraft/${d.slug}/deliver/ecarts-au-plan.md).`, ...d.ecartsAuPlan.map((x) => `- ${x.criterion} (${x.par}) : ${x.planned} → ${x.actual} — ${x.rule}`)]
       : []),
+    ...notesDuBilan(d.notesHorsChangement ?? []),
   ].join("\n");
 }
 /**

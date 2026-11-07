@@ -12,6 +12,7 @@
  * **exécutée par le code** : c'est le principe directeur du projet, et cela rend la revue
  * rejouable à l'identique depuis son seul JSON.
  */
+import { precisions } from "./review-thread.js";
 import { z } from "zod";
 export type Verdict = "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
 
@@ -31,6 +32,12 @@ export interface LensDefect {
   targetNote?: string | undefined;
   /** Gravité déclarée plafonnée par le code pour cette lentille, pour la trace (4.4 de docs/15). */
   severityNote?: string | undefined;
+  /** Pourquoi cette gravité, selon la lentille. */
+  severityReason?: string | undefined;
+  /** Autres endroits où le même défaut se répète (`chemin:ligne`), vérifiés par le code. */
+  occurrences?: string[] | undefined;
+  /** Occurrences retirées par le code (fichier introuvable), pour la trace. */
+  occurrencesNote?: string | undefined;
 }
 
 /** Arbitrage d'une lentille sur un de ses défauts que l'agent a contesté (ADR 0046). */
@@ -45,6 +52,10 @@ export interface LensVerdict {
   verdict: Verdict;
   defects: LensDefect[];
   rulings?: LensRuling[] | undefined;
+  /** Défauts réfutés avant la synthèse (ADR 0069), gardés pour le rapport avec la raison. */
+  refuted?: (LensDefect & { refutation: string })[] | undefined;
+  /** Défauts hors du changement de la phase, rangés en notes : rapportés, sans fil. */
+  notes?: LensDefect[] | undefined;
 }
 
 /**
@@ -147,30 +158,40 @@ export function reviewReport(phase: string, attempt: number, lenses: LensVerdict
     lines.push(`## Lentille ${v.lens} : ${v.verdict}`, "");
     if (!v.defects.length) lines.push("Aucun défaut.", "");
     for (const d of v.defects)
-      lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+      lines.push(`- ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}**${d.target ? ` (${d.target})` : ""} ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}${precisions(d)}`);
     for (const r of v.rulings ?? []) lines.push(`- arbitrage sur \`${r.defect}\` : **${r.decision}**${r.reason ? ` — ${r.reason}` : ""}`);
+    // Hors du changement de la phase : notés, sans fil ouvert.
+    for (const d of v.notes ?? []) lines.push(`- note (hors du changement) : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description}${d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : ""}`);
+    // Réfutés avant la synthèse (ADR 0069) : tracés avec la raison, sans fil ouvert.
+    for (const d of v.refuted ?? []) lines.push(`- réfuté : ${d.id ? `\`${d.id}\` ` : ""}**${d.severity}** ${d.description} — ${d.refutation}`);
     lines.push("");
   }
   return lines.join("\n");
 }
 
+const defectSchema = z.object({
+  severity: z.enum(["blocker", "major", "minor"]),
+  description: z.string(),
+  file: z.string().optional(),
+  line: z.number().optional(),
+  target: z.enum(["test", "code", "deliverable"]).optional(),
+  id: z.string().optional(),
+  targetNote: z.string().optional(),
+  severityNote: z.string().optional(),
+  severityReason: z.string().optional(),
+  occurrences: z.array(z.string()).optional(),
+  occurrencesNote: z.string().optional(),
+});
 const lensesSchema = z.array(
   z.object({
     lens: z.string(),
     verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
-    defects: z.array(
-      z.object({
-        severity: z.enum(["blocker", "major", "minor"]),
-        description: z.string(),
-        file: z.string().optional(),
-        line: z.number().optional(),
-        target: z.enum(["test", "code", "deliverable"]).optional(),
-        id: z.string().optional(),
-        targetNote: z.string().optional(),
-        severityNote: z.string().optional(),
-      }),
-    ),
+    defects: z.array(defectSchema),
     rulings: z.array(z.object({ defect: z.string(), decision: z.enum(["accepted", "maintained"]), reason: z.string().optional() })).optional(),
+    // Défauts réfutés avant la synthèse (ADR 0069).
+    refuted: z.array(defectSchema.extend({ refutation: z.string() })).optional(),
+    // Défauts hors du changement, rangés en notes.
+    notes: z.array(defectSchema).optional(),
   }),
 );
 

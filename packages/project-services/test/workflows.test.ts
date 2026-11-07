@@ -8,9 +8,10 @@ import { dirname, join, resolve } from "node:path";
 import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSessionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
 import { bundle, createNodeLauncher } from "@agent-studio/extension-host";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
+import type { TraceEntry, TraceStore } from "@agent-studio/core";
 import type { Workspace } from "@agent-studio/workspace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { workspaceServicesFactory } from "../src/main/workspace-services.js";
+import { workspaceServicesFactory } from "../src/workspace-services.js";
 
 let racine: string;
 let enfant: string;
@@ -46,7 +47,7 @@ async function poser(base: string, fichiers: Record<string, string>) {
   }
 }
 
-async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<string, string>; reponse?: "allow-once" | "allow-always" | "deny"; sansConfirmeur?: boolean }) {
+async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<string, string>; reponse?: "allow-once" | "allow-always" | "deny"; sansConfirmeur?: boolean; trace?: TraceStore }) {
   const projet = await mkdtemp(join(racine, "projet-"));
   const machine = await mkdtemp(join(racine, "machine-"));
   await poser(projet, opts.projet ?? {});
@@ -73,6 +74,7 @@ async function ouvrir(opts: { projet?: Record<string, string>; machine?: Record<
     clock: fixedClock(),
     ids: sequentialIds("id-"),
     workflows: { machine, launcher: createNodeLauncher(), runtimeEntry: enfant },
+    ...(opts.trace ? { traceStore: opts.trace } : {}),
   })({
     workspace,
     runtime: async () => runtime,
@@ -158,6 +160,80 @@ describe("Workflows en dossier dans l'application (ADR 0055)", () => {
     expect(await outil!.handler({ nom: "demo", arguments: "x.md" })).toMatch(/refusé/);
     expect(await o.services.tasks()).toEqual([]);
     await expect(outil!.handler({ nom: "autre", arguments: "" })).rejects.toThrow(/inconnu/);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("les workflows actifs sont listés, avec l'accord à montrer et s'il est déjà retenu (ADR 0068)", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-always" });
+    const [w] = await o.services.workflows();
+    expect(w).toMatchObject({ nom: "demo", commande: "demo", syntaxe: "/demo <story>", description: "Démo.", accordRetenu: false });
+    expect(w!.accord.title).toBe("Exécuter le workflow « demo » (projet) ?");
+    expect(w!.accord.detail).toContain("Écrire : .skraft/**");
+    await o.services.route("/demo x.md");
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(true);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("accord donné d'avance « une fois » : le workflow démarre sans rien demander, et l'accord n'est pas retenu", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "deny" });
+    const r = await o.services.lancerWorkflow("demo", "stories/us-2.md", { accord: "une-fois" });
+    expect(r).toEqual({ ok: true, taskId: expect.any(String) });
+    expect(o.demandes).toEqual([]);
+    await until(async () => (await o.services.tasks()).some((t) => t.id === (r as { taskId: string }).taskId && t.status === "finished"));
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(false);
+    // L'accord ponctuel est consommé : le lancement suivant redemande.
+    expect(await o.services.lancerWorkflow("demo", "stories/us-3.md")).toEqual({ ok: false, motif: expect.stringMatching(/accord refusé/) });
+    expect(o.demandes).toEqual(["Exécuter le workflow « demo » (projet) ?"]);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("accord donné d'avance « toujours » : retenu pour l'empreinte du workflow", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "deny" });
+    expect(await o.services.lancerWorkflow("demo", "stories/us-2.md", { accord: "toujours" })).toMatchObject({ ok: true });
+    expect(o.demandes).toEqual([]);
+    expect((await o.services.workflows())[0]!.accordRetenu).toBe(true);
+    await o.services.dispose();
+  }, 30_000);
+
+  it("arguments invalides : rien ne démarre, le motif est la syntaxe de la commande ; workflow inconnu : refusé", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-once" });
+    expect(await o.services.lancerWorkflow("demo", "", { accord: "une-fois" })).toEqual({ ok: false, motif: expect.stringContaining("/demo <story>") });
+    expect(await o.services.tasks()).toEqual([]);
+    // L'accord ponctuel d'un appel refusé ne profite pas au suivant.
+    await o.services.lancerWorkflow("demo", "x.md");
+    expect(o.demandes).toEqual(["Exécuter le workflow « demo » (projet) ?"]);
+    expect(await o.services.lancerWorkflow("autre", "x.md")).toEqual({ ok: false, motif: "Workflow inconnu : autre" });
+    await o.services.dispose();
+  }, 30_000);
+
+  it("rapport d'un run de workflow : messages du script et fin, lus dans l'état de la tâche ; autre tâche : aucun", async () => {
+    const o = await ouvrir({ projet: WF, reponse: "allow-once" });
+    const r = await o.services.lancerWorkflow("demo", "stories/us-2.md");
+    const id = (r as { taskId: string }).taskId;
+    await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    expect(await o.services.rapportWorkflow(id)).toMatchObject({ statut: "fini", messages: [] });
+    expect(await o.services.rapportWorkflow("inconnue")).toBeNull();
+    await o.services.dispose();
+  }, 30_000);
+
+  it("les rejets d'un workflow sont dans la trace de la tâche, avec leur porte et leurs motifs (ADR 0032)", async () => {
+    // Run réel du 05/11 par le serveur MCP : un rejet en DESIGN, absent de la trace, parce que le
+    // moteur des services ne recevait pas la trace (seul l'exécuteur d'agents l'avait).
+    const entrees: TraceEntry[] = [];
+    const trace: TraceStore = { append: async (e) => void entrees.push(e), list: async (id) => entrees.filter((e) => e.taskId === id), archive: async () => {} };
+    const REJET = DEMO.replace(`await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`, `await w.rejet("cohérence", ["motif d'essai"]);\n    await w.ecrireFichier(".skraft/resume.md", a.sortie.summary);`);
+    const o = await ouvrir({ projet: { ...WF, ".agent-studio/workflows/demo/workflow.mjs": REJET }, reponse: "allow-once", trace });
+    await o.services.lancerWorkflow("demo", "x.md");
+    await until(async () => (await o.services.tasks()).some((t) => t.status === "finished"));
+    expect(entrees.filter((e) => e.kind === "rejet")).toEqual([expect.objectContaining({ kind: "rejet", porte: "cohérence", motifs: ["motif d'essai"] })]);
+    expect(entrees.some((e) => e.kind === "transition")).toBe(true);
+    // Étapes du run, lues dans la même trace : chaque rejeu est une étape, avec son début et sa fin.
+    const id = (await o.services.tasks())[0]!.id;
+    const etapes = await o.services.etapesDuRun(id);
+    expect(etapes.filter((e) => e.phase === "REDACTION").map((e) => e.essai)).toEqual([1, 2]);
+    expect(etapes[0]!.rejets).toEqual([{ porte: "cohérence", motifs: ["motif d'essai"] }]);
+    expect(etapes.every((e) => typeof e.début === "string" && typeof e.fin === "string")).toBe(true);
+    expect(await o.services.etapesDuRun("inconnue")).toEqual([]);
     await o.services.dispose();
   }, 30_000);
 

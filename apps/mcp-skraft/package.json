@@ -1,0 +1,35 @@
+{
+  "name": "@agent-studio/mcp-skraft",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "dependencies": {
+    "@agent-studio/core": "workspace:*",
+    "@agent-studio/extension-host": "workspace:*",
+    "@agent-studio/github-auth": "workspace:*",
+    "@agent-studio/project-services": "workspace:*",
+    "@agent-studio/runtime-claude": "workspace:*",
+    "@agent-studio/runtime-copilot": "workspace:*",
+    "@agent-studio/stack-adapters": "workspace:*",
+    "@agent-studio/workflow": "workspace:*",
+    "@agent-studio/workspace": "workspace:*",
+    "@github/copilot-sdk": "1.0.14",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "esbuild": "^0.28.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@agent-studio/task-engine": "workspace:*"
+  },
+  "bin": {
+    "agent-studio-mcp-skraft": "dist/main.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node dist/main.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

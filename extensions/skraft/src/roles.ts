@@ -67,13 +67,19 @@ Rends ton verdict avec l'outil submit_lens_verdict.
 Un comportement vérifié par un test d'acceptance n'appelle pas de test unitaire qui le duplique : avant de signaler un test
 manquant, cherche-le dans les tests d'acceptance du projet. S'il y est, ce n'est pas un défaut (choix du projet, ADR 0045).
 Donne à chaque défaut sa cible (target) : test, code ou deliverable. Un défaut, un seul sujet : scinde celui qui touche à la fois
-un test et le code. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :
+un test et le code. Pour chaque défaut, dis pourquoi il a cette gravité (severityReason, une phrase) ;
+s'il se répète ailleurs, donne les autres endroits (occurrences, chemin:ligne) au lieu d'un défaut par endroit. Un défaut sur une ligne que la phase n'a pas modifiée est noté pour l'humain,
+sans renvoyer le travail. Si le dossier liste tes défauts précédents contestés par l'agent, rends pour chacun un arbitrage (rulings) :
 accepted si sa raison te convainc, maintained sinon, avec ta raison ; ne les relance pas dans tes défauts.
 Si juger demande une décision métier que ni la story ni les réponses de l'utilisateur ne tranchent, pose la question avec
 report_blocker au lieu de deviner. Une question déjà tranchée te sera renvoyée avec sa réponse.`,
 
   mutationArbiter: `Rends ta décision avec l'outil submit_lens_verdict : lens « mutation-arbiter », verdict APPROVED, aucun défaut, et pour
 chaque défaut de mutation listé un arbitrage (rulings) : accepted si le mutant est équivalent, maintained sinon, avec ta raison.`,
+
+  findingRefuter: `Rends ta décision avec l'outil submit_lens_verdict : lens « finding-refuter », verdict APPROVED, aucun défaut, et pour
+chaque défaut listé un arbitrage (rulings) : accepted s'il est réfuté, avec le passage \`chemin:ligne\` qui le montre dans ta raison ;
+maintained sinon, avec ta raison.`,
 };
 
 /**
@@ -104,6 +110,8 @@ export const ROLE_MODEL_CLASS = {
   test: "standard",
   dev: "standard",
   mutationArbiter: "standard",
+  // Juger un défaut demande au moins la capacité de la lentille qui l'a trouvé (ADR 0069).
+  findingRefuter: "strong",
 } as const;
 
 /** `quality-gates` ne rejuge rien : elle confronte les livrables aux faits établis par le code (ADR 0028). */

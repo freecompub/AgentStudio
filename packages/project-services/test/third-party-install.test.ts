@@ -14,8 +14,8 @@ import { generateKeyPair, packExtension } from "@agent-studio/extension-packagin
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { workspaceServicesFactory } from "../src/main/workspace-services.js";
-import type { WorkspaceServices } from "../src/main/protocols.js";
+import { workspaceServicesFactory } from "../src/workspace-services.js";
+import type { WorkspaceServices } from "../src/protocols.js";
 
 const MANIFEST = {
   id: "tiers.lint",

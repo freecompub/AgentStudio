@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { interactionSchema, roleSchema, taskCardSchema, usageRowSchema } from "@agent-studio/project-services/dto";
+
+// Schémas des cartes de tâche et des interactions : partagés avec le serveur MCP (ADR 0068).
+export { interactionSchema, roleSchema, taskCardSchema, usageRowSchema };
+export type { InteractionDto, TaskCardDto, UsageRowDto } from "@agent-studio/project-services/dto";
 import { EVENT_CHANNELS as EVENT_NAMES, REQUEST_CHANNELS as REQUEST_NAMES } from "./channels.js";
 
 /**
@@ -8,7 +13,6 @@ import { EVENT_CHANNELS as EVENT_NAMES, REQUEST_CHANNELS as REQUEST_NAMES } from
 
 const text = (max: number) => z.string().max(max);
 
-export const roleSchema = z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"]);
 
 export const chatMessageSchema = z.object({
   id: z.string(),
@@ -57,45 +61,6 @@ export type WorkspaceDiffDto = z.infer<typeof workspaceDiffSchema>;
 export const workspaceInfoSchema = z.object({ root: z.string(), name: z.string() });
 export type WorkspaceInfoDto = z.infer<typeof workspaceInfoSchema>;
 
-const usageRowSchema = z.object({
-  phase: z.string(),
-  label: z.string(),
-  requests: z.number(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  retries: z.number(),
-  durationMs: z.number(),
-});
-export type UsageRowDto = z.infer<typeof usageRowSchema>;
-
-export const taskCardSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  phase: z.string(),
-  phaseLabel: z.string(),
-  status: z.enum(["running", "waiting", "finished"]),
-  alert: z.boolean(),
-  milestone: z.boolean(),
-  step: z.object({ index: z.number(), total: z.number(), behavior: z.string() }).optional(),
-  feedback: z.string().optional(),
-  /** Usage par état (D37), dans l'unité du fournisseur. */
-  usage: z.object({ unit: z.enum(["requests", "tokens"]), rows: z.array(usageRowSchema), total: usageRowSchema }).optional(),
-  updatedAt: z.string(),
-});
-export type TaskCardDto = z.infer<typeof taskCardSchema>;
-
-export const interactionSchema = z.object({
-  id: z.string(),
-  taskId: z.string(),
-  extensionId: z.string(),
-  title: z.string(),
-  detail: z.string().optional(),
-  options: z.array(z.object({ id: z.string(), label: z.string() })),
-  requiredRoles: z.array(roleSchema).optional(),
-  freeText: z.boolean().optional(),
-  createdAt: z.string(),
-});
-export type InteractionDto = z.infer<typeof interactionSchema>;
 
 export const commandListingSchema = z.object({ invocation: z.string(), title: z.string(), description: z.string() });
 export type CommandListingDto = z.infer<typeof commandListingSchema>;

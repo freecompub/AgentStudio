@@ -5,6 +5,549 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude : mémoire automatique coupée, version minimale du CLI
+
+- **Vérifié par un mot-témoin** (projet jetable, `haiku`) : avec nos arguments du 06/11, la
+  **mémoire automatique** de Claude Code (`<projectsDirectory>/<dossier encodé>/memory/MEMORY.md`)
+  **est lue** par l'agent. En run réel, c'est celle des sessions de l'utilisateur sur son dépôt :
+  elle entrait dans le contexte de nos agents.
+- Deux moyens la coupent, **sans `--bare`** (qui imposerait une clé API) — noms vérifiés dans le
+  binaire installé, puis essayés : `--settings '{"autoMemoryEnabled": false}'` et
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ; dans les deux cas l'agent répond INCONNU et `memory_paths`
+  disparaît de l'init. Appliqués **tous les deux** : le réglage dans `argumentsDuTour` (testé), la
+  variable dans le lanceur.
+- Données de l'essai supprimées (`~/.claude/projects/…-memoire-projet`, seulement ce projet jetable).
+- **Version minimale** : `VERSION_MINIMALE = "2.1.319"` (celle des essais) ; `start` refuse une
+  version plus ancienne (« il faut au moins 2.1.319, `claude update` ») ou illisible ; une plus récente
+  est acceptée — le flux reste couvert par les tests de contrat sur les sorties enregistrées.
+- Tests vus rouges puis verts (26) ; `pnpm smoke:claude` réussi avec les nouveaux arguments.
+
+## 06/11 — Runtime Claude : les deux défauts de mesure du coût corrigés
+
+- **Cumul à la reprise** : le runtime retient, par session, le cumul déjà compté et n'émet que
+  l'écart (`coutDejaCompte`). Limite assumée : une session reprise après un redémarrage du serveur
+  compte une fois le cumul de ses tours d'avant, qu'on ne connaît pas.
+- **Ligne finale perdue** : attente par défaut portée de 5 s à **60 s** après l'outil terminal ; la
+  réponse de l'outil terminal ajoute « Tour terminé : n'écris plus rien. » pour que le CLI rende
+  vite sa ligne finale.
+- Tests vus rouges puis verts (24 dans `runtime-claude`) ; `scripts/smoke-claude.ts` fait désormais
+  deux tours sur la même session : 0,0016 $ puis 0,0003 $ (l'écart, pas le cumul), les deux clos.
+
+## 06/11 — Run réel US-2 avec Claude par le serveur MCP (`docs/runs/2026-11-06-us-2-mcp-claude/`)
+
+- `scripts/essai-mcp-skraft.ts` : `--runtime=claude`, `--base=<commit>`, source par adresse Git ;
+  tableau des étapes en fin de run (une par phase et par rejeu : début, fin, durée, tours, rejets avec
+  porte et motifs, coût, modèles).
+- Le `main` GitHub d'`exemple-dotnet-tdd` n'a plus de `.agent-studio/stack.yaml` ni de
+  `.skraft/quality.json` (converti à skraft-plugin v2 : `skraft-config.json`, BDD) : le serveur
+  **refuse de démarrer sans pile** (ADR 0068, point 8) — vu en réel, rien consommé. Run refait depuis
+  `a7cf6db`, le commit du run Copilot, décidé par le responsable.
+- Résultat : **fini**, 18 min 24 s, 34 tours, **4 rejets** (citations en RESEARCH, cohérence en DESIGN,
+  revue en DISTILL, correction ciblée en DELIVER), ADR-003 ratifié, `dotnet test` 10/10. Le
+  **réfutateur** a réfuté un défaut major ; des défauts de DELIVER ont été rangés en **notes**.
+- Branches poussées sur `freecompub/exemple-dotnet-tdd` (demandé par le responsable) :
+  `tests/us-2/mcp-copilot-1` (run Copilot du 05/11) et `tests/us-2/mcp-claude-1`.
+- **Deux défauts de mesure du coût** dans `runtime-claude`, vus dans la trace : (1) avec `--resume`,
+  `total_cost_usd` est **cumulé** sur la session → additionné, il compte plusieurs fois ; (2) après
+  l'outil terminal, le CLI met **plus de 5 s** à écrire sa ligne finale (opus) → arrêté avant, coût
+  perdu (chercheur, architectes, réfutateur). Le total de 2,27 $ n'est pas fiable ; borne basse ≈ 1,26 $.
+  À corriger : coût par différence avec le cumul précédent de la session, et attente plus longue (ou
+  sans arrêt) de la ligne finale.
+
+## 06/11 — Runtime Claude : stratégie de suppression des sessions (décidée, pas implémentée)
+
+- Constat (vérifié sur les sessions des essais) : une session `claude -p` tient dans **un seul
+  fichier**, `<projectsDirectory>/<dossier de travail encodé>/<id>.jsonl` ; aucune autre trace dans
+  `~/.claude` ni `~/.claude.json`. `projectsDirectory` est donné par `claude auth status`. Le nom du
+  dossier vient du dossier de travail (`/home/moi/Projets/x` → `-home-moi-Projets-x`).
+- **Ce dossier n'est pas à nous** : en run réel, le dossier de travail est le dépôt de l'utilisateur,
+  donc nos sessions sont rangées avec **ses** sessions Claude Code et la mémoire automatique du
+  projet (`memory/`). Dans les essais, il n'était qu'à nous parce que le projet était jetable.
+- **Stratégie retenue** : `deleteSession(id)` supprime `<projectsDirectory>/*/<id>.jsonl` (et un
+  dossier `<id>/` s'il existe), **jamais le dossier du projet ni `memory/`** ; l'identifiant doit
+  être un UUID (pas de chemin détourné) ; on ne touche qu'aux sessions que nous avons créées
+  (identifiants tirés par nous, `--session-id`) ; une session absente compte comme supprimée (comme
+  Copilot). Le nettoyage vient du registre des sessions, qui purge les orphelines au démarrage
+  (ADR 0053) en appelant `deleteSession`.
+- Écartés : `--no-session-persistence` (plus de reprise, dont on a besoin : réessai dans la même
+  session, continuité des lentilles) ; `claude purge` (efface toutes les données Claude Code du
+  projet, conversations de l'utilisateur comprises).
+- À vérifier au run US-2 : la mémoire automatique du projet, partagée avec l'utilisateur, est-elle
+  **lue** par nos agents ? (L'écriture y est refusée par la garde : hors du projet.)
+
+## 06/11 — Runtime Claude (ADR 0070), brique 4b : choix du runtime dans le serveur MCP
+
+- `mcp-skraft.json` : `runtime: "copilot" | "claude"` (Copilot par défaut) et `modeles` par classe
+  (`strong`, `standard`, `light`) ; runtime inconnu refusé.
+- `connexion-claude.ts` : connexion lue par `claude auth status` (JSON `loggedIn`) ; interactive, donc
+  `skraft_connexion` dit de lancer `claude auth login` ; CLI absent : dit de l'installer. Modèles par
+  défaut avec Claude : `strong` → opus, `standard` → sonnet, `light` → haiku (surchargés par la
+  configuration).
+- Sans duplication : `runtimeParesseux` (démarrer une fois, après vérification, échec non retenu),
+  commun à la connexion Copilot (refaite dessus) et Claude.
+- `assemblage.ts` choisit connexion et runtime selon la configuration ; `modelFor` passé aux services
+  (avec Copilot, seulement les modèles que la configuration nomme).
+- Essai stdio du paquet construit avec `runtime: "claude"` : démarre, répond, journal
+  `"runtime":"claude"` — écrit après le code (composition), pas vu rouge.
+- Reste : l'application de bureau (réglage, connexion, interface) ; un run réel sur US-2 avec Claude
+  (accord du responsable).
+
+## 06/11 — Runtime Claude (ADR 0070), brique 4a : coût en dollars dans la trace et les rapports
+
+- L'événement `usage` du port porte `costUsd` (runtime Claude) ; l'exécuteur d'agents le trace
+  (`coûtUsd` de l'entrée `usage`) ; `resumerTrace` l'additionne par étape, par phase et au total ;
+  `skraft_rapport` le donne par étape (`coutUsd`, 0 avec Copilot, qui garde `aiu`).
+- Le test de l'exécuteur a d'abord été mal écrit (option `trace` passée dans la spécification au
+  lieu des options de `run`) : il échouait **avec et sans** le correctif — revu, vu rouge sans,
+  vert avec. Aucun test ne couvrait jusque-là la trace d'usage écrite par l'exécuteur.
+
+## 06/11 — Runtime Claude (ADR 0070), brique 3 : le runtime, et un essai réel réussi
+
+- `createClaudeRuntime` (`packages/runtime-claude/src/claude-runtime.ts`), port `AgentRuntime` :
+  une session = un relais MCP + deux fichiers privés (prompt système, configuration MCP avec le
+  jeton) ; un tour = un processus `claude -p` (`--session-id` au premier, `--resume` ensuite ;
+  `resumeSession` reprend d'emblée) ; le prompt système rappelle les noms MCP de nos outils
+  (`report_phase` → `mcp__agent-studio__report_phase`) ; permissions → événements `permission` et
+  `tool-denied` ; `start` vérifie le CLI (message qui dit quoi faire) ; `deleteSession` sans effet
+  (les sessions restent dans le dossier du CLI). Lanceur réel : `createLanceurClaude` (processus
+  enfant, sortie ligne par ligne, entrée fermée aussitôt).
+- **Outil terminal (D18)** : le tour est clos à la ligne finale du CLI, ou au plus tard
+  `delaiApresTerminalMs` (5 s) après la réussite de l'outil, et le CLI arrêté. **Piège vu à l'essai
+  réel** : clos aussitôt, le CLI n'écrivait jamais sa ligne finale, qui porte le **coût** (0 $
+  rapporté) ; corrigé, et testé.
+- Tests (22) avec un faux `claude -p` qui appelle vraiment le relais (permission, outil terminal).
+- **Essai réel** `scripts/smoke-claude.ts` (`pnpm smoke:claude`, hors CI, `haiku`) avec la **vraie
+  garde** des agents de tâche (`createTaskAgentGuard`, périmètre `src/**`) : écriture dans `src/`
+  faite, `interdit/non.ts` refusé avec le message de la garde, `CLAUDE.md` du projet ignoré, rapport
+  reçu par `report_phase`, tour clos ; ≈ 0,0009 $, 6 s.
+- Reste : choix du runtime (application, serveur MCP), connexion Claude, modèles par classe,
+  coût en dollars dans l'usage et les rapports ; puis un run réel sur US-2.
+
+## 06/11 — Runtime Claude (ADR 0070), brique 2 : relais MCP HTTP local
+
+- `packages/runtime-claude/src/relais.ts` : un serveur MCP HTTP par session sur `127.0.0.1` (port
+  libre), protégé par un jeton `Bearer` tiré au hasard ; sert nos `ToolSpec` (schéma JSON tel quel,
+  serveur MCP bas niveau `Server`) et l'outil `permission` (demande normalisée → garde →
+  `{behavior: allow|deny}`) ; signale chaque décision (ADR 0032) et la réussite d'un outil terminal
+  (pour clore le tour, D18) ; une exception d'outil devient une erreur de l'outil. `configuration()`
+  rend le JSON à donner à `--mcp-config`.
+- Sans duplication : `decideSafely` (refus si la garde lève ou dépasse son délai, D28) déplacé de
+  `runtime-copilot` vers le cœur (`packages/core/src/guards/decide-safely.ts`), utilisé par les deux
+  adaptateurs ; tests Copilot inchangés (43).
+- Piège : `http.close` attend les connexions gardées ouvertes par le client MCP — fermer avec
+  `closeAllConnections()` d'abord, sinon les tests restent bloqués au nettoyage.
+
+## 06/11 — Runtime Claude (ADR 0070), brique 1 : arguments, flux, permissions
+
+- Nouveau paquet `packages/runtime-claude` (projet Vitest `runtime-claude`). Briques pures, testées
+  sur deux **vrais flux** `stream-json` enregistrés pendant les essais (chemins anonymisés, dont le
+  dossier de mémoire automatique de Claude Code) :
+  - `argumentsDuTour` : isolement (`--setting-sources ""`, `--disable-slash-commands`,
+    `--strict-mcp-config`), prompt système **par fichier** (`--system-prompt-file`) et prompt du tour
+    par l'entrée standard (limite de 32 767 caractères d'une ligne de commande sous Windows),
+    `--tools` sans Bash, nos outils autorisés, outil de permission caché et chargé des demandes,
+    `--session-id` puis `--resume`, modèle et `--max-budget-usd` facultatifs.
+  - `createTraducteur` : appels et résultats d'outils (refus compris, avec le message), messages,
+    raisonnement, **usage compté une fois par message** (le flux le répète pour chaque bloc), coût en
+    dollars au résultat, `idle` ou `error` (plafond de coût, etc.) ; toute autre ligne = activité.
+  - `versDemande` / `reponsePermission` : demandes normalisées comme Copilot (la garde ne lit que
+    `kind` et le chemin ; une demande `mcp` est refusée par défaut — nos outils, autorisés d'avance,
+    n'en posent pas).
+- Changé pour la conception : **toute** demande de permission passe par notre garde (comme Copilot),
+  sans règles par chemin à côté ; et le relais devient un **serveur MCP HTTP local** servi par notre
+  processus (`127.0.0.1`, port libre, jeton `Authorization: Bearer`), vérifié par un essai : plus de
+  script relais en stdio.
+- Port `AgentRuntime` : `costUsd` facultatif sur l'événement `usage`.
+- Mémoire automatique de Claude Code toujours active sans `--bare` (dossier listé à l'init) : ses
+  écritures passeraient par `Write`, donc par notre garde, qui refuse hors du projet.
+
+## 06/11 — Essais de `claude -p` comme runtime (ADR 0070 accepté)
+
+Question du responsable : donner le choix entre Copilot et Claude. Voie étudiée : le CLI de Claude
+Code en mode non interactif plutôt que le Claude Agent SDK (aucune authentification nouvelle, aucun
+SDK, plafond de coût par tour). Essais dans le dossier temporaire de la session, projet Git jetable,
+mini serveur MCP (SDK du dépôt) qui journalise ses appels ; 5 appels `--model haiku`, ≈ 0,005 $.
+
+| Vérifié (Claude Code 2.1.319) | Résultat |
+|---|---|
+| `CLAUDE.md` du projet | Chargé par défaut ; **`--system-prompt` ne l'écarte pas** (mot-témoin ressorti) ; **`--setting-sources ""` l'écarte**, sans `--bare` (qui imposerait une clé API) |
+| Nos outils par MCP | `--mcp-config` + `--strict-mcp-config` : `report_phase` appelé avec les bons arguments, vu par le modèle sous `mcp__spike__report_phase` |
+| Isolement | `--disable-slash-commands` : aucune skill ni commande ; `--tools` : seuls les outils donnés ; agents intégrés listés mais sans outil pour les lancer |
+| Périmètre fixé d'avance | `--allowedTools "Write(allowed/**)"` + `--permission-prompts none` : écriture permise dans `allowed/`, **refusée avant l'écriture** ailleurs |
+| Garde dynamique | **`--permission-prompt-tool mcp__…`** (absent de la liste des options de l'aide, mais accepté) : le CLI demande l'accord à notre outil pour chaque écriture non couverte, avec `tool_name` et `input` ; notre refus bloque, son message revient au modèle. `--disallowedTools` cache l'outil au modèle, le CLI s'en sert toujours |
+| Flux `stream-json --verbose` | init (outils, serveurs MCP, modèle, session), appels et résultats d'outils, usage par étape ; résultat : `total_cost_usd`, `modelUsage`, `permission_denials` |
+
+- Piège : sans `< /dev/null`, `claude -p` attend 3 s sur l'entrée standard (« no stdin data received »).
+- Non vérifié : reprise (`--session-id`, `--resume`), interruption, `--json-schema`, relais réel du
+  serveur MCP vers notre processus (dans l'essai, le serveur décidait seul).
+- ADR 0070 **accepté** le 06/11 par le responsable ; critère `runtime-claude-cli` (false). Effort estimé :
+  1,5 à 2 semaines. Rien ne change pour Copilot (adaptateur séparé, défaut inchangé).
+
+## 06/11 — Temps par rejeu : une étape par phase et par essai (resumerTrace, skraft_rapport)
+
+- Question du responsable : a-t-on, pour chaque phase et chaque rejeu, le début et la fin ? Avant :
+  par phase oui (étapes de `resumerTrace`), par rejeu seulement quand la phase reprenait après une
+  revue ; un rejeu après un rejet de porte restait **dans la même étape**.
+- `resumerTrace` (`packages/core/src/trace/run-summary.ts`) : après un `rejet`, la prochaine activité
+  de la même phase ouvre une **nouvelle étape** ; chaque étape porte `essai` (rang parmi les étapes de
+  sa phase) et `fin` (début de la suivante, ou dernier événement). Le rejet appartient à l'essai qui a
+  échoué (avant : à l'étape « qu'on va rejouer »). `parPhase` cumule et garde la fin du dernier essai.
+- Choix : fait dans le résumé, commun à tout (extension, workflow, banc, MCP), plutôt que tracer un
+  numéro d'essai que l'état d'un workflow n'a pas (`essaisMax` reste à 0 pour un workflow).
+- Un test existant attendait l'ancien comportement (deux tours dans une étape après un rejet) : mis à
+  jour, c'est le changement demandé. Le test du banc qui construit des étapes reçoit `essai` et `fin`.
+- `WorkspaceServices.etapesDuRun(taskId)` (project-services) ; `skraft_rapport` ajoute `etapes`
+  (`phase, essai, debut, fin, dureeMs, tours, rejets, aiu, modeles` ; `aiu` = `nanoAiu / 1e9`, qui a
+  concordé avec la réserve sur le run du 05/11).
+- Non fait : une colonne « Essai » dans le tableau des rapports du banc (`mesure-skraft.ts`) ; les
+  lignes y sont déjà une par étape, donc une par rejeu désormais.
+
+## 06/11 — Défauts hors du changement rangés en notes, extension et workflow
+
+- Décidé par le responsable : un défaut hors du changement de la story ne renvoie pas le travail ;
+  un **blocker** hors du changement est **notifié** — message immédiat, puis rappel dans le bilan
+  sous « **À corriger après le cycle** » —, sans question ni blocage : sa correction se fait après la
+  fin du cycle skraft (le run travaille sur sa branche, ses checkpoints supposent d'être seuls).
+- `rangerHorsChangement` (deux copies de `review-thread`) : un défaut est une note si **aucun** de ses
+  emplacements (ligne, occurrences) n'est à **3 lignes** (`TOLERANCE_HORS_CHANGEMENT`) d'une ligne
+  modifiée depuis le checkpoint de la phase ; fichier non touché → note ; fichier sans lignes connues
+  → tout le fichier compte ; défaut sans fichier → reste. Lentille REJECTED non touchée ;
+  CHANGES_REQUESTED sans blocker ni major restant → APPROVED.
+- Câblage : workflow `revue.mjs` (`fichiersDePhase` rend aussi `changements` ; `juger` range **avant
+  le réfutateur**, `noterHorsChangement` accumule dans `d.notesHorsChangement` et informe pour un
+  blocker, une fois) ; extension `effects.ts` (`runReview`, `changedFiles` du checkpoint de la
+  phase ; les notes voyagent dans les verdicts gardés par l'état, `finalReport` les relit — le
+  réducteur ne change pas). Rapports : « - note (hors du changement) : … » ; relecture JSON.
+- Consigne des lentilles complétée (le défaut hors du changement est noté pour l'humain).
+- En DESIGN et DISTILL, les livrables sont nouveaux : presque tout y est « dans le changement » ; la
+  règle sert surtout en DELIVER et pour les fichiers existants cités.
+- **Tests instables sous charge**, vus pendant ce travail, verts seuls (3 et 4 fois) :
+  `extensions/skraft/test/e2e-s2.test.ts` › « recherche sans document : rejet explicite » et
+  `e2e-s3.test.ts` › « incohérence rejetée… » (déjà à surveiller). Un test différent à chaque suite
+  complète de l'extension : à surveiller, pas lié aux revues pour e2e-s2 (RESEARCH n'a pas de revue).
+
+## 06/11 — Contrat de défaut enrichi (raison de la gravité, occurrences), extension et workflow
+
+- `submit_lens_verdict` (`packages/core/src/agents/terminal-tools.ts`) : chaque défaut porte
+  `severityReason` (**obligatoire**, 1 à 600 caractères) et `occurrences` (facultatif, `chemin:ligne`,
+  20 au plus). Noms anglais, comme les champs voisins (`severity`, `target`). Un seul changement pour
+  l'extension et le workflow (même outil).
+- `verifierOccurrences` (deux copies de `review-thread`) : une occurrence vers un fichier absent est
+  retirée, et c'est noté (`occurrencesNote`). Appelée dans la revue **avant** le réfutateur ; la
+  liste des fichiers n'est lue qu'une fois (`juger`, `runReview`).
+- La raison et les occurrences suivent le défaut : fil (`reviewRound`), retour au producteur
+  (« — gravité : … — aussi : … », `precisions`), dossier du réfutateur, rapport `.md` ; conservées au
+  rejeu (`lireVerdicts`, schéma zod).
+- Consigne ajoutée aux quatre lentilles (`meta` du workflow, `roles.ts`) ; les `.agent.md` ne
+  changent pas (ADR 0024).
+- Piège : le champ obligatoire a cassé 23 tests de 14 fichiers dont les lentilles scriptées signalent
+  des défauts ; complétés (`severityReason: "raison d'essai"`). Le schéma refuse désormais tout défaut
+  sans raison : c'est voulu.
+- Pièges d'édition : `review.mjs` et `review-brief.mjs` du workflow n'avaient **aucun** import ;
+  l'import de `precisions` est en ligne 2.
+- **Non fait**, dit au responsable : fusionner en un fil les défauts de lentilles différentes au même
+  endroit — l'arbitrage d'un fil appartient à sa lentille (ADR 0046) ; à reprendre avec la re-revue
+  incrémentale si besoin.
+
+## 06/11 — Réfutateur des défauts de revue (ADR 0069), extension et workflow
+
+- Décidé par le responsable (« on l'intègre chez nous ») ; idée de skraft-plugin v2, réimplémentée
+  sans copie (prompt écrit à neuf). ADR 0069.
+- **Règle pure**, dans les deux copies de `review-thread` : `defautsARefuter` (blocker et major, par
+  lentille ; ni les minor, ni une lentille REJECTED) et `appliquerRefutations` (le code décide : une
+  réfutation `accepted` ne compte que si sa raison cite `chemin:ligne` d'un fichier **qui existe** ;
+  sinon, ou sans arbitrage, le défaut reste ; une lentille CHANGES_REQUESTED sans blocker ni major
+  restant approuve ; les réfutés vont dans `refuted`, avec la raison).
+- **Dossier** : `refuterBrief` (deux copies de `review-brief`) — défauts numérotés, puis les **mêmes
+  entrées** que la lentille (cold-reader sans faits, quality-gates sans code ni tests), sans ses
+  consignes.
+- **Câblage** : workflow `revue.mjs` (`juger` → `refuter`, un appel par lentille en parallèle) ;
+  extension `effects.ts` (`runReview` → `refuter`) : le **réducteur ne change pas**, il reçoit des
+  verdicts filtrés. Réfutateur muet ou interrompu : rien n'est réfuté.
+- **Agent** `skraft-finding-refuter` (classe `strong`, sortie `submit_lens_verdict` avec `rulings`,
+  comme l'arbitre de mutants) : déclaré dans le `meta` du workflow et le manifeste de l'extension ;
+  même fichier `.agent.md` des deux côtés (aucun nom d'outil, ADR 0024).
+- **Rapports** : les réfutés figurent dans le JSON et le `.md` de la revue (« - réfuté : … — raison »),
+  et survivent au rejeu depuis le JSON (`replayReview`, schéma zod et `lireVerdicts`).
+- **Harnais** des deux côtés : un réfutateur par défaut qui **maintient** tout, pour que les tests
+  existants gardent leur déroulé.
+- Tests vus rouges puis verts : règle pure (5 × 2), dossier (2 × 2), rapport (extension), bout en bout
+  (workflow en DESIGN, extension en DELIVER : réfuté avec citation → aucun tour de plus ; sans
+  citation → le défaut part au producteur). Un test du manifeste figeait la liste des agents : mis à
+  jour.
+- **Mesure à faire** (`refutateur-mesure-us2`, accord du responsable) : attention, le run MCP d'US-2
+  du 05/11 n'a eu **aucun défaut sérieux en revue** ; le réfutateur n'y aurait pas été appelé. Pour
+  mesurer, il faut une story ou un run où les lentilles signalent des défauts.
+- Écartés pour l'instant (ADR 0069) : réfuter les minor, désaccord isolé, ne pas rejuger un défaut
+  déjà réfuté au même endroit.
+
+## 06/11 — skraft-plugin v2 et AgentStudio : comparatif lentilles, portes, revue (plan, rien d'implémenté)
+
+Suite de `docs/16` (v2 = `integration/v2-next`, commit `0425f031`, 2.0.0-alpha.63 ; nous = workflow
+`workflows/skraft/` et extension `extensions/skraft/`, mêmes agents et skills). Colonne « Mieux » :
+qui fait mieux, `v2`, `nous` ou `=`. Colonne « Suite » : lot de priorité — [1] simple, code pur ;
+[2] coût des revues, ADR puis mesure sur US-2 (run Copilot avec l'accord du responsable) ;
+[3] utile, moins urgent ; `garder` : on garde le nôtre ; `non` : on ne reprend pas. Reprises **à
+partir des idées**, sans copie (la v2 n'est pas couverte par l'autorisation, versions < v2.0.0),
+valables pour **l'extension et le workflow**, en TDD.
+
+### Lentilles
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Nombre et spécialisation | 11 lentilles spécialisées par phase (DESIGN 3, DISTILL 4, DELIVER 3) + 2 conditionnelles (mocks, contrats) | 4 généralistes (cold-reader, test-integrity, architecture, quality-gates) avec des « points à examiner » par phase | v2 (critères nets) ; nous (moins de tours) | [3] après mesure du réfutateur |
+| Sélection | Par le graphe ; lentilles `when=` déclenchées par le contenu du patch | Par le niveau de difficulté (2 ou 4 lentilles) et la phase (`quality-gates` retirée en DESIGN) | = | — |
+| Entrées par lentille | Fixées par le code (`blind`, portée, patchs par portée) | Fixées par le code (`lensBrief` : cold-reader sans faits, etc.) | = | — |
+| Contrat de sortie | YAML validé ; `severityReason`, `drift`, `occurrences` obligatoires ; 20 défauts au plus ; `pass` avec un défaut grave refusé | `submit_lens_verdict` à schéma ; identifiants et cibles fixés par le code ; pas de raison de gravité ni d'occurrences | v2 | [1] contrat enrichi, regroupement par ligne |
+| Ce que le code a déjà vérifié | Dit aux lentilles (« Not yours to report », findings du moteur à ne pas répéter) | Non dit : une lentille peut reprocher ce qu'une porte a déjà jugé | v2 | [1] lister les portes jugées dans le dossier de chaque lentille |
+| Plafond de gravité de cold-reader | `medium` au plus (consigne) | `major` au plus, **appliqué par le code** | nous | garder |
+| Confronter aux mesures | Supprimé (`quality-gates-lens`) : les portes sont exécutées par le moteur | `quality-gates` confronte les livrables aux faits mesurés | nous | garder |
+| Question d'une lentille | Interdite ; `inconclusive` → run BLOCKED, question à l'humain | Question de revue à l'humain, 2 par phase au plus, sans coût pour le producteur (ADR 0063) | nous | garder |
+| Modèle | Palier `economy` par défaut, configurable | Classe par lentille (`standard`, `light` pour quality-gates), ADR 0048 | = | — |
+
+### Portes
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Exécution | Le moteur lance les commandes de `skraft-config.json` (build, format, lint, test, architecture, coverage), par composant touché | Le code lance les tests et le linter par l'adaptateur de pile ; preuves produites par notre handler `run_tests` | = | — |
+| Format | Porte à part | Absente | v2 | [3] si le profil déclare `format` |
+| Gel des tests d'acceptance | **Aucune porte** : brief et lentille seulement ; l'ingénieur écrit dans `tests` | Empreinte au commit de DISTILL ; tests unitaires gelés dès leur rouge | nous | garder ; à proposer en amont |
+| RED / GREEN | Convention de commits + **rejeu de chaque commit rouge** dans un worktree | Un seul nouveau test rouge par pas, rouge pour une bonne raison, suite verte, vérifiés au moment du pas | v2 (preuve après coup) ; nous (au pas) | non pour l'instant (nos preuves viennent du handler) |
+| Couverture | Ce que dit la commande de l'équipe, aucun seuil dans le code | Couverture **du diff** avec seuil, lignes exemptées tracées | nous | garder ; à proposer en amont |
+| Mutation | 100 % core / 80 % boundary **figés** ; « core » reconnu au nom du dossier ; survivants par fichier, plan validé par l'humain, arrêt sans progrès | Seuils de `quality.yaml` ; arbitre de mutants plafonné à 2 dérogations, humain au-delà (ADR 0065) | v2 (boucle par fichier, arrêt) ; nous (seuils, dérogations) | [3] boucle par fichier et arrêt sans progrès, en plus de l'arbitre |
+| Cohérence DESIGN | Matrice **déclarée** par l'architecte (`consistency-gate: PASS`), présence vérifiée | Matrice **calculée** par le code (G10) et porte de cohérence (G6, G8, STRUCTURAL_DRIFT…) | nous | garder ; à proposer en amont |
+| Plan de test, écarts | C12 « Every test is planned » (skill), jugé par test-integrity | Matrice couche/doublure, walking skeleton, écarts vérifiés par le code (ADR 0067) | nous | garder |
+| Scans du patch | En code : `skip`/`only` ajoutés, test supprimé, assertions retirées ; placement des tests | Gel et règles de modification des tests (ajouts seulement) | v2 (en complément) | [3] pour les tests modifiés pendant un correctif |
+| Périmètre d'écriture | Contrôlé **après** l'étape | Bloqué **avant** l'écriture (`onPreToolUse`) | nous | garder |
+| Réessais | `max_attempts` + **disjoncteur** (deux échecs identiques → arrêt) | Budget `essayer({max})`, consommé jusqu'au bout | v2 | [1] disjoncteur |
+| Panne d'environnement | Code 127/9009 → question à l'humain | `ENV_FAILURE` → escalade immédiate | = | — |
+
+### Revue
+
+| Point | skraft v2 | AgentStudio | Mieux | Suite |
+|---|---|---|---|---|
+| Qui calcule le verdict | Le moteur (`verdict.mjs`) | Le code (`synthesize`, repris de v1) | = | — |
+| Faux positifs | **Réfutateur** sur chaque défaut avant le verdict (`confirmed`, `refuted` avec `path:line`, `unverifiable` qui compte) | Le producteur conteste, la lentille arbitre, puis l'humain : un tour du producteur par faux positif | v2 | **fait le 06/11** (ADR 0069), blocker et major seulement |
+| Désaccord isolé | Une seule lentille contre les autres → le réfutateur reçoit toutes les entrées | Aucune règle | v2 | [2] avec le réfutateur |
+| Relances entre rondes | Seules les lentilles dont les entrées ont changé ou qui avaient un défaut ; un défaut réfuté au même endroit n'est pas rejugé | Toutes les lentilles, à chaque ronde | v2 | [2] re-revue incrémentale |
+| Défaut hors du changement | Devient une **note** : rapporté, ne renvoie pas le travail | Renvoie le travail comme les autres | v2 | [1] notes |
+| Défaut mineur | Renvoie le travail (même `low`) | N'empêche pas l'approbation ; corrigé en fin de DELIVER (ADR 0062) | nous | garder |
+| Rejet net | Supprimé | REJECTED (2 lentilles) → escalade | nous | garder |
+| Plafond | `max_visits=3` par arête, puis question : ACCEPT (défauts acceptés dans le rapport) si seulement medium/low, sinon instruction ou STOP | Budget de 2 ou 3 essais, revue garantie à sa première ronde, puis escalade | v2 (sortie ACCEPT) | [3] « accepter les défauts restants », refusé s'il reste un blocker |
+| Arbitrage humain | Au plafond seulement | Fil de défauts : contesté, recontesté, persistant → ARBITRATION, tous à la fois | nous (plus fin) | garder |
+| Coût | Journalisé, aucun plafond | Journalisé (trace, usage), aucun plafond | = | — |
+| Doc et code | Décalage (message du commit 27c2e656 contre `verdict.mjs` ; skill qui décrit une synthèse pondérée abandonnée) | Skills v1 qui décrivent encore de la procédure faite par le code | = | [1] mentions « le code le vérifie déjà » dans nos skills |
+
+**Pourquoi cet ordre** : sur le run MCP d'US-2, 11 des 20 tours d'agent étaient des lentilles ; les
+lots [1] et [2] visent ce coût. À ne pas reprendre en bloc : journal signé, multi-composants,
+publication. Prochaine étape : le lot [1], ou directement le réfutateur, au choix du responsable.
+
+## 05/11 — Analyse de skraft-plugin v2 (docs/16)
+
+- `docs/16-skraft-plugin-v2.md` : agents, skills, lentilles, revue et portes de la branche
+  `integration/v2-next` (commit `0425f031`, 2.0.0-alpha.63) face à v1.15.1 et à AgentStudio. Lu en
+  lecture seule dans `~/Projets/skraft-plugin` (seule la branche a été récupérée).
+- Constat principal : la v2 passe d'un orchestrateur-prompt à un **moteur** qui parcourt un graphe
+  DOT ; revue en code avec un **réfutateur** de findings et un verdict calculé ; portes exécutées par
+  le moteur ; agents et skills fortement réduits. Même direction qu'AgentStudio.
+- Vérifié moi-même dans le code v2 : findings `low` qui renvoient le travail (`verdict.mjs`, en
+  contradiction avec le message du commit 27c2e656) ; `MUTATION_BARS` figé à 100/80 ; aucune porte
+  de gel des tests d'acceptance trouvée.
+- **Licence** : la v2 n'est pas couverte par l'autorisation (versions < v2.0.0). Le responsable est
+  contributeur de skraft-plugin depuis le 05/11 ; extension de l'autorisation **non** demandée ni
+  consignée à ce jour.
+- Décisions proposées (§9.1) : autorisation v2, réfutateur à mesurer dans le workflow, re-revue
+  incrémentale, défauts mineurs, lentilles par phase. Contributions possibles en amont (§9.3).
+
+## 05/11 — Les rejets des workflows manquaient à la trace (project-services)
+
+- Constat sur le run MCP d'US-2 : un rejet de cohérence en DESIGN (journal : `rejections: 1`), mais
+  aucune entrée `rejet` dans la trace — ni transition, ni effet : seulement les tours d'agent.
+- Cause : `workspace-services.ts` créait le moteur **sans** `trace` ; seul l'exécuteur d'agents la
+  recevait. Le moteur n'écrit transitions, effets, rejets et arbitrages (ADR 0032, 0065) que s'il
+  l'a. Touchait aussi l'**application de bureau** (même assemblage). `mesure-skraft.ts` passe la
+  trace à son propre moteur : les rapports du banc ne le montraient pas.
+- Corrigé : `trace: traceStore` au moteur. Test vu rouge puis vert : un workflow qui rejette laisse
+  une entrée `rejet` (porte, motifs) et des transitions dans la trace
+  (`packages/project-services/test/workflows.test.ts`).
+- Suite complète : 2064 tests. **Probable test instable, à surveiller** :
+  `apps/desktop/test/app-controller.test.ts` › « installation depuis un fichier : accord demandé
+  dans la fenêtre, puis services rechargés » — un échec dans une suite complète chargée (plus de
+  600 s), puis vert quatre fois (trois seul, une dans la suite). Il utilise des doublures de
+  services, pas `project-services`. Détail de l'échec non conservé.
+
+## 05/11 — Serveur MCP : run réel avec Copilot sur US-2 (critère serveur-mcp-skraft passé)
+
+- Hôte d'essai `scripts/essai-mcp-skraft.ts` (hors CI, consomme des requêtes) : lance le serveur
+  construit en stdio sur un **clone** du projet, donne l'accord, suit `skraft_etat`, répond avec le
+  répondeur commun du banc (`scripts/banc/repondeur.ts`, pas de copie), lit `skraft_rapport`. Config
+  propre à l'essai : seul le clone autorisé, profil `architecte`, `PATH` avec `~/.dotnet`.
+- **Premier essai échoué avant tout agent** (aucune requête) : l'enfant des workflows gardait
+  `esbuild` en import externe ; sous `--permission`, Node refuse de lire `node_modules`. Mes tests
+  ne rejouaient aucun workflow avec l'enfant **construit**. Corrigé (`external: []` pour l'enfant,
+  comme `build-extensions.mjs`) et testé (`stdio.test.ts` : l'enfant construit rejoue skraft).
+- Second essai sur `exemple-dotnet-tdd` / US-2 : **fini**, 19 min 24 s, **≈ 374 requêtes premium** (trace : 373,8 unités, 128 appels
+  `claude-sonnet-5` ; réserve : 0 → 373), toutes les
+  phases, livrable vérifié à part (`dotnet test` : 10/10). Compte rendu :
+  `docs/runs/2026-11-05-us-2-mcp/`. Accord en deux appels, questions et réponses par MCP, rapport :
+  tout le parcours de l'hôte a fonctionné en réel.
+- Constat à suivre dans le **workflow** (pas le serveur) : la même question ouverte a été posée deux
+  fois (avec et sans guillemets) — doublon à l'extraction des questions.
+- **Piège** : `usage.requests` de la carte (et de `skraft_etat`) compte les **tours d'agent** (20 ici),
+  pas les requêtes facturées ; je l'ai d'abord annoncé comme le coût. Le coût réel se lit dans la
+  trace (`nanoAiu` des événements `usage`) ou dans la réserve. Plus rapide que le run du 10/10
+  (55 min), mais plus cher (264,3) : un seul run, pas une mesure.
+- `serveur-mcp-skraft` passe à `true`. Reste hors critère : la distribution (registre, licence).
+
+## 05/11 — Serveur MCP, brique 7 : point d'entrée stdio, bundle, reprise hors Electron
+
+- `config.ts` : `~/.agent-studio/mcp-skraft.json` (ou `SKRAFT_MCP_CONFIG`) — `autorises` (chemins
+  absolus, `~` développé) et `hostname` ; absent : valeurs prudentes ; invalide : le serveur s'arrête,
+  raison sur stderr. Profil et programmes autorisés : `admin.json`, comme l'application.
+- `assemblage.ts` : la composition réelle (gh, Copilot, Workspace, adaptateur TypeScript,
+  `sansRepli`, lanceur Node isolé, workflow livré dans le paquet). Données dans
+  `~/.agent-studio/mcp-skraft/` : `tasks/`, `piles/`, `verrous/`, `copilot/`, `logs/`.
+  **Le journal va dans un fichier** : stdout est le canal du protocole.
+- **Verrou hors du dépôt** (ADR 0068 précisé) : les checkpoints font `git add -A` et le rollback
+  `clean -fdq` ; dans `.agent-studio/`, le verrou entrerait dans les checkpoints et les diffs que
+  contrôlent les portes. Il est dans `verrous/<empreinte du chemin>.lock`.
+- `main.ts` : transport stdio ; fermeture (stdin fermé, SIGINT, SIGTERM) libère services et verrous.
+- `scripts/build.mjs` (`pnpm --filter @agent-studio/mcp-skraft build`) : `dist/main.mjs` (paquets
+  internes intégrés), `dist/workflow-child.mjs`, `dist/workflows/skraft/` (sources et LICENSE) ;
+  externes : `@github/copilot-sdk` (CLI Copilot, binaires par plateforme) et `esbuild` (natif,
+  compile le workflow à l'activation), déclarés en dépendances. `dist/` n'est pas versionné.
+- `skraft_etat` donne aussi le workflow et son accord (`accordRetenu`).
+- Tests : `stdio.test.ts` construit le paquet et le lance en vrai processus (outils, workflow
+  skraft activé, pile détectée, projet hors des dossiers autorisés refusé, configuration invalide,
+  journal hors de stdout) — sans GitHub ni Copilot ; écrit après le code (composition), pas vu rouge.
+  « Reprise hors Electron » (`serveur.test.ts`) : stockages JSON réels, serveur fermé pendant une
+  question, un autre relit le disque et mène le run au bout, sans relancer l'agent : **le point 4
+  de docs/14 §5 est levé**.
+- `apps/mcp-skraft/README.md` : construire, prérequis, inscription, configuration, outils, données.
+- Suite complète : 2061 tests, typecheck.
+- **Reste** : un run avec des agents Copilot réels (accord du responsable) ; la distribution (registre, licence du paquet hors skraft).
+
+## 05/11 — Serveur MCP, brique 6 : pile fournie par le client (point 8)
+
+- `project-services` : le choix de la pile gagne une troisième source. Ordre : profil du projet, puis
+  détection, puis `pileFournie` (argument des services, YAML au format de `stack.yaml`, mêmes
+  contrôles : schéma et `allowedPrograms`). Fournie alors que le projet a la sienne : ignorée, et
+  c'est dit. `sansRepli` (config) : aucune pile lève `AucunePile` au lieu du repli averti sur le
+  premier adaptateur ; l'application de bureau garde son repli. `services.pile()` : `{ id, source }`
+  (`projet`, `detection`, `client`, `repli`). Tests : `packages/project-services/test/pile.test.ts`.
+- `apps/mcp-skraft` : argument `pile` de `skraft_demarrer` ; pile retenue gardée par le serveur dans
+  son dossier de données (`piles.ts`, un fichier par projet, hors du dépôt), relue à l'ouverture
+  suivante — une reprise par un autre serveur retrouve la même pile. Une autre pile remplace la
+  précédente, sauf pendant un run. Sans pile : `AucunePile`, avec l'indication de l'argument `pile`.
+  La pile et sa source figurent dans `skraft_etat`.
+- Ouverture d'un projet qui échoue (pas de pile) : le verrou est libéré, rien n'est gardé.
+- Le test du remplacement de pile a été écrit après le code : il n'a pas été vu rouge.
+
+## 05/11 — Serveur MCP, brique 5 : rapport d'un run (skraft_rapport)
+
+- `packages/workflow/src/rapport.ts` : `rapportDuWorkflow(etat)`, fonction pure sur l'état persisté
+  de la tâche — statut (`en-cours`, `fini` avec la valeur rendue par le script, `echec` avec le motif,
+  `annule`), messages du script (`w.informer` déjà exécutés, dont le bilan final de skraft, relus du
+  magasin de contenus), dernier rejet, arbitrages. Rien n'est relancé ni relu sur le disque du projet.
+- `WorkspaceServices.rapportWorkflow(taskId)` : `null` pour une tâche inconnue ou qui n'est pas un
+  workflow (nom `workflow.<nom>/…`). Outil `skraft_rapport` : le rapport en JSON.
+- Pourquoi pas les seuls messages de `skraft_etat` : ils sont en mémoire, par projet, et limités aux
+  20 derniers ; le journal de la tâche est durable et propre au run.
+
+## 05/11 — Serveur MCP, brique 4 : connexion à GitHub sans fenêtre (point 7)
+
+- `apps/mcp-skraft/src/connexion.ts`, sur `GitHubAuth` (`gh`, comme l'application) :
+  - `verifier()` : connecté, et jeton accepté par Copilot (pas de jeton personnel classique) ;
+  - `connecter()` (outil `skraft_connexion`) : lance le flux d'appareil et rend **aussitôt** le code
+    et l'adresse ; pendant l'attente, le même code (pas de second flux) ; ensuite « Connecté » ; un
+    échec est dit une fois, puis l'appel suivant relance ;
+  - `runtime(fabrique)` : runtime démarré une fois, au premier besoin, avec le jeton ; un échec
+    n'est pas retenu.
+- `skraft_demarrer`, `skraft_repondre`, `skraft_reprendre` exigent la connexion (ils font travailler
+  les agents) et renvoient vers `skraft_connexion` ; `skraft_etat` et `skraft_arreter`, non.
+- Le jeton ne va qu'à la fabrique du runtime : testé absent de toutes les réponses.
+
+## 05/11 — Serveur MCP, briques 2 et 3 : paquet apps/mcp-skraft, projet, verrou, outils
+
+- Nouveau paquet `apps/mcp-skraft` (projet Vitest `mcp-skraft`), SDK `@modelcontextprotocol/sdk` 1.32.2.
+  - `projet.ts` : projet de l'appelant (argument, puis premier root du client, puis dossier courant),
+    jugé sur sa cible réelle (liens résolus) ; refusé s'il n'est pas un dépôt Git ou s'il est hors
+    des roots du client et des dossiers autorisés de la configuration.
+  - `verrou.ts` : `.agent-studio/mcp-skraft.lock`, création exclusive (`wx`), PID du détenteur ;
+    repris si le détenteur est mort ou le fichier illisible ; libéré seulement s'il est encore à nous.
+  - `projets.ts` : un jeu de services par projet ; le verrou **avant** les services, et `demarrer()`
+    (purge des sessions, reprise des tâches) seulement en mode pilote.
+  - `services.ts` : les services de `project-services`, sans fenêtre (confirmeur qui refuse tout ;
+    l'accord du workflow vient de l'appel, point 9), messages du chat vers le journal du projet.
+  - `serveur.ts` : `skraft_demarrer`, `skraft_etat` (JSON : mode, tâches, questions, messages),
+    `skraft_repondre` (profil de `admin.json`), `skraft_reprendre`, `skraft_arreter`.
+- Testé de bout en bout par un vrai client MCP en mémoire (`InMemoryTransport`), vrais services,
+  workflow isolé, `ScriptedRuntime` : accord requis puis lancé, question puis réponse jusqu'au bout,
+  refus de profil, deux serveurs (consultation, reprise de la main à la mort du premier), arrêt,
+  projet hors des roots.
+- Piège trouvé par les tests : les entrées deviennent une ligne de commande découpée aux espaces.
+  `story: "deux mots.md"` faisait de `mots.md` le skill d'architecture (entrée positionnelle) et le
+  run partait sur `deux`. `story` et `archi` refusent donc tout espace.
+- Piège : les options d'une question de workflow sont préfixées du numéro d'appel (`3:oui`) ; l'hôte
+  doit reprendre l'identifiant rendu par `skraft_etat`.
+- **Écart à l'ADR 0068, point 5 — tranché le 05/11 par le responsable : le refus est gardé**, ADR
+  corrigé ; chaque serveur donne son PID et celui du pilote (`skraft_etat` : `pid`, `detenteur` ;
+  messages de refus), pour savoir depuis quelle fenêtre répondre. Constat d'origine : l'ADR dit qu'un serveur en consultation « peut
+  répondre aux questions enregistrées ». Or répondre passe la décision au moteur du serveur qui
+  répond (`interactions.respond` → `engine.dispatch`) : le run reprendrait **dans le serveur en
+  consultation**, en parallèle du pilote. Implémenté de façon sûre : en consultation,
+  `skraft_repondre` et `skraft_arreter` sont refusés, avec le PID du pilote.
+- Reste : voir la brique 7.
+
+## 05/11 — Serveur MCP, brique 1 : lancer un workflow avec un accord donné d'avance
+
+- ADR 0068 complété (point 9) : sans fenêtre, l'accord sur le workflow se donne **dans l'appel**.
+  `skraft_demarrer` rendra « accord requis » et le résumé, puis l'hôte rappelle avec
+  `accord: "une-fois" | "toujours"`. SDK retenu : `@modelcontextprotocol/sdk` (1.32.2, compatible zod 4).
+- `WorkspaceServices` gagne `workflows()` (nom, syntaxe, `accordRetenu`, résumé de l'accord) et
+  `lancerWorkflow(nom, args, { accord? })`, qui valide les arguments (`lireEntrees`), lance la
+  commande et dit ce qui a **réellement** démarré (identifiant de tâche, ou motif). `proposer_workflow`
+  s'appuie dessus : un seul chemin de lancement pour l'agent principal et le serveur MCP.
+- L'accord donné d'avance passe par un confirmeur enveloppé : il répond à la seule demande d'accord
+  du lancement, puis tombe dans tous les cas (`finally`) ; un appel refusé (arguments invalides) ne
+  le laisse pas au suivant. Testé dans `packages/project-services/test/workflows.test.ts`.
+
+## 17/10 — Paquet project-services : les services d'un projet hors de l'application de bureau
+
+- Pour que le serveur MCP (ADR 0068) ne duplique pas l'assemblage des services d'un projet, il est
+  sorti de `apps/desktop/src/main` vers `packages/project-services` (`@agent-studio/project-services`),
+  par `git mv` : `workspace-services.ts`, `stack-command.ts`, `admin-config.ts`, les interfaces
+  `WorkspaceServices*` et `RouteOutcome` (`protocols.ts`), et les schémas des cartes de tâche et des
+  interactions (`dto.ts`, exporté aussi en `@agent-studio/project-services/dto`, zod seul).
+- L'application importe le paquet ; `ipc-contract.ts` réexporte les schémas, `protocols.ts` les
+  interfaces : aucun autre fichier de l'application n'a changé. Les tests (et leur fixture
+  d'extension tierce) suivent le code, dans le projet Vitest `project-services`.
+- Vérifié : suite complète identique (2012 tests), typecheck, `pnpm build` (paquet intégré au bundle
+  du main et du renderer, pas externalisé).
+- Piège : le preload n'importe que des **types** du contrat IPC ; s'il en importait des valeurs, le
+  paquet devrait être intégré au bundle du preload, qui ne l'exclut pas de l'externalisation.
+- `scripts/mesure-skraft.ts` importait `admin-config` par un chemin profond dans l'application : il
+  importe le paquet. Il assemble encore lui-même ses services : à rapprocher plus tard.
+
+## 17/10 — Branche feat/mcp-skraft : ADR 0068 accepté (skraft en serveur MCP local)
+
+- Branche `feat/mcp-skraft`, partie de `feat/workflow-rejouable` (PR #12).
+- ADR 0068 **accepté** le 17/10. Décidé par le responsable : runtime **Copilot** pour l'instant (adaptateur
+  existant) ; Claude plus tard, par le port `AgentRuntime`. Aussi : le serveur orchestre le
+  **workflow** (option A de docs/14), transport **stdio** (le client lance le serveur), outils
+  courts, **verrou par projet** (deux instances de client = deux serveurs sur le même disque),
+  projet détecté (argument, roots MCP, dossier courant) et **borné** (dépôt Git, root du client ou
+  dossier autorisé).
+- Authentification (décidée) : jeton de `gh` s'il est connecté ; sinon outil `skraft_connexion`
+  (flux d'appareil, code et adresse rendus à l'hôte MCP). Jeton jamais rendu à l'hôte ni journalisé.
+- Pile (décidée) : profil `.agent-studio/stack.yaml`, sinon détection, sinon profil fourni par le
+  client dans `skraft_demarrer` (mêmes contrôles : schéma, liste de l'administrateur ; gardé avec le
+  run, pas écrit dans le dépôt). Aucune des trois : refus de démarrer.
+- À vérifier avant de s'y fier : dossier courant donné au serveur par Claude Code et Copilot CLI,
+  leur support des roots MCP, la reprise hors Electron, l'accord sur le workflow sans fenêtre.
+- Prochaine étape : un essai du serveur avec le `ScriptedRuntime`, sans Copilot réel (critère
+  `serveur-mcp-skraft`).
+
 ## 17/10 — Revue de la PR #12 : sept constats corrigés
 
 - **Lien symbolique d'un workflow** (sécurité) : la compilation vérifie le chemin **réel** de chaque

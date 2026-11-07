@@ -277,6 +277,55 @@
       "notes": "docs/15 §4.5, option A. CONSIGNES_DE_PHASE dans review-brief.ts et review-brief.mjs."
     },
     {
+      "id": "refutateur-de-revue",
+      "title": "Avant la synthèse d'une revue, chaque défaut blocker ou major est soumis à un réfutateur ; seul un défaut réfuté par une citation chemin:ligne d'un fichier existant tombe, gardé dans le rapport ; extension et workflow",
+      "verify": "pnpm vitest run --project workflow-skraft test/e2e-refutation-workflow.test.ts test/review-thread.test.ts test/review-brief.test.ts && pnpm vitest run --project ext-skraft test/e2e-refutation.test.ts test/review-thread.test.ts test/review-brief.test.ts",
+      "passes": true,
+      "notes": "ADR 0069 (06/11), idée de skraft-plugin v2 réimplémentée sans copie (docs/16 §5.3). Agent skraft-finding-refuter, classe strong ; lentilles REJECTED et défauts minor non soumis."
+    },
+    {
+      "id": "contrat-defaut-enrichi",
+      "title": "Chaque défaut de revue dit pourquoi il a sa gravité (severityReason, obligatoire) et peut lister ses autres endroits (occurrences, chemin:ligne) ; le code retire les occurrences vers un fichier absent ; raison et occurrences vont au producteur, au réfutateur et au rapport ; extension et workflow",
+      "verify": "pnpm vitest run --project core test/terminal-tools.test.ts && pnpm vitest run --project workflow-skraft test/review-thread.test.ts test/review-brief.test.ts test/e2e-refutation-workflow.test.ts && pnpm vitest run --project ext-skraft test/review-thread.test.ts test/review-brief.test.ts test/e2e-refutation.test.ts",
+      "passes": true,
+      "notes": "06/11, idée de skraft-plugin v2 (finding severityReason, occurrences), réimplémentée. Non fait : fusion en un fil de défauts de lentilles différentes au même endroit (l'arbitrage d'un fil appartient à sa lentille)."
+    },
+    {
+      "id": "notes-hors-changement",
+      "title": "Un défaut de revue dont aucun emplacement n'est à 3 lignes d'une ligne modifiée depuis le checkpoint de la phase devient une note : sans fil ni réfutateur, dans le rapport et le bilan ; un blocker hors du changement est signalé tout de suite, à corriger après le cycle ; extension et workflow",
+      "verify": "pnpm vitest run --project workflow-skraft test/review-thread.test.ts test/e2e-notes-workflow.test.ts && pnpm vitest run --project ext-skraft test/review-thread.test.ts test/e2e-notes.test.ts",
+      "passes": true,
+      "notes": "06/11, idée de skraft-plugin v2 (notes sur ligne inchangée), réimplémentée. Décidé par le responsable : un blocker hors du changement est notifié (message immédiat et bilan « À corriger après le cycle »), sans question ni blocage ; tolérance de 3 lignes."
+    },
+    {
+      "id": "etapes-par-rejeu",
+      "title": "Le résumé d'un run ouvre une étape par phase et par rejeu (après un rejet, la reprise de la phase est un nouvel essai), avec son numéro d'essai, son début et sa fin ; skraft_rapport donne ces étapes (durée, tours, rejets, unités facturées)",
+      "verify": "pnpm vitest run --project core test/run-summary.test.ts && pnpm vitest run --project project-services test/workflows.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts",
+      "passes": true,
+      "notes": "06/11. Fait dans resumerTrace (packages/core), donc commun à l'extension, au workflow, au banc et au serveur MCP ; pas besoin de tracer le numéro d'essai côté workflow."
+    },
+    {
+      "id": "runtime-claude-cli",
+      "title": "Un runtime Claude par le CLI (claude -p), au choix avec Copilot qui reste le défaut : isolement, prompt composé, outils par relais MCP, gardes avant l'écriture, usage et coût ; un run réel sur US-2",
+      "verify": "pnpm vitest run --project runtime-claude",
+      "passes": false,
+      "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). À faire : relais MCP vers notre processus, reprise de session, interruption, choix du runtime, usage en dollars."
+    },
+    {
+      "id": "refutateur-mesure-us2",
+      "title": "Effet du réfutateur mesuré sur US-2 par un run Copilot : tours d'agent, requêtes premium lues dans la trace, défauts réfutés, comparés au run MCP du 05/11",
+      "verify": "test -f docs/runs/$(ls docs/runs | grep -m1 refutateur)/rapport.md",
+      "passes": false,
+      "notes": "À faire avec l'accord du responsable (requêtes premium). Référence : docs/runs/2026-11-05-us-2-mcp (≈ 374 requêtes, 20 tours dont 11 de lentilles, aucun défaut sérieux en revue sur ce run)."
+    },
+    {
+      "id": "serveur-mcp-skraft",
+      "title": "Un serveur MCP local (stdio) lance le workflow skraft sur le projet de l'appelant, avec des agents Copilot : démarrer, consulter l'état, répondre aux questions, reprendre, arrêter, lire le rapport ; un verrou par projet ; projets bornés",
+      "verify": "pnpm vitest run --project mcp-skraft",
+      "passes": true,
+      "notes": "ADR 0068 (accepté), docs/14. Branche feat/mcp-skraft. Vérifié le 05/11 : `verify` (37 tests : outils, accord dans l'appel, verrou, projet borné, connexion gh, pile fournie, rapport, reprise hors Electron, bundle en stdio, processus enfant construit) et un run réel avec des agents Copilot sur US-2 par le serveur construit (docs/runs/2026-11-05-us-2-mcp : fini, 19 min, ≈ 374 requêtes premium, 10/10 tests verts)."
+    },
+    {
       "id": "mesures-revues-sur-runs-copilot",
       "title": "Au moins deux runs Copilot, extension et workflow, d'une story qui va jusqu'à DELIVER, avec la section « Coût des revues et des corrections » dans leur rapport ; chiffres reportés dans docs/15 §5",
       "verify": "test $(grep -l \"Coût des revues et des corrections\" docs/runs/*/rapport.md | wc -l) -ge 2",

@@ -1,0 +1,67 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "74e6df66b20e20f3b057b34bc815ed601ddd5d8151323584b4aa50c6f4621611",
+    "adrs": [],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/quality.yaml` (ADR 0049).",
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."
+      ],
+      "scenarios": [
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.Tests.RemiseParPalierDeQuantiteAcceptanceTests.Ac4_La_remise_se_calcule_ligne_par_ligne_jamais_sur_le_panier_entier",
+      "Tarification.Tests.RemiseParPalierDeQuantiteAcceptanceTests.Ac5_Aucun_palier_configure_la_remise_est_nulle",
+      "Tarification.Tests.RemiseParPalierDeQuantiteAcceptanceTests.Ac1_Une_ligne_sous_le_seuil_n_obtient_aucune_remise"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Précontrôle skraft — avertissement non bloquant sur le code existant :\n- Couverture : src/Tarification.Application/CalculDuPanier.cs à 66.7 % (minimum 90 %), 2 ligne(s) couverte(s) sur 3.\n- Couverture : src/Tarification.Domaine/Montant.cs à 75 % (minimum 90 %), 6 ligne(s) couverte(s) sur 8.\n- Couverture : src/Tarification.Domaine/Panier.cs à 85.7 % (minimum 90 %), 6 ligne(s) couverte(s) sur 7.\n- Couverture : src/Tarification.Domaine/Quantite.cs à 75 % (minimum 90 %), 3 ligne(s) couverte(s) sur 4.\n- Barre de qualité lue à l'ancien emplacement `.skraft/quality.json` : déplacez-la vers `.agent-studio/quality.yaml` (ADR 0049).\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.",
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : aucun."
+  ],
+  "dernierRejet": {
+    "gate": "cohérence",
+    "reasons": [
+      "`ArgumentOutOfRangeException` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+    ]
+  },
+  "arbitrages": []
+}

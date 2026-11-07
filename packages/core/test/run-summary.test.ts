@@ -38,13 +38,36 @@ describe("resumerTrace", () => {
       e({ kind: "tour-début", sessionId: "s2", phase: "DESIGN", prompt: "", repris: false }, 3),
       e({ kind: "tour-fin", sessionId: "s2", fin: "output" }, 5),
     ]);
+    // Le rejet appartient à l'essai qui a échoué ; la reprise de la phase est un nouvel essai.
     expect(etapes[0]).toMatchObject({
       phase: "DESIGN",
-      tours: 2,
+      essai: 1,
+      tours: 1,
       essaisMax: 1,
       rejets: [{ porte: "documents", motifs: ["model.md absent"] }],
       finsAnormales: [{ fin: "silence", raison: "aucun événement depuis 10 min" }],
     });
+    expect(etapes[1]).toMatchObject({ phase: "DESIGN", essai: 2, tours: 1, rejets: [], finsAnormales: [] });
+  });
+
+  it("chaque rejeu est une étape : essai numéroté par phase, début et fin ; une phase qui revient après la revue compte aussi", () => {
+    const { etapes, parPhase } = resumerTrace([
+      e({ kind: "transition", événement: "INITIALIZED", phase: "DESIGN", effets: [] }, 0),
+      e({ kind: "tour-début", sessionId: "s1", phase: "DESIGN", prompt: "", repris: false }, 1),
+      e({ kind: "rejet", porte: "cohérence", motifs: ["nom absent du modèle"] }, 3),
+      e({ kind: "tour-début", sessionId: "s2", phase: "DESIGN", prompt: "", repris: false }, 4),
+      e({ kind: "transition", événement: "AGENT_REPORTED", phase: "REVIEW", effets: [] }, 7),
+      e({ kind: "transition", événement: "LENSES_DONE", phase: "DESIGN", effets: [] }, 9),
+      e({ kind: "transition", événement: "GATE_OK", phase: "DISTILL", effets: [] }, 12),
+    ]);
+    expect(etapes.map((x) => [x.phase, x.essai, x.début, x.fin, x.duréeMs / 60_000])).toEqual([
+      ["DESIGN", 1, at(0), at(4), 4],
+      ["DESIGN", 2, at(4), at(7), 3],
+      ["REVIEW", 1, at(7), at(9), 2],
+      ["DESIGN", 3, at(9), at(12), 3],
+      ["DISTILL", 1, at(12), at(12), 0],
+    ]);
+    expect(parPhase.find((p) => p.phase === "DESIGN")).toMatchObject({ duréeMs: 10 * 60_000, rejets: [{ porte: "cohérence", motifs: ["nom absent du modèle"] }] });
   });
 
   it("rattache l'usage d'une session à l'étape où elle a commencé", () => {
@@ -103,6 +126,19 @@ describe("resumerTrace", () => {
     ]);
     expect(r.etapes[0]).toMatchObject({ phase: "DESIGN", agentsMs: 40_000, effetsMs: 60_000, codeMs: 20_000, moteurMs: 10 });
     expect(r.total).toMatchObject({ agentsMs: 40_000, effetsMs: 60_000, codeMs: 20_000, moteurMs: 10 });
+  });
+
+  it("coût en dollars (runtime Claude, ADR 0070) : additionné par étape, par phase et au total", () => {
+    const { etapes, parPhase, total } = resumerTrace([
+      e({ kind: "tour-début", sessionId: "s1", phase: "DESIGN", prompt: "", repris: false }, 0),
+      e({ kind: "usage", sessionId: "s1", modèle: "claude-sonnet-5", entrée: 100, sortie: 10 }, 1),
+      e({ kind: "usage", sessionId: "s1", modèle: "claude-sonnet-5", coûtUsd: 0.25 }, 2),
+      e({ kind: "tour-début", sessionId: "s2", phase: "DISTILL", prompt: "", repris: false }, 3),
+      e({ kind: "usage", sessionId: "s2", coûtUsd: 0.5 }, 4),
+    ]);
+    expect(etapes.map((x) => x.coûtUsd)).toEqual([0.25, 0.5]);
+    expect(parPhase.map((x) => x.coûtUsd)).toEqual([0.25, 0.5]);
+    expect(total.coûtUsd).toBe(0.75);
   });
 
   it("une trace vide rend un résumé vide, pas une erreur", () => {

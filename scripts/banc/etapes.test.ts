@@ -28,7 +28,9 @@ describe("nom d'étape de la trace → étape commune", () => {
 
 const et = (phase: string, début: string, duréeMs: number, x: Partial<ResumeEtape> = {}): ResumeEtape => ({
   phase,
+  essai: 1,
   début,
+  fin: début,
   duréeMs,
   tours: 0,
   essaisMax: 0,
@@ -38,6 +40,7 @@ const et = (phase: string, début: string, duréeMs: number, x: Partial<ResumeEt
   entrée: 0,
   sortie: 0,
   nanoAiu: 0,
+  coûtUsd: 0,
   modèles: [],
   agentsMs: 0,
   effetsMs: 0,

@@ -4,9 +4,11 @@
  * - `cold-reader` ne reçoit aucun contexte du producteur ; `test-integrity` reçoit critères, tests,
  *   code et faits ; `architecture` reçoit les ADR ratifiés, le code, les tests et les faits.
  */
+import { precisions } from "./review-thread.js";
 import type { Evidence } from "@agent-studio/extension-api";
 import type { LensName } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftState } from "./model.js";
+import type { LensDefect } from "./review.js";
 
 const short = (h: string) => h.slice(0, 12);
 
@@ -186,5 +188,35 @@ export function lensBrief(lens: LensName, state: SkraftState, phase: Phase, file
       break;
   }
   lines.push(...list(`Points à examiner en ${phase} :`, (CONSIGNES_DE_PHASE[phase]?.[lens] ?? []).map((x) => x.replace("<slug>", state.slug ?? "<slug>"))));
+  return lines.join("\n");
+}
+
+/**
+ * Dossier du réfutateur (ADR 0069) : les défauts à juger, numérotés par le code, puis les **mêmes
+ * entrées** que la lentille qui les a signalés — ni plus, ni moins, et sans ses consignes.
+ */
+export function refuterBrief(lens: LensName, state: SkraftState, phase: Phase, files: LensFiles, facts: string[], defects: LensDefect[]): string {
+  const ou = (d: LensDefect) => (d.file ? ` (${d.file}${d.line ? `:${d.line}` : ""})` : "");
+  const lines = [
+    ...list(`Défauts signalés par la lentille « ${lens} » en revue de la phase ${phase} :`, defects.map((d) => `[${d.id}] (${d.severity}) ${d.description}${ou(d)}${precisions(d)}`)),
+    "Entrées de la lentille :",
+  ];
+  const faits = list("Faits établis par le code :", facts);
+  const criteria = state.story?.criteria.map((c) => `${c.n}. ${c.text}`) ?? [];
+  const adrs = state.adrs.filter((a) => a.status === "Accepted").map((a) => `${a.id} : ${a.path}`);
+  switch (lens) {
+    case "cold-reader":
+      lines.push(...list("Livrables :", files.artifacts), ...list("Code :", files.code), ...list("Tests :", files.tests));
+      break;
+    case "test-integrity":
+      lines.push(...list("Critères d'acceptation :", criteria), ...list("Tests :", files.tests), ...list("Code :", files.code), ...list("Livrables :", files.artifacts), ...faits);
+      break;
+    case "architecture":
+      lines.push(...list("ADR ratifiés :", adrs), ...list("Code :", files.code), ...list("Tests :", files.tests), ...list("Livrables :", files.artifacts), ...faits);
+      break;
+    case "quality-gates":
+      lines.push(...faits, ...list("Livrables :", files.artifacts));
+      break;
+  }
   return lines.join("\n");
 }

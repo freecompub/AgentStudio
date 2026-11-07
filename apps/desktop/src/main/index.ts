@@ -16,12 +16,11 @@ import { createAppController, type AppController } from "./app-controller.js";
 import { createIpcRouter } from "./ipc-router.js";
 import { readFile } from "node:fs/promises";
 import { createExtensionInstaller } from "@agent-studio/extension-installer";
-import { defaultAdminConfigPath, loadAdminConfig } from "./admin-config.js";
 import { loadExtensions } from "./extension-loader.js";
 import { createJsonSettingsStore } from "./settings-store.js";
 import { createUtilityProcessLauncher } from "./utility-launcher.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
-import { workspaceServicesFactory } from "./workspace-services.js";
+import { defaultAdminConfigPath, loadAdminConfig, workspaceServicesFactory } from "@agent-studio/project-services";
 
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
 const RENDERER_FILE = join(import.meta.dirname, "../renderer/index.html");

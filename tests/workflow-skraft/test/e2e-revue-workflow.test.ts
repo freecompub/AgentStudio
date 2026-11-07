@@ -44,7 +44,7 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
         return void (await t.callTool("submit_lens_verdict", {
           lens: "architecture",
           verdict: "CHANGES_REQUESTED",
-          defects: [{ severity: "major", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
+          defects: [{ severity: "major", severityReason: "raison d’essai", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
         }));
       if (n === 2 || n === 3)
         return void (await t.callTool("submit_lens_verdict", {

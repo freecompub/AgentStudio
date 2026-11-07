@@ -6,9 +6,9 @@
 */
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, lignePile } from "./brief.mjs";
-import { lensBrief, latestArtifacts } from "./review-brief.mjs";
+import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
 import { reviewReport, synthesize } from "./review.mjs";
-import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
+import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, rangerHorsChangement, verifierOccurrences, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
 /**
 * `revues` ne fait que grandir : son rang numérote les rapports, qui ne reculent donc jamais, même
@@ -69,7 +69,7 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
     const issues = await Promise.all(lentilles.map((l) => lentille(w, l, lensBrief(l, contexte, phase, fichiers, tousFaits, lensHistory(s.fils, l)), reponses)));
     const q = issues.find((x) => x.question);
     if (!q)
-      return juger(w, d, s, phase, essai, issues.map((x) => x.sortie), disp);
+      return juger(w, d, s, phase, essai, issues.map((x) => x.sortie), disp, { contexte, fichiers, faits: tousFaits, changements: fichiers.changements });
     const motif = await questionDeRevue(w, d, s, phase, q);
     if (phase !== "DELIVER")
       return { motifs: [motif], porte: "question de revue", nonCompte: true };
@@ -120,10 +120,16 @@ async function questionDeRevue(w, d, s, phase, q) {
   return motif;
 }
 /** Verdicts rendus : rapports, fils de défauts, arbitrages, synthèse. */
-async function juger(w, d, s, phase, essai, bruts, disp) {
+async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
   const tour = s.revues.length + 1;
   const classer = (f) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], f) ? "test" : matchesAny(disp.sources, f) ? "code" : f.startsWith(".skraft/") || f.startsWith("docs/") ? "deliverable" : null;
-  const verdicts = numberDefects(bruts, tour, classer);
+  const existants = new Set(await w.listerFichiers());
+  const existe = (p) => existants.has(p);
+  // Hors du changement de la phase : notés, sans renvoyer le travail ; avant le réfutateur, pour ne
+  // pas payer un appel sur une note.
+  const ranges = rangerHorsChangement(verifierOccurrences(numberDefects(bruts, tour, classer), existe), entrees.changements);
+  await noterHorsChangement(w, d, ranges);
+  const verdicts = await refuter(w, phase, ranges, entrees, existe);
   await ecrireRapport(w, d.slug, phase, tour, essai, verdicts);
   const r = reviewRound(s.fils, verdicts, tour);
   s.fils = r.threads;
@@ -155,6 +161,48 @@ async function juger(w, d, s, phase, essai, bruts, disp) {
     garanti: s.revues.length === 1 || parHumain,
   };
 }
+/**
+* Réfutateur (ADR 0069) : un appel par lentille qui a des défauts blocker ou major, en parallèle, avec
+* les entrées de cette lentille. Le code décide de ce qui tombe (`appliquerRefutations`). Un
+* réfutateur muet ou interrompu ne réfute rien : les défauts restent, comme dans le doute.
+*/
+async function refuter(w, phase, verdicts, entrees, existe) {
+  const lots = defautsARefuter(verdicts);
+  if (!lots.length)
+    return verdicts;
+  const reponses = await Promise.all(lots.map(async (x) => {
+    try {
+      const r = await w.agent("skraft-finding-refuter", refuterBrief(x.lens, entrees.contexte, phase, entrees.fichiers, entrees.faits, x.defects));
+      return { lens: x.lens, rulings: r.sortie?.rulings ?? [] };
+    }
+    catch (e) {
+      if (!(e instanceof TourInterrompu))
+        throw e;
+      return { lens: x.lens, rulings: [] };
+    }
+  }));
+  return reponses.reduce((acc, r) => appliquerRefutations(acc, r.rulings, existe, r.lens), verdicts);
+}
+/** Emplacement d'une note, pour le message et le bilan. */
+const ouNote = (n) => `${n.file}${n.line ? `:${n.line}` : ""}`;
+/**
+* Notes hors du changement gardées pour le bilan (`d.notesHorsChangement`), une fois chacune. Un
+* blocker est signalé tout de suite : il n'est pas dû à la story, mais il ne doit pas passer
+* inaperçu ; sa correction attend la fin du cycle (le run travaille sur sa branche, ADR 0068).
+*/
+async function noterHorsChangement(w, d, lenses) {
+  const deja = new Set((d.notesHorsChangement ?? []).map((n) => `${n.lens}|${ouNote(n)}|${n.description}`));
+  for (const l of lenses)
+    for (const n of l.notes ?? []) {
+      const cle = `${l.lens}|${ouNote(n)}|${n.description}`;
+      if (deja.has(cle))
+        continue;
+      deja.add(cle);
+      d.notesHorsChangement = [...(d.notesHorsChangement ?? []), { lens: l.lens, severity: n.severity, description: n.description, file: n.file, ...(n.line ? { line: n.line } : {}) }];
+      if (n.severity === "blocker")
+        await w.informer(`**Défaut bloquant hors du changement de la story** (lentille ${l.lens}) : \`${ouNote(n)}\` — ${n.description}\nIl n'est pas dû à cette story et ne renvoie pas le travail. Pour le corriger, fais-le après la fin du cycle skraft.`);
+    }
+}
 /** Une ligne par lentille qui rejette, avec ses défauts. */
 function motifsDeRejet(lenses) {
   return lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
@@ -172,13 +220,14 @@ async function arbitrer(w, t) {
 }
 /** Fichiers de la phase depuis son checkpoint : livrables, code, tests (rapports de revue exclus). */
 async function fichiersDePhase(w, s, cp, disp) {
-  const changes = (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted" && !f.path.includes("/reviews/")).map((f) => f.path);
+  const modifies = (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted" && !f.path.includes("/reviews/"));
+  const changes = modifies.map((f) => f.path);
   // Approximation du `isTestFile` de l'adaptateur par ses emplacements déclarés.
   const tests = changes.filter((p) => matchesAny([...disp.acceptanceTests, ...disp.unitTests], p));
   const code = changes.filter((p) => !tests.includes(p) && matchesAny(disp.sources, p));
   const existants = new Set(await w.listerFichiers());
   const derniers = latestArtifacts(s.livrables).map((a) => a.path).filter((p) => existants.has(p));
-  return { artifacts: [...new Set([...derniers, ...changes.filter((p) => !tests.includes(p) && !code.includes(p))])], code, tests };
+  return { artifacts: [...new Set([...derniers, ...changes.filter((p) => !tests.includes(p) && !code.includes(p))])], code, tests, changements: modifies.map((f) => ({ path: f.path, ...(f.lines ? { lines: f.lines } : {}) })) };
 }
 /** Rapports d'une revue, nommés par son rang dans la phase. */
 async function ecrireRapport(w, slug, phase, tour, essai, lentilles) {

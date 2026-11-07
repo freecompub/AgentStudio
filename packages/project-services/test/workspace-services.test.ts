@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
-import type { InteractionDto, TaskCardDto } from "../src/shared/ipc-contract.js";
-import { workspaceServicesFactory } from "../src/main/workspace-services.js";
+import type { InteractionDto, TaskCardDto } from "../src/dto.js";
+import { workspaceServicesFactory } from "../src/workspace-services.js";
 
 function fakeWorkspace(): Workspace {
   let n = 0;

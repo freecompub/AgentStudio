@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 import type { LensVerdict } from "../../../workflows/skraft/review.mjs";
 import {
   agentFeedback,
+  appliquerRefutations,
+  defautsARefuter,
   allDisputed,
   applyArbitration,
   applyResponses,
@@ -17,7 +19,9 @@ import {
   lensHistory,
   lensesAfterThreads,
   numberDefects,
+  rangerHorsChangement,
   reviewRound,
+  verifierOccurrences,
   type DefectThread,
 } from "../../../workflows/skraft/review-thread.mjs";
 
@@ -246,5 +250,118 @@ describe("allDisputed (D7 de docs/12)", () => {
   it("un défaut maintenu par l'humain ne se conteste plus ; aucun défaut actif : faux", () => {
     expect(allDisputed([fil("a", { status: "humanMaintained" })], [{ defect: "a", status: "contested", reason: "r" }], dev)).toBe(false);
     expect(allDisputed([fil("a", { status: "contested" })], [], dev)).toBe(false);
+  });
+});
+
+describe("Réfutation des défauts avant la synthèse (ADR 0069)", () => {
+  const existe = (p: string) => ["src/Remise.cs", "tests/RemiseTests.cs"].includes(p);
+  const blocker = (description: string, o: Partial<LensVerdict["defects"][number]> = {}) => ({ severity: "blocker" as const, description, target: "code" as const, ...o });
+  const minor = (description: string) => ({ severity: "minor" as const, description, target: "code" as const });
+  const numerotes = (lenses: LensVerdict[]) => numberDefects(lenses, 1, () => null);
+
+  it("à soumettre : les défauts blocker et major, par lentille ; ni les mineurs, ni une lentille REJECTED, ni une lentille sans défaut sérieux", () => {
+    const lenses = numerotes([
+      verdict("cold-reader", [major("nom flou"), minor("virgule")]),
+      verdict("architecture", [blocker("dépendance inversée")], "REJECTED"),
+      verdict("test-integrity", [minor("titre")]),
+      verdict("quality-gates", [], "APPROVED"),
+    ]);
+    expect(defautsARefuter(lenses)).toEqual([{ lens: "cold-reader", defects: [expect.objectContaining({ id: "cold-reader#1.1", description: "nom flou" })] }]);
+  });
+
+  it("réfuté avec une citation d'un fichier qui existe : le défaut tombe, gardé dans le rapport avec la raison ; la lentille n'avait que lui à réclamer, elle approuve", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("le montant n'est pas arrondi"), minor("virgule")])]);
+    const [l] = appliquerRefutations(lenses, [{ defect: "cold-reader#1.1", decision: "accepted", reason: "L'arrondi est fait en `src/Remise.cs:12` (Math.Round)." }], existe);
+    expect(l!.verdict).toBe("APPROVED");
+    expect(l!.defects.map((d) => d.description)).toEqual(["virgule"]);
+    expect(l!.refuted).toEqual([expect.objectContaining({ id: "cold-reader#1.1", refutation: "L'arrondi est fait en `src/Remise.cs:12` (Math.Round)." })]);
+  });
+
+  it("réfutation sans citation, ou citant un fichier absent : le défaut est maintenu — le code décide, pas le réfutateur", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("a"), major("b")])]);
+    const [l] = appliquerRefutations(lenses, [
+      { defect: "cold-reader#1.1", decision: "accepted", reason: "C'est faux, le code arrondit déjà." },
+      { defect: "cold-reader#1.2", decision: "accepted", reason: "Voir src/Inexistant.cs:3." },
+    ], existe);
+    expect(l!.verdict).toBe("CHANGES_REQUESTED");
+    expect(l!.defects.map((d) => d.id)).toEqual(["cold-reader#1.1", "cold-reader#1.2"]);
+    expect(l!.refuted ?? []).toEqual([]);
+  });
+
+  it("maintenu, ou sans arbitrage : le défaut reste ; une lentille à qui il reste un défaut sérieux garde son verdict", () => {
+    const lenses = numerotes([verdict("test-integrity", [major("a"), major("b"), major("c")])]);
+    const [l] = appliquerRefutations(lenses, [
+      { defect: "test-integrity#1.1", decision: "accepted", reason: "tests/RemiseTests.cs:40 vérifie déjà ce cas." },
+      { defect: "test-integrity#1.2", decision: "maintained", reason: "Les entrées ne permettent pas de trancher." },
+    ], existe);
+    expect(l!.verdict).toBe("CHANGES_REQUESTED");
+    expect(l!.defects.map((d) => d.id)).toEqual(["test-integrity#1.2", "test-integrity#1.3"]);
+    expect(l!.refuted!.map((d) => d.id)).toEqual(["test-integrity#1.1"]);
+  });
+
+  it("une réfutation qui vise un défaut d'une autre lentille, ou un mineur, est sans effet", () => {
+    const lenses = numerotes([verdict("cold-reader", [major("a"), minor("b")]), verdict("architecture", [major("c")])]);
+    const out = appliquerRefutations(lenses, [
+      { defect: "architecture#1.1", decision: "accepted", reason: "src/Remise.cs:1" },
+      { defect: "cold-reader#1.2", decision: "accepted", reason: "src/Remise.cs:1" },
+    ], existe, "cold-reader");
+    expect(out[0]!.defects.map((d) => d.id)).toEqual(["cold-reader#1.1", "cold-reader#1.2"]);
+    expect(out[1]!.defects.map((d) => d.id)).toEqual(["architecture#1.1"]);
+  });
+});
+
+describe("Contrat de défaut enrichi : raison de la gravité et occurrences", () => {
+  const avec = { severity: "major" as const, description: "Nom flou.", target: "code" as const, file: "src/a.ts", line: 3, severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/b.ts:12", "src/absent.ts:4"] };
+
+  it("les occurrences qui visent un fichier absent sont retirées par le code, et c'est noté", () => {
+    const [l] = verifierOccurrences(numberDefects([verdict("cold-reader", [avec])], 1, () => null), (p) => p !== "src/absent.ts");
+    expect(l!.defects[0]!.occurrences).toEqual(["src/b.ts:12"]);
+    expect(l!.defects[0]!.occurrencesNote).toBe("occurrence retirée, fichier introuvable : src/absent.ts:4");
+  });
+
+  it("le fil garde la raison de la gravité et les occurrences ; le retour au producteur les montre", () => {
+    const lenses = numberDefects([verdict("cold-reader", [{ ...avec, occurrences: ["src/b.ts:12"] }])], 1, () => null);
+    const { threads } = reviewRound([], lenses, 1);
+    expect(threads[0]).toMatchObject({ severityReason: "Le nom cache la règle du plafond.", occurrences: ["src/b.ts:12"] });
+    const [ligne] = agentFeedback(threads, () => true);
+    expect(ligne).toBe("[cold-reader#1.1, major, code] Nom flou. (src/a.ts:3) — gravité : Le nom cache la règle du plafond. — aussi : src/b.ts:12");
+  });
+});
+
+describe("Défauts hors du changement rangés en notes", () => {
+  const changements = [{ path: "src/a.ts", lines: [40, 41] }, { path: "src/nouveau.ts" }];
+  const d = (file: string | undefined, line: number | undefined, o: Partial<LensVerdict["defects"][number]> = {}) =>
+    ({ severity: "major" as const, description: `défaut ${file ?? "sans fichier"}:${line ?? "-"}`, target: "code" as const, severityReason: "r", ...(file ? { file } : {}), ...(line ? { line } : {}), ...o });
+  const ranges = (defects: LensVerdict["defects"], v: LensVerdict["verdict"] = "CHANGES_REQUESTED") =>
+    rangerHorsChangement(numberDefects([verdict("architecture", defects, v)], 1, () => null), changements)[0]!;
+
+  it("ligne modifiée, ou à 3 lignes au plus d'une ligne modifiée : un défaut ; au-delà : une note", () => {
+    const l = ranges([d("src/a.ts", 41), d("src/a.ts", 44), d("src/a.ts", 45)]);
+    expect(l.defects.map((x) => x.line)).toEqual([41, 44]);
+    expect(l.notes!.map((x) => x.line)).toEqual([45]);
+  });
+
+  it("fichier que la phase n'a pas touché : une note ; fichier ajouté (lignes inconnues) : un défaut", () => {
+    const l = ranges([d("src/ancien.ts", 3), d("src/nouveau.ts", 900)]);
+    expect(l.defects.map((x) => x.file)).toEqual(["src/nouveau.ts"]);
+    expect(l.notes!.map((x) => x.file)).toEqual(["src/ancien.ts"]);
+  });
+
+  it("sans fichier : on ne peut pas le situer, il reste un défaut ; fichier modifié sans ligne : un défaut", () => {
+    const l = ranges([d(undefined, undefined), d("src/a.ts", undefined)]);
+    expect(l.defects).toHaveLength(2);
+    expect(l.notes ?? []).toEqual([]);
+  });
+
+  it("une seule occurrence dans le changement suffit à garder le défaut", () => {
+    const l = ranges([d("src/ancien.ts", 3, { occurrences: ["src/a.ts:40"] })]);
+    expect(l.defects).toHaveLength(1);
+  });
+
+  it("une lentille à qui il ne reste ni blocker ni major approuve ; une lentille REJECTED n'est pas touchée", () => {
+    expect(ranges([d("src/ancien.ts", 3)]).verdict).toBe("APPROVED");
+    const r = ranges([d("src/ancien.ts", 3)], "REJECTED");
+    expect(r.verdict).toBe("REJECTED");
+    expect(r.defects).toHaveLength(1);
   });
 });

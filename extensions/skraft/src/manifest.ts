@@ -124,6 +124,8 @@ export const manifest: ExtensionManifest = {
       })),
       // Juge les mutants survivants que le testeur conteste comme équivalents (ADR 0065).
       { name: "skraft-mutation-arbiter", title: "Arbitre de mutation", prompt: agentFile("skraft-mutation-arbiter"), role: ROLES.mutationArbiter, output: "submit_lens_verdict", modelClass: ROLE_MODEL_CLASS.mutationArbiter },
+      // Vérifie les défauts blocker et major d'une revue avant la synthèse (ADR 0069).
+      { name: "skraft-finding-refuter", title: "Réfutateur de revue", prompt: agentFile("skraft-finding-refuter"), role: ROLES.findingRefuter, output: "submit_lens_verdict", modelClass: ROLE_MODEL_CLASS.findingRefuter },
     ],
     skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
     tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],

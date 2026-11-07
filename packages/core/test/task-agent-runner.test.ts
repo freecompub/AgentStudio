@@ -157,13 +157,13 @@ describe("Exécuteur d'agent de tâche", () => {
     runtime.behave("lens", async (t) => {
       await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "NEEDS_REWORK", defects: [] }).catch((e: Error) => errors.push(e.message));
       // ADR 0046 : un défaut sans cible est refusé — c'est elle qui dit quel agent corrige.
-      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", description: "sans cible" }] }).catch((e: Error) => errors.push(e.message));
-      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", description: "sans cible" }] }).catch((e: Error) => errors.push(e.message));
+      await t.callTool("submit_lens_verdict", { lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
     });
     const r = await runner.run({ role: "lens", systemPrompt: "Relis.", writable: [], output: "submit_lens_verdict" }, "x");
     expect(errors[0]).toMatch(/invalides/);
     expect(errors[1]).toMatch(/invalides.*target/);
-    expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
+    expect(r.output).toEqual({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [{ severity: "major", severityReason: "raison d’essai", target: "code", description: "MaxBolus accepte une valeur négative", file: "Sources/Domain/MaxBolus.swift", line: 4 }] });
   });
 });
 
@@ -495,5 +495,24 @@ describe("Libération des sessions d'une phase rembobinée", () => {
     const { runtime, runner } = setup();
     await expect(runner.releaseRoles("t1", ["skraft/jamais-lancé"])).resolves.toBeUndefined();
     expect(runtime.deleted).toEqual([]);
+  });
+});
+
+describe("Exécuteur d'agent de tâche — trace de l'usage", () => {
+  it("le coût en dollars d'un runtime qui le rend (Claude, ADR 0070) est tracé avec l'usage", async () => {
+    const runtime = new ScriptedRuntime();
+    const entrees: { kind: string }[] = [];
+    const trace = { append: async (e: { kind: string }) => void entrees.push(e), list: async () => [], archive: async () => {} };
+    const runner = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 1_000, trace: trace as never });
+    runtime.behave("tdd-test", async (t) => {
+      t.session.emit({ type: "usage", model: "claude-sonnet-5", inputTokens: 100, outputTokens: 10 });
+      t.session.emit({ type: "usage", model: "claude-sonnet-5", costUsd: 0.25 });
+      await t.callTool("report_phase", { summary: "ok", files: [] });
+    });
+    await runner.run(TEST_AGENT, "x", { trace: { taskId: "t1", phase: "DELIVER" } });
+    expect(entrees.filter((e) => e.kind === "usage")).toEqual([
+      expect.objectContaining({ modèle: "claude-sonnet-5", entrée: 100, sortie: 10 }),
+      expect.objectContaining({ modèle: "claude-sonnet-5", coûtUsd: 0.25 }),
+    ]);
   });
 });
