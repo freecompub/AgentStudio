@@ -28,9 +28,11 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   déconnecter », qui déconnecte de GitHub, est masqué.
 - Essais Electron (`xvfb-run -a pnpm e2e`) verts : le mode d'essai ne propose pas Claude. Sans
   `xvfb-run`, Electron ne démarre pas sur cette machine (pas d'affichage) : ce n'est pas un défaut.
-- **Test intermittent** vu une fois dans la suite complète : « blocker sur un fichier non touché… »
-  (`e2e-notes`, extension ou workflow), en 4,3 s ; vert seul cinq fois, sur la branche comme sans les
-  changements. Sans lien avec le runtime ; à surveiller s'il revient.
+- **Test intermittent corrigé** : « blocker sur un fichier non touché… » (`extensions/skraft/test/
+  e2e-notes.test.ts`), vu en local puis en CI de la PR #15 (`bilan` à `undefined`). Le bilan est
+  publié par un effet **après** la transition vers DONE ; le test le cherchait aussitôt. Il l'attend
+  maintenant (`until`), comme `e2e-s1`. Le jumeau du workflow n'a pas ce défaut : son bilan est dit
+  avant la fin du run. Course non reproduite à la demande : la cause est lue dans l'erreur et le code.
 
 ## 07/11 — Runtime Claude, brique B : choix du runtime dans l'application (processus principal)
 
