@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { AuthStatusDto, EventPayload } from "../../shared/ipc-contract";
+import type { AuthStatusDto, EventPayload, RuntimeKindDto, RuntimeStatusDto } from "../../shared/ipc-contract";
 import { api } from "../api";
+import { RUNTIMES } from "../runtimes";
 
 /** Où se connecter. D'autres fournisseurs d'IA viendront s'ajouter ici (D35). */
 type Cible = "github" | "enterprise";
 
-export function AuthScreen({ status, onDone }: { status: AuthStatusDto; onDone: () => void }) {
+export function AuthScreen({ status, runtime, onDone }: { status: AuthStatusDto; runtime: RuntimeStatusDto; onDone: () => void }) {
   const [code, setCode] = useState<EventPayload<"auth:device-code"> | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +45,60 @@ export function AuthScreen({ status, onDone }: { status: AuthStatusDto; onDone: 
     }
   }
 
+  async function choisir(r: RuntimeKindDto) {
+    setError(null);
+    try {
+      await api.call("runtime:set", { runtime: r });
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  // Runtime des agents (ADR 0070), proposé seulement si l'application sait lancer Claude.
+  const choix =
+    runtime.disponibles.length > 1 ? (
+      <fieldset className="cibles">
+        <legend>Quels agents ?</legend>
+        {runtime.disponibles.map((r) => (
+          <label key={r}>
+            <input type="radio" name="runtime" checked={runtime.choisi === r} onChange={() => void choisir(r)} />
+            <span>{RUNTIMES[r]}</span>
+          </label>
+        ))}
+      </fieldset>
+    ) : null;
+
+  if (runtime.choisi === "claude")
+    return (
+      <main className="centered">
+        <div className="panel auth">
+          <h1>Connectez Claude Code</h1>
+          {choix}
+          {runtime.claude?.etat === "absent" ? (
+            <p>
+              Claude Code (claude) n'est pas installé sur cette machine : installez-le, puis connectez-vous avec{" "}
+              <code>claude auth login</code> dans un terminal.
+            </p>
+          ) : (
+            <p>
+              Les agents utilisent votre connexion à Claude Code. Lancez <code>claude auth login</code> dans un terminal
+              et suivez les instructions, puis revenez ici.
+            </p>
+          )}
+          <button className="primary" onClick={onDone}>
+            Vérifier la connexion
+          </button>
+          {error && <p className="error">{error}</p>}
+        </div>
+      </main>
+    );
+
   return (
     <main className="centered">
       <div className="panel auth">
         <h1>Connectez votre compte GitHub</h1>
+        {choix}
         {patRefused ? (
           <p>
             Vous êtes connecté en tant que <strong>{status.user}</strong> avec un jeton personnel classique. Copilot ne

@@ -10,6 +10,18 @@ export function createLanceurClaude(o: { commande?: string } = {}): LanceurClaud
       new Promise((resolve, reject) =>
         execFile(commande, ["--version"], { timeout: 15_000 }, (err, stdout) => (err ? reject(err) : resolve(stdout.trim()))),
       ),
+    statut: () =>
+      new Promise((resolve, reject) =>
+        execFile(commande, ["auth", "status"], { timeout: 15_000 }, (err, stdout) => {
+          // Non connecté : code de sortie non nul, mais le JSON est bien écrit.
+          if (err && !stdout) return reject(err);
+          try {
+            resolve(JSON.parse(stdout));
+          } catch (e) {
+            reject(e);
+          }
+        }),
+      ),
     lancer({ args, cwd, entree }) {
       // Mémoire automatique coupée aussi par l'environnement, en plus de `--settings` (essai du 07/11).
       const enfant = spawn(commande, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" } });

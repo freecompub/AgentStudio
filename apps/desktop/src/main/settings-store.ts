@@ -14,6 +14,7 @@ const schema = z.object({
   models: z.record(z.string(), z.string()).optional(),
   modelClasses: z.record(z.string(), z.object({ strong: z.string(), standard: z.string(), light: z.string() }).partial()).optional(),
   authHostname: z.string().optional(),
+  runtime: z.enum(["copilot", "claude"]).optional(),
 });
 
 /** Réglages de l'application en JSON, écriture atomique ; un fichier illisible vaut réglages vides. */

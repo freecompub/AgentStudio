@@ -5,6 +5,65 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude, brique D : documentation ; critère rempli
+
+- ADR 0070 : section « Mise en œuvre dans l'application » (réglage, connexion sans GitHub,
+  modèles, suppression des sessions, mode d'essai). `CLAUDE.md` : deux adaptateurs, projet Vitest
+  `runtime-claude`, arborescence.
+- Critère `runtime-claude-cli` passé à `true` après son `verify` (runtime, contrôleur, réglages,
+  interface, connexion du serveur MCP).
+- Prochaine étape : essayer l'application **à l'écran** avec un vrai Claude (choisir Claude, ouvrir
+  un projet, un tour de conversation, puis une tâche) ; ce n'est couvert que par les doubles.
+
+## 07/11 — Runtime Claude, brique C : choix du runtime dans l'interface
+
+- L'application lit `runtime:status` au démarrage. Avec Claude, elle n'attend que la connexion de
+  Claude Code : GitHub n'est pas demandé, et l'utilisateur affiché est « Claude » si GitHub n'est
+  pas connecté.
+- Écran de connexion : si Claude est disponible, un choix « Quels agents ? » (GitHub Copilot ou
+  Claude). Avec Claude, l'écran dit de lancer `claude auth login` dans un terminal (ou d'installer
+  Claude Code), puis propose « Vérifier la connexion ». Avec Copilot seul, rien ne change.
+- Conversation, en mode avancé : un sélecteur « Agents ». Changer de runtime ferme la conversation
+  côté principal ; la clé du `ChatScreen` la rouvre sur le nouveau. Avec Claude, le bouton « Se
+  déconnecter », qui déconnecte de GitHub, est masqué.
+- Essais Electron (`xvfb-run -a pnpm e2e`) verts : le mode d'essai ne propose pas Claude. Sans
+  `xvfb-run`, Electron ne démarre pas sur cette machine (pas d'affichage) : ce n'est pas un défaut.
+- **Test intermittent corrigé** : « blocker sur un fichier non touché… » (`extensions/skraft/test/
+  e2e-notes.test.ts`), vu en local puis en CI de la PR #15 (`bilan` à `undefined`). Le bilan est
+  publié par un effet **après** la transition vers DONE ; le test le cherchait aussitôt. Il l'attend
+  maintenant (`until`), comme `e2e-s1`. Le jumeau du workflow n'a pas ce défaut : son bilan est dit
+  avant la fin du run. Course non reproduite à la demande : la cause est lue dans l'erreur et le code.
+
+## 07/11 — Runtime Claude, brique B : choix du runtime dans l'application (processus principal)
+
+- Réglage `runtime` (`copilot` par défaut, ou `claude`) dans `settings.json` ; canaux IPC
+  `runtime:status` (choisi, disponibles, état de la connexion Claude) et `runtime:set`.
+- Avec Claude, la conversation ne demande **pas** GitHub : la connexion est celle de Claude Code
+  (`claude auth status`). Non connecté ou absent : la conversation ne démarre pas, et le message dit
+  quoi taper (`claude auth login`) ; l'échec n'est pas retenu.
+- Changer de runtime ferme la conversation et arrête l'ancien runtime (comme une déconnexion) ;
+  même runtime : rien n'est fermé.
+- Modèles : `listModels` de Claude rend les alias du CLI (`fable`, `opus`, `sonnet`, `haiku`,
+  « alias for the latest model » dans `claude --help`). `modelFor` : les défauts `MODELES_CLAUDE`
+  par classe, un réglage de classe l'emporte ; un identifiant Copilot resté dans les réglages du
+  projet est écarté par la liste du runtime (les réglages de modèle sont par projet, pas par runtime).
+- `index.ts` : Claude proposé hors mode d'essai seulement (les essais Electron ne lancent aucun CLI).
+  Le SDK MCP du relais est intégré au bundle principal (`pnpm build` vérifié).
+- Piège TDD : le schéma des réglages avait été modifié avant son test ; retiré le temps de voir le
+  test rouge, puis remis.
+
+## 07/11 — Runtime Claude, brique A : suppression des sessions, connexion partagée
+
+- `deleteSession(id)` applique la stratégie du 06/11 : `<projectsDirectory>/*/<id>.jsonl` et le
+  dossier `<id>/`, rien d'autre. Un identifiant qui n'est pas un UUID n'est pas à nous : ignoré
+  (journalisé), et retiré du registre. Une session absente compte comme supprimée. Dossier des
+  sessions inconnu : échec, pour que le registre réessaie au démarrage suivant (`task-agent-runner`).
+- `projectsDirectory` vient de `claude auth status`, désormais une méthode du lanceur (`statut`).
+- `etatConnexionClaude(lanceur)` et `MODELES_CLAUDE` passent du serveur MCP à `runtime-claude` :
+  l'application s'en servira ; le serveur garde ses messages (« appelle skraft_connexion »).
+- Tests vus rouges puis verts (suppression : dossier jetable qui imite celui de Claude Code, avec la
+  mémoire et une session de l'utilisateur, qui doivent survivre).
+
 ## 07/11 — Fichier de projet (ADR 0071) : l'exemple livré au nouveau format
 
 - `profiles/typescript.yaml` est désormais un `projet.yaml` complet : section `pile` (l'ancien

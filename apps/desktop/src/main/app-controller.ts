@@ -14,11 +14,14 @@ import {
 import { resolveModel, ROLE_LABELS, type Profile } from "@agent-studio/core";
 import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
+import { MODELES_CLAUDE } from "@agent-studio/runtime-claude";
 import type { Workspace } from "@agent-studio/workspace";
 import type { ChatMessageDto, RequestChannel, RequestInput, RequestOutput, WorkspaceInfoDto } from "../shared/ipc-contract.js";
 import { createIpcConfirmer } from "./ipc-confirmer.js";
 import { createIpcConsent } from "./ipc-consent.js";
 import type {
+  AppSettings,
+  ClaudeRuntimeProvider,
   EventSink,
   ExternalOpener,
   FolderPicker,
@@ -36,6 +39,8 @@ export interface AppControllerDeps {
   /** Registre, extensions, tâches et interactions du projet ouvert (J2). */
   workspaceServices: WorkspaceServicesFactory;
   runtimeFactory: RuntimeFactory;
+  /** Runtime Claude par le CLI (ADR 0070) ; absent, seul Copilot est proposé. */
+  claude?: ClaudeRuntimeProvider;
   conversations: ConversationStore;
   settings: SettingsStore;
   folderPicker: FolderPicker;
@@ -158,9 +163,14 @@ export function createAppController(deps: AppControllerDeps): AppController {
       // Modèle des agents de tâche (ADR 0048) : classe du rôle, puis modèle du projet (ADR 0020),
       // relus à chaque appel pour qu'un changement de réglage vaille dès le tour suivant.
       // Un modèle que l'abonnement ne propose pas (ou plus) est ignoré ; liste illisible = pas de filtre.
+      // Avec Claude, chaque classe a un modèle par défaut (opus, sonnet, haiku) : un réglage de classe
+      // l'emporte, et un identifiant Copilot resté dans les réglages est écarté par la liste du runtime.
       modelFor: async (cls) => {
         const reglages = await deps.settings.load();
-        return resolveModel(cls, { classes: reglages.modelClasses?.[ws.root], fallback: reglages.models?.[ws.root], available: await modelesDisponibles() });
+        const claude = runtimeChoisi(reglages) === "claude";
+        const classes = claude ? { ...MODELES_CLAUDE, ...reglages.modelClasses?.[ws.root] } : reglages.modelClasses?.[ws.root];
+        const retenu = resolveModel(cls, { classes, fallback: reglages.models?.[ws.root], available: await modelesDisponibles() });
+        return retenu ?? (claude && cls ? MODELES_CLAUDE[cls] : undefined);
       },
       ...(deps.notifier ? { notify: (title: string, body: string) => deps.notifier!.notify(title, body) } : {}),
       onPost: (extensionId, markdown) => {
@@ -227,7 +237,11 @@ export function createAppController(deps: AppControllerDeps): AppController {
     }
   }
 
+  /** Runtime retenu : Claude seulement s'il est choisi et que l'application sait le lancer. */
+  const runtimeChoisi = (r: AppSettings): "copilot" | "claude" => (r.runtime === "claude" && deps.claude ? "claude" : "copilot");
+
   async function demarrerRuntime(): Promise<AgentRuntime> {
+    if (runtimeChoisi(await deps.settings.load()) === "claude") return demarrerClaude(deps.claude!);
     const status = await deps.auth.status();
     if (!status.loggedIn) throw new Error("Connectez-vous à GitHub pour discuter avec l'agent.");
     if (!status.copilotCompatible)
@@ -240,8 +254,36 @@ export function createAppController(deps: AppControllerDeps): AppController {
     return rt;
   }
 
+  /** Claude par le CLI : sa connexion est celle de Claude Code, interactive ; on dit quoi taper. */
+  async function demarrerClaude(claude: ClaudeRuntimeProvider): Promise<AgentRuntime> {
+    const etat = await claude.etat();
+    if (etat.etat === "absent") throw new Error("Claude Code (claude) introuvable : installez-le, puis connectez-vous avec `claude auth login` dans un terminal.");
+    if (etat.etat !== "connecte") throw new Error("Claude n'est pas connecté : lancez `claude auth login` dans un terminal, puis réessayez.");
+    const rt = claude.creer();
+    await rt.start();
+    runtime = rt;
+    return rt;
+  }
+
   return {
     "auth:status": () => deps.auth.status(),
+
+    "runtime:status": async () => ({
+      choisi: runtimeChoisi(await deps.settings.load()),
+      disponibles: deps.claude ? ["copilot", "claude"] : ["copilot"],
+      claude: deps.claude ? await deps.claude.etat() : null,
+    }),
+
+    // Changer de runtime ferme la conversation et arrête l'ancien : le prochain tour part sur le nouveau.
+    "runtime:set": async ({ runtime: choix }) => {
+      if (choix === "claude" && !deps.claude) throw new Error("Claude est indisponible dans cette application.");
+      const reglages = await deps.settings.load();
+      if (runtimeChoisi(reglages) === choix) return;
+      await oublierRuntime();
+      disponibles = null;
+      await deps.settings.save({ ...reglages, runtime: choix });
+      deps.logger?.info("runtime choisi", { runtime: choix });
+    },
 
     // Consultée avant de lancer une tâche : une tâche skraft consomme des dizaines de requêtes
     // premium, et il vaut mieux le savoir avant qu'au milieu d'une phase (ADR 0044).

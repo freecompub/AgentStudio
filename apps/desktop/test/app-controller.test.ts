@@ -814,3 +814,77 @@ describe("auth:quota", () => {
     expect(() => requests["auth:quota"].output.parse({ restantes: "beaucoup" })).toThrow();
   });
 });
+
+/**
+ * Runtime au choix (ADR 0070) : Copilot par défaut, ou Claude par le CLI. Avec Claude, la connexion
+ * est celle de Claude Code (`claude auth status`), pas GitHub ; l'application ne la mène pas, elle dit
+ * quoi taper. Le cœur et les extensions ne savent pas lequel tourne.
+ */
+describe("AppController — runtime Claude (ADR 0070)", () => {
+  function avecClaude(etat: import("@agent-studio/runtime-claude").EtatConnexionClaude, o: Parameters<typeof setup>[0] = {}) {
+    const claude = new ScriptedRuntime();
+    claude.models = [{ id: "opus", name: "Opus" }, { id: "sonnet", name: "Sonnet" }, { id: "haiku", name: "Haiku" }];
+    let creations = 0;
+    let lu = etat;
+    const ctx = setup({ ...o, extra: { ...o.extra, claude: { etat: async () => lu, creer: () => (creations++, claude) } } });
+    return { ...ctx, claude, creations: () => creations, connecter: (e: typeof etat) => void (lu = e) };
+  }
+
+  it("Copilot par défaut ; Claude proposé seulement si l'application sait le lancer", async () => {
+    expect(await setup().controller["runtime:status"]({})).toEqual({ choisi: "copilot", disponibles: ["copilot"], claude: null });
+    const { controller } = avecClaude({ etat: "connecte", methode: "claude.ai" });
+    expect(await controller["runtime:status"]({})).toEqual({ choisi: "copilot", disponibles: ["copilot", "claude"], claude: { etat: "connecte", methode: "claude.ai" } });
+    await expect(setup().controller["runtime:set"]({ runtime: "claude" })).rejects.toThrow(/Claude.*indisponible/);
+  });
+
+  it("choisir Claude : réglage retenu ; la conversation passe par Claude, sans jeton GitHub, même déconnecté de GitHub", async () => {
+    const ctx = avecClaude({ etat: "connecte" }, { status: { loggedIn: false, hostname: "github.com" } as AuthStatus });
+    await ctx.controller["runtime:set"]({ runtime: "claude" });
+    expect(ctx.getSettings().runtime).toBe("claude");
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    await ctx.controller["chat:start"]({});
+    expect(ctx.claude.started).toBe(true);
+    expect(ctx.creations()).toBe(1);
+    expect(ctx.tokens).toEqual([]);
+    expect(ctx.runtime.started).toBe(false);
+  });
+
+  it("Claude non connecté ou absent : la conversation ne démarre pas, et le message dit quoi faire", async () => {
+    const ctx = avecClaude({ etat: "non-connecte" }, { settings: { runtime: "claude" } });
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    await expect(ctx.controller["chat:start"]({})).rejects.toThrow(/claude auth login/);
+    ctx.connecter({ etat: "absent" });
+    await expect(ctx.controller["chat:start"]({})).rejects.toThrow(/Claude Code \(claude\) introuvable/);
+    // Une fois connecté, le démarrage suivant réussit : l'échec n'a rien retenu.
+    ctx.connecter({ etat: "connecte" });
+    await ctx.controller["chat:start"]({});
+    expect(ctx.claude.started).toBe(true);
+  });
+
+  it("changer de runtime ferme la conversation et arrête l'ancien : le prochain tour part sur le nouveau", async () => {
+    const ctx = avecClaude({ etat: "connecte" });
+    await ctx.controller["workspace:open"]({ path: "/projets/demo" });
+    await ctx.controller["chat:start"]({});
+    const session = ctx.runtime.last;
+    await ctx.controller["runtime:set"]({ runtime: "claude" });
+    expect(session.closed).toBe(true);
+    expect(ctx.runtime.started).toBe(false);
+    await ctx.controller["chat:start"]({});
+    expect(ctx.claude.started).toBe(true);
+    // Même runtime : rien n'est fermé.
+    const sessionClaude = ctx.claude.last;
+    await ctx.controller["runtime:set"]({ runtime: "claude" });
+    expect(sessionClaude.closed).toBe(false);
+  });
+
+  it("modèles des agents avec Claude : opus, sonnet, haiku par classe ; un réglage de classe l'emporte ; un modèle Copilot resté dans les réglages est ignoré", async () => {
+    const ctx = avecClaude({ etat: "connecte" }, { settings: { runtime: "claude", modelClasses: { "/projets/a": { standard: "haiku", light: "gpt-5-mini" } }, models: { "/projets/a": "gpt-5" } } });
+    await ctx.controller["workspace:open"]({ path: "/projets/a" });
+    const modelFor = ctx.getServicesArgs()!.modelFor!;
+    expect(await modelFor("strong")).toBe("opus");
+    expect(await modelFor("standard")).toBe("haiku");
+    expect(await modelFor("light")).toBe("haiku");
+    // Agent sans classe : le modèle du projet s'il est proposé, sinon le runtime décide.
+    expect(await modelFor(undefined)).toBeUndefined();
+  });
+});

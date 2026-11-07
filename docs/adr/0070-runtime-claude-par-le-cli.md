@@ -63,3 +63,18 @@ existante, par abonnement ou clé API), aucun SDK à intégrer, et d'offrir un p
   rapports donnent tokens et dollars (`total_cost_usd`). `--max-budget-usd` borne un tour.
 - Effort estimé : 1,5 à 2 semaines, dont le relais MCP (la pièce la plus lourde), les gardes, le choix
   du runtime, l'usage, et un run réel sur US-2 avec l'accord du responsable.
+
+## Mise en œuvre dans l'application (2026-11-07, branche `feat/runtime-claude`)
+
+- Réglage `runtime` de l'application (`copilot` par défaut), choisi à l'écran de connexion ou, en mode
+  avancé, dans la conversation ; changer de runtime ferme la conversation et arrête l'ancien.
+- Avec Claude, **GitHub n'est pas demandé** : seule compte la connexion de Claude Code
+  (`claude auth status`). Elle se fait dans un terminal (`claude auth login`) ; l'application dit
+  quoi taper, puis vérifie. La déconnexion proposée à l'écran, celle de GitHub, est masquée.
+- Modèles : les alias du CLI (`fable`, `opus`, `sonnet`, `haiku`) ; par classe, `opus`, `sonnet` et
+  `haiku` par défaut, qu'un réglage de classe remplace. Les réglages de modèle restent par projet :
+  un identifiant Copilot resté dans les réglages est écarté par la liste du runtime.
+- Suppression des sessions : `<projectsDirectory>/*/<id>.jsonl` et `<id>/`, pour un UUID seulement ;
+  le dossier est partagé avec l'utilisateur, ses sessions et la mémoire du projet ne sont jamais
+  touchées (`progress.md`, 06/11).
+- Le mode d'essai de l'application (essais Electron) ne propose pas Claude.

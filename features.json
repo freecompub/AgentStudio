@@ -307,9 +307,9 @@
     {
       "id": "runtime-claude-cli",
       "title": "Un runtime Claude par le CLI (claude -p), au choix avec Copilot qui reste le défaut : isolement, prompt composé, outils par relais MCP, gardes avant l'écriture, usage et coût ; un run réel sur US-2",
-      "verify": "pnpm vitest run --project runtime-claude",
-      "passes": false,
-      "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). À faire : relais MCP vers notre processus, reprise de session, interruption, choix du runtime, usage en dollars."
+      "verify": "pnpm vitest run --project runtime-claude && pnpm vitest run --project desktop test/app-controller.test.ts test/settings-store.test.ts test/renderer/app.test.tsx && pnpm vitest run --project mcp-skraft test/connexion-claude.test.ts",
+      "passes": true,
+      "notes": "ADR 0070 (accepté le 06/11). Essais du 06/11 sur Claude Code 2.1.319 concluants (progress.md). Faits : relais MCP, reprise (--resume), interruption, usage en dollars, choix du runtime dans le serveur MCP, run réel US-2 (06/11), suppression des sessions (07/11). Choix du runtime dans l'application (réglage, connexion Claude sans GitHub, interface) le 07/11. Jamais essayé à l'écran avec un vrai Claude : les essais Electron tournent en mode d'essai, sans Claude."
     },
     {
       "id": "fichier-projet",

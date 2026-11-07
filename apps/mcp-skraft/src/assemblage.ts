@@ -11,14 +11,14 @@ import { createJsonLogger } from "@agent-studio/core";
 import { createNodeLauncher } from "@agent-studio/extension-host";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { defaultAdminConfigPath, loadAdminConfig, workspaceServicesFactory } from "@agent-studio/project-services";
-import { createClaudeRuntime, createLanceurClaude } from "@agent-studio/runtime-claude";
+import { createClaudeRuntime, createLanceurClaude, MODELES_CLAUDE } from "@agent-studio/runtime-claude";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
 import { cliGitRunnerFactory, openWorkspace } from "@agent-studio/workspace";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { cheminConfiguration, lireConfiguration } from "./config.js";
 import { createConnexion } from "./connexion.js";
-import { createConnexionClaude, MODELES_CLAUDE, statutClaude } from "./connexion-claude.js";
+import { createConnexionClaude } from "./connexion-claude.js";
 import { createPilesFichiers } from "./piles.js";
 import { createProjets, type Projets } from "./projets.js";
 import { createServeurSkraft } from "./serveur.js";
@@ -53,8 +53,9 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
   const { connexion, runtime } =
     config.runtime === "claude"
       ? (() => {
-          const c = createConnexionClaude({ statut: statutClaude() });
-          return { connexion: c, runtime: c.runtime(() => createClaudeRuntime({ lanceur: createLanceurClaude(), logger: logger.child({ component: "runtime" }) })) };
+          const lanceur = createLanceurClaude();
+          const c = createConnexionClaude(lanceur);
+          return { connexion: c, runtime: c.runtime(() => createClaudeRuntime({ lanceur, logger: logger.child({ component: "runtime" }) })) };
         })()
       : (() => {
           const c = createConnexion(createGhAuth({ runner: createNodeCommandRunner(), spawner: createNodeProcessSpawner(), hostname: config.hostname }));

@@ -353,3 +353,80 @@ describe("Renderer — tâches et décisions (J2)", () => {
     expect(screen.getByLabelText("Votre message")).toBeTruthy();
   });
 });
+
+/**
+ * Runtime au choix (ADR 0070). Avec Claude, la connexion est celle de Claude Code, menée dans un
+ * terminal : l'écran dit quoi taper et vérifie ensuite ; GitHub n'est pas demandé.
+ */
+describe("Renderer — runtime Claude (ADR 0070)", () => {
+  const DEUX = (choisi: "copilot" | "claude", claude: unknown) => () => ({ choisi, disponibles: ["copilot", "claude"], claude });
+  function conversation() {
+    api
+      .handle("workspace:current", () => WS)
+      .handle("chat:start", () => [])
+      .handle("commands:list", () => [])
+      .handle("tasks:list", () => [])
+      .handle("interactions:list", () => [])
+      .handle("models:list", () => ({ models: [], selected: null }));
+  }
+
+  it("Claude choisi et connecté : pas d'écran GitHub, on va au projet", async () => {
+    api.handle("runtime:status", DEUX("claude", { etat: "connecte", methode: "claude.ai" })).handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" })).handle("workspace:current", () => null);
+    render(<App />);
+    expect(await screen.findByText("Sur quel projet travaille-t-on, Claude ?")).toBeTruthy();
+  });
+
+  it("Claude choisi, non connecté : l'écran dit de lancer `claude auth login`, puis vérifie", async () => {
+    let claude: unknown = { etat: "non-connecte" };
+    api.handle("runtime:status", () => DEUX("claude", claude)()).handle("auth:status", () => OAUTH).handle("workspace:current", () => null);
+    render(<App />);
+    expect(await screen.findByText(/claude auth login/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Se connecter avec GitHub" })).toBeNull();
+    claude = { etat: "connecte" };
+    fireEvent.click(screen.getByRole("button", { name: "Vérifier la connexion" }));
+    expect(await screen.findByText("Sur quel projet travaille-t-on, octo ?")).toBeTruthy();
+  });
+
+  it("Claude Code absent : l'écran dit de l'installer", async () => {
+    api.handle("runtime:status", DEUX("claude", { etat: "absent" })).handle("auth:status", () => OAUTH);
+    render(<App />);
+    expect(await screen.findByText(/Claude Code \(claude\) n'est pas installé/)).toBeTruthy();
+  });
+
+  it("à la connexion, choisir Claude l'enregistre et relit l'état ; Copilot seul : aucun choix proposé", async () => {
+    let choisi: "copilot" | "claude" = "copilot";
+    api
+      .handle("runtime:status", () => DEUX(choisi, { etat: "non-connecte" })())
+      .handle("runtime:set", (i) => void (choisi = (i as { runtime: typeof choisi }).runtime))
+      .handle("auth:status", () => ({ loggedIn: false, hostname: "github.com" }));
+    render(<App />);
+    fireEvent.click(await screen.findByLabelText("Claude (Claude Code)"));
+    expect(await screen.findByText(/claude auth login/)).toBeTruthy();
+    expect(api.calls).toContainEqual({ channel: "runtime:set", input: { runtime: "claude" } });
+    cleanup();
+
+    api.handle("runtime:status", () => ({ choisi: "copilot", disponibles: ["copilot"], claude: null }));
+    render(<App />);
+    await screen.findByRole("button", { name: "Se connecter avec GitHub" });
+    expect(screen.queryByLabelText("Claude (Claude Code)")).toBeNull();
+  });
+
+  it("dans la conversation (mode avancé) : changer de runtime l'enregistre et relance ; avec Claude, pas de déconnexion GitHub", async () => {
+    let choisi: "copilot" | "claude" = "copilot";
+    conversation();
+    api
+      .handle("auth:status", () => OAUTH)
+      .handle("runtime:status", () => DEUX(choisi, { etat: "connecte" })())
+      .handle("runtime:set", (i) => void (choisi = (i as { runtime: typeof choisi }).runtime));
+    render(<App />);
+    await screen.findByLabelText("Votre message");
+    expect(screen.getByRole("button", { name: "Se déconnecter" })).toBeTruthy();
+    const avant = api.calls.filter((c) => c.channel === "chat:start").length;
+    fireEvent.change(screen.getByLabelText("Agents"), { target: { value: "claude" } });
+    await waitFor(() => expect(api.calls).toContainEqual({ channel: "runtime:set", input: { runtime: "claude" } }));
+    // La conversation a été fermée par le changement : elle est rouverte, sur Claude.
+    await waitFor(() => expect(api.calls.filter((c) => c.channel === "chat:start").length).toBeGreaterThan(avant));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Se déconnecter" })).toBeNull());
+    expect((screen.getByLabelText("Agents") as HTMLSelectElement).value).toBe("claude");
+  });
+});

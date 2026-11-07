@@ -7,6 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } fro
 import { createJsonConversationStore, createJsonLogger, createJsonPermissionRules } from "@agent-studio/core";
 import { API_VERSION } from "@agent-studio/extension-api";
 import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
+import { createClaudeRuntime, createLanceurClaude, etatConnexionClaude } from "@agent-studio/runtime-claude";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
 import { fabriquesDEssai, modeEssaiActif } from "./mode-essai.js";
 import { createTypeScriptAdapter } from "@agent-studio/stack-adapters";
@@ -193,7 +194,7 @@ async function createController(): Promise<AppController> {
         runtimeEntry: WORKFLOW_RUNTIME,
       },
       // TypeScript (Vitest).
-      // Un projet qui déclare son propre profil (`.agent-studio/stack.yaml`) l'emporte sur eux.
+      // Un projet qui déclare sa pile (section `pile` de `.agent-studio/projet.yaml`) l'emporte sur eux.
       stacks: [createTypeScriptAdapter()],
       // Programmes qu'un profil peut nommer : la liste vient de l'administrateur (D47, O12).
       allowedPrograms: admin.allowedPrograms,
@@ -209,6 +210,9 @@ async function createController(): Promise<AppController> {
           client: createCopilotClient({ gitHubToken: token, hostname, baseDirectory: join(userData, "copilot") }),
           logger: logger.child({ component: "runtime" }),
         })),
+    // Claude par le CLI (ADR 0070), au choix de l'utilisateur ; jamais en mode d'essai, qui ne doit
+    // rien envoyer à un vrai modèle.
+    ...(essai ? {} : { claude: runtimeClaude() }),
     conversations: createJsonConversationStore(join(userData, "conversations")),
     settings,
     folderPicker: essai?.folderPicker ?? {
@@ -242,6 +246,15 @@ async function createController(): Promise<AppController> {
   });
   ctl = controller;
   return controller;
+}
+
+/** Connexion et fabrique du runtime Claude, sur un même lanceur de `claude`. */
+function runtimeClaude() {
+  const lanceur = createLanceurClaude();
+  return {
+    etat: () => etatConnexionClaude(lanceur),
+    creer: () => createClaudeRuntime({ lanceur, logger: logger.child({ component: "runtime" }) }),
+  };
 }
 
 app.whenReady().then(async () => {

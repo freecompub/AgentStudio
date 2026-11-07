@@ -59,6 +59,8 @@ describe("skraft — défauts hors du changement rangés en notes", () => {
     const dossier = join(root, ".skraft/us-12/reviews");
     const fichier = (await readdir(dossier)).find((f) => f.startsWith("deliver-review-") && f.endsWith(".md"))!;
     expect(await readFile(join(dossier, fichier), "utf8")).toContain("- note (hors du changement) : `architecture#1.1` **blocker** La story fixe deux plafonds différents. (stories/us-12.md:1)");
+    // Le bilan est publié par un effet, après la transition vers DONE : on l'attend (comme e2e-s1).
+    await until(async () => app.posted.some((p) => p.startsWith("Pipeline skraft terminé")), 60_000);
     const bilan = app.posted.find((p) => p.startsWith("Pipeline skraft terminé"))!;
     expect(bilan).toContain("À corriger après le cycle");
     expect(bilan).toContain("- stories/us-12.md:1 (architecture, blocker) : La story fixe deux plafonds différents.");
