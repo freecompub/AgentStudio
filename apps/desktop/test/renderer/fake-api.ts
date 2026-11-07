@@ -13,6 +13,8 @@ export class FakeApi implements RendererApi {
     this.handle("profile:get", () => ({ role: "developpeur", roleLabel: "Développeur", defaultMode: "advanced", permissionPolicy: "souple", developerMode: false, adminSource: "défaut" }));
     this.handle("ui:get-mode", () => "advanced");
     this.handle("ui:set-mode", () => undefined);
+    // Par défaut : Copilot seul, comme une application sans Claude (ADR 0070).
+    this.handle("runtime:status", () => ({ choisi: "copilot", disponibles: ["copilot"], claude: null }));
   }
 
   handle(channel: RequestChannel, h: Handler): this {

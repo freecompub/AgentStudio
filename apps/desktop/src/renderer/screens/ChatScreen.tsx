@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessageDto, CommandListingDto, ModelListingDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
+import type { ChatMessageDto, CommandListingDto, ModelListingDto, ProfileInfoDto, RuntimeKindDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
 import { ModelsPanel } from "../components/ModelsPanel";
 import { GuidedActions } from "../components/GuidedActions";
 import { TaskPanel } from "../components/TaskPanel";
 import { TurnChanges } from "../components/TurnChanges";
+import { RUNTIMES } from "../runtimes";
 
 interface ToolActivity {
   id: string;
@@ -16,6 +17,8 @@ interface ToolActivity {
 
 export function ChatScreen(props: {
   user: string;
+  runtime: RuntimeStatusDto;
+  onRuntimeChanged: () => void;
   workspace: WorkspaceInfoDto;
   profile: ProfileInfoDto | null;
   mode: UiMode;
@@ -131,6 +134,16 @@ export function ChatScreen(props: {
     api.call("model:set", { id: selected }).catch((err: Error) => setError(err.message));
   }
 
+  async function chooseRuntime(runtime: RuntimeKindDto) {
+    setError(null);
+    try {
+      await api.call("runtime:set", { runtime });
+      props.onRuntimeChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function logout() {
     setError(null);
     try {
@@ -167,6 +180,18 @@ export function ChatScreen(props: {
         <button onClick={() => setExtensionsOpen(true)}>Extensions</button>
         {/* Réglage fin, réservé au mode avancé (ADR 0048). */}
         {advanced && <button onClick={() => setModelsOpen(true)}>Modèles des agents</button>}
+        {advanced && props.runtime.disponibles.length > 1 && (
+          <label className="model-pick">
+            <span>Agents</span>
+            <select value={props.runtime.choisi} onChange={(e) => void chooseRuntime(e.target.value as RuntimeKindDto)}>
+              {props.runtime.disponibles.map((r) => (
+                <option key={r} value={r}>
+                  {RUNTIMES[r]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {models.models.length > 0 && (
           <label className="model-pick">
             <span>Modèle</span>
@@ -192,9 +217,12 @@ export function ChatScreen(props: {
           {props.user}
           {props.profile && <span className="hint"> ({props.profile.roleLabel})</span>}
         </span>
-        <button className="link" onClick={() => void logout()}>
-          Se déconnecter
-        </button>
+        {/* La déconnexion est celle de GitHub : avec Claude, elle se fait dans le terminal. */}
+        {props.runtime.choisi === "copilot" && (
+          <button className="link" onClick={() => void logout()}>
+            Se déconnecter
+          </button>
+        )}
       </header>
 
       <TaskPanel />

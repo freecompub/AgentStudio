@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AuthStatusDto, ProfileInfoDto, UiMode, WorkspaceInfoDto } from "../shared/ipc-contract";
+import type { AuthStatusDto, ProfileInfoDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../shared/ipc-contract";
 import { api } from "./api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ConsentDialog } from "./components/ConsentDialog";
@@ -10,9 +10,9 @@ import { ProjectScreen } from "./screens/ProjectScreen";
 
 type Phase =
   | { kind: "loading" }
-  | { kind: "auth"; status: AuthStatusDto }
-  | { kind: "project"; user: string }
-  | { kind: "chat"; user: string; workspace: WorkspaceInfoDto }
+  | { kind: "auth"; status: AuthStatusDto; runtime: RuntimeStatusDto }
+  | { kind: "project"; user: string; runtime: RuntimeStatusDto }
+  | { kind: "chat"; user: string; workspace: WorkspaceInfoDto; runtime: RuntimeStatusDto }
   | { kind: "fatal"; message: string };
 
 export function App() {
@@ -25,10 +25,13 @@ export function App() {
       const [p, m] = await Promise.all([api.call("profile:get", {}), api.call("ui:get-mode", {})]);
       setProfile(p);
       setMode(m);
-      const status = await api.call("auth:status", {});
-      if (!status.loggedIn || !status.copilotCompatible) return setPhase({ kind: "auth", status });
+      const [status, runtime] = await Promise.all([api.call("auth:status", {}), api.call("runtime:status", {})]);
+      // Avec Claude (ADR 0070), seule compte la connexion de Claude Code : GitHub n'est pas demandé.
+      const pret = runtime.choisi === "claude" ? runtime.claude?.etat === "connecte" : status.loggedIn && status.copilotCompatible;
+      if (!pret) return setPhase({ kind: "auth", status, runtime });
+      const user = status.loggedIn ? status.user : "Claude";
       const ws = await api.call("workspace:current", {});
-      setPhase(ws ? { kind: "chat", user: status.user, workspace: ws } : { kind: "project", user: status.user });
+      setPhase(ws ? { kind: "chat", user, workspace: ws, runtime } : { kind: "project", user, runtime });
     } catch (err) {
       setPhase({ kind: "fatal", message: (err as Error).message });
     }
@@ -57,18 +60,22 @@ export function App() {
           </div>
         </main>
       )}
-      {phase.kind === "auth" && <AuthScreen status={phase.status} onDone={() => void boot()} />}
+      {phase.kind === "auth" && <AuthScreen status={phase.status} runtime={phase.runtime} onDone={() => void boot()} />}
       {phase.kind === "project" && (
-        <ProjectScreen user={phase.user} onOpened={(workspace) => setPhase({ kind: "chat", user: phase.user, workspace })} />
+        <ProjectScreen user={phase.user} onOpened={(workspace) => setPhase({ kind: "chat", user: phase.user, workspace, runtime: phase.runtime })} />
       )}
       {phase.kind === "chat" && (
+        // Changer de runtime ferme la conversation côté principal : la clé la rouvre, sur le nouveau.
         <ChatScreen
+          key={phase.runtime.choisi}
           user={phase.user}
+          runtime={phase.runtime}
+          onRuntimeChanged={() => void boot()}
           workspace={phase.workspace}
           profile={profile}
           mode={mode}
           onModeChange={changeMode}
-          onProjectClosed={() => setPhase({ kind: "project", user: phase.user })}
+          onProjectClosed={() => setPhase({ kind: "project", user: phase.user, runtime: phase.runtime })}
           onLoggedOut={() => void boot()}
         />
       )}

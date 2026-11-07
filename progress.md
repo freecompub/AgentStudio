@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude, brique C : choix du runtime dans l'interface
+
+- L'application lit `runtime:status` au démarrage. Avec Claude, elle n'attend que la connexion de
+  Claude Code : GitHub n'est pas demandé, et l'utilisateur affiché est « Claude » si GitHub n'est
+  pas connecté.
+- Écran de connexion : si Claude est disponible, un choix « Quels agents ? » (GitHub Copilot ou
+  Claude). Avec Claude, l'écran dit de lancer `claude auth login` dans un terminal (ou d'installer
+  Claude Code), puis propose « Vérifier la connexion ». Avec Copilot seul, rien ne change.
+- Conversation, en mode avancé : un sélecteur « Agents ». Changer de runtime ferme la conversation
+  côté principal ; la clé du `ChatScreen` la rouvre sur le nouveau. Avec Claude, le bouton « Se
+  déconnecter », qui déconnecte de GitHub, est masqué.
+- Essais Electron (`xvfb-run -a pnpm e2e`) verts : le mode d'essai ne propose pas Claude. Sans
+  `xvfb-run`, Electron ne démarre pas sur cette machine (pas d'affichage) : ce n'est pas un défaut.
+- **Test intermittent** vu une fois dans la suite complète : « blocker sur un fichier non touché… »
+  (`e2e-notes`, extension ou workflow), en 4,3 s ; vert seul cinq fois, sur la branche comme sans les
+  changements. Sans lien avec le runtime ; à surveiller s'il revient.
+
 ## 07/11 — Runtime Claude, brique B : choix du runtime dans l'application (processus principal)
 
 - Réglage `runtime` (`copilot` par défaut, ou `claude`) dans `settings.json` ; canaux IPC
