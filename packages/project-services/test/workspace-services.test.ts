@@ -2,7 +2,7 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSess
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
@@ -69,13 +69,12 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
+  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
-    if (opts.profil !== undefined) {
-      await mkdir(join(racine, ".agent-studio"), { recursive: true });
-      await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
-    }
+    if (opts.profil !== undefined || opts.projet !== undefined) await mkdir(join(racine, ".agent-studio"), { recursive: true });
+    if (opts.profil !== undefined) await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
+    if (opts.projet !== undefined) await writeFile(join(racine, ".agent-studio", "projet.yaml"), opts.projet);
     const posts: string[] = [];
     const ecrits: string[] = [];
     const services = await workspaceServicesFactory({
@@ -103,7 +102,7 @@ describe("Services d'un projet (J2)", () => {
       workspace: {
         ...fakeWorkspace(),
         root: racine,
-        files: { ...fakeWorkspace().files, list: async () => opts.fichiers ?? [], write: async (rel, c) => void ecrits.push(`${rel}\n${c}`) },
+        files: { ...fakeWorkspace().files, read: (rel: string) => readFile(join(racine, rel), "utf8"), list: async () => opts.fichiers ?? [], write: async (rel, c) => void ecrits.push(`${rel}\n${c}`) },
       },
       runtime: async () => new ScriptedRuntime(),
       onTask: () => {},
@@ -180,8 +179,19 @@ infrastructureModules: [django]
     const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"] });
     await services.route("/stack init");
     expect(ecrits).toHaveLength(1);
-    expect(ecrits[0]).toMatch(/^\.agent-studio\/stack\.yaml\n/);
-    expect(ecrits[0]).toMatch(/id: python/);
+    // Fichier de projet (ADR 0071) : le profil va dans la section pile.
+    expect(ecrits[0]).toMatch(/^\.agent-studio\/projet\.yaml\n/);
+    expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
+    await cleanup();
+  });
+
+  it("/stack init garde la section qualite d'un projet.yaml existant", async () => {
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"], projet: "# barre de l'équipe\nqualite:\n  couverture:\n    reste: 70\n" });
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    expect(ecrits[0]).toContain("# barre de l'équipe");
+    expect(ecrits[0]).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
+    expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
     await cleanup();
   });
 

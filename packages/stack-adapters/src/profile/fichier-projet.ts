@@ -3,7 +3,7 @@
  * les outils, schéma du profil de pile) et section `qualite` (ce qui est exigé, schéma de la barre).
  * Ici, on ne fait que séparer : chaque section est rendue en YAML à son propre validateur. PUR.
  */
-import { parse as parseYaml, stringify } from "yaml";
+import { parse as parseYaml, parseDocument, stringify } from "yaml";
 
 export const FICHIER_PROJET = ".agent-studio/projet.yaml";
 const SECTIONS = ["pile", "qualite"] as const;
@@ -23,4 +23,16 @@ export function lireFichierProjet(raw: string): { pile?: string; qualite?: strin
     ...(d["pile"] != null ? { pile: stringify(d["pile"]) } : {}),
     ...(d["qualite"] != null ? { qualite: stringify(d["qualite"]) } : {}),
   };
+}
+
+/**
+ * Écrit le profil de pile dans la section `pile` de `projet.yaml` (`/stack init`), en gardant le
+ * reste du fichier tel quel, commentaires compris. Un fichier existant illisible n'est pas écrasé.
+ */
+export function ecrirePileDansProjet(existant: string | null, pile: string): string | { error: string } {
+  const doc = parseDocument(existant ?? "");
+  if (doc.errors.length) return { error: `\`${FICHIER_PROJET}\` n'est pas du YAML valide, rien n'a été écrit : ${doc.errors[0]!.message.split("\n")[0]}` };
+  if (doc.contents === null) doc.contents = doc.createNode({}) as never;
+  doc.set("pile", doc.createNode(parseYaml(pile)));
+  return doc.toString();
 }

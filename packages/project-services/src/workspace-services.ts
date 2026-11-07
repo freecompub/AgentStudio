@@ -45,6 +45,7 @@ import {
   runCanaries,
   parseStackProfile,
   FICHIER_PROJET,
+  ecrirePileDansProjet,
   lireFichierProjet,
   selectStackAdapter,
   type StackAdapter,
@@ -605,12 +606,18 @@ function stackCommandDeps(args: {
   const fichiers = () => workspace.files.list();
 
   return {
-    chemin: PROFIL_PROJET,
+    // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
+    chemin: FICHIER_PROJET,
     profilDeclare: () => lireProfilDeclare(workspace.root, allowedPrograms),
     stackActive: () => ({ id: stack.id, declaree }),
     post: (markdown) => onPost("agent-studio", markdown),
     confirmer: (req) => confirmer.confirm(req),
-    ecrireProfil: (yaml) => workspace.files.write(PROFIL_PROJET, yaml),
+    async ecrireProfil(yaml) {
+      const existant = await workspace.files.read(FICHIER_PROJET).catch(() => null);
+      const r = ecrirePileDansProjet(existant, yaml);
+      if (typeof r !== "string") throw new Error(r.error);
+      await workspace.files.write(FICHIER_PROJET, r);
+    },
 
     async indices() {
       const tous = await fichiers();

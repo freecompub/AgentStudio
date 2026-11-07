@@ -4,7 +4,7 @@
  * fichiers restent lus pendant la transition, avec un avertissement.
  */
 import { describe, expect, it } from "vitest";
-import { lireFichierProjet } from "../src/profile/fichier-projet.js";
+import { ecrirePileDansProjet, lireFichierProjet } from "../src/profile/fichier-projet.js";
 import { parseQualityBar } from "../src/profile/quality-bar.js";
 
 const PROJET = `
@@ -63,5 +63,29 @@ describe("parseQualityBar et projet.yaml (ADR 0071)", () => {
     if ("error" in r) throw new Error(r.error);
     expect(r.source).toBe(".agent-studio/quality.yaml");
     expect(r.warnings).toEqual([expect.stringMatching(/regroupe.*projet\.yaml.*section qualite/s)]);
+  });
+});
+
+describe("ecrirePileDansProjet (`/stack init`, ADR 0071)", () => {
+  const PILE = "id: python\ndetect: [pyproject.toml]\n";
+
+  it("sans fichier : un projet.yaml qui n'a que la section pile", () => {
+    const r = ecrirePileDansProjet(null, PILE);
+    if (typeof r !== "string") throw new Error(r.error);
+    expect(lireFichierProjet(r)).toEqual({ pile: expect.stringMatching(/id: python/) });
+  });
+
+  it("fichier existant : la section pile est ajoutée ou remplacée ; la section qualite et ses commentaires restent", () => {
+    const existant = "# Barre décidée par l'équipe\nqualite:\n  couverture:\n    reste: 70 # minimum\npile:\n  id: ancienne\n";
+    const r = ecrirePileDansProjet(existant, PILE);
+    if (typeof r !== "string") throw new Error(r.error);
+    expect(r).toContain("# Barre décidée par l'équipe");
+    expect(r).toContain("reste: 70 # minimum");
+    expect(r).toMatch(/pile:\n\s+id: python/);
+    expect(r).not.toContain("ancienne");
+  });
+
+  it("fichier existant illisible : rien n'est écrit, l'erreur dit pourquoi", () => {
+    expect(ecrirePileDansProjet("qualite: [\n", PILE)).toEqual({ error: expect.stringMatching(/projet\.yaml.*YAML/) });
   });
 });

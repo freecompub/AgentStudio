@@ -5,6 +5,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Fichier de projet (ADR 0071), brique 2 : `/stack init` écrit la section pile
+
+- `ecrirePileDansProjet(existant, pile)` (`stack-adapters`, pur) : ajoute ou remplace la section
+  `pile` de `projet.yaml` avec l'API `Document` de `yaml`, en gardant le reste **commentaires
+  compris** ; un fichier existant illisible n'est pas écrasé (erreur, rien d'écrit).
+- `/stack init` (dépendances de `project-services`) écrit `.agent-studio/projet.yaml` et nomme ce
+  fichier dans ses messages ; toujours après confirmation de l'utilisateur.
+- Tests vus rouges puis verts : écriture pure (3), `/stack init` (emplacement, et section `qualite`
+  d'un `projet.yaml` existant gardée). Le faux Workspace du test lit désormais le disque.
+- Non fait : les exemples commentés de `profiles/` restent au format de l'ancien `stack.yaml` (une
+  section `pile` sans l'en-tête).
+
 ## 07/11 — Fichier de projet `.agent-studio/projet.yaml` (ADR 0071), brique 1 : lecture
 
 - Branche `feat/fichier-projet`, partie de `main` après la fusion de la PR #13.
@@ -22,7 +34,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - Conséquence voulue : une barre lue dans l'ancien `quality.yaml` porte désormais un avertissement ;
   deux tests qui l'attendaient sans (un test de mutation de l'extension, et e2e-s5 des deux côtés) ont
   été adaptés — e2e-s5 passe au nouveau format plutôt que d'attendre l'avertissement.
-- Reste : `/stack init` écrit la section `pile` de `projet.yaml` ; la porte de format.
+- Reste : la porte de format (brique 3).
 
 ## 07/11 — Runtime Claude : mémoire automatique coupée, version minimale du CLI
 
