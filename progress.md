@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Composants (ADR 0074), brique 1 : adaptateur composé, section composants, branchement
+
+- `createComposedAdapter` (`stack-adapters/src/composants.ts`) : les composants derrière le port
+  `StackAdapter`. Emplacements réunis et ramenés à la racine du projet ; `isTestFile` délègue au
+  composant qui contient le fichier ; tests lancés dans chaque racine, identifiants préfixés
+  (`services/api: …`), fichiers et couverture ramenés à la racine du projet ; lint et format ne
+  reçoivent que les fichiers de leur composant ; format attesté seulement si tous les composants
+  touchés l'ont ; mutation fusionnée (score pondéré par le nombre de fichiers) ; règle de dépendance
+  en chemins ramenée à la racine de son composant. Une opération qu'aucun composant n'a reste absente.
+- `projet.yaml` : section `composants` (`nom`, `racine`, `pile`), exclusive de `pile`. Racine
+  normalisée (`./services/api/` → `services/api`), relative, sans `..` ; noms uniques ; racines qui se
+  chevauchent refusées (`.` avec d'autres compris).
+- `project-services` : un projet à composants obtient l'adaptateur composé (chaque pile validée comme
+  une pile seule, contre la liste de l'administrateur) ; une pile refusée est nommée par son
+  composant, et la détection reprend la main. `pile()` donne les composants (nom, racine, id).
+- Tests vus rouges puis verts. Trois branches de l'adaptateur (format, mutation, imports) codées avant
+  leur test : chacun vu rouge en cassant la ligne qu'il protège.
+- **Reste** : composants touchés seulement aux portes de pas et de scénario ; `/stack init` et
+  `/stack doctor` par composant ; argument `pile` du serveur MCP au format composants ; écriture de
+  `pile` par `/stack init` quand le projet a des composants.
+
 ## 07/11 — ADR 0074 accepté : composants d'un projet, BDD par composant (rien d'implémenté)
 
 - Question du responsable : donner le choix TDD ou BDD, et traiter les dépôts qui mélangent les

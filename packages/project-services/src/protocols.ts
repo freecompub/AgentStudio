@@ -38,8 +38,8 @@ export interface WorkspaceServices {
   hookGuards(): ToolCallGuard[];
   /** Outils donnés à l'agent principal (`proposer_workflow` si un workflow est actif, ADR 0055). */
   outilsAgent(): ToolSpec[];
-  /** Pile retenue pour le projet, et sa source. */
-  pile(): { id: string; source: SourcePile };
+  /** Pile retenue pour le projet, et sa source ; ses composants quand le projet en déclare (ADR 0074). */
+  pile(): { id: string; source: SourcePile; composants?: { nom: string; racine: string; id: string }[] };
   /** Workflows en dossier activés pour ce projet (ADR 0055). */
   workflows(): Promise<WorkflowActif[]>;
   /**

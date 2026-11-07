@@ -39,6 +39,7 @@ import {
 } from "@agent-studio/extension-host";
 import {
   createNodeProcessRunner,
+  createComposedAdapter,
   createProfileAdapter,
   detecte,
   diagnoseProfile,
@@ -49,6 +50,8 @@ import {
   ecrirePileDansProjet,
   lireFichierProjet,
   selectStackAdapter,
+  type ComposantDeclare,
+  type Composant,
   type StackAdapter,
 } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
@@ -169,7 +172,8 @@ export class AucunePile extends Error {
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
-    const declare = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const pileDuProjet = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const declare = pileDuProjet?.adapter ?? null;
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
     let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
     let choisie = detected;
@@ -492,7 +496,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
             accord: resumeAccord(a.workflow),
           })),
         ),
-      pile: () => ({ id: stack.id, source }),
+      pile: () => ({ id: stack.id, source, ...(source === "projet" && pileDuProjet?.composants ? { composants: pileDuProjet.composants } : {}) }),
       lancerWorkflow,
       async rapportWorkflow(taskId) {
         const r = (await engine.list()).find((t) => t.id === taskId);
@@ -530,6 +534,8 @@ interface SourceDuProfil {
   libelle: string;
   /** Profil en YAML ; `null` : le fichier de projet n'a pas de section `pile`. */
   brut: string | null;
+  /** Composants déclarés (ADR 0074), à la place de la section `pile`. */
+  composants?: ComposantDeclare[];
   erreur?: string;
   avertissements: string[];
 }
@@ -550,6 +556,7 @@ async function lireSourceDuProfil(root: string): Promise<SourceDuProfil | null> 
     const avertissements = ancien !== null ? [`\`${PROFIL_PROJET}\` est ignoré : \`${FICHIER_PROJET}\` fait foi, supprime-le (ADR 0071).`] : [];
     const p = lireFichierProjet(projet);
     if ("error" in p) return { libelle: `\`${FICHIER_PROJET}\``, brut: null, erreur: p.error, avertissements };
+    if (p.composants) return { libelle: `\`${FICHIER_PROJET}\` (section composants)`, brut: null, composants: p.composants, avertissements };
     return { libelle: `\`${FICHIER_PROJET}\` (section pile)`, brut: p.pile ?? null, avertissements };
   }
   if (ancien !== null)
@@ -572,14 +579,35 @@ async function lireProfilDeclare(root: string, allowedPrograms: readonly string[
   return "error" in lu ? { error: `${src.libelle} : ${lu.error}` } : lu;
 }
 
+/** Pile du projet, et ses composants quand il en déclare (ADR 0074). */
+interface PileDuProjet {
+  adapter: StackAdapter;
+  composants?: { nom: string; racine: string; id: string }[];
+}
+
 async function lireProfilDuProjet(
   root: string,
   allowedPrograms: readonly string[],
   onPost: (extensionId: string, markdown: string) => void,
   logger?: Logger,
-): Promise<StackAdapter | null> {
+): Promise<PileDuProjet | null> {
   const src = await lireSourceDuProfil(root);
   for (const a of src?.avertissements ?? []) onPost("agent-studio", a);
+  // Composants (ADR 0074) : chaque pile validée comme une pile seule ; une seule refusée, et la
+  // détection reprend la main, comme pour un profil refusé.
+  if (src?.composants) {
+    const composants: Composant[] = [];
+    for (const c of src.composants) {
+      const lu = parseStackProfile(c.pile, { allowedPrograms });
+      if ("error" in lu) {
+        logger?.warn("pile de composant refusée", { root, composant: c.nom, error: lu.error });
+        onPost("agent-studio", `**La pile du composant « ${c.nom} » est refusée** (${src.libelle}). ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez-la puis rouvrez le projet.`);
+        return null;
+      }
+      composants.push({ nom: c.nom, racine: c.racine, adapter: createProfileAdapter(lu.profile) });
+    }
+    return { adapter: createComposedAdapter(composants), composants: composants.map((c) => ({ nom: c.nom, racine: c.racine, id: c.adapter.id })) };
+  }
   const lu = await lireProfilDeclare(root, allowedPrograms);
   if (lu === null) return null;
   if ("error" in lu) {
@@ -587,7 +615,7 @@ async function lireProfilDuProjet(
     onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez ${src?.libelle ?? `\`${FICHIER_PROJET}\``} puis rouvrez le projet.`);
     return null;
   }
-  return createProfileAdapter(lu.profile);
+  return { adapter: createProfileAdapter(lu.profile) };
 }
 
 /**
