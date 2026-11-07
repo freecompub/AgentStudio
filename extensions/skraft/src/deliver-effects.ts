@@ -1,6 +1,6 @@
 import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/extension-api";
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
-import { buildBrief, lignePile } from "./brief.js";
+import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.js";
 import { SANS_GEL, sansGel } from "./deliver-machine.js";
 import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, parseQualityBar, planScenarios, sansLignesExemptees, sansTestsObsoletes, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
@@ -23,6 +23,8 @@ export const QUALITY = ".agent-studio/quality.yaml";
 export const QUALITY_LEGACY = ".skraft/quality.json";
 /** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
 export const PROJET = ".agent-studio/projet.yaml";
+/** `passation.md` est écrit par le code avant chaque tour (07/11) : jamais compté comme une modification de l'agent. */
+const horsPassation = <F extends { path: string }>(changes: F[], slug: string): F[] => changes.filter((f) => f.path !== fichierDePassation(slug));
 const fail = (reason: string, rouges?: string[]): Ev => ({ type: "STEP_FAIL", reason, ...(rouges?.length ? { rouges } : {}) });
 
 /**
@@ -115,6 +117,7 @@ const STEP_TEXT: Record<Fx<"runDeliverAgent">["step"], (d: { newTest: string | n
 
 /** Agent test ou dev d'un pas : dossier de passation construit par le code, tests gelés hors de son périmètre. */
 export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
+  await ecrirePassation(ctx, state);
   const d = state.deliver!;
   const sc = d.scenarios.find((x) => x.id === e.scenarioId)!;
   const criterion = state.story?.criteria.find((c) => c.n === sc.ac);
@@ -160,7 +163,7 @@ function testsRetouches(changed: { path: string; status: string; removed?: numbe
 export async function verifyUnitRed(e: Fx<"verifyUnitRed">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
   const k = kinds(ctx);
-  const changed = await ctx.workspace.changedFiles(e.since);
+  const changed = horsPassation(await ctx.workspace.changedFiles(e.since), state.slug);
   if (e.coveredBy) return coveredByAcceptance(e, changed.length, { ctx, state, taskId, signal });
   if (changed.length === 0)
     return fail(
@@ -254,7 +257,7 @@ async function coveredByAcceptance(e: Fx<"verifyUnitRed">, changed: number, { ct
 export async function verifyFixTests(e: Fx<"verifyFixTests">, { ctx, state, taskId, signal }: Run): Promise<Ev> {
   if (!(await acceptanceFrozen(ctx, state))) return fail("Les tests d'acceptance ont été modifiés : ils sont gelés depuis DISTILL. Le tour est annulé.");
   const k = kinds(ctx);
-  const changed = await ctx.workspace.changedFiles(e.since);
+  const changed = horsPassation(await ctx.workspace.changedFiles(e.since), state.slug);
   const outside = changed.filter((f) => !k.unit(f.path));
   if (outside.length) return fail(`À ce pas, seuls des tests unitaires peuvent être ajoutés. Fichiers hors tests unitaires : ${outside.map((f) => f.path).join(", ")}.`);
   // Renforcer un test existant est permis, s'il est cité par un défaut adressé au testeur (D10 de docs/12).
@@ -291,7 +294,7 @@ export async function verifyUnitGreen(e: Fx<"verifyUnitGreen">, { ctx, state, ta
   if (e.unitTestsHash && (await ctx.workspace.fingerprint(["@stack:unitTests"])) !== e.unitTestsHash)
     return fail("Les tests unitaires ont été modifiés pendant le pas de code : ils sont gelés depuis leur rouge. Le tour est annulé ; modifie uniquement le code de production.");
   const k = kinds(ctx);
-  const changed = await ctx.workspace.changedFiles(e.since);
+  const changed = horsPassation(await ctx.workspace.changedFiles(e.since), state.slug);
   if (e.mode !== "refactor" && !e.nothingToChange && !changed.some((f) => k.production(f.path))) return fail("Aucun fichier de production modifié : écris le code qui fait passer le test.");
   // Garde du contrat ratifié (ADR 0047) : le 03/10, une « correction » de revue a supprimé ce que
   // le contrat de DESIGN exigeait, pour faire taire un défaut de couverture.

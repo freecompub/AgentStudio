@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
-import { buildBrief, lignePile } from "./brief.js";
+import { buildBrief, ecrirePassation, lignePile } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
 import type { DefectThread } from "./review-thread.js";
@@ -163,6 +163,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     }
 
     case "runSpecialist": {
+      await ecrirePassation(ctx, state);
       let brief = buildBrief(state, effect.phase, effect.feedback);
       if (effect.phase === "RESEARCH" && state.story) {
         // Présélection par le code (§7.1) : placée dans le dossier de passation.

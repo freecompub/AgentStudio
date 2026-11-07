@@ -36,3 +36,21 @@ describe("Recherche dans le dossier de passation", () => {
     expect(buildBrief(vue({ architecture: "clean-architecture-java" }), "RESEARCH", [])).not.toContain("Architecture du projet");
   });
 });
+
+/** Réponses humaines citables (décidé le 07/11), jumeau du test de l'extension. */
+describe("Réponses de l'utilisateur, citables", async () => {
+  const { passationMd } = await import("../../../workflows/skraft/brief.mjs");
+  const reponses = [{ question: "Le plafond est-il par prise ?", answer: "par prise" }, { question: "Arrondi ?", answer: "au dixième (affichage)" }];
+
+  it("passation.md : une réponse par ligne, après un en-tête qui dit comment la citer", () => {
+    expect(passationMd("US-12", reponses)).toBe(
+      "# Réponses de l'utilisateur — US-12\n\nÉcrites par le code au fil du run, une par ligne : cite-les comme toute autre source (`passation.md:<ligne>`).\n\n- « Le plafond est-il par prise ? » → par prise\n- « Arrondi ? » → au dixième (affichage)\n",
+    );
+  });
+
+  it("le dossier dit où elles sont écrites ; sans réponse, ni ligne ni fichier", () => {
+    const b = buildBrief(vue({ questions: [{ id: "q1", text: "Le plafond est-il par prise ?", answer: "par prise" }] }), "DESIGN", []);
+    expect(b).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
+    expect(buildBrief(vue(), "DESIGN", [])).not.toContain("passation.md");
+  });
+});

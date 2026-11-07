@@ -7,7 +7,7 @@
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
 import { disjoncte, memeRefus, problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
-import { buildBrief, lignePile } from "./brief.mjs";
+import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.mjs";
 import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
@@ -51,6 +51,8 @@ class ScenarioEchoue extends Error {
 async function lancerTests(w, d, o) {
   return sansTestsObsoletes(await w.lancerTests(o), d.testsObsoletes.map((x) => x.test));
 }
+/** `passation.md` est écrit par le code avant chaque tour (07/11) : jamais compté comme une modification de l'agent. */
+const horsPassation = (changes, slug) => changes.filter((f) => f.path !== fichierDePassation(slug));
 const premiereLigne = (msg) => (msg ?? "").split("\n").find((l) => l.trim())?.trim().slice(0, 300) ?? "";
 const uniq = (xs) => [...new Set(xs)];
 /** Un défaut de revue revient à l'agent des tests (`test`) ou au développeur (`code`, `deliverable`). */
@@ -415,6 +417,8 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
       ...(unitTests.length ? ["Tests unitaires déjà écrits pour ce scénario :", ...unitTests.map((t) => `  - ${t}`)] : []),
       TEXTE[etape]({ nouveau, unit: L.disp.unitTests.join(", "), sources: L.disp.sources.join(", ") }),
     ].join("\n");
+    // Avant chaque tour, y compris celui qui suit une réponse : la réponse est aussitôt citable.
+    await ecrirePassation(w, d);
     const r = await w.agent(testeur ? "skraft-test" : "skraft-dev", consigne, { lectureSeule: testeur ? GELES_TESTEUR : GELES_DEV, preuve: { etape: sc.id } });
     if (r.sortie)
       return r.sortie;
@@ -438,7 +442,7 @@ async function porteDuPas(w, d, L, i, etape, depuis, sortie, nouveau, correction
 async function porteRouge(w, d, L, i, depuis, couvertPar) {
   const sc = L.scenarios[i];
   const k = natures(L.disp);
-  const changes = await w.fichiersModifies(depuis);
+  const changes = horsPassation(await w.fichiersModifies(depuis), d.slug);
   if (couvertPar)
     return couvertParAcceptance(w, d, L, i, changes.length, couvertPar);
   if (changes.length === 0)
@@ -521,7 +525,7 @@ async function porteVerte(w, d, L, i, etape, depuis, nouveau, sortie, correction
   if (L.unitTestsHash && (await w.empreinte(["@stack:unitTests"])) !== L.unitTestsHash)
     throw new PasRefuse("Les tests unitaires ont été modifiés pendant le pas de code : ils sont gelés depuis leur rouge. Le tour est annulé ; modifie uniquement le code de production.");
   const k = natures(L.disp);
-  const changes = await w.fichiersModifies(depuis);
+  const changes = horsPassation(await w.fichiersModifies(depuis), d.slug);
   // Correction où tout est contesté ou renvoyé, sans test rouge à faire passer : rien à modifier,
   // la lentille arbitrera (D7 de docs/12).
   const rienAModifier = etape === "fix" && !correction.cibles.length && allDisputed(correction.fils, sortie.responses ?? [], pourDev);
@@ -998,7 +1002,7 @@ async function deroulerCorrection(w, d, L, s, i, depart, max, motifs) {
 async function porteCorrectionTests(w, d, L, i, depuis, sortie, c) {
   const sc = L.scenarios[i];
   const k = natures(L.disp);
-  const changes = await w.fichiersModifies(depuis);
+  const changes = horsPassation(await w.fichiersModifies(depuis), d.slug);
   const hors = changes.filter((f) => !k.unit(f.path));
   if (hors.length)
     throw new PasRefuse(`À ce pas, seuls des tests unitaires peuvent être ajoutés. Fichiers hors tests unitaires : ${hors.map((f) => f.path).join(", ")}.`);

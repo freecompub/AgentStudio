@@ -163,7 +163,7 @@ export const meta = {
 * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
 */
 import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond } from "@agent-studio/workflow";
-import { buildBrief } from "./brief.mjs";
+import { buildBrief, ecrirePassation } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
 import { checkResearch, extraireInventaire } from "./research.mjs";
@@ -407,6 +407,7 @@ function rechercher(w, vue, max, relance) {
       await w.etape("RESEARCH");
       const fichiers = await w.listerFichiers();
       const utiles = preselectFiles(vue.story, fichiers);
+      await ecrirePassation(w, vue);
       const consigne = buildBrief(vue, "RESEARCH", motifs) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
       const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
       if (r.sortie)

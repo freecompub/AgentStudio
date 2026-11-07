@@ -35,9 +35,9 @@ export function buildBrief(d, phase, rejet) {
   const decides = d.adrs.filter((a) => a.status !== "Proposed");
   if (decides.length)
     lines.push("ADR décidés :", ...decides.map((a) => `  - ${a.id} (${a.status}) : ${a.path}`));
-  const repondues = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer })), ...d.reponses];
+  const repondues = reponsesDeLUtilisateur(d);
   if (repondues.length)
-    lines.push("Réponses de l'utilisateur :", ...repondues.map((a) => `  - ${a.question} → ${a.answer}`));
+    lines.push(`Réponses de l'utilisateur (écrites dans \`${fichierDePassation(d.slug)}\`, à citer comme source) :`, ...repondues.map((a) => `  - ${a.question} → ${a.answer}`));
   if (d.regressions.length)
     lines.push("Tests d'acceptance requalifiés en non-régression :", ...d.regressions.map((r) => `  - ${r}`));
   if (d.acceptanceHash)
@@ -59,4 +59,33 @@ function extrait(texte) {
 /** Pile du projet, tirée de l'adaptateur de pile qui fait autorité (docs/15 §5) : une seule ligne commune. */
 export function lignePile(id, layout) {
   return `Pile du projet : ${id} ; sources : ${layout.sources.join(", ")} ; tests unitaires : ${layout.unitTests.join(", ")} ; tests d'acceptance : ${layout.acceptanceTests.join(", ")}.`;
+}
+/**
+* Réponses humaines citables (décidé le 07/11) : sans fichier, une réponse n'arrivait que par le
+* prompt, et la porte `citations` refusait qu'on s'y réfère ; le 29/09, l'agent avait reposé cinq fois
+* la même question. Le code écrit ce fichier avant chaque tour d'agent ; les portes de DELIVER ne le
+* comptent pas parmi les fichiers modifiés par l'agent.
+*/
+export const fichierDePassation = (slug) => `.skraft/${slug}/passation.md`;
+/** Questions ouvertes répondues, puis réponses aux questions des agents, dans l'ordre. */
+export function reponsesDeLUtilisateur(d) {
+  return [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer })), ...d.reponses];
+}
+/** Contenu de `passation.md` : une réponse par ligne, pour qu'une citation `passation.md:<ligne>` la désigne. */
+export function passationMd(storyId, reponses) {
+  const ligne = (t) => t.replace(/\s*\n\s*/g, " ");
+  return [
+    `# Réponses de l'utilisateur — ${storyId}`,
+    "",
+    "Écrites par le code au fil du run, une par ligne : cite-les comme toute autre source (`passation.md:<ligne>`).",
+    "",
+    ...reponses.map((r) => `- « ${ligne(r.question)} » → ${ligne(r.answer)}`),
+    "",
+  ].join("\n");
+}
+/** Écrit `passation.md` s'il y a des réponses ; contenu identique, rien ne change dans le dépôt. */
+export async function ecrirePassation(w, d) {
+  const reponses = reponsesDeLUtilisateur(d);
+  if (reponses.length)
+    await w.ecrireFichier(fichierDePassation(d.slug), passationMd(d.story?.id ?? d.slug, reponses));
 }
