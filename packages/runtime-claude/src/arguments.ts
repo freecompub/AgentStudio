@@ -36,6 +36,9 @@ export function argumentsDuTour(t: Tour): string[] {
     // Isolement (essais du 06/11) : `--system-prompt` seul n'écarte pas le CLAUDE.md du projet.
     "--setting-sources", "",
     "--disable-slash-commands",
+    // Mémoire automatique coupée (essai du 07/11) : le dossier de travail est le dépôt de
+    // l'utilisateur, et sa mémoire Claude Code entrerait dans le contexte de nos agents.
+    "--settings", JSON.stringify({ autoMemoryEnabled: false }),
     "--strict-mcp-config",
     "--mcp-config", t.fichierMcp,
     "--system-prompt-file", t.fichierPrompt,

@@ -29,6 +29,11 @@ describe("arguments d'un tour", () => {
     expect(a).not.toContain("--resume");
   });
 
+  it("mémoire automatique de Claude Code coupée : sinon nos agents lisent celle des sessions de l'utilisateur sur ce dépôt (essai du 07/11)", () => {
+    const a = argumentsDuTour({ ...base, reprise: false });
+    expect(JSON.parse(a[a.indexOf("--settings") + 1]!)).toEqual({ autoMemoryEnabled: false });
+  });
+
   it("outils intégrés sans Bash ; nos outils autorisés ; outil de permission caché au modèle et chargé des demandes", () => {
     const a = argumentsDuTour({ ...base, reprise: false });
     expect(a[a.indexOf("--tools") + 1]).toBe("Read,Write,Edit,Glob,Grep");

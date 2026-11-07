@@ -218,6 +218,15 @@ describe("Runtime Claude par le CLI (ADR 0070)", () => {
     await s2.close();
   });
 
+  it("version du CLI : au moins celle qu'on a vérifiée ; plus ancienne ou illisible, start refuse et dit laquelle il faut", async () => {
+    const avec = (v: string) => createClaudeRuntime({ lanceur: { version: async () => v, lancer: () => { throw new Error("non"); } } });
+    await expect(avec("2.1.319 (Claude Code)").start()).resolves.toBeUndefined();
+    await expect(avec("2.2.0 (Claude Code)").start()).resolves.toBeUndefined();
+    await expect(avec("2.1.300 (Claude Code)").start()).rejects.toThrow(/2\.1\.300.*au moins 2\.1\.319/);
+    await expect(avec("1.9.999 (Claude Code)").start()).rejects.toThrow(/au moins 2\.1\.319/);
+    await expect(avec("version inconnue").start()).rejects.toThrow(/version de Claude Code illisible/i);
+  });
+
   it("CLI absent ou illisible : start échoue avec un message qui dit quoi faire", async () => {
     const rt = createClaudeRuntime({ lanceur: { version: async () => { throw new Error("ENOENT"); }, lancer: () => { throw new Error("non"); } } });
     await expect(rt.start()).rejects.toThrow(/Claude Code \(claude\) introuvable/);

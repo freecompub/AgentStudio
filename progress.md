@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Runtime Claude : mémoire automatique coupée, version minimale du CLI
+
+- **Vérifié par un mot-témoin** (projet jetable, `haiku`) : avec nos arguments du 06/11, la
+  **mémoire automatique** de Claude Code (`<projectsDirectory>/<dossier encodé>/memory/MEMORY.md`)
+  **est lue** par l'agent. En run réel, c'est celle des sessions de l'utilisateur sur son dépôt :
+  elle entrait dans le contexte de nos agents.
+- Deux moyens la coupent, **sans `--bare`** (qui imposerait une clé API) — noms vérifiés dans le
+  binaire installé, puis essayés : `--settings '{"autoMemoryEnabled": false}'` et
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ; dans les deux cas l'agent répond INCONNU et `memory_paths`
+  disparaît de l'init. Appliqués **tous les deux** : le réglage dans `argumentsDuTour` (testé), la
+  variable dans le lanceur.
+- Données de l'essai supprimées (`~/.claude/projects/…-memoire-projet`, seulement ce projet jetable).
+- **Version minimale** : `VERSION_MINIMALE = "2.1.319"` (celle des essais) ; `start` refuse une
+  version plus ancienne (« il faut au moins 2.1.319, `claude update` ») ou illisible ; une plus récente
+  est acceptée — le flux reste couvert par les tests de contrat sur les sorties enregistrées.
+- Tests vus rouges puis verts (26) ; `pnpm smoke:claude` réussi avec les nouveaux arguments.
+
 ## 06/11 — Runtime Claude : les deux défauts de mesure du coût corrigés
 
 - **Cumul à la reprise** : le runtime retient, par session, le cumul déjà compté et n'émet que

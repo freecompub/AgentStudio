@@ -25,6 +25,20 @@ export interface ClaudeRuntimeDeps {
   delaiApresTerminalMs?: number;
 }
 
+/**
+ * Version de Claude Code sur laquelle le format `stream-json`, les options et la délégation des
+ * permissions ont été vérifiés (essais du 06/11). Plus ancienne : refusée ; plus récente : acceptée,
+ * et le flux reste couvert par les tests de contrat sur des sorties enregistrées.
+ */
+export const VERSION_MINIMALE = "2.1.319";
+
+const enNombres = (v: string) => v.split(".").map(Number);
+function auMoins(v: string, min: string): boolean {
+  const [a, b] = [enNombres(v), enNombres(min)];
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  return true;
+}
+
 /** Nom de notre serveur MCP dans la configuration donnée au CLI. */
 const SERVEUR = "agent-studio";
 
@@ -169,12 +183,16 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
       return [];
     },
     async start() {
+      let brute: string;
       try {
-        const v = await lanceur.version();
-        logger?.info("runtime Claude prêt", { version: v });
+        brute = await lanceur.version();
       } catch (e) {
         throw new Error(`Claude Code (claude) introuvable ou inutilisable : installe-le et connecte-toi (\`claude\`), puis relance. (${e instanceof Error ? e.message : String(e)})`);
       }
+      const v = /(\d+\.\d+\.\d+)/.exec(brute)?.[1];
+      if (!v) throw new Error(`Version de Claude Code illisible (« ${brute} ») : il faut au moins ${VERSION_MINIMALE}.`);
+      if (!auMoins(v, VERSION_MINIMALE)) throw new Error(`Claude Code ${v} est trop ancien : il faut au moins ${VERSION_MINIMALE} (\`claude update\`).`);
+      logger?.info("runtime Claude prêt", { version: v, minimale: VERSION_MINIMALE });
     },
     async stop() {
       for (const s of [...ouvertes]) await s.close();

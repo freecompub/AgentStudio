@@ -11,7 +11,8 @@ export function createLanceurClaude(o: { commande?: string } = {}): LanceurClaud
         execFile(commande, ["--version"], { timeout: 15_000 }, (err, stdout) => (err ? reject(err) : resolve(stdout.trim()))),
       ),
     lancer({ args, cwd, entree }) {
-      const enfant = spawn(commande, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+      // Mémoire automatique coupée aussi par l'environnement, en plus de `--settings` (essai du 07/11).
+      const enfant = spawn(commande, args, { cwd, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" } });
       let erreur = "";
       enfant.stderr.setEncoding("utf8").on("data", (c: string) => (erreur = (erreur + c).slice(-4_000)));
       const lignes = createInterface({ input: enfant.stdout });
