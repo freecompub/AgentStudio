@@ -2,7 +2,8 @@
 
 ## Statut
 
-**Proposé** le 2026-11-07, à valider par le responsable du projet avant toute implémentation.
+**Accepté** le 2026-11-07 par le responsable du projet (« Oui ça me convient »), avec la profondeur de
+détection de 4 niveaux.
 Concerne `stack-adapters`, `project-services` (`/stack init`, `/stack doctor`), l'extension `skraft`
 et le workflow `workflows/skraft/` (donc aussi le serveur MCP). Complète l'ADR 0071 (fichier de
 projet) et l'ADR 0072 (profils de pile).
@@ -52,7 +53,7 @@ ne cherche aucun dossier.
 4. **Seuls les composants touchés** par le pas ou la phase sont lancés aux portes de pas et de
    scénario ; la porte de fin de DELIVER et la référence de début de DELIVER lancent tous les
    composants (rien ne doit casser ailleurs).
-5. **`/stack init`** détecte chaque sous-projet (un manifeste par dossier, à profondeur bornée,
+5. **`/stack init`** détecte chaque sous-projet (un manifeste par dossier, jusqu'à 4 niveaux sous la racine,
    dossiers cachés et de dépendances exclus), propose un composant par sous-projet reconnu, et
    écrit `composants` après confirmation, comme il écrit `pile` aujourd'hui. `/stack doctor`
    diagnostique chaque composant.
@@ -105,5 +106,4 @@ d'acceptance, et seulement pour un composant qui le choisit.
 - Le BDD reste un choix du projet, jamais imposé, et décidé une fois, à l'initialisation.
 - Tranché le 07/11 : un composant dont `bdd` n'est pas déclaré n'est **pas** en BDD, et son run n'est
   pas refusé (le BDD est un choix, le TDD la règle).
-- Reste à trancher à la validation : la profondeur de détection des sous-projets (proposé : 4
-  niveaux sous la racine, comme la v2).
+- Tranché le 07/11 : les sous-projets sont détectés jusqu'à 4 niveaux sous la racine.

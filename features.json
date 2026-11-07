@@ -183,14 +183,14 @@
       "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port, et les portes ne lancent que les composants touchés (ADR 0074)",
       "verify": "",
       "passes": false,
-      "notes": "ADR 0074 PROPOSÉ le 07/11, à valider avant toute implémentation. Aujourd'hui une seule pile par projet : un dépôt mixte n'est jugé qu'en partie."
+      "notes": "ADR 0074 accepté le 07/11. Aujourd'hui une seule pile par projet : un dépôt mixte n'est jugé qu'en partie."
     },
     {
       "id": "bdd-par-composant",
       "title": "Le BDD se décide par composant (`bdd: false` ou couples lanceur, features, étapes) : DISTILL écrit les .feature exécutés et leurs étapes, gelés, reliés à leur test par @ac-<n> (ADR 0074)",
       "verify": "",
       "passes": false,
-      "notes": "ADR 0074 PROPOSÉ le 07/11, après les composants. Idée reprise de skraft-plugin v2 (rien de copié). Lien scénario-test à vérifier sur la version installée de chaque lanceur (Reqnroll d'abord)."
+      "notes": "ADR 0074 accepté le 07/11 ; après les composants. TDD toujours, BDD au choix. Idée reprise de skraft-plugin v2 (rien de copié). Lien scénario-test à vérifier sur la version installée de chaque lanceur (Reqnroll d'abord)."
     },
     {
       "id": "lentilles-informees-des-portes-jugees",

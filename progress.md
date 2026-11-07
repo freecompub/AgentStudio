@@ -5,7 +5,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
-## 07/11 — ADR 0074 proposé : composants d'un projet, BDD par composant (rien d'implémenté)
+## 07/11 — ADR 0074 accepté : composants d'un projet, BDD par composant (rien d'implémenté)
 
 - Question du responsable : donner le choix TDD ou BDD, et traiter les dépôts qui mélangent les
   technologies. Vérifié dans le code : une seule pile par projet (`selectStackAdapter`, une section
@@ -18,8 +18,8 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   composant, `.feature` et étapes écrits en DISTILL et gelés, scénario relié à son test par `@ac-<n>`.
   Différence voulue avec la v2 : `bdd` absent ne bloque pas les projets existants. **Décidé par le
   responsable : le TDD toujours, le BDD au choix** (un composant qui ne dit rien n'est pas en BDD).
-- Critères `composants-d-un-projet` et `bdd-par-composant` (false). Prochaine étape : validation de
-  l'ADR par le responsable.
+- Critères `composants-d-un-projet` et `bdd-par-composant` (false). ADR **accepté** par le responsable
+  (détection des sous-projets jusqu'à 4 niveaux). Prochaine étape : les composants (brique 1).
 
 ## 07/11 — Run de mesure US-2 avec Claude (`docs/runs/2026-11-07-us-2-mcp-claude/`)
 
