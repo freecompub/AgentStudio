@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defaultAdminConfigPath, loadAdminConfig } from "../src/admin-config.js";
+import { DEFAULT_ALLOWED_PROGRAMS_FOR_TESTS } from "../../stack-adapters/test/support/programmes.js";
 
 describe("Configuration administrateur (D6, O5)", () => {
   let dir: string;
@@ -16,10 +17,12 @@ describe("Configuration administrateur (D6, O5)", () => {
     expect(c).toMatchObject({ source: "défaut", profile: { role: "developpeur", defaultMode: "advanced", permissionPolicy: "souple" }, trustedPublishers: [], developerMode: false, revocation: null });
   });
 
-  it("programmes autorisés par défaut : lanceurs de tests, linters et outils de mutation courants (O12)", async () => {
+  it("programmes autorisés par défaut : lanceurs de tests, linters, outils de format et de mutation courants (O12)", async () => {
     const c = await loadAdminConfig(join(dir, "absent.json"));
     // Ce sont ceux qu'un profil de stack peut nommer sans que l'administrateur intervienne.
-    expect(c.allowedPrograms).toEqual(expect.arrayContaining(["pytest", "eslint", "stryker"]));
+    expect(c.allowedPrograms).toEqual(expect.arrayContaining(["pytest", "eslint", "stryker", "prettier"]));
+    // La copie de `stack-adapters` (ses tests ne dépendent pas de l'application) doit suivre.
+    expect([...c.allowedPrograms].sort()).toEqual([...DEFAULT_ALLOWED_PROGRAMS_FOR_TESTS].sort());
     // Et jamais de quoi sortir du projet ou atteindre le réseau.
     for (const interdit of ["curl", "wget", "rm", "bash", "sh", "ssh", "node", "npm"])
       expect(c.allowedPrograms, interdit).not.toContain(interdit);

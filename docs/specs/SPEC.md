@@ -513,7 +513,7 @@ Tout ce qui dépend du langage ou de l'outillage d'un projet est **externalisé 
 
 ### 8.2 Format du profil
 
-Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON Schema `stack-profile@1` (publié par `packages/stack-profiles`).
+Fichier `.agent-studio/stack.yaml` à la racine du projet, validé par le JSON Schema `stack-profile@1` (publié par `packages/stack-profiles`). *Depuis l'ADR 0071 : section `pile` de `.agent-studio/projet.yaml` ; `stack.yaml` n'est plus relu que pendant la transition.*
 
 ```yaml
 schema: agent-studio/stack-profile@1

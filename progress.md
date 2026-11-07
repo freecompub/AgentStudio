@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 07/11 — Fichier de projet (ADR 0071) : l'exemple livré au nouveau format
+
+- `profiles/typescript.yaml` est désormais un `projet.yaml` complet : section `pile` (l'ancien
+  profil, plus `format: [prettier, --check, "{fichiers}"]`) et section `qualite` commentée (cœur,
+  couverture, mutation, dépendances). Le README de `profiles/` décrit les deux sections, la
+  transition et la porte de format ; SPEC (profil de stack) renvoie à l'ADR 0071.
+- **`prettier` ajouté aux programmes autorisés par défaut** (`admin-config`), sans quoi l'exemple
+  serait refusé. Choix fait ici, à signaler : un outil de format peut réécrire les fichiers du
+  projet (`--write`), comme `eslint --fix` déjà autorisé ; il ne sort pas du projet. Les autres
+  formateurs courants passent par un programme déjà autorisé (`dotnet format`, `cargo fmt`,
+  `ruff format`). Un test vérifie maintenant que la copie de la liste dans les tests de
+  `stack-adapters` reste égale à la vraie (elle avait pu diverger sans que rien ne le dise).
+- Les trois tests qui lisent l'exemple livré (profils, lint et canaris contre les vrais outils)
+  passent par `test/support/profil-livre.ts`.
+- `/stack init`, quand rien n'est reconnu, ne parle plus de « deux exemples » (il n'en reste qu'un
+  depuis le retrait de Swift).
+
 ## 07/11 — Fichier de projet (ADR 0071), brique 3 : porte de format
 
 - Profil de pile : commande facultative `format` (`dotnet format --verify-no-changes`,

@@ -7,5 +7,6 @@
 export const DEFAULT_ALLOWED_PROGRAMS_FOR_TESTS = [
   "pytest", "go", "cargo", "gradle", "mvn", "dotnet", "vitest", "jest", "phpunit", "rspec",
   "eslint", "ruff", "flake8", "pylint", "ktlint", "rubocop", "phpcs",
+  "prettier",
   "stryker", "mutmut", "pitest",
 ];

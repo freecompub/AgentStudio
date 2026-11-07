@@ -5,9 +5,24 @@ l'application n'ait pas besoin d'un adaptateur écrit en TypeScript pour ce lang
 
 ## S'en servir
 
-Copier le profil qui convient dans `.agent-studio/stack.yaml`, à la racine du projet, puis
-l'ajuster. Il est lu à l'ouverture et **l'emporte sur la détection automatique**. S'il est refusé,
-la raison est expliquée dans la conversation et la détection reprend la main.
+Copier l'exemple qui convient dans `.agent-studio/projet.yaml`, à la racine du projet, puis
+l'ajuster (ADR 0071). Le fichier a deux sections, validées chacune selon ses règles :
+
+- `pile` — **comment** lancer les outils : tests, lint, format, mutation, emplacements, canaris.
+  Elle est lue à l'ouverture et **l'emporte sur la détection automatique** ; refusée, la raison
+  est expliquée dans la conversation et la détection reprend la main. `/stack init` l'écrit pour
+  vous, après confirmation, sans toucher au reste du fichier.
+- `qualite` — **ce qui est exigé** : chemins du cœur, seuils de couverture et de mutation, règles
+  de dépendance. Elle ne lance rien. Sans elle, les valeurs par défaut s'appliquent.
+
+Toute autre clé de premier niveau est refusée. Les anciens `.agent-studio/stack.yaml` et
+`.agent-studio/quality.yaml` sont encore lus, avec un avertissement, tant que `projet.yaml`
+n'existe pas ; ensuite ils sont ignorés.
+
+La commande `format` est facultative : elle **vérifie** la mise en forme sans rien modifier
+(`prettier --check`, `dotnet format --verify-no-changes`), en fin de scénario à côté du lint. Seul
+son code de sortie compte ; un écart revient au développeur. Sans elle, la porte note que le
+format n'est pas mesuré.
 
 Les programmes nommés doivent figurer dans la liste autorisée par l'administrateur (`admin.json`,
 D47/O12). La liste par défaut couvre les lanceurs de tests, linters et outils de mutation

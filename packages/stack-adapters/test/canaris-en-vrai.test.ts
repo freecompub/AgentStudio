@@ -11,16 +11,15 @@
  * Aucun LLM n'intervient ici, et aucune requête réseau : uniquement `vitest`, que le dépôt
  * possède déjà. Ce test peut donc tourner en CI.
  */
-import { cp, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import { cp, mkdtemp, rm, symlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCanaries } from "../src/profile/canaries.js";
-import { parseStackProfile } from "../src/profile/stack-profile.js";
+import { profilLivre } from "./support/profil-livre.js";
 import { createNodeProcessRunner } from "../src/process/node-process-runner.js";
 import type { ProcessRunner } from "../src/protocols.js";
-import { DEFAULT_ALLOWED_PROGRAMS_FOR_TESTS as AUTORISES } from "./support/programmes.js";
 
 const RACINE_DEPOT = join(import.meta.dirname, "../../..");
 const TEMOIN = join(import.meta.dirname, "fixtures/projet-vitest");
@@ -54,14 +53,6 @@ function lanceurReel(): ProcessRunner {
   };
 }
 
-/** Le profil livré, celui qu'un utilisateur copie : c'est lui qu'il faut éprouver, pas une copie. */
-async function profilLivre() {
-  const brut = await readFile(join(RACINE_DEPOT, "profiles/typescript.yaml"), "utf8");
-  const r = parseStackProfile(brut, { allowedPrograms: AUTORISES });
-  if ("error" in r) throw new Error(r.error);
-  return r.profile;
-}
-
 let bac: string;
 beforeEach(async () => {
   bac = await mkdtemp(join(tmpdir(), "agent-studio-temoin-"));
@@ -78,7 +69,7 @@ describeSiInstalle("Les canaris de profiles/typescript.yaml contre le vrai Vites
   it(
     "les quatre genres ressortent tels que l'oracle les attend",
     async () => {
-      const { constats, observations } = await runCanaries(await profilLivre(), { runner: lanceurReel(), sandboxRoot: bac });
+      const { constats, observations } = await runCanaries(profilLivre("typescript") /* le profil livré, pas une copie */, { runner: lanceurReel(), sandboxRoot: bac });
       const lisible = constats.map((c) => `${c.gravite} — ${c.message}`).join("\n");
 
       // Le relevé initial doit voir le test du projet-témoin : sinon rien de ce qui suit ne vaut.

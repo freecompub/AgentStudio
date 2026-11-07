@@ -1,55 +1,77 @@
-# Profil d'exemple — TypeScript avec Vitest.
+# Exemple de fichier de projet — TypeScript avec Vitest (ADR 0071).
 #
-# À copier dans `.agent-studio/stack.yaml` à la racine d'un projet, puis à ajuster.
-# Les programmes nommés doivent figurer dans la liste autorisée par l'administrateur (D47, O12).
-id: typescript
+# À copier dans `.agent-studio/projet.yaml` à la racine d'un projet, puis à ajuster. Deux
+# sections : `pile` dit comment lancer les outils, `qualite` ce qui est exigé. Les programmes
+# nommés doivent figurer dans la liste autorisée par l'administrateur (D47, O12).
+pile:
+  id: typescript
 
-# Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
-# existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
-detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
+  # Fichiers dont la présence signale cette stack. Attention : la détection ne regarde que leur
+  # existence, jamais leur contenu — un projet Node sans Vitest correspondrait aussi.
+  detect: [vitest.config.ts, vitest.config.js, vite.config.ts]
 
-tests:
-  command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
-  report: vitest-json
+  tests:
+    command: [vitest, run, --reporter=json, "--outputFile={rapport}"]
+    report: vitest-json
 
-lint:
-  command: [eslint, --format, json, "--", "{fichiers}"]
-  report: eslint-json
+  lint:
+    command: [eslint, --format, json, "--", "{fichiers}"]
+    report: eslint-json
 
-mutation:
-  command: [stryker, run]
-  report: stryker-json
+  # Porte de format (ADR 0071) : vérifie sans rien modifier ; seul le code de sortie compte.
+  # Sans cette section, le format n'est pas mesuré, et la porte le note.
+  format:
+    command: [prettier, --check, "{fichiers}"]
 
-layout:
-  acceptanceTests: ["tests/acceptance/**"]
-  unitTests: ["tests/**", "src/**/*.test.ts"]
-  sources: ["src/**"]
+  mutation:
+    command: [stryker, run]
+    report: stryker-json
 
-# Ce qu'un domaine ne doit pas importer.
-infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+  layout:
+    acceptanceTests: ["tests/acceptance/**"]
+    unitTests: ["tests/**", "src/**/*.test.ts"]
+    sources: ["src/**"]
 
-# Canaris de `/stack doctor` : des tests dont la bonne réponse est connue d'avance. Le code les
-# écrit un par un dans une copie isolée du projet, lance la commande ci-dessus, et vérifie que
-# l'échec obtenu porte le classement attendu. `{marque}` est remplacée par un identifiant unique,
-# qui permet de retrouver les résultats du canari parmi ceux du projet.
-canaries:
-  - kind: passed
-    file: src/canari_{marque}.test.ts
-    content: |
-      import { expect, test } from "vitest";
-      test("canari {marque}", () => { expect(1).toBe(1); });
-  - kind: assertion
-    file: src/canari_{marque}.test.ts
-    content: |
-      import { expect, test } from "vitest";
-      test("canari {marque}", () => { expect(1).toBe(2); });
-  - kind: missing_symbol
-    file: src/canari_{marque}.test.ts
-    content: |
-      import { test } from "vitest";
-      test("canari {marque}", () => { fonctionAbsente_{marque}(); });
-  - kind: syntax
-    file: src/canari_{marque}.test.ts
-    content: |
-      import { test } from "vitest";
-      test("canari {marque}", () => { :::
+  # Ce qu'un domaine ne doit pas importer.
+  infrastructureModules: [Infrastructure, Interface, UI, API, react, express, next]
+
+  # Canaris de `/stack doctor` : des tests dont la bonne réponse est connue d'avance. Le code les
+  # écrit un par un dans une copie isolée du projet, lance la commande ci-dessus, et vérifie que
+  # l'échec obtenu porte le classement attendu. `{marque}` est remplacée par un identifiant unique,
+  # qui permet de retrouver les résultats du canari parmi ceux du projet.
+  canaries:
+    - kind: passed
+      file: src/canari_{marque}.test.ts
+      content: |
+        import { expect, test } from "vitest";
+        test("canari {marque}", () => { expect(1).toBe(1); });
+    - kind: assertion
+      file: src/canari_{marque}.test.ts
+      content: |
+        import { expect, test } from "vitest";
+        test("canari {marque}", () => { expect(1).toBe(2); });
+    - kind: missing_symbol
+      file: src/canari_{marque}.test.ts
+      content: |
+        import { test } from "vitest";
+        test("canari {marque}", () => { fonctionAbsente_{marque}(); });
+    - kind: syntax
+      file: src/canari_{marque}.test.ts
+      content: |
+        import { test } from "vitest";
+        test("canari {marque}", () => { :::
+
+# Ce qui est exigé. Chaque clé est facultative : un seuil absent n'est pas exigé, la couverture
+# est alors un fait rapporté. Une clé inconnue ou un seuil hors de 0–100 fait refuser le fichier.
+qualite:
+  # Le cœur se définit par des chemins ; sans déclaration, les noms usuels (Domain, Domaine,
+  # Application) sont reconnus.
+  coeur:
+    domaine: ["src/domain/**"]
+    application: ["src/application/**"]
+  couverture: { domaine: 100, application: 90, reste: 70 }
+  # Mutation en fin de DELIVER par défaut (`fin-de-phase`) ; `scenario` la lance à chaque scénario.
+  mutation: { active: true, domaine: 100, application: 100, reste: 90, moment: fin-de-phase }
+  dependances:
+    - module: src/domain
+      interdits: [src/infrastructure, express, react]
