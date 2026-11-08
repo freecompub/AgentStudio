@@ -243,6 +243,20 @@ describe("Concept d'un ADR absent du modèle (STRUCTURAL_DRIFT de skraft-plugin,
     expect(checkDesign(input({ adrs }))).toEqual(["`DoseLedger`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."]);
   });
 
+  // Run du 08/11 (et du 07/11) : « Agrégat `Panier` » était dans domain-model.md, et la porte le disait
+  // absent. Les noms du modèle étaient relevés comme des identifiants composés (`GrilleDePaliers`) :
+  // un nom d'un seul mot n'y figurait jamais, alors que ceux de l'ADR, si.
+  it("un concept d'un seul mot présent dans le modèle : accepté", () => {
+    const docs = { ...input().docs, "domain-model.md": `${input().docs["domain-model.md"]}\n### Agrégat \`Panier\` (existant, étendu)\n` };
+    const adrs = [...input().adrs, { path: "docs/adr/adr-003-panier.md", md: adr(3, { decision: "Nous gardons l'Agrégat `Panier` comme seule frontière de cohérence." }), isNew: true }];
+    expect(checkDesign(input({ docs, adrs }))).toEqual([]);
+  });
+
+  it("un concept d'un seul mot absent du modèle : toujours rejeté", () => {
+    const adrs = [...input().adrs, { path: "docs/adr/adr-003-registre.md", md: adr(3, { decision: "Agrégat `Registre` conserve l'historique des doses." }), isNew: true }];
+    expect(checkDesign(input({ adrs }))).toEqual(["`Registre`, Agrégat dans ADR-003, n'existe ni dans event-model.md ni dans domain-model.md."]);
+  });
+
   it("un concept cité seulement dans les alternatives écartées de l'ADR : accepté", () => {
     const adrs = [...input().adrs, { path: "docs/adr/adr-003-historique.md", md: adr(3, { alternatives: "Agrégat `DoseLedger` : écarté, l'historique n'est pas demandé." }), isNew: true }];
     expect(checkDesign(input({ adrs }))).toEqual([]);

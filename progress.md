@@ -26,6 +26,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Porte de cohérence de DESIGN : un nom d'un seul mot n'était jamais reconnu dans le modèle
+
+- **Défaut** (trouvé en lisant les refus du run BDD) : `conceptsAbsentsDuModele` comparait les noms
+  qu'un ADR classe (`classements`, tout nom en capitale initiale : `Panier`) aux noms du modèle relevés
+  par `extractCodeIdentifiers`, qui ne garde que les noms **composés** (`PASCAL` : `GrilleDePaliers`).
+  « Agrégat `Panier` » écrit dans `domain-model.md` n'y figurait donc jamais.
+- **Effet** : runs du 07/11 et du 08/11, « `Panier`, Agrégat dans ADR-003, n'existe ni dans… »
+  répété ; le 08/11, deux essais (4,36 $), disjoncteur, escalade, puis l'ADR-003 **abandonné** par
+  l'architecte pour passer la porte. L'« incohérence entre les deux architectes » du 07/11 était en
+  partie ce défaut.
+- **Correction**, extension et workflow : `nomsDuModele` ajoute aux noms composés les noms d'un seul
+  mot écrits entre accents graves ou dans un bloc de code. `extractCodeIdentifiers` n'est pas
+  touché (il sert aussi aux citations).
+- **Vérifié** : test rouge puis vert dans les deux copies, garde « nom d'un seul mot absent : rejeté » ;
+  rejoué sur l'instantané réel de l'essai 3 (`traces/…/DESIGN rembobinage`) : l'ancien code redonne
+  le refus mot pour mot, le nouveau aucun.
+- Les autres refus de DESIGN du run (`SommeDesArticles`, `FraisDePort`, `PrixUnitaire` : champs du
+  code cités par les contrats, absents du modèle) relèvent de la règle, pas d'un défaut. Question
+  laissée au responsable : exiger ces champs existants dans le modèle est-il trop strict ?
+
 ## 08/11 — Run réel US-2 en BDD, Claude, par le serveur MCP (`docs/runs/2026-11-08-us-2-bdd-claude/`)
 
 - Départ : `main` GitHub d'`exemple-dotnet-tdd` (`19583a4`, US-1 déjà en BDD Reqnroll), pile
@@ -33,6 +53,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   responsable (« Lance un test l'exemple à partir de sa branche main »).
 - Résultat : **fini, 23m28, 8 rejets, 12,18 $**, `dotnet test` 10/10. Le `.feature` va au projet,
   titres `AC-n`, étapes dans `Steps/` : le chemin BDD fonctionne de bout en bout.
+- **Défaut de DESIGN** : `Panier` refusé à tort (nom d'un seul mot), **corrigé** (entrée précédente).
 - **Deux défauts de nos portes, à corriger avant de passer `bdd-par-composant` à `true`** :
   1. la porte des titres `AC-n` juge **tous** les `.feature` du dossier : l'agent a renommé les
      scénarios de l'**US-1** pour la satisfaire ;
