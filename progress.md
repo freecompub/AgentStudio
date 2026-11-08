@@ -189,6 +189,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Troisième run réel US-2 en BDD (`docs/runs/2026-11-08-us-2-bdd-claude-3/`)
+
+- Demandé par le responsable (« On lance le test ») ; serveur reconstruit à `991df12` (PR #25).
+- **Fini : 15m05, 2 rejets, 5,12 $** (second : 16m13, 1 rejet, 5,18 $) ; DESIGN 2,94 $ ; ADR-003 ratifié ;
+  US-1 intacte ; `dotnet test` 10/10.
+- **Vérifié en réel** : aucun refus « nom cité absent du modèle » (liste des noms) ; aucune question
+  bloquante du chercheur (question de la story posée avant RESEARCH) ; note « ac-3 déjà vert » émise.
+- **Nouveau défaut de porte** (à corriger) : la porte de cohérence lit comme une relation entre contextes
+  une phrase qui dit qu'il n'y en a pas (« aucune flèche `A` → `B` à qualifier ») : patron manquant,
+  contextes `A` et `B` non classés. Coût : le second essai de DESIGN (1,58 $).
+- Erreur d'agent : citation à chemin incomplet en RESEARCH (`Steps/ChiffrageDuPanierSteps.cs`) ; la porte a
+  raison. Piste : proposer le chemin complet dans le motif quand un seul fichier y correspond.
+
 ## 08/11 — L'architecte qui décide reçoit les noms du modèle
 
 - **Pourquoi** : hors le défaut `Panier`, tous les refus de DESIGN des deux runs du jour étaient des noms

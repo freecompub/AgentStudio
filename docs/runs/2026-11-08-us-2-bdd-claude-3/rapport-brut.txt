@@ -1,0 +1,72 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "bc24f89b2b45518a26e1357e5445a12a99205c4dd1d24e11729ea1872cdb9763",
+    "adrs": [
+      {
+        "id": "ADR-003",
+        "path": "docs/adr/adr-003-frontiere-agregat-panier-et-remise-par-paliers.md",
+        "status": "Accepted"
+      }
+    ],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Scénario ac-3 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
+        "Mutation hors du changement : src/Tarification.Domaine/Montant.cs, 5 mutant(s) survivant(s) sur des lignes que la story ne modifie pas (ligne 14 (String mutation), ligne 21 (Conditional (false) mutation), ligne 21 (Equality mutation), ligne 21 (String mutation (non couvert)), ligne 27 (String mutation (non couvert))) ; non jugés."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_5SansPalierConfigureAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_1UneLigneSousLePalierNobtientAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_4LaRemiseSeCalculeParLigneJamaisSurLePanierEntier"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : ADR-003 (Accepted).\nRemarques hors du changement de la story :\n- src/Tarification.Application/CalculDuPanier.cs:6 (quality-gates, minor) : La doc de `Facture` affirme que « les remises ... restent à zéro tant que les stories correspondantes ne sont pas livrées », alors que `Chiffrer` calcule désormais `Remise` via `panier.RemiseParPaliers(_grille)`. Le commentaire est périmé.\n- src/Tarification.Domaine/TauxDeRemise.cs:11 (quality-gates, major) : La validation `TauxDeRemise.De` (rejet d'un pourcentage négatif) n'a aucun test. Le plan de test l'a explicitement notée pour la boucle interne de DELIVER (test-plan.md:19). Les faits ne rapportent aucun test unitaire ajouté pour ce cas, et les tests existants ne couvrent que `Quantite.De` et `Montant.De` négatifs (tests/Tarification.Tests/CalculDuPanierTests.cs:11-22). La couverture de ligne à 100 % (TauxDeRemise.cs, 3/3) ne prouve pas que la branche `throw` est exercée.\n- src/Tarification.Domaine/TauxDeRemise.cs:10 (quality-gates, minor) : La mutation de fin de DELIVER n'est rapportée que pour GrilleDePaliers.cs et Montant.cs, alors que le diff de la tâche touche aussi PalierDeRemise.cs, TauxDeRemise.cs, Panier.cs et CalculDuPanier.cs. Ces fichiers ont une couverture de ligne mais aucun résultat de mutation : un mutant survivant sur la garde de `TauxDeRemise.De` ou sur `PalierDeRemise.De` ne serait pas détecté."
+  ],
+  "dernierRejet": {
+    "gate": "cohérence",
+    "reasons": [
+      "context-map.md : la relation « `A` → `B` » ne nomme aucun patron (ACL, Conformist, Shared Kernel, Customer-Supplier, Open Host Service, Published Language, Partnership, Separate Ways).",
+      "context-map.md : le contexte `A` n'est classé ni Core, ni Supporting, ni Generic (une ligne « `A` : Core | Supporting | Generic »
+
+Rapport complet : /tmp/essai-mcp-skraft-keBAGO/rapport.json
+Clone : /tmp/essai-mcp-skraft-keBAGO/projet
