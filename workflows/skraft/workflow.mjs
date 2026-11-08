@@ -162,7 +162,7 @@ export const meta = {
 * celui du réducteur de skraft. Si le script n'est pas nettement plus simple que la partie du
 * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
 */
-import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond } from "@agent-studio/workflow";
+import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond, bddNonDeclare, estUnManifeste } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
@@ -181,7 +181,13 @@ const RELANCER_OU_ABANDONNER = [
 export default async function skraft(w, entree) {
   const { story, slug, indicateurs } = await preparer(w, entree.story);
   const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
-  const problems = problemesTestsExistants(run);
+  // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
+  const racinesMuettes = (await w.disposition()).bddNonDecide ?? [];
+  const tousLesFichiers = racinesMuettes.length ? await w.listerFichiers() : [];
+  const manifestes = [];
+  for (const path of tousLesFichiers.filter(estUnManifeste))
+    manifestes.push({ path, content: await w.lireFichier(path).catch((e) => (e instanceof PanneEnvironnement ? Promise.reject(e) : "")) });
+  const problems = [...problemesTestsExistants(run), ...bddNonDeclare(racinesMuettes, tousLesFichiers, manifestes)];
   if (problems.length) {
     await w.informer(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
     throw new PanneEnvironnement(problems.join(" ; "));

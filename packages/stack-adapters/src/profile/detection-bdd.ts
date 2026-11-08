@@ -87,3 +87,35 @@ export function blocBdd(d: DetectionBdd): string {
   const manque = [!d.lanceur && "lanceur", !d.features && "dossier des .feature", !d.etapes && "dossier des étapes"].filter(Boolean);
   return `# bdd (ADR 0074) : à compléter. Trouvé : ${trouve.join(", ")}. Introuvable : ${manque.join(", ")}.\n`;
 }
+
+/**
+ * Au démarrage de skraft (08/11) : pour chaque racine de composant dont la pile ne dit rien du BDD
+ * (`bddNonDecide`), les signes qu'il en montre — un lanceur cité par un manifeste, des `.feature`. Un
+ * dossier d'étapes seul n'en est pas un : `steps` ou `bindings` servent aussi ailleurs. Chemins relatifs
+ * à la racine du projet ; un motif par composant concerné, à montrer tel quel.
+ */
+export function bddNonDeclare(racines: readonly string[], fichiers: readonly string[], manifestes: readonly FichierLu[]): string[] {
+  const sous = <T>(racine: string, xs: readonly T[], chemin: (x: T) => string) => xs.filter((x) => racine === "." || chemin(x).startsWith(`${racine}/`));
+  const relatif = (racine: string, p: string) => (racine === "." ? p : p.slice(racine.length + 1));
+  const projet = (racine: string, p: string) => (racine === "." ? p : `${racine}/${p}`);
+  const motifs: string[] = [];
+  for (const racine of racines) {
+    const siens = sous(racine, manifestes, (m) => m.path);
+    const d = detecterBdd({
+      fichiers: sous(racine, fichiers, (f) => f).map((f) => relatif(racine, f)),
+      manifestes: siens.map((m) => ({ path: relatif(racine, m.path), content: m.content })),
+    });
+    const signes: string[] = [];
+    if (d.lanceur) {
+      const cite = siens.find((m) => lanceursCites([m]).includes(d.lanceur!));
+      signes.push(`lanceur ${d.lanceur} cité par \`${cite?.path ?? "un manifeste"}\``);
+    }
+    if (d.features) signes.push(`des \`.feature\` dans \`${projet(racine, d.features)}\``);
+    if (!signes.length) continue;
+    motifs.push(
+      `${racine === "." ? "Le projet" : `Composant \`${racine}\``} : sa pile ne dit rien du BDD, mais il en montre les signes (${signes.join(" ; ")}). ` +
+        "Déclare `bdd` dans sa pile (`lanceur`, `features`, `etapes`), ou `bdd: false` s'il ne fait pas de BDD ; `/stack init` peut le proposer.",
+    );
+  }
+  return motifs;
+}

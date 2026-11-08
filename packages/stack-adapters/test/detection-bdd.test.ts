@@ -4,7 +4,7 @@
  * et ne devine rien — un couple complet est proposé, une moitié est signalée à compléter.
  */
 import { describe, expect, it } from "vitest";
-import { blocBdd, detecterBdd } from "../src/profile/detection-bdd.js";
+import { bddNonDeclare, blocBdd, detecterBdd } from "../src/profile/detection-bdd.js";
 import { diagnoseProfile, proposeProfile } from "../src/profile/stack-doctor.js";
 import { parseStackProfile } from "../src/profile/stack-profile.js";
 
@@ -100,5 +100,32 @@ bdd:
   it("sans manifestes lus, le lanceur n'est pas vérifié plutôt que déclaré absent", () => {
     const c = diagnoseProfile(profil, { ...base, cheminExiste: () => true });
     expect(c.filter((x) => /BDD/.test(x.message))).toHaveLength(2);
+  });
+});
+
+/**
+ * Au démarrage de skraft (08/11) : un composant dont la pile ne dit rien du BDD, mais qui en montre les
+ * signes, doit le déclarer — sinon le run part dans le mauvais mode sans que personne le sache.
+ */
+describe("bddNonDeclare — les composants muets qui montrent des signes de BDD", () => {
+  const cucumber = { path: "web/package.json", content: '{"devDependencies":{"@cucumber/cucumber":"10"}}' };
+
+  it("signes trouvés sous une racine non décidée : un motif qui dit ce qui est vu et comment déclarer", () => {
+    expect(bddNonDeclare(["web"], ["web/features/a.feature", "web/src/a.ts"], [cucumber])).toEqual([
+      "Composant `web` : sa pile ne dit rien du BDD, mais il en montre les signes (lanceur cucumber-js cité par `web/package.json` ; des `.feature` dans `web/features`). Déclare `bdd` dans sa pile (`lanceur`, `features`, `etapes`), ou `bdd: false` s'il ne fait pas de BDD ; `/stack init` peut le proposer.",
+    ]);
+  });
+
+  it("la racine du projet est nommée « le projet »", () => {
+    expect(bddNonDeclare(["."], ["features/a.feature"], [])[0]).toMatch(/^Le projet : sa pile ne dit rien du BDD, mais il en montre les signes \(des `\.feature` dans `features`\)/);
+  });
+
+  it("aucun signe, ou seulement un dossier `steps` : rien à dire", () => {
+    expect(bddNonDeclare(["."], ["src/a.ts", "tests/steps/a.ts"], [{ path: "package.json", content: '{"devDependencies":{"vitest":"4"}}' }])).toEqual([]);
+  });
+
+  it("seules les racines non décidées sont regardées", () => {
+    expect(bddNonDeclare([], ["features/a.feature"], [])).toEqual([]);
+    expect(bddNonDeclare(["api"], ["web/features/a.feature"], [cucumber])).toEqual([]);
   });
 });

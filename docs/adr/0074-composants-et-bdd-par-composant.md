@@ -163,6 +163,23 @@ scénario de l'US-1 qui porte le même critère.
    n'a donc pas encore de proposition, BDD compris. Vérifié sur le `main` BDD d'`exemple-dotnet-tdd` :
    la détection rend `reqnroll`, `tests/Tarification.UnitTests/Features`, `…/Steps`.
 
+### 6. Révision du 08/11 : un BDD muet ne démarre pas
+
+Décidée par le responsable le 08/11 : une détection partielle écrivait le profil **sans** `bdd`, et
+`bdd` absent valait « pas de BDD ». Un projet BDD démarrait alors dans le mauvais mode, sans que personne
+le sache ; une pile donnée au serveur MCP sans `bdd` avait le même effet.
+
+1. **`bdd: false` est un choix déclaré, `bdd` absent n'est rien décidé.** Le profil garde la
+   différence (`false` devient une liste vide) ; le port expose `bddNonDecide`, les racines des
+   composants dont la pile ne dit rien (l'adaptateur TypeScript intégré, sans profil, n'en décide pas).
+2. **Au démarrage de skraft** (INIT, extension et workflow, donc aussi le serveur MCP), le code cherche
+   sous ces racines les signes du BDD : un lanceur cité par un manifeste, des `.feature` (un dossier
+   d'étapes seul n'en est pas un). S'il en trouve, le run **ne démarre pas**, avant tout appel d'agent :
+   le motif dit ce qui est vu et de déclarer `bdd`, ou `bdd: false` (`bddNonDeclare`, une seule copie,
+   dans `stack-adapters`).
+3. Un projet sans signe de BDD n'est pas concerné : la décision du 07/11 (« absent ne bloque pas ») tient
+   pour lui.
+
 ## Ordre de mise en œuvre
 
 1. Composants : schéma, adaptateur composé ; tests sur un dépôt mixte simulé, puis réel. **Fait le
@@ -179,5 +196,6 @@ scénario de l'US-1 qui porte le même critère.
   les références enregistrées avant ne s'y comparent plus.
 - Le BDD reste un choix du projet, jamais imposé, et décidé une fois, à l'initialisation.
 - Tranché le 07/11 : un composant dont `bdd` n'est pas déclaré n'est **pas** en BDD, et son run n'est
-  pas refusé (le BDD est un choix, le TDD la règle).
+  pas refusé (le BDD est un choix, le TDD la règle). **Révisé le 08/11** (§6) : sauf s'il montre des
+  signes de BDD.
 - Tranché le 07/11 : les sous-projets sont détectés jusqu'à 4 niveaux sous la racine.

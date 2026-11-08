@@ -26,6 +26,9 @@ export function createTypeScriptAdapter(deps: TypeScriptAdapterDeps = {}): Stack
     // Couches et bibliothèques que l'écosystème TypeScript tient pour de l'infrastructure ou de
     // l'interface : ce qu'un domaine ne devrait pas importer.
     infrastructureModules: ["Infrastructure", "Interface", "UI", "API", "react", "express", "next"],
+    // Adaptateur intégré, sans profil : rien n'y décide le BDD (08/11). Un projet qui en montre les
+    // signes doit le déclarer dans `.agent-studio/projet.yaml`.
+    bddNonDecide: ["."],
 
     async detect(root) {
       try {

@@ -49,7 +49,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   /** Pour le GEL des tests : insensible à la casse (ADR 0035), sinon une majuscule le contourne. */
   const motifsSansCasse = (globs: readonly string[]) => globs.map((g) => globToRegExp(g, "i"));
   // BDD (ADR 0074) : les `.feature` et leurs étapes sont des tests d'acceptance, que le gel couvre.
-  const bdd = profile.bdd ? profile.bdd.map((c) => ({ lanceur: c.lanceur, features: c.features.replace(/\/+$/, ""), etapes: c.etapes.replace(/\/+$/, "") })) : undefined;
+  const bdd = profile.bdd?.length ? profile.bdd.map((c) => ({ lanceur: c.lanceur, features: c.features.replace(/\/+$/, ""), etapes: c.etapes.replace(/\/+$/, "") })) : undefined;
   const layout = bdd ? { ...profile.layout, acceptanceTests: [...profile.layout.acceptanceTests, ...bdd.flatMap((c) => [`${c.features}/**`, `${c.etapes}/**`])] } : profile.layout;
   const testGlobs = [...layout.unitTests, ...layout.acceptanceTests];
   // Motif d'import compilé une fois ; le profil a déjà été validé à la lecture (`parseStackProfile`).
@@ -61,6 +61,8 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     id: profile.id as StackAdapter["id"],
     layout,
     ...(bdd ? { bdd } : {}),
+    // `bdd` absent du profil : rien n'est décidé pour ce composant (08/11).
+    bddNonDecide: profile.bdd === undefined ? ["."] : [],
     infrastructureModules: profile.infrastructureModules,
     // `[].join("|")` rend la chaîne vide, et `new RegExp("")` reconnaît TOUT. L'extension
     // reconstruit un RegExp depuis ce motif (extension-host) : un motif vide y ferait de chaque

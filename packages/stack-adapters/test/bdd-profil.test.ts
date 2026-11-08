@@ -35,6 +35,25 @@ describe("BDD dans le profil de pile (ADR 0074)", () => {
     expect(adaptateur("bdd: false\n").layout.acceptanceTests).toEqual(["tests/Tarification.Tests/**"]);
   });
 
+  // Décision du 08/11 : `bdd: false` est un choix déclaré, `bdd` absent n'est rien décidé. skraft refuse
+  // de démarrer quand un composant non décidé montre des signes de BDD.
+  it("`bdd` décidé ou non : les racines des composants dont la pile n'en dit rien", () => {
+    expect(adaptateur("").bddNonDecide).toEqual(["."]);
+    expect(adaptateur("bdd: false\n").bddNonDecide).toEqual([]);
+    expect(adaptateur(REQNROLL).bddNonDecide).toEqual([]);
+    const r = lire("bdd: false\n");
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([]);
+  });
+
+  it("composants : chaque racine non décidée, ramenée à la racine du projet", () => {
+    const c = createComposedAdapter([
+      { nom: "api", racine: "services/api", adapter: adaptateur("") },
+      { nom: "web", racine: "web", adapter: adaptateur("bdd: false\n") },
+      { nom: "principal", racine: ".", adapter: adaptateur("") },
+    ]);
+    expect(c.bddNonDecide).toEqual(["services/api", "."]);
+  });
+
   it("un couple : exposé, et ses dossiers rejoignent les emplacements des tests d'acceptance", () => {
     const a = adaptateur(REQNROLL);
     expect(a.bdd).toEqual([{ lanceur: "reqnroll", features: "tests/Tarification.UnitTests/Features", etapes: "tests/Tarification.UnitTests/Steps" }]);

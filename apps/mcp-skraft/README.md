@@ -124,7 +124,9 @@ buildErrors:
   `.skraft/<slug>/` et les tests d'acceptance sont ordinaires ; une liste de couples
   `{ lanceur, features, etapes }`, les `.feature` du projet **sont** les tests d'acceptance. Lanceurs
   connus : `reqnroll`, `specflow`, `cucumber-js`, `jest-cucumber`, `cucumber-jvm`, `pytest-bdd`,
-  `behave`. Le TDD reste la règle en DELIVER.
+  `behave`. Le TDD reste la règle en DELIVER. **Une pile muette sur le BDD** (`bdd` absent) dans un
+  projet qui en montre les signes (un lanceur cité par un manifeste, des `.feature`) **ne démarre pas** :
+  déclarer les couples, ou `bdd: false`.
 - **Qualité** : la section `qualite` de `projet.yaml` fixe les seuils (couverture, mutation). Par
   défaut, la mutation exige 100 % pour le domaine et l'application, jugée sur les **seules lignes
   modifiées** par la story ; la couverture est rapportée, pas exigée.

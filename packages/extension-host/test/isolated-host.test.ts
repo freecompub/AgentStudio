@@ -101,6 +101,13 @@ describe("Hôte d'extension isolé (processus Node réel)", () => {
     expect(posted[0]).toBe('bdd : [{"lanceur":"reqnroll","features":"tests/Features","etapes":"tests/Steps"}]');
   }, 30_000);
 
+  it("l'extension isolée voit les racines où rien ne décide le BDD (08/11)", async () => {
+    const { d, posted } = await activate({}, { bddNonDecide: [".", "web"] });
+    await d.registry.command("pile-non-decide")!.handler("");
+    await until(() => posted.length > 0);
+    expect(posted[0]).toBe('non décidé : [".","web"]');
+  }, 30_000);
+
   it("l'extension tourne dans un autre processus et répond par RPC", async () => {
     const { d, posted, handle } = await activate();
     expect(handle.pid).toBeGreaterThan(0);

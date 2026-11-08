@@ -26,6 +26,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Un BDD muet ne démarre pas (ADR 0074 §6)
+
+- **Pourquoi** (remarque du responsable) : une détection partielle écrivait le profil sans `bdd`, et
+  `bdd` absent valait « pas de BDD » : un projet BDD partait dans le mauvais mode, en silence. Même effet
+  par une pile donnée au serveur MCP sans `bdd`.
+- **Fait** : `parseStackProfile` rend `bdd: false` en liste vide (choix déclaré) ; `StackAdapter.bddNonDecide`
+  (profil sans `bdd` : `["."]` ; adaptateur composé : racines ramenées au projet ; adaptateur TypeScript
+  intégré : `["."]`), exposé par les deux hôtes d'extension et `w.disposition()`. `bddNonDeclare(racines,
+  fichiers, manifestes)` (`detection-bdd.ts`, une seule copie, offert par `extension-api` et la
+  bibliothèque des workflows avec `estUnManifeste`) rend un motif par composant muet qui montre un
+  lanceur cité ou des `.feature`. INIT (extension `effects.ts`, workflow `workflow.mjs`) l'ajoute aux
+  problèmes de la suite de départ : « Lancement skraft bloqué avant tout appel d'agent ».
+- Tests : profil et composants (2), adaptateur intégré (1), hôtes et disposition (3), `bddNonDeclare` (4),
+  bout en bout dans les deux implémentations (2 chacune : bloqué ; `bdd: false` démarre). Vus rouges sauf
+  la garde `bdd: false`. Suite entière : 2378 tests. Serveur MCP reconstruit.
+- **Reste (point 1, décidé)** : `/stack init` demande la moitié manquante au lieu d'un commentaire.
+
 ## 08/11 — Détection du BDD par `/stack init` et `/stack doctor` (ADR 0074 §5) ; critère `bdd-par-composant` à `true`
 
 - **Fait** : `detecterBdd` et `blocBdd` (`stack-adapters/src/profile/detection-bdd.ts`, purs) : lanceur

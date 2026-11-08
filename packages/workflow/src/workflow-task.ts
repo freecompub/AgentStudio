@@ -260,7 +260,7 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return ctx.workspace.fingerprint(a.motifs);
     case "disposition": {
       const { acceptanceTests, unitTests, sources } = ctx.stack.layout;
-      return { pile: ctx.stack.id, acceptanceTests, unitTests, sources, infrastructureModules: [...ctx.stack.infrastructureModules], ...(ctx.stack.bdd ? { bdd: ctx.stack.bdd.map((c) => ({ ...c })) } : {}) };
+      return { pile: ctx.stack.id, acceptanceTests, unitTests, sources, infrastructureModules: [...ctx.stack.infrastructureModules], ...(ctx.stack.bdd ? { bdd: ctx.stack.bdd.map((c) => ({ ...c })) } : {}), ...(ctx.stack.bddNonDecide ? { bddNonDecide: [...ctx.stack.bddNonDecide] } : {}) };
     }
     case "brancher":
       return ctx.git.branch(a.nom);

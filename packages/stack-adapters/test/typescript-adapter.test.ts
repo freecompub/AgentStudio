@@ -33,6 +33,10 @@ it("au-dessus", () => expect(cap(12, 10)).toBe(11));
   });
   afterAll(() => rm(root, { recursive: true, force: true }));
 
+  it("adaptateur intégré : rien n'y décide le BDD, la racine reste à vérifier par skraft (08/11)", () => {
+    expect(createTypeScriptAdapter().bddNonDecide).toEqual(["."]);
+  });
+
   it("reconnaît un projet Vitest ; pas un dossier quelconque", async () => {
     expect(await adapter.detect(root)).toBe(true);
     const other = await mkdtemp(join(tmpdir(), "agent-studio-empty-"));

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
+import { baselineProblems, bddNonDeclare, coverageForChanges, EnvFailureError, MANIFESTE, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
 import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
@@ -115,7 +115,13 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const parsed = parseStory(raw);
       if (!parsed.ok) return { type: "INIT_FAILED", reasons: parsed.errors };
       const run = await ctx.stack.runTests({ signal, evidence: tag("INIT_BASELINE") });
-      const problems = baselineProblems(run);
+      // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
+      const tousLesFichiers = await ctx.workspace.listFiles();
+      const racinesMuettes = ctx.stack.bddNonDecide ?? [];
+      const manifestes = racinesMuettes.length
+        ? await Promise.all(tousLesFichiers.filter((f) => MANIFESTE.test(f)).map(async (path) => ({ path, content: await ctx.workspace.readFile(path).catch(() => "") })))
+        : [];
+      const problems = [...baselineProblems(run), ...bddNonDeclare(racinesMuettes, tousLesFichiers, manifestes)];
       if (problems.length) {
         ctx.chat.post(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
         return { type: "INIT_FAILED", reasons: problems };

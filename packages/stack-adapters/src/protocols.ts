@@ -127,6 +127,12 @@ export interface StackAdapter {
   /** Couples BDD du projet (ADR 0074) ; absent : pas de BDD, le TDD seul. */
   readonly bdd?: CoupleBdd[];
   /**
+   * Racines (relatives à celle du projet) des composants dont la pile ne dit rien du BDD : ni couples,
+   * ni `bdd: false` (08/11). skraft y cherche des signes de BDD avant de démarrer. Absent : l'adaptateur
+   * ne le sait pas, rien n'est vérifié.
+   */
+  readonly bddNonDecide?: readonly string[];
+  /**
    * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
    * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `Microsoft.AspNetCore` ne veut
    * rien dire en Python — donc elle vit ici, et non dans une extension, qui doit rester

@@ -16,5 +16,5 @@ export { detecte, libelleDetect, type ElementDetect } from "./profile/detect.js"
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "./profile/quality-bar.js";
 export { ecrireComposantsDansProjet, ecrirePileDansProjet, FICHIER_PROJET, lireFichierProjet, type ComposantDeclare } from "./profile/fichier-projet.js";
 export { diagnoseProfile, proposeProfile, proposeProfileEtBdd, type Constat, type DiagnosticDeps, type Gravite, type IndicesDuProjet } from "./profile/stack-doctor.js";
-export { blocBdd, detecterBdd, MANIFESTE, type DetectionBdd, type FichierLu } from "./profile/detection-bdd.js";
+export { bddNonDeclare, blocBdd, detecterBdd, MANIFESTE, type DetectionBdd, type FichierLu } from "./profile/detection-bdd.js";
 export { jugerCanari, runCanaries, type CanaryObservation, type CanaryRun, type RunCanariesDeps } from "./profile/canaries.js";

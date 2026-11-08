@@ -166,7 +166,8 @@ const schema = z
      * projet sont les tests d'acceptance, liés par les définitions d'étapes de `etapes`. Le TDD reste
      * la boucle interne dans les deux cas.
      */
-    // `false` vaut « absent » ; une union de zod perdrait le chemin précis de chaque erreur.
+    // `false` passe ici pour absent (une union de zod perdrait le chemin précis de chaque erreur) ;
+    // `parseStackProfile` le rend ensuite en liste vide : un choix déclaré.
     bdd: z.preprocess(
       (v) => (v === false ? undefined : v),
       z
@@ -262,5 +263,8 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     if ("error" in compile) return { error: `Profil de stack refusé : ${compile.error}` };
   }
 
-  return { profile: parsed.data };
+  // `bdd: false` est un choix déclaré, `bdd` absent n'est rien décidé (08/11) : le premier devient une
+  // liste vide, pour que skraft distingue un composant qui a choisi le TDD seul d'un composant muet.
+  const sansBdd = typeof brut === "object" && brut !== null && (brut as Record<string, unknown>)["bdd"] === false;
+  return { profile: sansBdd ? { ...parsed.data, bdd: [] } : parsed.data };
 }

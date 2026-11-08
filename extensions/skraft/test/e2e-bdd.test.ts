@@ -149,4 +149,34 @@ describe("skraft — BDD au choix (ADR 0074)", () => {
     expect(((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).map((r) => r.porte)).not.toContain("RED d'acceptance");
     expect(stateOf(await app.engine.status(id))!.deliver!.scenarios.map((s) => s.id).sort()).toEqual(["ac-1", "ac-2", "ac-3"]);
   }, 150_000);
+
+  // Décision du 08/11 : une pile muette sur le BDD, dans un projet qui en montre les signes, ne démarre pas.
+  const avecSignesBdd = async () => {
+    await put(root, "features/panier.feature", "Fonctionnalité: panier\n");
+    await put(root, "package.json", '{ "name": "demo", "type": "module", "devDependencies": { "@cucumber/cucumber": "10" } }\n');
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "signes de BDD");
+  };
+  const MOTIF = "Le projet : sa pile ne dit rien du BDD, mais il en montre les signes (lanceur cucumber-js cité par `package.json` ; des `.feature` dans `features`).";
+
+  it("BDD non déclaré mais signes présents : bloqué avant tout appel d'agent, le motif dit quoi déclarer", async () => {
+    await avecSignesBdd();
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const app = await assemble(root, runtime, tasksDir, { stack: { ...fakeStack(), bddNonDecide: ["."] } });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "ESCALATED");
+    expect(runtime.history).toEqual([]);
+    expect(app.posted.join("\n")).toContain(MOTIF);
+  }, 60_000);
+
+  it("`bdd: false` déclaré (aucune racine non décidée) : le même projet démarre", async () => {
+    await avecSignesBdd();
+    const runtime = simulatedAgents(new ScriptedRuntime(), root);
+    const app = await assemble(root, runtime, tasksDir, { stack: { ...fakeStack(), bddNonDecide: [] } });
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    expect(app.posted.join("\n")).not.toContain("ne dit rien du BDD");
+  }, 60_000);
 });

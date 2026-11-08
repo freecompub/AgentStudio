@@ -44,6 +44,7 @@ const demo: ExtensionModule = {
 
     ctx.chat.registerCommand("files", async () => ctx.chat.post(`fichiers : ${(await ctx.workspace.listFiles()).join(", ")}`));
     ctx.chat.registerCommand("pile", async () => ctx.chat.post(`bdd : ${JSON.stringify(ctx.stack.bdd ?? null)}`));
+    ctx.chat.registerCommand("pile-non-decide", async () => ctx.chat.post(`non décidé : ${JSON.stringify(ctx.stack.bddNonDecide ?? null)}`));
 
     ctx.hooks.onPreToolUse((call) => {
       if (call.kind === "shell" && call.command?.includes("boom")) throw new Error("le hook plante");

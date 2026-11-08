@@ -44,6 +44,7 @@ export function createComposedAdapter(composants: readonly Composant[]): StackAd
     ...(composants.some((c) => c.adapter.bdd)
       ? { bdd: composants.flatMap((c) => (c.adapter.bdd ?? []).map((b) => ({ ...b, features: vers(c, b.features), etapes: vers(c, b.etapes) }))) }
       : {}),
+    ...(composants.some((c) => c.adapter.bddNonDecide) ? { bddNonDecide: composants.flatMap((c) => (c.adapter.bddNonDecide ?? []).map((r) => (r === "." ? c.racine : vers(c, r)))) } : {}),
     infrastructureModules: [...new Set(composants.flatMap((c) => c.adapter.infrastructureModules))],
     async detect(root) {
       for (const c of composants) if (await c.adapter.detect(racineDe(root, c))) return true;

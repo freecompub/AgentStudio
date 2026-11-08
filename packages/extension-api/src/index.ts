@@ -12,7 +12,7 @@ export const API_VERSION = "0.1.0";
 export { EnvFailureError, TurnBudgetError, TurnContextError, TurnCostError, TurnTimeoutError, WorkDefectError } from "./errors.js";
 // Les globs viennent de `stack-adapters`, plus bas : une extension n'a qu'un paquet à connaître.
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "@agent-studio/stack-adapters";
-export { coverageForChanges, baselineProblems } from "@agent-studio/stack-adapters";
+export { coverageForChanges, baselineProblems, bddNonDeclare, MANIFESTE } from "@agent-studio/stack-adapters";
 export { disjoncte, MEME_REFUS, memeRefus, type Refus } from "@agent-studio/core";
 // Barre de qualité du projet (ADR 0049) : `.agent-studio/quality.yaml`, commune aux extensions.
 export { coreFilesMissing, layerOf, parseQualityBar, type Layer, type QualityBar, type QualityBarSource } from "@agent-studio/stack-adapters";
@@ -202,6 +202,8 @@ export interface StackApi {
   readonly infrastructureModules: string[];
   /** Couples BDD de la pile (ADR 0074) : les `.feature` du projet sont ses tests d'acceptance ; absent, le TDD seul. */
   readonly bdd?: CoupleBdd[];
+  /** Racines des composants dont la pile ne dit rien du BDD (08/11) : skraft y cherche des signes avant de démarrer. */
+  readonly bddNonDecide?: readonly string[];
   /** Exécution par le cœur ; avec `evidence`, la preuve est enregistrée (source « gate »). */
   runTests(opts?: { signal?: AbortSignal; evidence?: EvidenceTag }): Promise<TestRun>;
   isTestFile(path: string): boolean;
