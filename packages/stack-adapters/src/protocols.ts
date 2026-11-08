@@ -49,7 +49,15 @@ export interface MutationReport {
    * `killed` et `total` (mutants jugés) permettent de retirer un mutant du score, quand une
    * dérogation l'a reconnu équivalent (D22 de docs/12) ; `replacement` : le code du mutant.
    */
-  files: { file: string; score: number; killed?: number; total?: number; survived: { line: number; operator: string; replacement?: string }[] }[];
+  files: {
+    file: string;
+    score: number;
+    killed?: number;
+    total?: number;
+    /** Ligne de chaque mutant détecté : la porte peut ne juger que les lignes modifiées par une story (08/11). */
+    killedLines?: number[];
+    survived: { line: number; operator: string; replacement?: string }[];
+  }[];
 }
 
 /**

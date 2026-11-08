@@ -3,7 +3,7 @@
 import type { Evidence } from "@agent-studio/extension-api";
 import { coverageForChanges } from "@agent-studio/extension-api";
 import { describe, expect, it } from "vitest";
-import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
+import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, lignesSousLeSeuil, mutantsSousLeSeuil, sansLignesExemptees, checkRedGreenSequence, defaultDependencyRules, parseQualityBar, planScenarios, restreindreAuChangement, type QualityBar } from "../../../workflows/skraft/deliver.mjs";
 
 /** Barre depuis l'ancien format JSON (relu et converti, ADR 0049), ou par défaut. */
 const bar = (raw: string | null = null): QualityBar => {
@@ -329,5 +329,57 @@ describe("Cause d'un scénario en échec (ADR 0066)", () => {
     // Aucun échec retiré : le code de sortie dit autre chose (compilation, configuration), il reste.
     const compilation = { exitCode: 2, results: [{ id: "b", status: "passed" }] };
     expect(sansTestsObsoletes(compilation, ["ancien"]).exitCode).toBe(2);
+  });
+});
+
+/**
+ * Mutation jugée sur les lignes modifiées par la story (décision du responsable le 08/11), comme la
+ * couverture : un fichier touché n'a pas à rattraper les mutants survivants du code qu'elle ne change
+ * pas. Run du 08/11 : `Montant.cs` à 62 % avant l'US-2, la barre par défaut exige 100 %.
+ */
+describe("Mutation restreinte aux lignes modifiées", () => {
+  const rapport = {
+    score: 61.5,
+    files: [
+      {
+        file: "src/Domaine/Montant.cs",
+        score: 61.5,
+        killed: 3,
+        total: 6,
+        killedLines: [8, 30, 31],
+        survived: [
+          { line: 14, operator: "String mutation" },
+          { line: 21, operator: "Equality mutation" },
+          { line: 30, operator: "Arithmetic mutation" },
+        ],
+      },
+    ],
+  };
+
+  it("score et survivants des seules lignes modifiées ; les autres survivants deviennent une note", () => {
+    const r = restreindreAuChangement(rapport, [{ path: "src/Domaine/Montant.cs", lines: [30, 31, 32] }]);
+    expect(r.report.files).toEqual([
+      { file: "src/Domaine/Montant.cs", score: (2 / 3) * 100, killed: 2, total: 3, killedLines: [30, 31], survived: [{ line: 30, operator: "Arithmetic mutation" }] },
+    ]);
+    expect(r.notes).toEqual([
+      "Mutation hors du changement : src/Domaine/Montant.cs, 2 mutant(s) survivant(s) sur des lignes que la story ne modifie pas (ligne 14 (String mutation), ligne 21 (Equality mutation)) ; non jugés.",
+    ]);
+  });
+
+  it("aucun mutant sur les lignes modifiées : le fichier n'est pas jugé, rien n'y a été mesuré", () => {
+    const r = restreindreAuChangement(rapport, [{ path: "src/Domaine/Montant.cs", lines: [50] }]);
+    expect(r.report.files).toEqual([]);
+  });
+
+  it("sans les lignes du changement, ou sans celles des mutants détectés, le fichier entier reste jugé", () => {
+    expect(restreindreAuChangement(rapport, [{ path: "src/Domaine/Montant.cs" }]).report).toEqual(rapport);
+    const sansLignes = { ...rapport, files: rapport.files.map(({ killedLines: _, ...f }) => f) };
+    expect(restreindreAuChangement(sansLignes, [{ path: "src/Domaine/Montant.cs", lines: [30] }]).report).toEqual(sansLignes);
+  });
+
+  it("le rapport restreint passe la porte quand les lignes de la story sont couvertes par des tests qui tuent leurs mutants", () => {
+    const r = restreindreAuChangement(rapport, [{ path: "src/Domaine/Montant.cs", lines: [8] }]);
+    expect(checkMutation(r.report, ["src/Domaine/Montant.cs"], (parseQualityBar({}) as { bar: QualityBar }).bar)).toEqual([]);
+    expect(checkMutation(rapport, ["src/Domaine/Montant.cs"], (parseQualityBar({}) as { bar: QualityBar }).bar)).not.toEqual([]);
   });
 });

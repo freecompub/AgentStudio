@@ -2,7 +2,7 @@ import { coverageForChanges, EnvFailureError, matchesAny } from "@agent-studio/e
 import type { ExtensionContext, TestResult } from "@agent-studio/extension-api";
 import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.js";
 import { SANS_GEL, sansGel } from "./deliver-machine.js";
-import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, parseQualityBar, planScenarios, sansLignesExemptees, sansTestsObsoletes, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
+import { checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, restreindreAuChangement, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, parseQualityBar, planScenarios, sansLignesExemptees, sansTestsObsoletes, type MutantExempte, type MutantSurvivant, type QualityBar } from "./deliver.js";
 import { coreFilesMissing } from "@agent-studio/extension-api";
 import { acOf, featureScenarios } from "./distill.js";
 import { declaredIdentifiers } from "./text-analysis.js";
@@ -382,17 +382,20 @@ export async function loadQualityBar(ctx: ExtensionContext): Promise<{ bar: Qual
 async function mutate(
   ctx: ExtensionContext,
   bar: QualityBar,
-  sources: string[],
+  changes: readonly { path: string; lines?: number[] }[],
   label: string,
   signal?: AbortSignal,
   derogations: readonly MutantExempte[] = [],
 ): Promise<{ reasons: string[]; mutants: MutantSurvivant[]; facts: string[]; notes: string[] }> {
-  const mutation = await ctx.stack.mutation({ ...(signal ? { signal } : {}) });
-  if (!mutation) return { reasons: [], mutants: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  const sources = changes.map((f) => f.path);
+  const brut = await ctx.stack.mutation({ ...(signal ? { signal } : {}) });
+  if (!brut) return { reasons: [], mutants: [], facts: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  // Jugée sur les seules lignes modifiées (décision du 08/11, comme la couverture).
+  const { report: mutation, notes } = restreindreAuChangement(brut, changes);
   const facts = mutation.files
     .filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`)))
     .map((f) => `Mutation (${label}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-  return { reasons: checkMutation(mutation, sources, bar, derogations), mutants: mutantsSousLeSeuil(mutation, sources, bar, derogations), facts, notes: [] };
+  return { reasons: checkMutation(mutation, sources, bar, derogations), mutants: mutantsSousLeSeuil(mutation, sources, bar, derogations), facts, notes };
 }
 
 /**
@@ -411,12 +414,10 @@ export async function phaseEndMutation(
   const cp = state.checkpoints.DELIVER;
   if (!cp) return { reasons: [], mutants: [], facts: [], notes };
   const k = kinds(ctx);
-  const sources = (await ctx.workspace.changedFiles(cp))
-    .filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(ctx.stack.layout.sources, f.path))
-    .map((f) => f.path);
-  if (sources.length === 0) return { reasons: [], mutants: [], facts: [], notes };
+  const changes = (await ctx.workspace.changedFiles(cp)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(ctx.stack.layout.sources, f.path));
+  if (changes.length === 0) return { reasons: [], mutants: [], facts: [], notes };
   // Les mutants reconnus équivalents par arbitrage sortent du score (ADR 0065).
-  const r = await mutate(ctx, bar, sources, "fin de DELIVER", signal, state.derogations ?? []);
+  const r = await mutate(ctx, bar, changes, "fin de DELIVER", signal, state.derogations ?? []);
   return { reasons: r.reasons, mutants: r.mutants, facts: r.facts, notes: [...notes, ...r.notes] };
 }
 
@@ -449,7 +450,7 @@ export async function scenarioGate(e: Fx<"scenarioGate">, { ctx, state, taskId, 
     // exécution en fin de DELIVER (`phaseEndMutation`). Désactivée : on le dit aux lentilles.
     if (!bar.mutation.active) notes.push("Mutation désactivée par la barre de qualité du projet.");
     else if (bar.mutation.moment === "scenario") {
-      const m = await mutate(ctx, bar, sources, e.scenarioId, signal, state.derogations ?? []);
+      const m = await mutate(ctx, bar, changed.filter((f) => matchesAny(ctx.stack.layout.sources, f.path)), e.scenarioId, signal, state.derogations ?? []);
       reasons.push(...m.reasons);
       facts.push(...m.facts);
       notes.push(...m.notes);

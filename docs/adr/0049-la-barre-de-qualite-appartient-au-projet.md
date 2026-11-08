@@ -63,6 +63,24 @@ Trois autres manques :
 10. **Transition** : sans `quality.yaml`, `.skraft/quality.json` est relu, converti, avec un
     avertissement aux lentilles.
 
+## Révision du 08/11 : la mutation est jugée sur les lignes modifiées
+
+Décidée par le responsable le 08/11, après une vérification réelle sur la version BDD
+d'`exemple-dotnet-tdd` : le code de l'US-1 y est à 62 % (`Montant.cs`) et 60 % (`Quantite.cs`), et la
+barre par défaut exige 100 % pour le domaine. La porte jugeait le **score du fichier entier** dès que
+la story y touchait : l'US-2, qui modifie `Montant.cs`, aurait dû tuer les mutants survivants de
+l'US-1, sur des lignes qu'elle ne change pas. La couverture, elle, ne juge déjà que les lignes ajoutées
+ou modifiées.
+
+1. Pour chaque fichier modifié, le score se calcule sur les **seuls mutants des lignes ajoutées ou
+   modifiées** par la story (`restreindreAuChangement`, extension et workflow) ; un fichier sans
+   mutant sur ces lignes n'est pas jugé.
+2. Les survivants des autres lignes deviennent une **note hors du changement**, transmise aux
+   lentilles et au bilan : ils restent visibles, ils ne bloquent pas.
+3. Le lecteur Stryker garde la ligne de chaque mutant détecté (`killedLines`). Un lecteur qui ne la
+   donne pas, ou un fichier dont on ne connaît pas les lignes modifiées, garde l'ancienne règle : le
+   fichier entier.
+
 ## Conséquences
 
 - Le défaut de `Montant.cs` disparaît même sans migration : les noms usuels par défaut reconnaissent

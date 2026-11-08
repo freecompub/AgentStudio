@@ -96,4 +96,31 @@ describe("skraft en workflow — porte de fin de scénario (pile simulée)", () 
     expect(s.livraison?.notes).not.toContain("Format non mesuré : la pile du projet ne déclare pas de commande `format`.");
     expect(format).toBeGreaterThanOrEqual(2);
   }, 90_000);
+
+  // Décision du 08/11 : la mutation est jugée sur les lignes modifiées par la story, comme la couverture.
+  it("mutation sur les seules lignes modifiées : un survivant ancien d'un fichier touché ne bloque pas, il est noté", async () => {
+    const dev = async (t: Parameters<Parameters<ScriptedRuntime["behave"]>[1]>[0]) => {
+      await put(root, "src/domain/bolus-cap.ts", "export class BolusCap {}\n");
+      // La story ajoute la ligne 2 à un fichier existant ; la ligne 1 est d'avant.
+      await put(root, "src/domain/bolus-calculator.ts", "export class BolusCalculator {}\nexport const PLAFOND = 1;\n");
+      await t.callTool("report_phase", { summary: "plafond", files: ["src/domain/bolus-cap.ts", "src/domain/bolus-calculator.ts"] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-dev": dev });
+    const stack: StackAdapter = {
+      ...fakeStack(),
+      mutation: async () => ({
+        score: 50,
+        files: [{ file: "src/domain/bolus-calculator.ts", score: 50, killed: 1, total: 2, killedLines: [2], survived: [{ line: 1, operator: "RemoveSideEffects" }] }],
+      }),
+      architecture: async () => ({ modules: [{ name: "Domain", imports: [] }], violations: [] }),
+    };
+    const app = await assemble(root, runtime, tasksDir, { stack });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md");
+    const s = await fin(app, id, 60_000);
+    expect((await app.trace.list(id)).filter((e) => e.kind === "rejet")).toEqual([]);
+    expect(s.livraison?.notes).toContain(
+      "Mutation hors du changement : src/domain/bolus-calculator.ts, 1 mutant(s) survivant(s) sur des lignes que la story ne modifie pas (ligne 1 (RemoveSideEffects)) ; non jugés.",
+    );
+  }, 90_000);
 });

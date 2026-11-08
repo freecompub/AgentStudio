@@ -8,7 +8,7 @@
 */
 import { disjoncte, memeRefus, problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.mjs";
-import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
+import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, restreindreAuChangement, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
 import { gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
@@ -594,13 +594,18 @@ function problemesDeSuite(results, attente, estAcceptance) {
   return out;
 }
 // ---------- fin de scénario et fin de phase ----------------------------------------------------
-/** Mutation des fichiers de production donnés, jugée contre la barre. */
-async function muter(w, barre, sources, etiquette, derogations = []) {
-  const m = await w.mutation();
-  if (!m)
+/**
+* Mutation des fichiers de production modifiés, jugée contre la barre sur leurs seules lignes
+* modifiées (décision du 08/11, comme la couverture) : `changes` vient de `fichiersModifies`.
+*/
+async function muter(w, barre, changes, etiquette, derogations = []) {
+  const sources = changes.map((f) => f.path);
+  const brut = await w.mutation();
+  if (!brut)
     return { motifs: [], mutants: [], faits: [], notes: ["Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."] };
+  const { report: m, notes } = restreindreAuChangement(brut, changes);
   const faits = m.files.filter((x) => sources.some((p) => p === x.file || p.endsWith(`/${x.file}`))).map((f) => `Mutation (${etiquette}) : ${f.file} à ${f.score} %, ${f.survived.length} mutant(s) survivant(s).`);
-  return { motifs: checkMutation(m, sources, barre, derogations), mutants: mutantsSousLeSeuil(m, sources, barre, derogations), faits, notes: [] };
+  return { motifs: checkMutation(m, sources, barre, derogations), mutants: mutantsSousLeSeuil(m, sources, barre, derogations), faits, notes };
 }
 /** Porte de fin de scénario (§7.4) : acceptance verte, suite verte, séquence des preuves, mutation, dépendances, lint. */
 async function porteScenario(w, d, L, i, depuis, unitTests) {
@@ -630,7 +635,7 @@ async function porteScenario(w, d, L, i, depuis, unitTests) {
     else if (barre.mutation.moment === "scenario") {
       // Les dérogations accordées comptent ici aussi, comme dans l'extension. Elles ne naissent qu'en
       // fin de DELIVER : ce cas suppose une barre passée « par scénario » pendant le run.
-      const m = await muter(w, barre, sources, sc.id, d.derogations);
+      const m = await muter(w, barre, changes, sc.id, d.derogations);
       motifs.push(...m.motifs);
       faits.push(...m.faits);
       notes.push(...m.notes);
@@ -694,10 +699,10 @@ async function mutationDeFin(w, L, cpPhase, derogations) {
   if (barre.mutation.moment !== "phase-end")
     return { motifs: [], faits: [], notes };
   const k = natures(L.disp);
-  const sources = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(L.disp.sources, f.path)).map((f) => f.path);
-  if (sources.length === 0)
+  const changes = (await w.fichiersModifies(cpPhase)).filter((f) => f.status !== "deleted" && k.production(f.path) && matchesAny(L.disp.sources, f.path));
+  if (changes.length === 0)
     return { motifs: [], faits: [], notes };
-  const r = await muter(w, barre, sources, "fin de DELIVER", derogations);
+  const r = await muter(w, barre, changes, "fin de DELIVER", derogations);
   return { motifs: r.motifs, mutants: r.mutants, faits: r.faits, notes: [...notes, ...r.notes] };
 }
 /**

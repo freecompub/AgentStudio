@@ -26,6 +26,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Mutation : vérifiée en vrai, puis jugée sur les lignes modifiées (ADR 0049 révisé)
+
+- **Pourquoi** : le run BDD n'avait pas mesuré la mutation ; la pile fournie (reprise de `a7cf6db`)
+  n'en déclarait pas, alors que le `main` BDD a Stryker.NET 4.14.1 (`dotnet-tools.json`,
+  `stryker-config-core.json`). Mon oubli.
+- **Vérifié sans LLM** sur une copie du `main` : `dotnet tool restore`, puis la mutation par notre
+  adaptateur (`[dotnet, stryker, --config-file, stryker-config-core.json, --output, "{dossier}"]`,
+  `stryker-json`) : 57 s, score et survivants lus ; `format` (`dotnet format --verify-no-changes`)
+  répond. La pile de l'essai (scratchpad `run-bdd/pile.yaml`) a désormais `mutation` et `format`.
+- **Constat** : le code de l'US-1 est à 62 % (`Montant.cs`), 60 % (`Quantite.cs`) ; la barre par défaut
+  exige 100 % (domaine, application, en fin de DELIVER) et la porte jugeait le fichier entier.
+- **Décision du responsable** (option 1) : juger les seules lignes modifiées, comme la couverture.
+- **Fait** : lecteur Stryker, `killedLines` ; `restreindreAuChangement` (extension, workflow) appliqué
+  avant `checkMutation` aux deux portes (fin de scénario, fin de DELIVER), qui reçoivent les lignes de
+  `fichiersModifies` ; survivants hors des lignes modifiées → note « Mutation hors du changement ».
+  Sans `killedLines` ou sans lignes, l'ancienne règle (fichier entier).
+- Tests : lecteur (1), restriction (4 par copie), bout en bout S5 (1 par implémentation : survivant
+  ancien sur la ligne 1 d'un fichier touché à la ligne 2) ; vus rouges, le bout en bout en neutralisant
+  la restriction (escalade « à 50 % (minimum 100 %) »). Une attente exacte de `profile-adapter.test.ts`
+  complétée par `killedLines`.
+
 ## 08/11 — DISTILL ne juge que le Gherkin de la story (ADR 0074 §4)
 
 - **Défaut** (run BDD du 08/11) : la porte des titres `AC-n` jugeait tous les `.feature` du dossier,
