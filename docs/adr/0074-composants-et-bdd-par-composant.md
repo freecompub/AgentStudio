@@ -33,7 +33,7 @@ manifestes des sous-projets et le couple de dossiers ; `/skraft-init` le fait co
 que la racine (fichiers de premier niveau, `package.json`), ne propose que TypeScript et Python, et
 ne cherche aucun dossier.
 
-## Décision proposée
+## Décision
 
 ### 1. Les composants
 
@@ -74,17 +74,23 @@ d'acceptance, et seulement pour un composant qui le choisit.
      d'acceptance ordinaires). **Absent ne bloque pas** les projets existants, contrairement à la v2 ;
    - une liste de couples `{ lanceur, features, etapes }` : les `.feature` du projet **sont** les
      tests d'acceptance, liés par les définitions d'étapes du dossier `etapes`.
-2. **DISTILL** en BDD : l'agent d'acceptance écrit le `.feature` dans le dossier `features` du
-   composant (plus dans `.skraft/`), et les définitions d'étapes avec les signatures minimales pour
-   compiler, rouges pour la bonne raison — le même contrat qu'un test d'acceptance aujourd'hui.
-   Les valeurs du critère y sont recopiées à l'identique (porte inchangée). Un skill par lanceur.
+2. **DISTILL** en BDD : le `.feature` que DISTILL écrit **va au projet**, tel quel, dans le dossier
+   `features` du composant (plus dans `.skraft/`, décision du responsable le 08/11) ; l'agent
+   d'acceptance écrit aussi les définitions d'étapes, avec les signatures minimales pour compiler,
+   rouges pour la bonne raison — le même contrat qu'un test d'acceptance aujourd'hui. Les valeurs du
+   critère y sont recopiées à l'identique (porte inchangée). Un skill par lanceur.
 3. **Le gel** de fin de DISTILL couvre les `.feature` de la story **et** les définitions d'étapes
-   qu'elle a écrites ; DELIVER ne les modifie pas (gel absolu, décision du 07/11).
-4. **Relier un scénario à son test exécuté** : chaque scénario porte déjà le tag `@ac-<n>` ; la
-   porte retrouve le résultat du scénario par ce lien. Comment le lanceur nomme le test généré
-   (titre du scénario, nom de la fonctionnalité) est **à vérifier sur la version installée** de
-   chaque lanceur avant d'écrire la porte (SPEC §16) ; Reqnroll d'abord, le cas
-   d'`exemple-dotnet-tdd`.
+   qu'elle a écrites ; DELIVER ne les modifie pas (gel absolu, décision du 07/11). À chaque porte,
+   le code vérifie que le `.feature` du projet est **exactement** celui que DISTILL a écrit, par son
+   empreinte (décision du responsable le 08/11). Les dossiers `features` et `etapes` rejoignent les
+   emplacements des tests d'acceptance, que le gel couvre déjà.
+4. **Relier un scénario à son test exécuté** : le **titre de chaque scénario commence par son
+   critère** (`Scénario: AC-1 Le client chiffre…`, décision du responsable le 08/11). DISTILL
+   l'écrit ainsi, une porte le vérifie. Constat sur la version installée (Reqnroll 3.3.4, xUnit,
+   JunitXml.TestLogger 4.1.0, 08/11) : le nom du test vient du titre (`AC-1 Le client…` →
+   `AC_1LeClient…`, que `acOf` reconnaît déjà) ; le tag `@ac-1` devient un attribut xUnit dans le
+   code généré, mais **l'enregistreur JUnit n'écrit aucun attribut** : le tag seul ne suffit pas.
+   Le Gherkin du projet peut être en français (`# language: fr`), que notre lecteur comprend.
 5. **Détection** par `/stack init` : un lanceur nommé dans un manifeste du composant (Reqnroll,
    SpecFlow, jest-cucumber, Cucumber-JVM, Cucumber-JS, pytest-bdd, behave), un dossier contenant
    des `.feature`, un dossier d'étapes (`steps`, `stepdefinitions`, `step_definitions`, `bindings`,
@@ -95,9 +101,9 @@ d'acceptance, et seulement pour un composant qui le choisit.
 
 ## Ordre de mise en œuvre
 
-1. Composants : schéma, adaptateur composé, portes par composant touché ; tests sur un dépôt mixte
-   simulé, puis réel.
-2. `/stack init` et `/stack doctor` par composant.
+1. Composants : schéma, adaptateur composé ; tests sur un dépôt mixte simulé, puis réel. **Fait le
+   07/11** (branche `feat/composants`), sans les composants touchés (reportés, point 4).
+2. `/stack init` et `/stack doctor` par composant. **Fait le 07/11.**
 3. BDD : schéma, détection, DISTILL (agent, skill Reqnroll), gel, lien scénario-test ; tests de
    bout en bout dans les deux implémentations, puis un run réel sur la version BDD
    d'`exemple-dotnet-tdd`.
