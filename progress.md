@@ -5,6 +5,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/11 — État du BDD et suite (ADR 0074)
+
+- **Fait** : vérification sur Reqnroll 3.3.4 (nom du test tiré du titre ; tag `@ac-1` absent du rapport
+  JUnit ; titre « AC-1 … » → `AC_1…`, relié par `acOf`) ; 3a, réglage `bdd` du profil (`8c605e8`) ;
+  3b, DISTILL et DELIVER en BDD dans l'extension et le workflow (`5831500`).
+- **Reste, pour passer le critère `bdd-par-composant` à `true`** :
+  1. **Détection par `/stack init`** : lanceur trouvé dans les manifestes, couple de dossiers
+     `.feature` et étapes, confirmé par l'utilisateur. Limite : `/stack init` ne propose pas encore
+     de profil .NET ; pour Reqnroll, la détection servira surtout à `/stack doctor` (lanceur et
+     dossiers déclarés présents).
+  2. **Skill Reqnroll** pour l'agent d'acceptance (écriture des étapes, Gherkin en français),
+     contenu partageable (ADR 0024).
+  3. **Run réel** sur la version BDD d'`exemple-dotnet-tdd` (`main`, Reqnroll), avec l'accord du
+     responsable (consomme des requêtes).
+- **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
+  partie de la précédente. Rien de poussé.
+
 ## 08/11 — BDD (ADR 0074), brique 3b : DISTILL et DELIVER en BDD, extension et workflow
 
 - Les couples BDD atteignent les extensions et les workflows : `ctx.stack.bdd` (en processus, et
