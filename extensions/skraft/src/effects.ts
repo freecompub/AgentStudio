@@ -10,7 +10,7 @@ import { preselectFiles } from "./preselect.js";
 import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
-import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.js";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.js";
 import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
@@ -135,7 +135,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // objet ici. Le code prépare, l'agent n'a plus à y penser.
       for (const d of dossiersDeLaStory(slug)) await ctx.workspace.ensureDir(d);
       const indicators = computeIndicators(parsed.story, repositoryShape(await ctx.workspace.listFiles()));
-      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators, qualityCheckpoint };
+      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators, qualityCheckpoint, testsAvant: run.results.map((r) => ({ id: r.id, status: r.status })) };
     }
 
     case "classify": {
@@ -606,14 +606,14 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   // qu'elle exige (ADR 0041). Filtrer ici sur les globs de `layout.acceptanceTests` comparait un
   // chemin de fichier à un identifiant que le rapport n'exprime pas ainsi — `Tarification.Tests.
   // RemiseParPalierAcceptanceTests` pour JUnit — et ne rendait jamais rien.
-  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results });
+  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results, ...(state.testsAvant ? { avant: state.testsAvant } : {}) });
   if (red.reasons.length) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: red.reasons };
 
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
-  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, planDeTest: planDeTest(testPlan) };
+  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, testsDeLaStory: testsDeLaStory(run.results, state.testsAvant), planDeTest: planDeTest(testPlan) };
 }
 
 /** Notes hors du changement de toutes les revues du run, une fois chacune. */

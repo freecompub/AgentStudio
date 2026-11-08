@@ -212,6 +212,11 @@ export default async function skraft(w, entree) {
     adrs: [],
     regressions: [],
     acceptanceHash: null,
+    // Tests au relevé d'INIT : ceux des stories précédentes (ADR 0074 §4). RESEARCH et DESIGN n'écrivent
+    // aucun test : c'est encore la suite au début de DISTILL.
+    testsAvant: run.results.map((r) => ({ id: r.id, status: r.status })),
+    // Tests d'acceptance de la story, relevés à la porte de DISTILL : DELIVER n'en fait pas d'autres scénarios.
+    testsDeLaStory: null,
     qualityCheckpoint,
     // Mutants reconnus équivalents par arbitrage, exemptés de la porte de mutation (ADR 0065).
     derogations: [],

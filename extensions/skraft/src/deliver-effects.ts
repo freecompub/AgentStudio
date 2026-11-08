@@ -94,7 +94,9 @@ export async function planDeliver({ ctx, state, taskId, signal }: Run): Promise<
   const broken = run.results.filter((r) => r.status === "failed" && !k.acceptanceResult(r));
   if (broken.length) throw new EnvFailureError(`La suite est rouge avant DELIVER : ${broken.map((r) => r.id).join(", ")}. Corrigez-la avant de relancer.`);
   const implPlan = (await readOr(ctx, `.skraft/${state.slug}/distill/impl-plan.md`)) ?? "";
-  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter(k.acceptanceResult).map((r) => r.id), regressions: state.regressions });
+  // Seuls les tests de la story : ceux d'une story précédente portent aussi `ac-n` (ADR 0074 §4).
+  const deLaStory = (id: string) => !state.testsDeLaStory || state.testsDeLaStory.includes(id);
+  const scenarios = planScenarios({ implPlan, acceptanceTestIds: run.results.filter((r) => k.acceptanceResult(r) && deLaStory(r.id)).map((r) => r.id), regressions: state.regressions });
   return { type: "DELIVER_PLANNED", scenarios, all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) };
 }
 

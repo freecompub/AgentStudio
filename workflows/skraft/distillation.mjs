@@ -4,7 +4,7 @@
 * d'acceptance exécuté par le code (D20), puis gel des tests d'acceptance (D21) et revue.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.mjs";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.mjs";
 import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
@@ -27,6 +27,7 @@ export async function distiller(w, d, lentilles, max) {
     apresRembobinage: () => {
       d.acceptanceHash = null;
       d.regressions = [];
+      d.testsDeLaStory = null;
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
       oublierLeRun(suivi);
       return creerDossiers(w, d.slug);
@@ -105,7 +106,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)
     return { motifs: ["Les tests ont dépassé le délai."], porte: "RED d'acceptance" };
-  const red = checkAcceptanceRed({ criteria: d.story.criteria, testPlan, results: run.results });
+  const red = checkAcceptanceRed({ criteria: d.story.criteria, testPlan, results: run.results, avant: d.testsAvant });
   if (red.reasons.length)
     return { motifs: red.reasons, porte: "RED d'acceptance" };
   const compte = (st) => run.results.filter((r) => r.status === st).length;
@@ -113,6 +114,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   await enregistrerLivrables(w, s, (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted").map((f) => f.path), essai, sha256);
   d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
   d.regressions = red.regressions;
+  d.testsDeLaStory = testsDeLaStory(run.results, d.testsAvant);
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
   d.planDeTest = planDeTest(testPlan);
   return { motifs: [], porte: "" };

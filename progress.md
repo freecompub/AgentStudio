@@ -44,8 +44,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   implémentation (US-1 déjà en BDD : livrée sans juger ses titres ; renommer un scénario de l'US-1
   refusé, motif exact ; DELIVER reçoit le scénario de la story). Tous vus rouges pour la bonne raison ;
   le refus vérifié en le retirant.
-- **Reste** : les tests d'une story précédente portent aussi `ac-n` (porte du rouge d'acceptance) ;
-  prochaine brique, relevé des tests au début de DISTILL.
+- **Fait ensuite, même entrée** : les tests d'une story précédente. Relevé de la suite d'INIT gardé
+  (`testsAvant` : workflow dans `d`, extension par `INITIALIZED` jusqu'à l'état) ; aucune exécution de
+  plus, RESEARCH et DESIGN n'écrivant aucun test. `checkAcceptanceRed(… avant)` ne compte que les tests
+  nouveaux, refuse un test existant passé au rouge, et dit « aucun nouveau test d'acceptance » si tous
+  les marqués existaient ; `testsDeLaStory` est gardé à la porte (workflow `d`, extension `GATE_OK` de
+  DISTILL), remis à zéro avec les régressions, et `planScenarios` de DELIVER n'en sort pas. Tests : 3
+  de porte dans chaque copie, 1 de bout en bout dans chaque implémentation (test de l'US-1 vert : ni
+  « passe déjà », ni scénario `ac-1#2`), vus rouges (escalade « passe déjà », exactement le run) ; le
+  filtrage de DELIVER vérifié en le retirant.
+- Piège de test : le lanceur simulé fait échouer tout test d'acceptance tant que la story n'est pas
+  livrée ; l'enveloppe qui rend vert le test de l'US-1 doit aussi recalculer `exitCode`, sinon INIT
+  refuse de démarrer (« Exécution des tests existants en erreur »).
 
 ## 08/11 — Porte de cohérence de DESIGN : un nom d'un seul mot n'était jamais reconnu dans le modèle
 
@@ -77,7 +87,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Défaut de DESIGN** : `Panier` refusé à tort (nom d'un seul mot), **corrigé** (entrée précédente).
 - **Deux défauts de nos portes, à corriger avant de passer `bdd-par-composant` à `true`** :
   1. ~~la porte des titres `AC-n` juge **tous** les `.feature` du dossier~~ **corrigé** (ADR 0074 §4) ;
-  2. les marqueurs `ac-n` de **deux stories se confondent** : les scénarios renommés de l'US-1
+  2. ~~les marqueurs `ac-n` de deux stories se confondent~~ **corrigé** (ADR 0074 §4) : les scénarios renommés de l'US-1
      sont pris pour des tests de l'US-2 (« passe déjà »), requalifiés en régression ; 8 scénarios
      pour 5 critères. Le défaut existe aussi hors BDD, dès qu'une story précédente laisse des
      tests `Ac<n>_…`.

@@ -136,9 +136,13 @@ scénario de l'US-1 qui porte le même critère.
    de poser la question si la story change ce comportement. Lignes vides et espaces de fin ne
    comptent pas.
 3. Hors BDD, rien ne change : le Gherkin vit dans `.skraft/<slug>/`, vide au début de DISTILL.
-4. Reste : les **tests** d'une story précédente portent aussi des marqueurs `ac-n`, que la porte du
-   rouge d'acceptance confond avec ceux de la story (même run). À traiter de la même façon, par un
-   relevé des tests au début de DISTILL.
+4. Les **tests** d'une story précédente portent aussi des marqueurs `ac-n` : la porte du rouge
+   d'acceptance les prenait pour des critères de la story (« passe déjà »), et DELIVER en faisait des
+   scénarios (`ac-1#2`). Le code garde le relevé de la suite d'INIT (RESEARCH et DESIGN n'écrivent
+   aucun test : c'est encore la suite au début de DISTILL, sans exécution de plus). Un test
+   d'acceptance de la story est marqué `ac-n` **et** absent de ce relevé ; un test existant qui
+   passait et échoue à la porte est refusé (DISTILL ne casse rien) ; DELIVER ne fait de scénarios
+   que des tests de la story. Vaut aussi hors BDD.
 
 ## Ordre de mise en œuvre
 

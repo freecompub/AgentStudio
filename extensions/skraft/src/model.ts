@@ -2,7 +2,7 @@
  * Modèle d'état unifié du pipeline skraft (SPEC-skraft §5.1) : un seul type, un seul validateur
  * (défaut C2 rendu impossible). Types purs, sérialisables, persistés par le moteur.
  */
-import type { EcartDeclare, LigneDuPlan } from "./distill.js";
+import type { EcartDeclare, LigneDuPlan, TestAvant } from "./distill.js";
 import { z } from "zod";
 import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
@@ -254,6 +254,13 @@ export interface SkraftState {
   acceptanceHash: string | null;
   /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
   regressions: string[];
+  /**
+   * Tests au relevé d'INIT (ADR 0074 §4) : ceux des stories précédentes. RESEARCH et DESIGN n'écrivent
+   * aucun test : c'est encore la suite au début de DISTILL.
+   */
+  testsAvant?: TestAvant[];
+  /** Tests d'acceptance de la story, relevés à la porte de DISTILL : DELIVER n'en fait pas d'autres scénarios. */
+  testsDeLaStory?: string[];
   /** Granularité imposée par réglage, sinon choisie selon la difficulté. */
   granularitySetting: Granularity | null;
   /** Skills chargées à la demande par `load_skill`, tracées par rôle et par phase (D26) ; absent d'un état antérieur. */
@@ -276,6 +283,8 @@ export type SkraftEvent =
       story: Story;
       baseSha: string;
       qualityCheckpoint?: string;
+      /** Tests au relevé d'INIT : ceux des stories précédentes (ADR 0074 §4). */
+      testsAvant?: TestAvant[];
       branch: string;
       indicators: DifficultyIndicators;
     }
@@ -297,6 +306,7 @@ export type SkraftEvent =
       recherche?: { conventions: string; existant: string };
       acceptanceHash?: string;
       regressions?: string[];
+      testsDeLaStory?: string[];
       /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
       facts?: string[];
       notes?: string[];
@@ -417,6 +427,8 @@ const stateSchema = z.object({
   branch: z.string(),
   checkpoints: z.record(z.string(), z.string()),
   gherkinAvant: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
+  testsAvant: z.array(z.object({ id: z.string(), status: z.enum(["passed", "failed", "skipped"]) })).optional(),
+  testsDeLaStory: z.array(z.string()).optional(),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
   reviews: byPhase(z.object({ attempt: z.number(), lenses: z.array(z.unknown()), verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]), reportPath: z.string() })),
   attempts: z.number().int().min(0),

@@ -185,7 +185,8 @@ async function planifier(w, d) {
   const implPlan = (await lireOu(w, `.skraft/${d.slug}/distill/impl-plan.md`)) ?? "";
   return {
     disp,
-    scenarios: planScenarios({ implPlan, acceptanceTestIds: run.results.filter(k.resultatAcceptance).map((r) => r.id), regressions: d.regressions }),
+    // Seuls les tests de la story : ceux d'une story précédente portent aussi `ac-n` (ADR 0074 §4).
+    scenarios: planScenarios({ implPlan, acceptanceTestIds: run.results.filter((r) => k.resultatAcceptance(r) && (!d.testsDeLaStory || d.testsDeLaStory.includes(r.id))).map((r) => r.id), regressions: d.regressions }),
     granularity: levelEffects(d.niveau).granularity,
     baseline: { all: run.results.map((r) => r.id), passed: run.results.filter((r) => r.status === "passed").map((r) => r.id) },
     // Un test de cette liste devenu rouge est un candidat à l'obsolescence (ADR 0066).

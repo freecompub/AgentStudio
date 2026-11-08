@@ -86,7 +86,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
         const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
         return {
-          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}) },
+          state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}), ...(e.testsAvant ? { testsAvant: e.testsAvant } : {}) },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
         };
       }
@@ -178,7 +178,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
             ? { deliver: { ...s.deliver, facts: [...new Set([...(s.deliver.facts ?? []), ...(e.facts ?? [])])], notes: [...new Set([...s.deliver.notes, ...(e.notes ?? [])])] } }
             : {}),
           // Empreinte de l'essai validé ; un refus de DISTILL l'invalide avant correction.
-          ...(p === "DISTILL" && e.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [] } : {}),
+          ...(p === "DISTILL" && e.acceptanceHash ? { acceptanceHash: e.acceptanceHash, regressions: e.regressions ?? [], ...(e.testsDeLaStory ? { testsDeLaStory: e.testsDeLaStory } : {}) } : {}),
         };
         if (REVIEWED_PHASES.includes(p)) return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
         return commit(ns);
@@ -583,7 +583,7 @@ function oublierLaPhase(s: SkraftState): SkraftState {
 
 function leverGelDistill(s: SkraftState): SkraftState {
   return s.phase === "DISTILL" && !s.phasesCompleted.includes("DISTILL")
-    ? { ...s, acceptanceHash: null, regressions: [] }
+    ? (({ testsDeLaStory: _, ...reste }) => ({ ...reste, acceptanceHash: null, regressions: [] }))(s)
     : s;
 }
 

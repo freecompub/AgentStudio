@@ -126,4 +126,27 @@ describe("skraft — BDD au choix (ADR 0074)", () => {
     expect(ac1).toContain("Scénario: AC-1 critère 1");
     expect(ac1).not.toContain("Ancien critère de l'US-1");
   }, 150_000);
+
+  it("tests d'une story précédente : ni pris pour des critères de la story, ni comptés comme scénarios par DELIVER", async () => {
+    await put(root, "tests/acceptance/us1.acceptance.test.ts", `import { it } from "vitest";\n\nit("ac-1", () => {});\n`);
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "us-1");
+    // L'US-1 est livrée : son test passe toujours.
+    const base = pileBdd();
+    const pile: StackAdapter = {
+      ...base,
+      runTests: async (o) => {
+        const r = await base.runTests(o);
+        const results = r.results.map((x) => (x.file.endsWith("us1.acceptance.test.ts") ? { id: x.id, file: x.file, status: "passed" as const } : x));
+        return { ...r, results, exitCode: results.some((x) => x.status === "failed") ? 1 : 0 };
+      },
+    };
+    const app = await assemble(root, simulatedAgents(new ScriptedRuntime(), root, { "skraft-acceptance": acceptanceBdd(root, { titres: true }) }), tasksDir, { stack: pile });
+    answerQuestions(app);
+    const id = await lancer(app);
+    await until(async () => ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 90_000);
+    expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
+    expect(((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).map((r) => r.porte)).not.toContain("RED d'acceptance");
+    expect(stateOf(await app.engine.status(id))!.deliver!.scenarios.map((s) => s.id).sort()).toEqual(["ac-1", "ac-2", "ac-3"]);
+  }, 150_000);
 });
