@@ -119,3 +119,37 @@ export function bddNonDeclare(racines: readonly string[], fichiers: readonly str
   }
   return motifs;
 }
+
+export type PartieBdd = "lanceur" | "features" | "etapes";
+export const LIBELLE_PARTIE: Record<PartieBdd, string> = { lanceur: "lanceur", features: "dossier des .feature", etapes: "dossier des étapes" };
+const PARTIES: readonly PartieBdd[] = ["lanceur", "features", "etapes"];
+
+/** Ce qui manque d'un couple commencé (08/11) ; rien si le couple est complet, ou s'il n'y a aucun signe. */
+export function partiesManquantes(d: DetectionBdd): PartieBdd[] {
+  return PARTIES.some((p) => d[p]) ? PARTIES.filter((p) => !d[p]) : [];
+}
+
+/** Ce qui est trouvé, en clair : « lanceur cucumber-js, dossier des .feature features ». */
+export function partiesTrouvees(d: DetectionBdd): string {
+  return PARTIES.filter((p) => d[p]).map((p) => `${LIBELLE_PARTIE[p]} ${d[p]}`).join(", ");
+}
+
+/**
+ * Complète la détection par ce que l'utilisateur a donné (`/stack init --etapes …`), après l'avoir
+ * vérifié : un lanceur connu, des dossiers qui contiennent au moins un fichier du projet.
+ */
+export function completerBdd(d: DetectionBdd, donne: Partial<Record<PartieBdd, string>>, fichiers: readonly string[]): { detection: DetectionBdd } | { error: string } {
+  const out: DetectionBdd = { ...d };
+  if (donne.lanceur !== undefined) {
+    if (!(LANCEURS_BDD as readonly string[]).includes(donne.lanceur))
+      return { error: `\`${donne.lanceur}\` : lanceur inconnu. Lanceurs connus : ${LANCEURS_BDD.join(", ")}.` };
+    out.lanceur = donne.lanceur as LanceurBdd;
+  }
+  for (const p of ["features", "etapes"] as const) {
+    const dossier = donne[p]?.replace(/\/+$/, "");
+    if (dossier === undefined) continue;
+    if (!fichiers.some((f) => f.startsWith(`${dossier}/`))) return { error: `\`${dossier}\` : aucun fichier du projet n'est dans ce dossier.` };
+    out[p] = dossier;
+  }
+  return { detection: out };
+}

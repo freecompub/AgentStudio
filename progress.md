@@ -41,7 +41,15 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - Tests : profil et composants (2), adaptateur intégré (1), hôtes et disposition (3), `bddNonDeclare` (4),
   bout en bout dans les deux implémentations (2 chacune : bloqué ; `bdd: false` démarre). Vus rouges sauf
   la garde `bdd: false`. Suite entière : 2378 tests. Serveur MCP reconstruit.
-- **Reste (point 1, décidé)** : `/stack init` demande la moitié manquante au lieu d'un commentaire.
+- **Fait ensuite (point 1)** : `/stack init` demande la moitié manquante. Rien n'est écrit ; le message
+  dit ce qui est trouvé, ce qui manque, et la relance : `--lanceur`, `--features`, `--etapes`
+  (combinables), ou `--sans-bdd` (écrit `bdd: false`). `completerBdd` vérifie ce qui est donné (lanceur
+  connu, dossier non vide), `partiesManquantes` et `partiesTrouvees` décrivent l'état (`detection-bdd.ts`).
+  Choix : les **arguments de la commande** servent de réponse libre, la confirmation n'admettant qu'un
+  oui ou un non (une saisie libre aurait demandé une boîte de dialogue dans l'interface Electron).
+  Composants : une moitié arrête l'écriture, le message dit de compléter la pile à la main.
+  `proposeProfileEtBdd` retiré. Tests : 5 de `stack-command` (dont l'ancien « commentaire » remplacé),
+  vus rouges.
 
 ## 08/11 — Détection du BDD par `/stack init` et `/stack doctor` (ADR 0074 §5) ; critère `bdd-par-composant` à `true`
 

@@ -1,7 +1,7 @@
 import type { Constat } from "./constat.js";
 import type { StackProfile } from "./stack-profile.js";
 import { libelleDetect } from "./detect.js";
-import { blocBdd, detecterBdd, lanceursCites, MARQUES_DES_LANCEURS, type FichierLu } from "./detection-bdd.js";
+import { lanceursCites, MARQUES_DES_LANCEURS, type FichierLu } from "./detection-bdd.js";
 
 /**
  * Outillage des profils (J5) : proposer un profil d'après ce qu'un projet porte, et diagnostiquer
@@ -18,13 +18,6 @@ export interface IndicesDuProjet {
   arborescence?: readonly string[];
   /** Texte des manifestes (dépendances) : quel lanceur BDD le projet emploie (ADR 0074). */
   manifestes?: readonly FichierLu[];
-}
-
-/** Profil proposé, suivi de ce que la détection du BDD y ajoute (ADR 0074 §2.5). */
-export function proposeProfileEtBdd(indices: IndicesDuProjet): string | null {
-  const yaml = proposeProfile(indices);
-  if (yaml === null) return null;
-  return `${yaml}${blocBdd(detecterBdd({ fichiers: indices.arborescence ?? indices.fichiers, manifestes: indices.manifestes ?? [] }))}`;
 }
 
 /** Ce que `/stack init` écrirait, ou `null` quand rien n'est reconnu — on ne devine pas. */

@@ -337,12 +337,57 @@ describe("/stack init — le BDD du projet", () => {
     expect("error" in r ? r.error : r.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "features/steps" }]);
   });
 
-  it("une moitié seulement : dite en commentaire dans le profil, sans rien écrire de deviné", async () => {
-    const h = harnais({ indices: async () => ({ fichiers: ["package.json"], dependances: ["vitest"], arborescence: ["features/panier.feature"], manifestes: [] }) });
+  // Décision du 08/11 : une moitié n'est plus un commentaire, dont skraft ferait « pas de BDD » ; on
+  // demande ce qui manque, par les arguments de la commande, et rien n'est écrit en attendant.
+  const moitie = { fichiers: ["package.json"], dependances: ["vitest", "@cucumber/cucumber"], arborescence: ["features/panier.feature", "tests/bdd/glue.ts", "src/a.ts"], manifestes: [cucumber] };
+
+  it("une moitié seulement : rien n'est écrit, la commande dit ce qui manque et comment le donner", async () => {
+    const h = harnais({ indices: async () => moitie });
     await h.lancer("init");
-    expect(h.postes[0]).toMatch(/# bdd \(ADR 0074\) : à compléter\. Trouvé : dossier des \.feature features\. Introuvable : lanceur, dossier des étapes\./);
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("BDD détecté à moitié");
+    expect(h.postes.at(-1)).toContain("Trouvé : lanceur cucumber-js, dossier des .feature features. Manque : dossier des étapes.");
+    expect(h.postes.at(-1)).toContain("`/stack init --etapes <dossier>`");
+    expect(h.postes.at(-1)).toContain("`/stack init --sans-bdd`");
+  });
+
+  it("la moitié manquante donnée en argument : vérifiée, puis le profil complet est proposé et écrit", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --etapes tests/bdd");
     const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
-    expect("error" in r ? r.error : r.profile.bdd).toBeUndefined();
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "tests/bdd" }]);
+  });
+
+  it("un dossier donné qui n'existe pas, ou un lanceur inconnu : refusé, rien n'est écrit", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --etapes tests/absent");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("`tests/absent` : aucun fichier du projet n'est dans ce dossier.");
+    await h.lancer("init --etapes tests/bdd --lanceur gherkin-maison");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toMatch(/`gherkin-maison` : lanceur inconnu\. Lanceurs connus : reqnroll, specflow, cucumber-js/);
+  });
+
+  it("--sans-bdd : le choix est déclaré, `bdd: false`, et skraft démarrera sans BDD", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --sans-bdd");
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([]);
+  });
+
+  it("composants : une moitié dans l'un d'eux, rien n'est écrit, et le message nomme le composant", async () => {
+    const ecrits: string[] = [];
+    const h = harnais({
+      sousProjets: async () => [
+        { racine: "services/api", indices: { fichiers: ["pyproject.toml"], dependances: [] } },
+        { racine: "web", indices: { ...moitie } },
+      ],
+      ecrireComposants: async (yaml) => void ecrits.push(yaml),
+    });
+    await h.lancer("init");
+    expect(ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("`web` : BDD détecté à moitié.");
+    expect(h.postes.at(-1)).toContain(".agent-studio/stack.yaml");
   });
 
   it("composants : chacun reçoit son BDD, chemins relatifs à sa racine", async () => {

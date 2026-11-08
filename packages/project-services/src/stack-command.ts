@@ -1,5 +1,5 @@
 import type { ConfirmAnswer } from "@agent-studio/core";
-import { proposeProfileEtBdd, type Constat, type IndicesDuProjet, type StackProfile } from "@agent-studio/stack-adapters";
+import { blocBdd, completerBdd, detecterBdd, LIBELLE_PARTIE, partiesManquantes, partiesTrouvees, proposeProfile, type Constat, type DetectionBdd, type IndicesDuProjet, type PartieBdd, type StackProfile } from "@agent-studio/stack-adapters";
 
 /**
  * Commande `/stack` (SPEC §8.6). Elle donne accès, depuis la conversation, à ce qui n'existait
@@ -59,7 +59,7 @@ export function createStackCommand(deps: StackCommandDeps): (args: string) => Pr
     const sous = args.trim().split(/\s+/)[0] ?? "";
     if (sous === "") return deps.post(await etat(deps));
     if (sous === "doctor") return deps.post(await doctor(deps));
-    if (sous === "init") return init(deps);
+    if (sous === "init") return init(deps, args.trim().split(/\s+/).slice(1));
     deps.post(
       `Sous-commande inconnue : \`${sous}\`. \`/stack\` sans argument donne l'état, ` +
         SOUS_COMMANDES.map((s) => `\`/stack ${s}\``).join(" et ") +
@@ -184,7 +184,36 @@ async function diagnostic(deps: StackCommandDeps, profile: StackProfile, racine?
   return lignes.join("\n");
 }
 
-async function init(deps: StackCommandDeps): Promise<void> {
+/** Options de `/stack init` (08/11) : la moitié manquante du BDD, ou le choix de s'en passer. */
+interface OptionsInit {
+  donne: Partial<Record<PartieBdd, string>>;
+  sansBdd: boolean;
+}
+const OPTION_DE: Record<string, PartieBdd> = { "--lanceur": "lanceur", "--features": "features", "--etapes": "etapes" };
+
+function lireOptions(mots: readonly string[]): OptionsInit | { error: string } {
+  const o: OptionsInit = { donne: {}, sansBdd: false };
+  for (let i = 0; i < mots.length; i++) {
+    const m = mots[i]!;
+    if (m === "--sans-bdd") o.sansBdd = true;
+    else if (OPTION_DE[m]) {
+      const v = mots[++i];
+      if (!v || v.startsWith("--")) return { error: `\`${m}\` attend une valeur : \`/stack init ${m} <${m === "--lanceur" ? "nom" : "dossier"}>\`.` };
+      o.donne[OPTION_DE[m]!] = v;
+    } else return { error: `Option inconnue : \`${m}\`. Options de \`/stack init\` : \`--lanceur <nom>\`, \`--features <dossier>\`, \`--etapes <dossier>\`, \`--sans-bdd\`.` };
+  }
+  return o;
+}
+
+/** Ce qui manque, et la commande qui le donne. */
+function demandeBdd(d: DetectionBdd, manque: readonly PartieBdd[]): string {
+  const option = (p: PartieBdd) => `\`/stack init --${p} <${p === "lanceur" ? "nom" : "dossier"}>\``;
+  return `Trouvé : ${partiesTrouvees(d)}. Manque : ${manque.map((p) => LIBELLE_PARTIE[p]).join(", ")}.\n\nDonne ce qui manque : ${manque.map(option).join(", ")} (les options se combinent). S'il ne fait pas de BDD : \`/stack init --sans-bdd\`.`;
+}
+
+async function init(deps: StackCommandDeps, mots: readonly string[] = []): Promise<void> {
+  const options = lireOptions(mots);
+  if ("error" in options) return deps.post(options.error);
   const declare = await deps.profilDeclare();
   if (declare && "profile" in declare)
     return deps.post(
@@ -200,22 +229,41 @@ async function init(deps: StackCommandDeps): Promise<void> {
   // Sous-projets (ADR 0074) : plusieurs reconnus, ou un seul hors de la racine, deviennent des composants.
   if (deps.sousProjets && deps.ecrireComposants) {
     const reconnus = (await deps.sousProjets())
-      .map((p) => ({ racine: p.racine, yaml: proposeProfileEtBdd(p.indices) }))
-      .filter((p): p is { racine: string; yaml: string } => p.yaml !== null);
-    if (reconnus.length > 1 || (reconnus.length === 1 && reconnus[0]!.racine !== "."))
-      return initComposants(deps, deps.ecrireComposants, reconnus);
+      .map((p) => ({ racine: p.racine, yaml: proposeProfile(p.indices), d: detecterBdd({ fichiers: p.indices.arborescence ?? p.indices.fichiers, manifestes: p.indices.manifestes ?? [] }) }))
+      .filter((p): p is { racine: string; yaml: string; d: DetectionBdd } => p.yaml !== null);
+    if (reconnus.length > 1 || (reconnus.length === 1 && reconnus[0]!.racine !== ".")) {
+      // Un BDD à moitié dans un composant : rien n'est écrit, sinon skraft partirait dans le mauvais mode (08/11).
+      const amoitie = reconnus.filter((r) => partiesManquantes(r.d).length);
+      if (amoitie.length)
+        return deps.post(
+          `**Rien n'a été écrit.** ${amoitie.map((r) => `\`${r.racine}\` : BDD détecté à moitié. Trouvé : ${partiesTrouvees(r.d)}. Manque : ${partiesManquantes(r.d).map((p) => LIBELLE_PARTIE[p]).join(", ")}.`).join("\n\n")}\n\n` +
+            `Pour un dépôt à composants, complétez la section \`bdd\` de la pile du composant dans \`${deps.chemin}\` (\`lanceur\`, \`features\`, \`etapes\`), ou \`bdd: false\` s'il ne fait pas de BDD.`,
+        );
+      return initComposants(deps, deps.ecrireComposants, reconnus.map((r) => ({ racine: r.racine, yaml: `${r.yaml}${blocBdd(r.d)}` })));
+    }
   }
 
   const indices = await deps.indices();
-  // Le BDD détecté (ADR 0074 §2.5) est ajouté au profil : confirmé avec lui, ou signalé à compléter.
-  const yaml = proposeProfileEtBdd(indices);
-  if (yaml === null)
+  const profil = proposeProfile(indices);
+  if (profil === null)
     return deps.post(
       `**Rien de reconnu dans ce projet**, et je préfère ne rien proposer plutôt que de deviner. ` +
         `Les marques cherchées sont \`pyproject.toml\`, \`setup.cfg\`, et la dépendance \`vitest\`.\n\n` +
         `Vous pouvez écrire \`${deps.chemin}\` à la main : \`profiles/typescript.yaml\` en est un exemple commenté, à ce format.`,
     );
 
+  // Le BDD (ADR 0074 §2.5, 08/11) : complet, il est confirmé avec le profil ; à moitié, on demande ce
+  // qui manque et rien n'est écrit ; `--sans-bdd` déclare le choix.
+  let bloc = "bdd: false\n";
+  if (!options.sansBdd) {
+    const arborescence = indices.arborescence ?? indices.fichiers;
+    const c = completerBdd(detecterBdd({ fichiers: arborescence, manifestes: indices.manifestes ?? [] }), options.donne, arborescence);
+    if ("error" in c) return deps.post(`**Rien n'a été écrit.** ${c.error}`);
+    const manque = partiesManquantes(c.detection);
+    if (manque.length) return deps.post(`**BDD détecté à moitié**, rien n'est écrit : sans lui, skraft refuserait de démarrer, ou partirait sans BDD.\n\n${demandeBdd(c.detection, manque)}`);
+    bloc = blocBdd(c.detection);
+  }
+  const yaml = `${profil}${bloc}`;
   const programmes = programmesDe(yaml);
   deps.post(
     `Profil proposé pour ce projet, d'après ${indices.fichiers.length} fichier(s) repère(s) :\n\n` +

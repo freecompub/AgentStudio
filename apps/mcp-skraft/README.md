@@ -86,7 +86,9 @@ compilation. Il prend, dans cet ordre :
 Sans aucune des trois, le serveur refuse de démarrer, et dit de fournir `pile`.
 
 Dans un projet, `/stack init` (application de bureau) propose un profil, BDD compris, et
-`/stack doctor` le vérifie en l'exécutant (canaris). Exemple de pile .NET, en BDD avec Reqnroll,
+`/stack doctor` le vérifie en l'exécutant (canaris). Si le BDD n'est détecté qu'à moitié, `/stack init`
+n'écrit rien et demande la suite : `/stack init --lanceur <nom> --features <dossier> --etapes <dossier>`,
+ou `/stack init --sans-bdd`. Exemple de pile .NET, en BDD avec Reqnroll,
 mutation Stryker et deux projets de test :
 
 ```yaml

@@ -179,6 +179,13 @@ le sache ; une pile donnée au serveur MCP sans `bdd` avait le même effet.
    dans `stack-adapters`).
 3. Un projet sans signe de BDD n'est pas concerné : la décision du 07/11 (« absent ne bloque pas ») tient
    pour lui.
+4. **`/stack init` demande la moitié manquante** au lieu de l'écrire en commentaire (le §5.2 est
+   révisé) : rien n'est écrit, la commande dit ce qui est trouvé, ce qui manque, et la relance qui le
+   donne — `/stack init --lanceur <nom>`, `--features <dossier>`, `--etapes <dossier>` (combinables),
+   ou `--sans-bdd`, qui écrit `bdd: false`. Le code vérifie ce qui est donné (lanceur connu, dossier
+   qui contient un fichier du projet). Les arguments de la commande servent de réponse libre : la
+   confirmation n'admet qu'un oui ou un non. Dans un dépôt à composants, une moitié dans l'un d'eux
+   arrête aussi l'écriture, et le message dit de compléter la pile du composant à la main.
 
 ## Ordre de mise en œuvre
 
