@@ -130,6 +130,13 @@
       "notes": "ADR 0072 (07/11) : `report: tap` (section tests), TAP 13 et 14, sous-tests indentés (blocs `describe` écartés, titres des parents dans l'identifiant), SKIP et TODO ignorés, `Bail out!` en échec, message et fichier tirés du bloc YAML (`location`). Lu dans `{rapport}` si la commande le nomme, sinon sur la sortie standard. Éprouvé sur une vraie sortie de `node --test` (Node 22.22) et contre le vrai lanceur. Lecteurs : junit-xml, vitest-json, tap, eslint-json, stryker-json."
     },
     {
+      "id": "rapports-de-tests-multiples",
+      "title": "Une commande de test qui lance plusieurs projets est relevée entièrement : `{rapports}`, erreurs de compilation et couvertures réunies",
+      "verify": "pnpm vitest run --project stack-adapters test/rapports-multiples.test.ts test/canaris.test.ts test/profile-adapter.test.ts",
+      "passes": true,
+      "notes": "ADR 0072 révisé le 08/11. Trouvé sur la version BDD d'exemple-dotnet-tdd (deux projets de test, 3 tests relevés sur 5). Vérifié en vrai avec dotnet : 5 tests, canaris tous ok, couverture réunie. Adaptateur et canaris partagent executerTests."
+    },
+    {
       "id": "j5-stack-init-doctor",
       "title": "Vérification statique d'un profil (une partie de /stack doctor, §8.6)",
       "verify": "pnpm vitest run --project stack-adapters test/stack-doctor.test.ts",
@@ -180,17 +187,24 @@
     },
     {
       "id": "composants-d-un-projet",
-      "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port, et les portes ne lancent que les composants touchés (ADR 0074)",
+      "title": "Un projet déclare plusieurs composants (nom, racine, pile) ; un adaptateur composé les présente derrière le même port ; /stack, /stack doctor et /stack init les connaissent ; le serveur MCP les accepte (ADR 0074)",
+      "verify": "pnpm vitest run --project stack-adapters test/composants.test.ts test/projet-composants.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/stack-command.test.ts test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "ADR 0074 accepté le 07/11. Fait le 07/11 : adaptateur composé (identifiants préfixés par la racine, chemins ramenés à la racine du projet, chaque outil sur les fichiers de son composant), section composants (exclusive de pile, racines sans chevauchement), /stack, /stack doctor par composant, /stack init sur 4 niveaux, pile fournie au format composants. Chaque porte lance encore tous les composants (voir composants-touches-seulement). Limite : /stack init ne reconnaît que TypeScript (Vitest) et Python."
+    },
+    {
+      "id": "composants-touches-seulement",
+      "title": "Les portes de pas et de scénario ne lancent que les composants touchés (et celui du test d'acceptance du scénario), sans perdre la détection des régressions des autres (ADR 0074, point 4)",
       "verify": "",
       "passes": false,
-      "notes": "ADR 0074 accepté le 07/11. Aujourd'hui une seule pile par projet : un dépôt mixte n'est jugé qu'en partie."
+      "notes": "REPORTÉ le 07/11 par le responsable, après une mesure sur un vrai dépôt mixte. Piège : la liste des tests verts est remplacée à chaque pas, dans l'extension et le workflow ; il faut la fusionner, sinon une régression d'un composant non lancé n'est plus vue."
     },
     {
       "id": "bdd-par-composant",
-      "title": "Le BDD se décide par composant (`bdd: false` ou couples lanceur, features, étapes) : DISTILL écrit les .feature exécutés et leurs étapes, gelés, reliés à leur test par @ac-<n> (ADR 0074)",
-      "verify": "",
-      "passes": false,
-      "notes": "ADR 0074 accepté le 07/11 ; après les composants. TDD toujours, BDD au choix. Idée reprise de skraft-plugin v2 (rien de copié). Lien scénario-test à vérifier sur la version installée de chaque lanceur (Reqnroll d'abord)."
+      "title": "Le BDD se décide par composant (`bdd: false` ou couples lanceur, features, étapes) : DISTILL écrit les .feature exécutés et leurs étapes, gelés, reliés à leur test par le titre AC-n, sans rien de propre à un langage (ADR 0074)",
+      "verify": "pnpm vitest run --project stack-adapters test/bdd-profil.test.ts test/canari-bdd.test.ts test/detection-bdd.test.ts && pnpm vitest run --project ext-skraft test/gherkin.test.ts test/brief.test.ts test/agents-skills.test.ts test/distill-gates.test.ts test/e2e-bdd.test.ts && pnpm vitest run --project workflow-skraft test/gherkin.test.ts test/brief.test.ts test/skills.test.ts test/distill-gates.test.ts test/e2e-bdd-workflow.test.ts",
+      "passes": true,
+      "notes": "ADR 0074 accepté ; TDD toujours, BDD au choix. Fait le 08/11 : réglage bdd (3a) ; DISTILL et DELIVER en BDD dans les deux implémentations (3b) ; canari BDD de /stack doctor ; skill de méthode bdd-step-definitions ; Gherkin et tests de la story seuls jugés (§4) ; détection par /stack init et /stack doctor (§5). Deux runs réels sur le main BDD d'exemple-dotnet-tdd (US-2, Claude) : le second fini en 16m13, 1 rejet, 5,18 $, .feature de l'US-1 intact. Limite : /stack init ne propose pas de profil .NET."
     },
     {
       "id": "lentilles-informees-des-portes-jugees",
@@ -976,6 +990,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts test/profile-adapter.test.ts -t \"Stryker\"",
       "passes": true,
       "notes": "Lecteur écrit sur un rapport réel de Stryker.NET 5.0.0 (03/10) ; éprouvé de bout en bout sur le code livré d’US-2 : 72 % en 32 s, comme Stryker. dotnet-stryker installé en outil global sur la machine de dev ; le projet d’essai n’a pas encore la commande dans son stack.yaml."
+    },
+    {
+      "id": "mutation-sur-les-lignes-modifiees",
+      "title": "La mutation d'un fichier modifié est jugée sur les seules lignes que la story change ; les survivants anciens sont notés, sans bloquer",
+      "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts test/e2e-s5.test.ts && pnpm vitest run --project workflow-skraft test/deliver-gates.test.ts test/e2e-s5-workflow.test.ts",
+      "passes": true,
+      "notes": "ADR 0049 révisé le 08/11 (décision du responsable). Vérifié en vrai avant : Stryker.NET 4.14.1 par l'adaptateur sur le main BDD d'exemple-dotnet-tdd, 57 s, Montant.cs à 62 % et Quantite.cs à 60 % avant l'US-2. Lecteur : killedLines ; porte : restreindreAuChangement, extension et workflow."
     },
     {
       "id": "instantane-initial-ne-perime-pas-un-evenement",

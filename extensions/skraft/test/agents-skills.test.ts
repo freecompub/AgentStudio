@@ -209,6 +209,10 @@ describe("Un agent peut faire ce que son contenu lui demande (ADR 0024, run comp
     }
   });
 
+  it("en BDD, l'agent d'acceptance peut charger la skill des définitions d'étapes (ADR 0074 §3)", () => {
+    expect(ROLE_SKILLS.acceptance.onDemand).toContain("bdd-step-definitions");
+  });
+
   it("aucune skill exigée d'un rôle n'est absente du paquet", async () => {
     // Une skill obligatoire introuvable, c'est le cas `qa-reporting` : l'agent découvre le manque
     // au moment de juger, et juge quand même.

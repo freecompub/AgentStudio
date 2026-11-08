@@ -31,7 +31,8 @@ beforeAll(async () => {
   machine = join(racine, "machine");
   await poser(join(machine, "demo"), { "workflow.mjs": DEMO, "agents/redacteur.agent.md": "Tu résumes." });
 }, 60_000);
-afterAll(() => rm(racine, { recursive: true, force: true }));
+// Un run peut encore écrire dans `.taches/` au moment du nettoyage (ENOTEMPTY vu en CI le 08/11) : nouvelles tentatives, comme ailleurs.
+afterAll(() => rm(racine, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 const DEMO = `export const meta = {
   name: "demo",

@@ -43,7 +43,8 @@ export function parseStrykerReport(raw: unknown, root: string): MutationReport {
   let jugesTotal = 0;
   const files: MutationReport["files"] = [];
   for (const [chemin, f] of Object.entries(r.data.files)) {
-    const detectes = f.mutants.filter((m) => DETECTES.has(m.status)).length;
+    const tues = f.mutants.filter((m) => DETECTES.has(m.status));
+    const detectes = tues.length;
     const nonDetectes = f.mutants.filter((m) => NON_DETECTES.has(m.status));
     const juges = detectes + nonDetectes.length;
     if (juges === 0) continue;
@@ -54,6 +55,7 @@ export function parseStrykerReport(raw: unknown, root: string): MutationReport {
       score: (detectes / juges) * 100,
       killed: detectes,
       total: juges,
+      killedLines: tues.map((m) => m.location.start.line),
       survived: nonDetectes.map((m) => ({
         line: m.location.start.line,
         operator: m.status === "NoCoverage" ? `${m.mutatorName} (non couvert)` : m.mutatorName,

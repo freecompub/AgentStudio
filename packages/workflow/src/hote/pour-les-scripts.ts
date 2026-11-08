@@ -23,6 +23,8 @@ export const {
   // Revue de la PR #12 : absents, ils valaient `undefined` dans les tests du workflow.
   couvertureDuDiff,
   problemesTestsExistants,
+  bddNonDeclare,
+  estUnManifeste,
   memeRefus,
   disjoncte,
 } = bibliotheque;

@@ -247,6 +247,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
       id: deps.stack.id,
       layout: deps.stack.layout,
       infrastructureModules: deps.stack.infrastructureModules,
+      ...(deps.stack.bdd ? { bdd: deps.stack.bdd } : {}),
+      ...(deps.stack.bddNonDecide ? { bddNonDecide: deps.stack.bddNonDecide } : {}),
       async mutation(opts) {
         perm.require("shell:test");
         if (!deps.stack.mutation) return null;

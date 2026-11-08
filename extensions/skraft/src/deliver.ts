@@ -273,3 +273,33 @@ export function sansTestsObsoletes<R extends { results: { id: string; status: st
   const seulsEchecs = retires && !results.some((r) => r.status === "failed");
   return { ...run, results, ...(seulsEchecs && run.exitCode ? { exitCode: 0 } : {}) };
 }
+
+/**
+ * Mutation jugée sur les lignes modifiées par la story (décision du responsable le 08/11), comme la
+ * couverture. Pour chaque fichier dont on connaît les lignes du changement et celles des mutants
+ * détectés : score et survivants des seules lignes modifiées ; les survivants des autres lignes
+ * deviennent une note, hors du changement. Sans l'une de ces informations, le fichier entier reste jugé.
+ */
+export function restreindreAuChangement(report: MutationReport, changes: readonly { path: string; lines?: number[] }[]): { report: MutationReport; notes: string[] } {
+  const notes: string[] = [];
+  const files: MutationReport["files"] = [];
+  for (const f of report.files) {
+    const c = changes.find((x) => x.path === f.file || x.path.endsWith(`/${f.file}`));
+    if (!c?.lines || !f.killedLines) {
+      files.push(f);
+      continue;
+    }
+    const lignes = new Set(c.lines);
+    const tues = f.killedLines.filter((l) => lignes.has(l));
+    const survived = f.survived.filter((m) => lignes.has(m.line));
+    const ailleurs = f.survived.filter((m) => !lignes.has(m.line));
+    if (ailleurs.length)
+      notes.push(`Mutation hors du changement : ${f.file}, ${ailleurs.length} mutant(s) survivant(s) sur des lignes que la story ne modifie pas (${ailleurs.map((m) => `ligne ${m.line} (${m.operator})`).join(", ")}) ; non jugés.`);
+    const total = tues.length + survived.length;
+    // Aucun mutant sur les lignes modifiées : rien n'y a été mesuré, le fichier n'est pas jugé.
+    if (total === 0)
+      continue;
+    files.push({ ...f, score: (tues.length / total) * 100, killed: tues.length, total, killedLines: tues, survived });
+  }
+  return { report: { ...report, files }, notes };
+}

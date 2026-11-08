@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
+import { baselineProblems, bddNonDeclare, coverageForChanges, EnvFailureError, MANIFESTE, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
-import { buildBrief, ecrirePassation, lignePile } from "./brief.js";
+import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
 import type { DefectThread } from "./review-thread.js";
@@ -10,8 +10,8 @@ import { preselectFiles } from "./preselect.js";
 import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
-import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.js";
-import { checkGherkin } from "./gherkin.js";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.js";
+import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
@@ -115,7 +115,13 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const parsed = parseStory(raw);
       if (!parsed.ok) return { type: "INIT_FAILED", reasons: parsed.errors };
       const run = await ctx.stack.runTests({ signal, evidence: tag("INIT_BASELINE") });
-      const problems = baselineProblems(run);
+      // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
+      const tousLesFichiers = await ctx.workspace.listFiles();
+      const racinesMuettes = ctx.stack.bddNonDecide ?? [];
+      const manifestes = racinesMuettes.length
+        ? await Promise.all(tousLesFichiers.filter((f) => MANIFESTE.test(f)).map(async (path) => ({ path, content: await ctx.workspace.readFile(path).catch(() => "") })))
+        : [];
+      const problems = [...baselineProblems(run), ...bddNonDeclare(racinesMuettes, tousLesFichiers, manifestes)];
       if (problems.length) {
         ctx.chat.post(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
         return { type: "INIT_FAILED", reasons: problems };
@@ -135,7 +141,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // objet ici. Le code prépare, l'agent n'a plus à y penser.
       for (const d of dossiersDeLaStory(slug)) await ctx.workspace.ensureDir(d);
       const indicators = computeIndicators(parsed.story, repositoryShape(await ctx.workspace.listFiles()));
-      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators, qualityCheckpoint };
+      return { type: "INITIALIZED", slug, story: parsed.story, baseSha, branch, indicators, qualityCheckpoint, testsAvant: run.results.map((r) => ({ id: r.id, status: r.status })) };
     }
 
     case "classify": {
@@ -159,6 +165,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 
     case "checkpointPhase": {
       const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : début de ${effect.phase}`);
+      // Gherkin déjà là au début de DISTILL (ADR 0074, run du 08/11) : celui des stories précédentes.
+      if (effect.phase === "DISTILL") return { type: "PHASE_CHECKPOINTED", phase: effect.phase, checkpointId: cp.id, gherkinAvant: await gherkinDuDisque(ctx, state.slug) };
       return { type: "PHASE_CHECKPOINTED", phase: effect.phase, checkpointId: cp.id };
     }
 
@@ -175,6 +183,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       if (effect.phase === "DESIGN" || effect.phase === "DISTILL") brief += `\n${lignePile(ctx.stack.id, ctx.stack.layout)}`;
+      // BDD (ADR 0074) : DISTILL écrit le `.feature` dans le projet, titres qui commencent par le critère.
+      if (effect.phase === "DISTILL" && ctx.stack.bdd?.length) brief += `\n${ligneBdd(ctx.stack.bdd)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
       const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase) });
@@ -569,7 +579,10 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const dir = `.skraft/${state.slug}/distill`;
   const files = await ctx.workspace.listFiles();
   const read = async (paths: string[]) => Promise.all(paths.map(async (path) => ({ path, content: await ctx.workspace.readFile(path) })));
-  const features = await read(files.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
+  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
+  // Seuls les scénarios de la story sont jugés ; toucher à ceux d'une story précédente est refusé.
+  const { features, modifies } = gherkinDeLaStory(state.gherkinAvant ?? [], await gherkinDuDisque(ctx, state.slug));
+  if (modifies.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: modifies };
   const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
   const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];
@@ -577,7 +590,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   // Porte `gherkin` AVANT la porte `valeurs` : un scénario couplé à un détail technique doit être
   // refusé même s'il contient les bonnes valeurs, et surtout avant le gel des tests d'acceptance —
   // passé ce point, plus personne ne peut le réécrire.
-  const gherkinReasons = checkGherkin(features);
+  const gherkinReasons = [...checkGherkin(features), ...(ctx.stack.bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkinReasons.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: gherkinReasons };
 
   const valueReasons = checkValues({ criteria, features, acceptanceTests });
@@ -599,14 +612,14 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   // qu'elle exige (ADR 0041). Filtrer ici sur les globs de `layout.acceptanceTests` comparait un
   // chemin de fichier à un identifiant que le rapport n'exprime pas ainsi — `Tarification.Tests.
   // RemiseParPalierAcceptanceTests` pour JUnit — et ne rendait jamais rien.
-  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results });
+  const red = checkAcceptanceRed({ criteria, testPlan, results: run.results, ...(state.testsAvant ? { avant: state.testsAvant } : {}) });
   if (red.reasons.length) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: red.reasons };
 
   const changed = (await ctx.workspace.changedFiles(state.checkpoints.DISTILL!)).filter((f) => f.status !== "deleted");
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
-  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, planDeTest: planDeTest(testPlan) };
+  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, testsDeLaStory: testsDeLaStory(run.results, state.testsAvant), planDeTest: planDeTest(testPlan) };
 }
 
 /** Notes hors du changement de toutes les revues du run, une fois chacune. */

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assemble, createProject, git, put, researchDoc, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, git, put, researchDoc, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
 
 describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
   let root: string;
@@ -55,25 +55,32 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     const [difficulty] = await app.interactions.pending();
     await app.interactions.respond(difficulty!.id, "medium-hard");
 
-    // Présélection par le code dans le dossier de passation de RESEARCH.
+    // Décision du 08/11 : la question de la story est posée AVANT RESEARCH, pour que le chercheur
+    // reçoive sa réponse au lieu de s'arrêter pour la poser.
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
+    const [avant] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
+    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
+    expect(stateOf(await app.engine.status(id))).toMatchObject({ stage: "ROUTE", phasesCompleted: [] });
+    expect(researchPrompts).toHaveLength(0);
+    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond.
+    await expect(app.interactions.respond(avant!.id, avant!.options[0]!.id, "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
+    await app.interactions.respond(avant!.id, "answer:q1", "par prise", { role: "po" });
+
+    // Présélection par le code, et la réponse, dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
     expect(researchPrompts[0]).toContain("Fichiers utiles (présélection) :");
     expect(researchPrompts[0]).toContain("src/domain/bolus-calculator.ts");
+    expect(researchPrompts[0]).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
 
-    // Porte citations : rejet précis, relance ciblée, puis questions posées à la fin de RESEARCH.
-    await until(async () => (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte")).length === 2);
+    // Porte citations : rejet précis, relance ciblée, puis la seule question de la recherche, posée à la fin de RESEARCH.
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
     expect(researchPrompts).toHaveLength(2);
     expect(researchPrompts[1]).toContain("Rejet précédent :");
     expect(researchPrompts[1]).toContain("`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes.");
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
-    expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
-    expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
+    expect(questions.map((q) => q.detail)).toEqual(["Le plafond est-il rappelé au patient ?"]);
     expect(stateOf(await app.engine.status(id))).toMatchObject({ stage: "ROUTE", phasesCompleted: ["RESEARCH"] });
-
-    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond, puis reporte l'autre.
-    await expect(app.interactions.respond(questions[0]!.id, questions[0]!.options[0]!.id, "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
-    await app.interactions.respond(questions[0]!.id, "answer:q1", "par prise", { role: "po" });
-    await app.interactions.respond(questions[1]!.id, "defer:q2", undefined, { role: "po" });
+    await app.interactions.respond(questions[0]!.id, "defer:q2", undefined, { role: "po" });
 
     // DESIGN démarre, avec les réponses dans le dossier de passation.
     await until(async () => designBrief !== "");
@@ -95,6 +102,8 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
       "skraft-researcher": async (t) => void (await t.callTool("report_phase", { summary: "rien", files: [] })),
     });
     const app = await assemble(root, runtime, tasksDir);
+    // La question de la story est posée avant RESEARCH (08/11) : le répondeur la tranche.
+    answerQuestions(app);
     await app.registry.command("skraft")!.handler("--auto stories/us-12.md");
     await until(async () => stateOf((await app.engine.list())[0] ?? null)?.stage === "ESCALATED", 60_000);
     const s = stateOf((await app.engine.list())[0]!)!;

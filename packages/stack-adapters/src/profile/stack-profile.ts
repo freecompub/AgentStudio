@@ -2,7 +2,7 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { compileBuildErrorSpec } from "./build-errors.js";
 import { compilerMotifSur } from "./motif-sur.js";
-import { JETON_RAPPORT } from "./tokens.js";
+import { JETON_RAPPORT, JETON_RAPPORTS } from "./tokens.js";
 
 /**
  * Profil de stack déclaratif (J5, O11) : un projet décrit sa chaîne au lieu qu'un adaptateur
@@ -63,6 +63,9 @@ export type CanaryKind = (typeof CANARY_KINDS)[number];
 
 /** Marque unique injectée par le code, qui permet de retrouver les résultats du canari. */
 export const JETON_MARQUE = "{marque}";
+
+/** Lanceurs BDD connus (ADR 0074) : un profil les nomme, il n'en invente pas. */
+export const LANCEURS_BDD = ["reqnroll", "specflow", "cucumber-js", "jest-cucumber", "cucumber-jvm", "pytest-bdd", "behave"] as const;
 
 /** Chemin relatif à la racine, sans `..` : un profil ne désigne rien hors du projet. */
 const cheminDuProjet = (champ: string) =>
@@ -158,6 +161,22 @@ const schema = z
       })
       .strict()
       .optional(),
+    /**
+     * BDD (ADR 0074) : `false` ou absent, le TDD seul ; une liste de couples, les `.feature` du
+     * projet sont les tests d'acceptance, liés par les définitions d'étapes de `etapes`. Le TDD reste
+     * la boucle interne dans les deux cas.
+     */
+    // `false` passe ici pour absent (une union de zod perdrait le chemin précis de chaque erreur) ;
+    // `parseStackProfile` le rend ensuite en liste vide : un choix déclaré.
+    bdd: z.preprocess(
+      (v) => (v === false ? undefined : v),
+      z
+        .array(z.object({ lanceur: z.enum(LANCEURS_BDD), features: cheminDuProjet("features"), etapes: cheminDuProjet("etapes") }).strict(), {
+          error: "`bdd` : une liste de couples `{ lanceur, features, etapes }`, ou `false`.",
+        })
+        .min(1, "`bdd` : au moins un couple `{ lanceur, features, etapes }`, ou `false`.")
+        .optional(),
+    ),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -217,10 +236,15 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     // Le lint est lu sur la sortie standard, jamais dans un fichier : `{rapport}` y devenait la
     // chaîne vide, l'outil écrivait nulle part, et la porte disait « rien n'a été jugé » sans
     // jamais dire pourquoi.
-    if (section === "lint" && c.command.some((a) => a.includes(JETON_RAPPORT)))
+    if (section === "lint" && c.command.some((a) => a.includes(JETON_RAPPORT) || a.includes(JETON_RAPPORTS)))
       return {
-        error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` n'a pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
+        error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` et \`${JETON_RAPPORTS}\` n'ont pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
       };
+    // `{rapports}` (un dossier, plusieurs rapports) n'est lu que pour les tests.
+    if (section === "mutation" && c.command.some((a) => a.includes(JETON_RAPPORTS)))
+      return { error: `Profil de stack refusé : mutation.command — \`${JETON_RAPPORTS}\` n'est lu que pour les tests ; la mutation écrit dans \`${JETON_RAPPORT}\` ou \`{dossier}\`.` };
+    if (section === "tests" && c.command.some((a) => a.includes(JETON_RAPPORT)) && c.command.some((a) => a.includes(JETON_RAPPORTS)))
+      return { error: `Profil de stack refusé : tests.command — \`${JETON_RAPPORT}\` et \`${JETON_RAPPORTS}\` ensemble : on ne saurait pas lequel lire. Gardez \`${JETON_RAPPORTS}\` si la commande écrit plusieurs rapports.` };
   }
 
   // Le format lance un programme lui aussi : même liste que les autres sections.
@@ -239,5 +263,8 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     if ("error" in compile) return { error: `Profil de stack refusé : ${compile.error}` };
   }
 
-  return { profile: parsed.data };
+  // `bdd: false` est un choix déclaré, `bdd` absent n'est rien décidé (08/11) : le premier devient une
+  // liste vide, pour que skraft distingue un composant qui a choisi le TDD seul d'un composant muet.
+  const sansBdd = typeof brut === "object" && brut !== null && (brut as Record<string, unknown>)["bdd"] === false;
+  return { profile: sansBdd ? { ...parsed.data, bdd: [] } : parsed.data };
 }

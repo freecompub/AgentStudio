@@ -6,7 +6,7 @@
  * Travaille sur un **clone** du projet, jamais sur le dépôt donné.
  *
  *   pnpm --filter @agent-studio/mcp-skraft build
- *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>]
+ *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>]
  */
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
@@ -22,6 +22,9 @@ const auto = args.includes("--auto");
 const runtime = args.find((a) => a.startsWith("--runtime="))?.slice("--runtime=".length) ?? "copilot";
 // Commit de départ (par défaut, la branche par défaut du dépôt cloné).
 const baseRun = args.find((a) => a.startsWith("--base="))?.slice("--base=".length);
+// Pile donnée par l'hôte (argument `pile` de skraft_demarrer), pour un projet qui n'en déclare pas.
+const fichierPile = args.find((a) => a.startsWith("--pile="))?.slice("--pile=".length);
+const pile = fichierPile ? await readFile(fichierPile, "utf8") : undefined;
 const [source, story, fichierReponses] = args.filter((a) => !a.startsWith("--"));
 if (!source || !story || !fichierReponses) throw new Error("Utilisation : essai-mcp-skraft.ts <projet> <story> <reponses.json> [--auto]");
 
@@ -61,10 +64,11 @@ const appel = async (name: string, a: Record<string, unknown> = {}) => {
 console.log(`Clone : ${projet}\n`);
 const etat0 = await appel("skraft_etat");
 console.log(etat0.texte, "\n");
-const premier = await appel("skraft_demarrer", { story, ...(auto ? { auto } : {}) });
+const demarrage = { story, ...(auto ? { auto } : {}), ...(pile ? { pile } : {}) };
+const premier = await appel("skraft_demarrer", demarrage);
 console.log(`${h()} skraft_demarrer →\n${premier.texte}\n`);
 // L'accord est donné ici au nom de l'utilisateur, qui a demandé l'essai.
-const lance = premier.texte.startsWith("Accord requis") ? await appel("skraft_demarrer", { story, ...(auto ? { auto } : {}), accord: "une-fois" }) : premier;
+const lance = premier.texte.startsWith("Accord requis") ? await appel("skraft_demarrer", { ...demarrage, accord: "une-fois" }) : premier;
 console.log(`${h()} ${lance.texte}\n`);
 if (lance.erreur) process.exit(1);
 const tache = /tâche (\S+)\./.exec(lance.texte)![1]!;

@@ -34,6 +34,12 @@ describe("parseStrykerReport", () => {
     expect(montant.survived.some((s) => typeof s.replacement === "string" && s.replacement.length > 0)).toBe(true);
   });
 
+  it("la ligne de chaque mutant détecté : de quoi juger les seules lignes modifiées par une story (08/11)", async () => {
+    const montant = parseStrykerReport(await reel(), "/projet").files.find((f) => f.file === "src/Tarification.Domaine/Montant.cs")!;
+    expect(montant.killedLines).toHaveLength(10);
+    expect(montant.killedLines!.every((l) => l > 0)).toBe(true);
+  });
+
   it("un fichier sans mutant testable est absent : rien n'y a été mesuré", async () => {
     // LigneDePanier.cs : trois mutants, tous en erreur de compilation.
     const r = parseStrykerReport(await reel(), "/projet");

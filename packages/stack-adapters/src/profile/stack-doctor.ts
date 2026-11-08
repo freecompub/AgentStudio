@@ -1,6 +1,7 @@
 import type { Constat } from "./constat.js";
 import type { StackProfile } from "./stack-profile.js";
 import { libelleDetect } from "./detect.js";
+import { lanceursCites, MARQUES_DES_LANCEURS, type FichierLu } from "./detection-bdd.js";
 
 /**
  * Outillage des profils (J5) : proposer un profil d'après ce qu'un projet porte, et diagnostiquer
@@ -13,6 +14,10 @@ export interface IndicesDuProjet {
   fichiers: readonly string[];
   /** Dépendances déclarées (package.json…), qui disent le lanceur de tests mieux qu'un fichier. */
   dependances: readonly string[];
+  /** Tous les fichiers, relatifs à la même racine : où sont les `.feature` et les étapes (ADR 0074). */
+  arborescence?: readonly string[];
+  /** Texte des manifestes (dépendances) : quel lanceur BDD le projet emploie (ADR 0074). */
+  manifestes?: readonly FichierLu[];
 }
 
 /** Ce que `/stack init` écrirait, ou `null` quand rien n'est reconnu — on ne devine pas. */
@@ -37,6 +42,8 @@ export interface DiagnosticDeps {
   cheminExiste(glob: string): boolean;
   /** Les fichiers de `detect` sont-ils présents ? Sinon le profil ne reconnaîtrait pas son projet. */
   fichiersDeDetectionPresents: boolean;
+  /** Manifestes du composant (dépendances), pour vérifier que le lanceur BDD déclaré y est cité. Absents : non vérifié. */
+  manifestes?: readonly FichierLu[];
 }
 
 /**
@@ -79,6 +86,26 @@ export function diagnoseProfile(profile: StackProfile, deps: DiagnosticDeps): Co
         gravite: "avertissement",
         message: `\`${nom}\` : aucun fichier ne correspond à ${globs.filter((g) => !vus.includes(g)).join(", ")}. Normal si le projet n'en a pas encore.`,
       });
+  }
+
+  // BDD déclaré (ADR 0074) : ses dossiers existent-ils, son lanceur est-il cité par un manifeste ?
+  for (const c of profile.bdd ?? []) {
+    const features = c.features.replace(/\/+$/, "");
+    const etapes = c.etapes.replace(/\/+$/, "");
+    constats.push(
+      deps.cheminExiste(`${features}/**/*.feature`)
+        ? { gravite: "ok", message: `BDD : des \`.feature\` dans \`${features}\`.` }
+        : { gravite: "avertissement", message: `BDD : aucun \`.feature\` dans \`${features}\`. Normal si aucune story n'y est encore ; sinon, le dossier déclaré n'est pas le bon.` },
+      deps.cheminExiste(`${etapes}/**`)
+        ? { gravite: "ok", message: `BDD : le dossier des étapes \`${etapes}\` existe.` }
+        : { gravite: "avertissement", message: `BDD : le dossier des étapes \`${etapes}\` est vide ou absent. Normal si aucune story n'y est encore.` },
+    );
+    if (deps.manifestes)
+      constats.push(
+        lanceursCites(deps.manifestes).includes(c.lanceur)
+          ? { gravite: "ok", message: `BDD : le lanceur \`${c.lanceur}\` est cité par un manifeste du projet.` }
+          : { gravite: "avertissement", message: `BDD : le lanceur \`${c.lanceur}\` n'est cité par aucun manifeste du projet (${MARQUES_DES_LANCEURS[c.lanceur].join(", ")}). Est-il installé ?` },
+      );
   }
 
   if (!profile.lint) constats.push({ gravite: "avertissement", message: "Aucun linter déclaré : la qualité de forme ne sera pas mesurée." });

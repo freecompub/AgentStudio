@@ -236,6 +236,17 @@ function horsAlternatives(md) {
 }
 
 /**
+ * Noms que le modèle mentionne, pour les comparer à ceux qu'un ADR classe. Même règle des deux côtés :
+ * `classements` prend tout nom en capitale initiale (`Panier`), alors que `extractCodeIdentifiers` ne
+ * relève que les noms composés (`GrilleDePaliers`). Un agrégat d'un seul mot, pourtant écrit dans le
+ * modèle, était déclaré absent (runs du 07/11 et du 08/11 : l'ADR-003 refusé, puis abandonné).
+ */
+function nomsDuModele(md) {
+  const simples = [...md.matchAll(/`([^`\n]+)`/g), ...md.matchAll(/```[^\n]*\n([\s\S]*?)```/g)].flatMap((m) => m[1].match(/\b[A-Z]\w*\b/g) ?? []);
+  return [...extractCodeIdentifiers(md), ...simples];
+}
+
+/**
 * Concept d'un ADR absent du modèle (STRUCTURAL_DRIFT de skraft-plugin v1.6.1, vérifié ici par le
 * code ; docs/15 §4.5) : un concept classé dans un nouvel ADR, hors de ses alternatives, existe dans
 * le modèle. Le sens inverse (un agrégat sans ADR qui le justifie) est laissé à la lentille
@@ -243,7 +254,7 @@ function horsAlternatives(md) {
 */
 export function conceptsAbsentsDuModele(i) {
   const reasons = [];
-  const known = new Set(MODEL_DOCS.flatMap((d) => extractCodeIdentifiers(i.docs[d] ?? "")));
+  const known = new Set(MODEL_DOCS.flatMap((d) => nomsDuModele(i.docs[d] ?? "")));
   for (const a of i.adrs.filter((x) => x.isNew)) {
     const id = parseAdr(a.md).id || a.path;
     for (const [nom, cats] of classements(horsAlternatives(a.md)))

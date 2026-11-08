@@ -1,7 +1,7 @@
 // Repris de extensions/skraft-workflow/test/distill-gates.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import { describe, expect, it } from "vitest";
-import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios, planDeTest, verifierEcarts } from "../../../workflows/skraft/distill.mjs";
+import { acOf, checkAcceptanceRed, checkPlans, checkValues, featureScenarios, planDeTest, testsDeLaStory, verifierEcarts } from "../../../workflows/skraft/distill.mjs";
 import { matchesAny } from "@agent-studio/extension-api";
 import { parseStory } from "../../../workflows/skraft/story.mjs";
 import { US12 } from "./story.test.js";
@@ -267,6 +267,38 @@ describe("Écarts au plan de test (PLAN_DEVIATION de skraft-plugin v1.15.1)", ()
     ]);
     expect(verifierEcarts([{ criterion: "ac-1", planned: "Infrastructure, base réelle", actual: "Domaine", rule: "r" }], plan)).toEqual([
       "Écart au plan pour ac-1 : le prévu « Infrastructure, base réelle » ne reprend pas la ligne de la matrice (Application, dépôt en mémoire).",
+    ]);
+  });
+});
+
+/**
+ * Tests d'une story précédente (ADR 0074 §4, run du 08/11) : ils portent aussi des marqueurs `ac-n`.
+ * `avant` est le relevé d'INIT ; seuls les tests nouveaux sont ceux de la story, et un test existant
+ * qui passait ne doit pas être cassé par DISTILL.
+ */
+describe("Porte RED d'acceptance : les tests d'une story précédente", () => {
+  const red = (id: string) => ({ id, file: "tests/acceptance/x.test.ts", status: "failed" as const, failureKind: "assertion" as const, message: "x" });
+  const green = (id: string) => ({ id, file: "tests/acceptance/x.test.ts", status: "passed" as const });
+  const avant = [{ id: "us1 > ac-1 le client chiffre une ligne", status: "passed" as const }, { id: "us1 > ac-2 deux lignes", status: "passed" as const }];
+  const story = [red("us12 > ac-1 x"), red("us12 > ac-2 x"), red("us12 > ac-3 x")];
+
+  it("un test d'une story précédente, déjà vert, n'est pas pris pour un critère de la story", () => {
+    const r = checkAcceptanceRed({ criteria, testPlan: "", results: [green(avant[0]!.id), green(avant[1]!.id), ...story], avant });
+    expect(r).toEqual({ reasons: [], regressions: [] });
+    expect(testsDeLaStory([green(avant[0]!.id), ...story], avant)).toEqual(["us12 > ac-1 x", "us12 > ac-2 x", "us12 > ac-3 x"]);
+  });
+
+  it("un test existant qui passait et échoue désormais : rejet, DISTILL ne casse rien", () => {
+    const r = checkAcceptanceRed({ criteria, testPlan: "", results: [red(avant[0]!.id), green(avant[1]!.id), ...story], avant });
+    expect(r.reasons).toEqual([
+      "Le test « us1 > ac-1 le client chiffre une ligne » passait avant la story et échoue maintenant : DISTILL ne doit casser aucun test existant.",
+    ]);
+  });
+
+  it("aucun test nouveau : la porte dit que ceux qui portent un marqueur existaient déjà", () => {
+    const r = checkAcceptanceRed({ criteria, testPlan: "", results: [green(avant[0]!.id), green(avant[1]!.id)], avant });
+    expect(r.reasons).toEqual([
+      "Aucun nouveau test d'acceptance : les tests qui portent un marqueur « ac-<n> » existaient avant la story (vus : « us1 > ac-1 le client chiffre une ligne », « us1 > ac-2 deux lignes »…). Écris les tests d'acceptance de cette story.",
     ]);
   });
 });

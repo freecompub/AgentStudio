@@ -58,11 +58,12 @@ function play(events: Ev[], input = { storyPath: "stories/us-12.md" }) {
 const kinds = (e: SkraftEffect[]) => e.map((x) => x.kind);
 
 /** Jusqu'au début de la première phase exécutée, difficulté confirmée par l'utilisateur. */
-const toFirstPhase = (level = "medium-hard") => [INITIALIZED, PROPOSED(level), DECIDE(level)];
+/** Réponse à la question ouverte de US-12 : posée avant RESEARCH, ou avant DESIGN si RESEARCH est sautée (08/11). */
+const ANSWER = DECIDE("answer:q1", "par prise");
+const AVEC_RECHERCHE = (level: string) => level === "medium-hard" || level === "challenging";
+const toFirstPhase = (level = "medium-hard") => [INITIALIZED, PROPOSED(level), DECIDE(level), ...(AVEC_RECHERCHE(level) ? [ANSWER] : [])];
 /** Déroule une phase sans reviewer (RESEARCH) jusqu'au commit. */
 const researchPhase = [CP("RESEARCH"), REPORTED, GATE_OK, COMMITTED];
-/** Réponse à la question ouverte de US-12 (posée avant DESIGN). */
-const ANSWER = DECIDE("answer:q1", "par prise");
 /** Déroule DESIGN (deux sessions) jusqu'au commit, sans ADR. */
 const designPhase = [ANSWER, CP("DESIGN"), REPORTED, REPORTED, GATE_OK, LENSES(lens("APPROVED")), COMMITTED];
 const reviewedPhase = (p: "DISTILL" | "DELIVER") => [CP(p), REPORTED, GATE_OK, LENSES(lens("APPROVED")), COMMITTED];
@@ -137,7 +138,9 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
   it("confirmation automatique (O3, mode avancé) : route directement", () => {
     const { state } = play([INITIALIZED, PROPOSED("medium-hard")], { storyPath: "s.md", confirmDifficulty: false } as never);
     expect(state.difficulty).toMatchObject({ level: "medium-hard", confirmedBy: "auto" });
-    expect(state.stage).toBe("SPECIALIST");
+    // Aucune confirmation demandée ; la question ouverte de la story, elle, l'est avant RESEARCH (08/11).
+    expect(state.stage).toBe("ROUTE");
+    expect(play([INITIALIZED, PROPOSED("medium-hard"), ANSWER], { storyPath: "s.md", confirmDifficulty: false } as never).state).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
   });
 
   it("CONFIRM_DIFFICULTY + décision → ROUTE → SPECIALIST : difficulté écrite, RESEARCH exécutée pour medium-hard", () => {
@@ -306,7 +309,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
   });
 
   it("COMMIT → ROUTE : phase complétée, essais remis à zéro, phase suivante", () => {
-    const { state, effects } = play([...toFirstPhase(), ...researchPhase, ANSWER]);
+    const { state, effects } = play([...toFirstPhase(), ...researchPhase]);
     expect(state.phasesCompleted).toEqual(["RESEARCH"]);
     expect(state).toMatchObject({ stage: "SPECIALIST", phase: "DESIGN", attempts: 0 });
     expect(effects).toEqual([{ kind: "checkpointPhase", phase: "DESIGN" }]);
@@ -325,38 +328,41 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     expect(play([INITIALIZED]).state.openQuestions).toEqual([{ id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
   });
 
-  it("RESEARCH démarre sans attendre ; avant DESIGN, chaque question sans réponse est posée une fois", () => {
-    expect(play(toFirstPhase()).state.phase).toBe("RESEARCH");
+  // Décision du 08/11 : les questions de la story sont posées avant RESEARCH. Le chercheur s'arrêtait
+  // pour poser lui-même une question que la story annonçait (deux runs réels du 08/11).
+  it("les questions de la story sont posées avant RESEARCH ; celles de la recherche, seules, avant DESIGN", () => {
+    const avant = play([INITIALIZED, PROPOSED("medium-hard"), DECIDE("medium-hard")]);
+    expect(avant.state).toMatchObject({ stage: "ROUTE", phase: null });
+    expect(avant.effects).toEqual([{ kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
+    expect(play(toFirstPhase()).state).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Le plafond est-il affiché ?"] }, COMMITTED]);
     expect(state).toMatchObject({ stage: "ROUTE", phase: null });
-    expect(effects).toEqual([
-      { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
-      { kind: "askQuestion", id: "q2", text: "Le plafond est-il affiché ?" },
-    ]);
+    expect(effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Le plafond est-il affiché ?" }]);
   });
 
   it("D17 (docs/12) : panne en ROUTE, escalade relancer / abandonner ; relancer repose les seules questions non posées", () => {
-    const route = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
-    const panne = play([...route, { type: "QUESTION_ASKED", id: "q1" } as Ev, { type: "ENV_FAILURE", reason: "disque plein" } as Ev]);
+    const route = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?", "Arrondi ?"] } as Ev, COMMITTED];
+    const panne = play([...route, { type: "QUESTION_ASKED", id: "q2" } as Ev, { type: "ENV_FAILURE", reason: "disque plein" } as Ev]);
     expect(panne.state.escalation).toEqual({ from: "ROUTE", reason: "disque plein" });
     expect(panne.effects).toEqual([{ kind: "askEscalation", reason: "disque plein", options: ["retry", "abort"] }]);
-    // q1 a reçu sa réponse pendant l'escalade : elle n'est pas perdue.
-    const repondue = transition(panne.state, DECIDE("answer:q1", "par prise"));
-    expect(repondue.state.openQuestions[0]).toMatchObject({ id: "q1", answer: "par prise" });
+    // q2 a reçu sa réponse pendant l'escalade : elle n'est pas perdue.
+    const repondue = transition(panne.state, DECIDE("answer:q2", "oui"));
+    expect(repondue.state.openQuestions[1]).toMatchObject({ id: "q2", answer: "oui" });
     const relance = transition(repondue.state, DECIDE("retry"));
     expect(relance.state.stage).toBe("ROUTE");
-    expect(relance.effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
+    expect(relance.effects).toEqual([{ kind: "askQuestion", id: "q3", text: "Arrondi ?" }]);
   });
 
   it("réponse libre ou report ; la phase suivante démarre quand tout est tranché", () => {
-    const base = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED];
-    const one = play([...base, DECIDE("answer:q1", "par prise")]);
+    const base = [...toFirstPhase(), CP("RESEARCH"), REPORTED, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?", "Arrondi ?"] } as Ev, COMMITTED];
+    const one = play([...base, DECIDE("answer:q2", "oui")]);
     expect(one.state.stage).toBe("ROUTE");
     expect(one.effects).toEqual([]);
-    const both = play([...base, DECIDE("answer:q1", "par prise"), DECIDE("defer:q2")]);
+    const both = play([...base, DECIDE("answer:q2", "oui"), DECIDE("defer:q3")]);
     expect(both.state.openQuestions).toEqual([
       { id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?", answer: "par prise" },
-      { id: "q2", text: "Affiché ?", answer: "(question reportée par l'utilisateur)" },
+      { id: "q2", text: "Affiché ?", answer: "oui" },
+      { id: "q3", text: "Arrondi ?", answer: "(question reportée par l'utilisateur)" },
     ]);
     expect(both.state).toMatchObject({ stage: "SPECIALIST", phase: "DESIGN" });
   });
@@ -444,7 +450,8 @@ describe("Réducteur skraft — ratification et escalade (§5.2)", () => {
     expect(skipped.effects).toEqual([
       { kind: "rollback", to: "cp-RESEARCH" },
       { kind: "forgetSessions", roles: ["skraft-researcher"] },
-      { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
+      // La question de la story est déjà tranchée, avant RESEARCH (08/11) : DESIGN démarre.
+      { kind: "checkpointPhase", phase: "DESIGN" },
     ]);
     expect(play([...escalated, DECIDE("abort")]).state.stage).toBe("ABORTED");
   });
@@ -657,6 +664,8 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev];
     const r = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }]);
     expect(r.effects).toEqual([{ kind: "scenarioGate", scenarioId: "ac-2", since: "cp-s2", unitTests: [], pending: [] }]);
+    // Le code d'un pas précédent l'a fait passer sans test rouge qui le demande : noté, sans refus (08/11).
+    expect(r.state.deliver?.notes).toContain("Scénario ac-2 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.");
     const end = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }, { type: "SCENARIO_OK", notes: [] }]);
     expect(end.state.stage).toBe("ARTIFACT_GATE");
     expect(end.effects).toEqual([{ kind: "runGate", phase: "DELIVER", attempt: 1 }]);

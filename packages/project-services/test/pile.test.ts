@@ -89,11 +89,42 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
     await b.services.dispose();
   });
 
+  it("projet.yaml à composants (ADR 0074) : une pile composée, et la pile dit ses composants", async () => {
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const projet = `composants:\n  - nom: api\n    racine: services/api\n    pile:\n${indente(profil("python-api"), 6)}\n  - nom: outils\n    racine: outils\n    pile:\n${indente(profil("python-outils"), 6)}\n`;
+    const a = await ouvrir({ fichierProjet: projet, detecte: true });
+    expect(a.services.pile()).toEqual({
+      id: "python-api",
+      source: "projet",
+      composants: [{ nom: "api", racine: "services/api", id: "python-api" }, { nom: "outils", racine: "outils", id: "python-outils" }],
+    });
+    await a.services.dispose();
+  });
+
+  it("composant dont la pile est refusée : nommé avec sa raison, puis la détection reprend la main", async () => {
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const projet = `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api", "curl"), 6)}\n`;
+    const a = await ouvrir({ fichierProjet: projet, detecte: true });
+    expect(a.services.pile().source).toBe("detection");
+    expect(a.posts.join("\n")).toMatch(/composant « api ».*curl/s);
+    await a.services.dispose();
+  });
+
   it("ancien stack.yaml seul : encore lu, avec un avertissement qui dit de le regrouper dans projet.yaml", async () => {
     const a = await ouvrir({ profilProjet: profil("python-ancien"), detecte: true });
     expect(a.services.pile()).toEqual({ id: "python-ancien", source: "projet" });
     expect(a.posts.join("\n")).toMatch(/regroupe.*projet\.yaml/s);
     await a.services.dispose();
+  });
+
+  it("pile fournie au format composants (ADR 0074, serveur MCP) : une pile composée, de source client ; un composant refusé est nommé", async () => {
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const fournie = `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api"), 6)}\n`;
+    const a = await ouvrir({ fournie, sansRepli: true });
+    expect(a.services.pile()).toEqual({ id: "python-api", source: "client", composants: [{ nom: "api", racine: "api", id: "python-api" }] });
+    await a.services.dispose();
+    const refusee = `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api", "curl"), 6)}\n`;
+    await expect(ouvrir({ fournie: refusee, sansRepli: true })).rejects.toThrow(/composant « api ».*curl/s);
   });
 
   it("pile fournie ignorée parce que le projet a la sienne : c'est dit", async () => {

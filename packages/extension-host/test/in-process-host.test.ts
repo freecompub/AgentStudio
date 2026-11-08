@@ -92,6 +92,24 @@ async function activateWith(activate: (ctx: ExtensionContext) => void | Promise<
 }
 
 describe("Hôte d'extension en processus", () => {
+  it("l'extension voit les couples BDD de la pile ; sans BDD, rien (ADR 0074)", async () => {
+    const env = setup();
+    env.deps.stack = { ...env.deps.stack, bdd: [{ lanceur: "reqnroll", features: "tests/Features", etapes: "tests/Steps" }] };
+    let vu: unknown = "non lu";
+    await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (vu = c.stack.bdd) } }, env.deps);
+    expect(vu).toEqual([{ lanceur: "reqnroll", features: "tests/Features", etapes: "tests/Steps" }]);
+    const { ctx } = await activateWith(() => {});
+    expect(ctx.stack.bdd).toBeUndefined();
+  });
+
+  it("l'extension voit les racines où rien ne décide le BDD (08/11)", async () => {
+    const env = setup();
+    env.deps.stack = { ...env.deps.stack, bddNonDecide: [".", "web"] };
+    let vu: unknown = "non lu";
+    await activateInProcess({ manifest: MANIFEST, module: { activate: (c) => void (vu = c.stack.bddNonDecide) } }, env.deps);
+    expect(vu).toEqual([".", "web"]);
+  });
+
   it("les commandes déclarées sont enregistrées au registre et invocables", async () => {
     const seen: string[] = [];
     const { deps } = await activateWith((ctx) => void ctx.chat.registerCommand("demo", async (args) => void seen.push(args)));

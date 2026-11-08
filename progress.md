@@ -5,6 +5,353 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/11 — État du BDD et suite (ADR 0074, révisé)
+
+- **Principe rappelé par le responsable** : skraft ne connaît aucun langage. Tout ce qui dépend de
+  la pile passe par le profil et l'adaptateur ; un skill ou une porte qui nomme un langage ou un
+  lanceur est à refuser. ADR 0074 §3 révisé en ce sens (le « skill par lanceur » est abandonné).
+- **Fait** : 3a, réglage `bdd` du profil (`8c605e8`) ; 3b, DISTILL et DELIVER en BDD dans
+  l'extension et le workflow (`5831500`) : `.feature` au projet, titres `AC-n` vérifiés, gel des
+  dossiers `features` et `etapes`. Constat sur un premier lanceur (Reqnroll 3.3.4) : le nom du
+  test vient du titre, le tag n'arrive pas au rapport JUnit, d'où le lien par le titre. Un autre
+  lanceur peut se comporter autrement : c'est au canari de le dire, pas à une hypothèse.
+- **Reste, pour passer le critère `bdd-par-composant` à `true`** :
+  1. ~~**Canari BDD**~~ **fait** (voir l'entrée suivante).
+  2. ~~**Skill `bdd-step-definitions`**~~ **fait** (voir l'entrée suivante).
+  3. **Détection par `/stack init`** : lanceur nommé dans un manifeste, dossiers `.feature` et
+     d'étapes ; un couple complet est confirmé, une moitié fait demander l'autre.
+  4. **Run réel** sur un projet BDD (le premier : la version BDD d'`exemple-dotnet-tdd`), avec
+     l'accord du responsable.
+- **Ne pas commiter** `docs/Growing Object-Oriented Software, Guided by Tests.pdf` (sous droits).
+- **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
+  partie de la précédente. Rien de poussé.
+
+## 08/11 — Un BDD muet ne démarre pas (ADR 0074 §6)
+
+- **Pourquoi** (remarque du responsable) : une détection partielle écrivait le profil sans `bdd`, et
+  `bdd` absent valait « pas de BDD » : un projet BDD partait dans le mauvais mode, en silence. Même effet
+  par une pile donnée au serveur MCP sans `bdd`.
+- **Fait** : `parseStackProfile` rend `bdd: false` en liste vide (choix déclaré) ; `StackAdapter.bddNonDecide`
+  (profil sans `bdd` : `["."]` ; adaptateur composé : racines ramenées au projet ; adaptateur TypeScript
+  intégré : `["."]`), exposé par les deux hôtes d'extension et `w.disposition()`. `bddNonDeclare(racines,
+  fichiers, manifestes)` (`detection-bdd.ts`, une seule copie, offert par `extension-api` et la
+  bibliothèque des workflows avec `estUnManifeste`) rend un motif par composant muet qui montre un
+  lanceur cité ou des `.feature`. INIT (extension `effects.ts`, workflow `workflow.mjs`) l'ajoute aux
+  problèmes de la suite de départ : « Lancement skraft bloqué avant tout appel d'agent ».
+- Tests : profil et composants (2), adaptateur intégré (1), hôtes et disposition (3), `bddNonDeclare` (4),
+  bout en bout dans les deux implémentations (2 chacune : bloqué ; `bdd: false` démarre). Vus rouges sauf
+  la garde `bdd: false`. Suite entière : 2378 tests. Serveur MCP reconstruit.
+- **Fait ensuite (point 1)** : `/stack init` demande la moitié manquante. Rien n'est écrit ; le message
+  dit ce qui est trouvé, ce qui manque, et la relance : `--lanceur`, `--features`, `--etapes`
+  (combinables), ou `--sans-bdd` (écrit `bdd: false`). `completerBdd` vérifie ce qui est donné (lanceur
+  connu, dossier non vide), `partiesManquantes` et `partiesTrouvees` décrivent l'état (`detection-bdd.ts`).
+  Choix : les **arguments de la commande** servent de réponse libre, la confirmation n'admettant qu'un
+  oui ou un non (une saisie libre aurait demandé une boîte de dialogue dans l'interface Electron).
+  Composants : une moitié arrête l'écriture, le message dit de compléter la pile à la main.
+  `proposeProfileEtBdd` retiré. Tests : 5 de `stack-command` (dont l'ancien « commentaire » remplacé),
+  vus rouges.
+
+## 08/11 — Détection du BDD par `/stack init` et `/stack doctor` (ADR 0074 §5) ; critère `bdd-par-composant` à `true`
+
+- **Fait** : `detecterBdd` et `blocBdd` (`stack-adapters/src/profile/detection-bdd.ts`, purs) : lanceur
+  lu comme un nom entier dans le texte des manifestes (table de marques par lanceur, table des noms de
+  manifestes), dossier des `.feature` (parent commun), dossier des étapes (unique dossier au nom usuel).
+  `proposeProfileEtBdd` ajoute la section `bdd` (couple complet) ou un commentaire « à compléter »
+  (une moitié) ; `/stack init` l'emploie à la racine et pour chaque composant. `diagnoseProfile` vérifie
+  les couples déclarés (`.feature` présents, dossier d'étapes, lanceur cité). `IndicesDuProjet` gagne
+  `arborescence` et `manifestes`, remplis par `workspace-services` (`sous`, `manifestesSous`, aussi
+  pour `diagnostiquer`).
+- **Choix** : la confirmation n'admet qu'un oui ou un non, la moitié manquante n'est donc pas demandée
+  mais dite en commentaire, sans rien deviner.
+- **Vérifié en vrai** sur la copie du `main` BDD d'`exemple-dotnet-tdd` : `reqnroll`,
+  `tests/Tarification.UnitTests/Features`, `…/Steps`, le couple écrit à la main pour les runs.
+- **Limite** : `/stack init` ne propose de profil que pour TypeScript et Python (pas .NET).
+- Tests : `test/detection-bdd.test.ts` (12), `stack-command.test.ts` (3), `workspace-services.test.ts` (3),
+  vus rouges. Suite entière : 2364 tests.
+- **Critère `bdd-par-composant` passé à `true`** après son verify : tout l'ordre de mise en œuvre de
+  l'ADR 0074 est fait, et deux runs réels l'ont confirmé.
+
+## 08/11 — Questions ouvertes de la story posées avant RESEARCH (ADR 0014 révisé)
+
+- **Pourquoi** : aux deux runs du jour, le chercheur s'arrêtait (`blocker`) pour poser une question
+  que la story annonçait ; un tour de plus (≈ 0,20 $). Demandé par le responsable : poser les
+  questions de la story avant la recherche.
+- **Fait** : extension, `route` du réducteur sans l'exception « sauf avant RESEARCH » ; workflow,
+  `trancher` (questions sans réponse seulement) appelée avant RESEARCH et avant DESIGN.
+- Tests : réducteur (3 réécrits, 3 attentes mises à jour, l'aide `toFirstPhase` répond à la question
+  quand RESEARCH a lieu) ; bout en bout S2 dans les deux implémentations (question posée avant
+  RESEARCH, réponse dans le dossier du chercheur, seule la question de la recherche ensuite), vus
+  rouges avec l'ancien ordre ; deux tests `--auto` reçoivent le répondeur.
+- **Le réfutateur** : il ne juge que les défauts `blocker`/`major` des lentilles (ADR 0069), jamais
+  une porte du code ; au second run, défauts mineurs seulement, il n'a pas été appelé.
+- **Rejet `ArgumentNullException` (DESIGN, second run) : pas un faux positif**, lu dans la trace.
+  `contracts.md` promettait des gardes contre les nuls (lignes 23, 85, 94) ; l'architecte du modèle a
+  vérifié que le projet n'en a aucune (`Nullable` activé, avertissements bloquants,
+  `Directory.Build.props:4, 7-8`), l'a documenté, et le contrat a été corrigé. **Décision du
+  responsable : porte inchangée**, à revoir seulement si un rejet sans enjeu de conception apparaît
+  (un nom du framework cité en passant). N'exiger que les noms déclarés aurait laissé passer celui-ci.
+
+## 08/11 — Aucun test unitaire en DELIVER : règle de l'ADR 0045 gardée, scénario déjà vert noté
+
+- **Constat** (second run) : ce n'est ni un défaut ni une faute d'agent. Le testeur a usé de `coveredBy`
+  (ADR 0045, option A du 03/10) pour `ac-2` ; le développeur a écrit toute la remise en un pas ; `ac-3`
+  était déjà vert (code écrit sans test rouge qui le demande). La mutation des lignes de la story est
+  passée : les scénarios tuent ses mutants.
+- **Décision du responsable** : garder la règle 1 (le scénario peut tenir lieu de rouge) ; les tests
+  unitaires complètent quand les scénarios ne suffisent pas, ce que font déjà les portes de fin (mutant
+  survivant → testeur ; ligne non couverte → testeur si le projet a un seuil de couverture, aucun par
+  défaut). ADR 0045 complété.
+- **Fait** : note « Scénario ac-n : déjà vert avant son premier pas ; … » quand un scénario pilote est
+  vert à son tour (extension `deliver-machine.ts`, workflow `livraison.mjs`). Test du réducteur et trois
+  attentes exactes de bout en bout (S1, S5 ; ordre : après les notes de la porte du scénario précédent)
+  vues rouges puis vertes.
+- Précision donnée au responsable : en DISTILL, l'agent d'acceptance **peut** écrire dans les sources
+  (signatures minimales pour compiler) ; le code borne l'emplacement, pas le contenu (pas de logique :
+  consigne seulement). Au second run : `BaremeDeRemises` vide, deux types-valeurs, un constructeur.
+
+## 08/11 — Second run réel US-2 en BDD (`docs/runs/2026-11-08-us-2-bdd-claude-2/`)
+
+- Demandé par le responsable (« Aller on relance »), après les quatre corrections du jour ; même
+  départ, pile complétée (`mutation` Stryker, `format`). Serveur MCP reconstruit.
+- **Fini : 16m13, 1 rejet, 5,18 $** (premier : 23m28, 8 rejets, 12,18 $). DESIGN 3,20 $ (au lieu de
+  7,98) sans refus sur `Panier`, ADR-003 ratifié ; DISTILL en un essai, `.feature` de l'US-1 intact ;
+  5 scénarios pour 5 critères ; mutation mesurée, 5 survivants anciens de `Montant.cs` notés hors du
+  changement ; `dotnet test` 10/10.
+- **À examiner** : (1) le seul rejet, `ArgumentNullException` exigé dans le modèle parce que cité par
+  `contracts.md` (type du framework, faux positif probable) ; (2) **aucun test unitaire écrit** en
+  DELIVER, pour la seconde fois (« TDD toujours ») ; (3) notes : commentaire de `Facture` périmé,
+  justification de requalification devenue fausse après DELIVER.
+- Branche du run (`skraft/us-2`, clone `/tmp/essai-mcp-skraft-R89Ove`) non poussée.
+
+## 08/11 — Mutation : vérifiée en vrai, puis jugée sur les lignes modifiées (ADR 0049 révisé)
+
+- **Pourquoi** : le run BDD n'avait pas mesuré la mutation ; la pile fournie (reprise de `a7cf6db`)
+  n'en déclarait pas, alors que le `main` BDD a Stryker.NET 4.14.1 (`dotnet-tools.json`,
+  `stryker-config-core.json`). Mon oubli.
+- **Vérifié sans LLM** sur une copie du `main` : `dotnet tool restore`, puis la mutation par notre
+  adaptateur (`[dotnet, stryker, --config-file, stryker-config-core.json, --output, "{dossier}"]`,
+  `stryker-json`) : 57 s, score et survivants lus ; `format` (`dotnet format --verify-no-changes`)
+  répond. La pile de l'essai (scratchpad `run-bdd/pile.yaml`) a désormais `mutation` et `format`.
+- **Constat** : le code de l'US-1 est à 62 % (`Montant.cs`), 60 % (`Quantite.cs`) ; la barre par défaut
+  exige 100 % (domaine, application, en fin de DELIVER) et la porte jugeait le fichier entier.
+- **Décision du responsable** (option 1) : juger les seules lignes modifiées, comme la couverture.
+- **Fait** : lecteur Stryker, `killedLines` ; `restreindreAuChangement` (extension, workflow) appliqué
+  avant `checkMutation` aux deux portes (fin de scénario, fin de DELIVER), qui reçoivent les lignes de
+  `fichiersModifies` ; survivants hors des lignes modifiées → note « Mutation hors du changement ».
+  Sans `killedLines` ou sans lignes, l'ancienne règle (fichier entier).
+- Tests : lecteur (1), restriction (4 par copie), bout en bout S5 (1 par implémentation : survivant
+  ancien sur la ligne 1 d'un fichier touché à la ligne 2) ; vus rouges, le bout en bout en neutralisant
+  la restriction (escalade « à 50 % (minimum 100 %) »). Une attente exacte de `profile-adapter.test.ts`
+  complétée par `killedLines`.
+
+## 08/11 — DISTILL ne juge que le Gherkin de la story (ADR 0074 §4)
+
+- **Défaut** (run BDD du 08/11) : la porte des titres `AC-n` jugeait tous les `.feature` du dossier,
+  dont celui de l'US-1 ; l'agent a renommé ses scénarios. Trouvé aussi en lisant le code : DELIVER
+  prenait le premier scénario `@ac-n` du dossier, donc celui de l'US-1 (`panier-chiffrage` avant
+  `panier-remise`).
+- **Fait, extension et workflow** : `gherkinDeLaStory(avant, après)` (`gherkin.ts`, `gherkin.mjs`)
+  découpe chaque fichier en en-tête et blocs de scénario ; nouveaux blocs = la story (rendus avec
+  l'en-tête du fichier) ; bloc existant modifié ou supprimé, ou en-tête modifié = refus (porte
+  `gherkin`). Relevé `avant` : workflow, au début du callback de `w.phase("DISTILL")` dans `d` ;
+  extension, dans l'effet `checkpointPhase` de DISTILL, porté par `PHASE_CHECKPOINTED.gherkinAvant`
+  jusqu'à l'état (`SkraftState.gherkinAvant`, schéma zod). Portes et DELIVER passent par
+  `gherkinDuDisque` + `gherkinDeLaStory`.
+- Décision du responsable : un scénario d'une story précédente **doit** être refusé s'il est touché.
+- Tests : 6 de `gherkinDeLaStory` dans chaque copie, et 3 de bout en bout dans chaque
+  implémentation (US-1 déjà en BDD : livrée sans juger ses titres ; renommer un scénario de l'US-1
+  refusé, motif exact ; DELIVER reçoit le scénario de la story). Tous vus rouges pour la bonne raison ;
+  le refus vérifié en le retirant.
+- **Fait ensuite, même entrée** : les tests d'une story précédente. Relevé de la suite d'INIT gardé
+  (`testsAvant` : workflow dans `d`, extension par `INITIALIZED` jusqu'à l'état) ; aucune exécution de
+  plus, RESEARCH et DESIGN n'écrivant aucun test. `checkAcceptanceRed(… avant)` ne compte que les tests
+  nouveaux, refuse un test existant passé au rouge, et dit « aucun nouveau test d'acceptance » si tous
+  les marqués existaient ; `testsDeLaStory` est gardé à la porte (workflow `d`, extension `GATE_OK` de
+  DISTILL), remis à zéro avec les régressions, et `planScenarios` de DELIVER n'en sort pas. Tests : 3
+  de porte dans chaque copie, 1 de bout en bout dans chaque implémentation (test de l'US-1 vert : ni
+  « passe déjà », ni scénario `ac-1#2`), vus rouges (escalade « passe déjà », exactement le run) ; le
+  filtrage de DELIVER vérifié en le retirant.
+- Piège de test : le lanceur simulé fait échouer tout test d'acceptance tant que la story n'est pas
+  livrée ; l'enveloppe qui rend vert le test de l'US-1 doit aussi recalculer `exitCode`, sinon INIT
+  refuse de démarrer (« Exécution des tests existants en erreur »).
+
+## 08/11 — Porte de cohérence de DESIGN : un nom d'un seul mot n'était jamais reconnu dans le modèle
+
+- **Défaut** (trouvé en lisant les refus du run BDD) : `conceptsAbsentsDuModele` comparait les noms
+  qu'un ADR classe (`classements`, tout nom en capitale initiale : `Panier`) aux noms du modèle relevés
+  par `extractCodeIdentifiers`, qui ne garde que les noms **composés** (`PASCAL` : `GrilleDePaliers`).
+  « Agrégat `Panier` » écrit dans `domain-model.md` n'y figurait donc jamais.
+- **Effet** : runs du 07/11 et du 08/11, « `Panier`, Agrégat dans ADR-003, n'existe ni dans… »
+  répété ; le 08/11, deux essais (4,36 $), disjoncteur, escalade, puis l'ADR-003 **abandonné** par
+  l'architecte pour passer la porte. L'« incohérence entre les deux architectes » du 07/11 était en
+  partie ce défaut.
+- **Correction**, extension et workflow : `nomsDuModele` ajoute aux noms composés les noms d'un seul
+  mot écrits entre accents graves ou dans un bloc de code. `extractCodeIdentifiers` n'est pas
+  touché (il sert aussi aux citations).
+- **Vérifié** : test rouge puis vert dans les deux copies, garde « nom d'un seul mot absent : rejeté » ;
+  rejoué sur l'instantané réel de l'essai 3 (`traces/…/DESIGN rembobinage`) : l'ancien code redonne
+  le refus mot pour mot, le nouveau aucun.
+- Les autres refus de DESIGN du run (`SommeDesArticles`, `FraisDePort`, `PrixUnitaire` : champs du
+  code cités par les contrats, absents du modèle) relèvent de la règle, pas d'un défaut. Question
+  laissée au responsable : exiger ces champs existants dans le modèle est-il trop strict ?
+
+## 08/11 — Run réel US-2 en BDD, Claude, par le serveur MCP (`docs/runs/2026-11-08-us-2-bdd-claude/`)
+
+- Départ : `main` GitHub d'`exemple-dotnet-tdd` (`19583a4`, US-1 déjà en BDD Reqnroll), pile
+  donnée par l'argument `pile` (`--pile=` ajouté à `scripts/essai-mcp-skraft.ts`). Demandé par le
+  responsable (« Lance un test l'exemple à partir de sa branche main »).
+- Résultat : **fini, 23m28, 8 rejets, 12,18 $**, `dotnet test` 10/10. Le `.feature` va au projet,
+  titres `AC-n`, étapes dans `Steps/` : le chemin BDD fonctionne de bout en bout.
+- **Défaut de DESIGN** : `Panier` refusé à tort (nom d'un seul mot), **corrigé** (entrée précédente).
+- **Deux défauts de nos portes, à corriger avant de passer `bdd-par-composant` à `true`** :
+  1. ~~la porte des titres `AC-n` juge **tous** les `.feature` du dossier~~ **corrigé** (ADR 0074 §4) ;
+  2. ~~les marqueurs `ac-n` de deux stories se confondent~~ **corrigé** (ADR 0074 §4) : les scénarios renommés de l'US-1
+     sont pris pour des tests de l'US-2 (« passe déjà »), requalifiés en régression ; 8 scénarios
+     pour 5 critères. Le défaut existe aussi hors BDD, dès qu'une story précédente laisse des
+     tests `Ac<n>_…`.
+- Autres constats : aucun test unitaire écrit en DELIVER (un seul pas) ; DESIGN 7,98 $ sur 12,18
+  (même incohérence entre architectes qu'au 07/11) ; RESEARCH refusé pour des citations venues de
+  l'ADR-002 périmé du projet.
+- Branche du run (`skraft/us-2`, clone `/tmp/essai-mcp-skraft-zqGCsb`) **non poussée**.
+
+## 08/11 — Plusieurs rapports de tests pour une commande (`{rapports}`, ADR 0072 révisé)
+
+- **Trouvé en préparant le run BDD** (vérification gratuite, sans LLM, avant de lancer) : le
+  `main` BDD d'`exemple-dotnet-tdd` a deux projets de test (`Tarification.UnitTests` : Reqnroll ;
+  `Tarification.Tests` : xUnit). Avec `LogFilePath={rapport}`, le second rapport écrasait le
+  premier : 3 tests relevés sur 5, et les canaris `missing_symbol` et `syntax` « pas vus ». Le run
+  aurait jugé DELIVER sans ses tests unitaires.
+- **Fait** (`stack-adapters` seulement ; l'extension, le workflow et le serveur MCP en profitent) :
+  jeton `{rapports}` (dossier, tous les fichiers réunis) ; erreurs de compilation **ajoutées** aux
+  rapports présents ; couvertures **réunies** par ligne ; `executerTests` (`execution-tests.ts`)
+  partagé par l'adaptateur et les canaris, qui recevaient `{couverture}` vide.
+- **Vérifié en vrai** (`dotnet`, copie du `main` GitHub) : 5 tests relevés, six constats `ok`
+  (dont le canari BDD), couverture réunie de 5 fichiers.
+- **Piège** : avant, `lireCouverture` gardait le premier rapport Cobertura (« le premier lisible
+  fait foi ») : avec deux projets, la porte de couverture aurait vu la moitié des lignes.
+- **Remarqué, non traité** : les fichiers de la couverture .NET sortent sans `src/`
+  (`Tarification.Domaine/Panier.cs`), comme avant ce changement.
+- Tests : `test/rapports-multiples.test.ts` (12) ; vus rouges sauf deux qui passaient déjà
+  (acceptation du jeton ; dossier vide lu comme absent, par accident). L'ajout des erreurs de
+  compilation et la fusion de couverture vérifiés en les cassant.
+- Pile de l'essai BDD : `LogFilePath={rapports}/{assembly}.xml`, `unitTests` dans
+  `tests/Tarification.Tests`, `acceptanceTests: []` plus le couple `bdd` Reqnroll.
+
+## 08/11 — Skill `bdd-step-definitions` (ADR 0074 §3)
+
+- **Quoi** : `skills/bdd-step-definitions/SKILL.md`, dans l'extension et le workflow (copies
+  identiques). Écrit pour agent-studio, en français, à partir des idées de *GOOS* (Freeman et
+  Pryce, ch. 5, 8, 10, 11, 21 à 23, 27), reformulées, provenance en commentaire. Aucun langage ni
+  lanceur : exemples en Gherkin et pseudo-code. Contenu partageable (ADR 0024), aucun outil
+  d'agent-studio nommé.
+- **Contenu** : trois étages (scénario, étapes, pilotes) ; étape en une ligne ; pilotes en langage
+  métier (impératif pour agir, description pour vérifier) ; faux systèmes externes minimaux, ne
+  doubler que ses types ; builders à valeurs par défaut (le scénario ne porte que les valeurs du
+  critère, intactes jusqu'au pilote) ; contexte neuf par scénario ; un rouge sur la vérification
+  métier, jamais une étape sans définition ; attendre un effet, jamais une durée ; une étape qui
+  résiste fait poser la question.
+- **Branchement** : à la demande de l'agent d'acceptance (`ROLE_SKILLS.acceptance`, `meta.agents`
+  du workflow), et `ligneBdd` dit de la charger avant d'écrire les étapes. Ajoutée à `SKILLS` avec
+  un commentaire qui la distingue des reprises de skraft-plugin.
+- Tests : `brief.test.ts` (deux copies) et `agents-skills.test.ts` vus rouges ; nouveau
+  `tests/workflow-skraft/test/skills.test.ts`, dont la garde d'existence (une skill accordée doit
+  exister) passait déjà et a été vérifiée en retirant la copie.
+
+## 08/11 — Canari BDD de `/stack doctor` (ADR 0074 §3)
+
+- **Quoi** : pour chaque couple `bdd` du profil, `runCanaries` écrit lui-même
+  `<features>/<marque>.feature` (Gherkin, `# language: en` imposé), dont l'étape n'a aucune
+  définition, lance la commande de test et juge le résultat (`jugerCanariBdd`, `canaries.ts`).
+  Rien n'est à déclarer dans le profil : Gherkin ne dépend d'aucun langage.
+- **Oracle** : la porte de DISTILL ne refuse que `other_error` et les tests ignorés. Le canari est
+  donc `ok` pour ces deux-là ; `probleme` si le scénario est réussi, classé `assertion`,
+  `missing_symbol` ou non classé (le pire l'emporte) ; `avertissement` s'il est absent du rapport
+  (dossier non découvert, ou lanceur qui n'exécute un .feature que chargé par ses étapes, comme
+  jest-cucumber ou pytest-bdd) ou s'il n'y a aucun rapport.
+- **Piège** : la marque est cherchée **sans casse**. Vérifié en vrai (Reqnroll 3.3.4, xUnit,
+  JunitXml) : le test s'appelle `…C1A2B3C4CanaryFeature.C1A2B3C4Canary`, et l'échec
+  `XUnitPendingStepException … No matching step definition found` est classé `other_error`
+  par notre lecteur → `ok`. Les autres lanceurs ne sont pas vérifiés : c'est le canari qui le dira
+  sur leur projet.
+- Tests : `packages/stack-adapters/test/canari-bdd.test.ts` (13 ; 12 vus rouges, le 13e — « sans
+  BDD, aucun .feature » — est une garde ; la recherche sans casse vérifiée en la cassant).
+
+## 08/11 — BDD (ADR 0074), brique 3b : DISTILL et DELIVER en BDD, extension et workflow
+
+- Les couples BDD atteignent les extensions et les workflows : `ctx.stack.bdd` (en processus, et
+  isolée par la requête d'activation) et `w.disposition().bdd`.
+- Fonctions pures en deux copies (`gherkin.ts` / `gherkin.mjs`, `brief.ts` / `brief.mjs`) :
+  `dossiersDesFeatures` (dossiers `features` des couples, sinon `.skraft/<slug>/distill/features`),
+  `checkTitresBdd` (titre d'un scénario `@ac-<n>` qui commence par `AC-<n>`, casse et séparateur
+  libres), `ligneBdd` (consigne du dossier de passation de DISTILL).
+- Branché des deux côtés : la porte `gherkin` de DISTILL lit les `.feature` du projet et refuse un
+  titre sans critère ; le dossier de passation de DISTILL dit où écrire le `.feature` et ses étapes ;
+  DELIVER lit le scénario dans le projet. Le gel et l'empreinte n'ont rien demandé : les dossiers BDD
+  sont déjà dans `acceptanceTests` (brique 3a).
+- Agent d'acceptance (deux copies) : le cas BDD mentionné, sans nommer d'outil d'agent-studio.
+- Tests de bout en bout des deux côtés (`e2e-bdd`) vus rouges puis verts : story livrée, `.feature`
+  commité dans le projet et rien dans `.skraft/` ; titres sans critère refusés par la porte `gherkin`.
+- **Reste** : détection BDD par `/stack init` (lanceur dans les manifestes, dossiers `.feature` et
+  étapes) ; skill par lanceur (Reqnroll d'abord) ; run réel sur la version BDD d'`exemple-dotnet-tdd`.
+
+## 08/11 — BDD (ADR 0074), vérification sur Reqnroll et brique 3a : le réglage `bdd`
+
+- **Vérifié sur la version installée** (clone du `main` BDD d'`exemple-dotnet-tdd`, Reqnroll 3.3.4,
+  xUnit, JunitXml.TestLogger 4.1.0, .NET 10) : le nom du test vient du titre du scénario
+  (`LeClientChiffreUneLigneDePlusieursArticles`, classe `…ChiffrerUnPanierLigneALigneFeature`) ; le tag
+  `@ac-1` devient `Trait("Category","ac-1")` dans le `.feature.cs` généré, mais **l'enregistreur JUnit
+  n'écrit aucun attribut** (sa documentation le dit). Un titre « AC-1 Le client… » donne
+  `AC_1LeClient…`, que `acOf` reconnaît déjà. Le Gherkin du projet est en français.
+- **Décisions du responsable (08/11)** : le `.feature` de DISTILL va au projet, tel quel ; le titre de
+  chaque scénario commence par son critère (`AC-n`) ; le code vérifie à chaque porte que le `.feature`
+  du projet est exactement celui de DISTILL (empreinte).
+- **Brique 3a** : `bdd` dans le profil de pile (`false` = absent ; liste de couples `{ lanceur,
+  features, etapes }`, lanceurs connus : Reqnroll, SpecFlow, Cucumber-JS, jest-cucumber,
+  Cucumber-JVM, pytest-bdd, behave). Les dossiers d'un couple rejoignent `acceptanceTests` : le gel
+  de DISTILL et `isTestFile` les couvrent. `StackAdapter.bdd` expose les couples ; l'adaptateur
+  composé les ramène à la racine du projet. **Piège** : une union zod (`false` ou liste) perdait le
+  chemin de l'erreur (« bdd — Invalid input ») ; `false` est ramené à « absent » avant la validation.
+
+## 07/11 — Composants (ADR 0074), brique 2 : /stack, /stack doctor, /stack init, serveur MCP
+
+- `/stack` dit les composants (nom, pile, racine) ; `/stack doctor` en fait un diagnostic chacun,
+  relu dans sa racine (emplacements, fichiers de détection), canaris dans la racine du composant au
+  sein de la copie isolée.
+- `/stack init` cherche les sous-projets jusqu'à **4 niveaux** (dépendances installées et dossiers
+  cachés écartés : `node_modules`, `bin`, `obj`, `target`, `dist`, `vendor`, `.*`). Un seul reconnu à
+  la racine : la section `pile`, comme avant ; plusieurs, ou un seul hors de la racine : la section
+  `composants`, montrée, confirmée en nommant les programmes, écrite par
+  `ecrireComposantsDansProjet` (commentaires et `qualite` gardés, `pile` retirée). Composants déjà
+  déclarés : rien n'est écrasé.
+- Lecture des composants unifiée (`profilsDesComposants`, `pileComposee`) : projet, `/stack` et pile
+  fournie par le client passent par les mêmes contrôles. L'argument `pile` du serveur MCP accepte
+  `composants:`.
+- **Limite connue** : `proposeProfile` ne reconnaît toujours que TypeScript (Vitest) et Python ; un
+  sous-projet .NET n'est pas proposé (`exemple-dotnet-tdd` a son profil écrit à la main).
+- Tests vus rouges puis verts (`stack-command`, `workspace-services`, `pile`).
+
+## 07/11 — Composants (ADR 0074), brique 1 : adaptateur composé, section composants, branchement
+
+- `createComposedAdapter` (`stack-adapters/src/composants.ts`) : les composants derrière le port
+  `StackAdapter`. Emplacements réunis et ramenés à la racine du projet ; `isTestFile` délègue au
+  composant qui contient le fichier ; tests lancés dans chaque racine, identifiants préfixés
+  (`services/api: …`), fichiers et couverture ramenés à la racine du projet ; lint et format ne
+  reçoivent que les fichiers de leur composant ; format attesté seulement si tous les composants
+  touchés l'ont ; mutation fusionnée (score pondéré par le nombre de fichiers) ; règle de dépendance
+  en chemins ramenée à la racine de son composant. Une opération qu'aucun composant n'a reste absente.
+- `projet.yaml` : section `composants` (`nom`, `racine`, `pile`), exclusive de `pile`. Racine
+  normalisée (`./services/api/` → `services/api`), relative, sans `..` ; noms uniques ; racines qui se
+  chevauchent refusées (`.` avec d'autres compris).
+- `project-services` : un projet à composants obtient l'adaptateur composé (chaque pile validée comme
+  une pile seule, contre la liste de l'administrateur) ; une pile refusée est nommée par son
+  composant, et la détection reprend la main. `pile()` donne les composants (nom, racine, id).
+- Tests vus rouges puis verts. Trois branches de l'adaptateur (format, mutation, imports) codées avant
+  leur test : chacun vu rouge en cassant la ligne qu'il protège.
+- **Reporté par le responsable** : composants touchés seulement aux portes (une économie de temps ;
+  piège noté dans l'ADR : la liste des tests verts est remplacée à chaque pas). **Reste** : `/stack init` et
+  `/stack doctor` par composant ; argument `pile` du serveur MCP au format composants ; écriture de
+  `pile` par `/stack init` quand le projet a des composants.
+
 ## 07/11 — ADR 0074 accepté : composants d'un projet, BDD par composant (rien d'implémenté)
 
 - Question du responsable : donner le choix TDD ou BDD, et traiter les dépôts qui mélangent les

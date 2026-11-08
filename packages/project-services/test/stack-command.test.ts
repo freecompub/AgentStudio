@@ -240,3 +240,172 @@ describe("/stack init — proposer, faire approuver, puis écrire", () => {
     expect("error" in parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES })).toBe(false);
   });
 });
+
+/**
+ * Composants (ADR 0074, brique 2) : `/stack` les montre, `/stack doctor` diagnostique chacun dans sa
+ * racine, et `/stack init` cherche les sous-projets (jusqu'à 4 niveaux) pour proposer la section
+ * `composants` quand il y en a plusieurs, ou un seul hors de la racine.
+ */
+describe("/stack et les composants (ADR 0074)", () => {
+  const PY = PROFIL_VALIDE;
+  const TS = profil(`
+id: typescript
+detect: [package.json]
+tests:
+  command: [vitest, run]
+  report: vitest-json
+layout:
+  unitTests: ["tests/**"]
+`);
+  const declares = async () => ({ composants: [{ nom: "api", racine: "services/api", profile: PY }, { nom: "web", racine: "web", profile: TS }] });
+
+  it("/stack : les composants déclarés, avec leur racine et leur pile", async () => {
+    const h = harnais({ profilDeclare: declares, stackActive: () => ({ id: "python", declaree: true }) });
+    await h.lancer("");
+    expect(h.postes[0]).toMatch(/2 composants/);
+    expect(h.postes[0]).toMatch(/api.*python.*services\/api/);
+    expect(h.postes[0]).toMatch(/web.*typescript.*web/);
+  });
+
+  it("/stack doctor : un diagnostic par composant, chacun relu dans sa racine", async () => {
+    const racines: string[] = [];
+    const h = harnais({ profilDeclare: declares, diagnostiquer: async (p, racine) => (racines.push(racine ?? "."), [{ gravite: "ok", message: `relu ${p.id}` }]) });
+    await h.lancer("doctor");
+    expect(racines).toEqual(["services/api", "web"]);
+    const rapport = h.postes.at(-1)!;
+    expect(rapport).toMatch(/## Composant `api` \(`services\/api`\) — profil `python`/);
+    expect(rapport).toMatch(/## Composant `web` \(`web`\) — profil `typescript`/);
+    expect(rapport).toMatch(/relu python[\s\S]*relu typescript/);
+  });
+
+  it("/stack init : plusieurs sous-projets reconnus, la section composants est proposée, confirmée, puis écrite", async () => {
+    const ecrits: string[] = [];
+    let demande = "";
+    const h = harnais({
+      sousProjets: async () => [
+        { racine: "services/api", indices: { fichiers: ["pyproject.toml"], dependances: [] } },
+        { racine: "web", indices: { fichiers: ["package.json"], dependances: ["vitest"] } },
+        { racine: "docs", indices: { fichiers: ["README.md"], dependances: [] } },
+      ],
+      ecrireComposants: async (yaml) => void ecrits.push(yaml),
+      confirmer: async (r) => ((demande = `${r.title} ${r.detail}`), "allow-once"),
+    });
+    await h.lancer("init");
+    expect(h.postes[0]).toMatch(/composants/);
+    expect(h.postes[0]).toMatch(/nom: api[\s\S]*racine: services\/api[\s\S]*nom: web[\s\S]*racine: web/);
+    expect(demande).toMatch(/pytest/);
+    expect(demande).toMatch(/vitest/);
+    expect(ecrits).toHaveLength(1);
+    expect(h.ecrits).toEqual([]);
+    const { lireFichierProjet } = await import("@agent-studio/stack-adapters");
+    const relu = lireFichierProjet(`composants:\n${ecrits[0]!.split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`);
+    if ("error" in relu) throw new Error(relu.error);
+    expect(relu.composants?.map((c) => [c.nom, c.racine])).toEqual([["api", "services/api"], ["web", "web"]]);
+    for (const c of relu.composants!) expect("error" in parseStackProfile(c.pile, { allowedPrograms: AUTORISES })).toBe(false);
+  });
+
+  it("/stack init : un seul sous-projet, à la racine, la section pile comme avant ; hors de la racine, un composant", async () => {
+    const racine = harnais({ sousProjets: async () => [{ racine: ".", indices: { fichiers: ["pyproject.toml"], dependances: [] } }] });
+    await racine.lancer("init");
+    expect(racine.ecrits).toHaveLength(1);
+    const ecrits: string[] = [];
+    const sous = harnais({ sousProjets: async () => [{ racine: "api", indices: { fichiers: ["pyproject.toml"], dependances: [] } }], ecrireComposants: async (y) => void ecrits.push(y) });
+    await sous.lancer("init");
+    expect(ecrits[0]).toMatch(/nom: api[\s\S]*racine: api/);
+  });
+
+  it("/stack init : des composants déjà déclarés ne sont pas écrasés", async () => {
+    const h = harnais({ profilDeclare: declares });
+    await h.lancer("init");
+    expect(h.postes[0]).toMatch(/composants.*existent déjà/is);
+    expect(h.ecrits).toEqual([]);
+  });
+});
+
+/** Détection du BDD par /stack init (ADR 0074 §2.5) : un couple complet proposé, une moitié signalée, rien sinon. */
+describe("/stack init — le BDD du projet", () => {
+  const cucumber = { path: "package.json", content: '{"devDependencies":{"vitest":"4","@cucumber/cucumber":"10"}}' };
+
+  it("couple complet : la section bdd est dans le profil proposé, confirmée et écrite avec lui", async () => {
+    const h = harnais({
+      indices: async () => ({ fichiers: ["package.json"], dependances: ["vitest", "@cucumber/cucumber"], arborescence: ["features/panier.feature", "features/steps/panier.steps.ts", "src/a.ts"], manifestes: [cucumber] }),
+    });
+    await h.lancer("init");
+    expect(h.postes[0]).toMatch(/bdd:\n {2}- lanceur: cucumber-js\n {4}features: features\n {4}etapes: features\/steps/);
+    expect(h.ecrits).toHaveLength(1);
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "features/steps" }]);
+  });
+
+  // Décision du 08/11 : une moitié n'est plus un commentaire, dont skraft ferait « pas de BDD » ; on
+  // demande ce qui manque, par les arguments de la commande, et rien n'est écrit en attendant.
+  const moitie = { fichiers: ["package.json"], dependances: ["vitest", "@cucumber/cucumber"], arborescence: ["features/panier.feature", "tests/bdd/glue.ts", "src/a.ts"], manifestes: [cucumber] };
+
+  it("une moitié seulement : rien n'est écrit, la commande dit ce qui manque et comment le donner", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("BDD détecté à moitié");
+    expect(h.postes.at(-1)).toContain("Trouvé : lanceur cucumber-js, dossier des .feature features. Manque : dossier des étapes.");
+    expect(h.postes.at(-1)).toContain("`/stack init --etapes <dossier>`");
+    expect(h.postes.at(-1)).toContain("`/stack init --sans-bdd`");
+  });
+
+  it("la moitié manquante donnée en argument : vérifiée, puis le profil complet est proposé et écrit", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --etapes tests/bdd");
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "tests/bdd" }]);
+  });
+
+  it("un dossier donné qui n'existe pas, ou un lanceur inconnu : refusé, rien n'est écrit", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --etapes tests/absent");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("`tests/absent` : aucun fichier du projet n'est dans ce dossier.");
+    await h.lancer("init --etapes tests/bdd --lanceur gherkin-maison");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toMatch(/`gherkin-maison` : lanceur inconnu\. Lanceurs connus : reqnroll, specflow, cucumber-js/);
+  });
+
+  it("--sans-bdd : le choix est déclaré, `bdd: false`, et skraft démarrera sans BDD", async () => {
+    const h = harnais({ indices: async () => moitie });
+    await h.lancer("init --sans-bdd");
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([]);
+  });
+
+  it("composants : une moitié dans l'un d'eux, rien n'est écrit, et le message nomme le composant", async () => {
+    const ecrits: string[] = [];
+    const h = harnais({
+      sousProjets: async () => [
+        { racine: "services/api", indices: { fichiers: ["pyproject.toml"], dependances: [] } },
+        { racine: "web", indices: { ...moitie } },
+      ],
+      ecrireComposants: async (yaml) => void ecrits.push(yaml),
+    });
+    await h.lancer("init");
+    expect(ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toContain("`web` : BDD détecté à moitié.");
+    expect(h.postes.at(-1)).toContain(".agent-studio/stack.yaml");
+  });
+
+  it("composants : chacun reçoit son BDD, chemins relatifs à sa racine", async () => {
+    const ecrits: string[] = [];
+    const h = harnais({
+      sousProjets: async () => [
+        { racine: "services/api", indices: { fichiers: ["pyproject.toml"], dependances: [] } },
+        { racine: "web", indices: { fichiers: ["package.json"], dependances: ["vitest"], arborescence: ["features/a.feature", "features/steps/a.ts"], manifestes: [cucumber] } },
+      ],
+      ecrireComposants: async (yaml) => void ecrits.push(yaml),
+    });
+    await h.lancer("init");
+    const { lireFichierProjet } = await import("@agent-studio/stack-adapters");
+    const relu = lireFichierProjet(`composants:\n${ecrits[0]!.split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`);
+    if ("error" in relu) throw new Error(relu.error);
+    const web = parseStackProfile(relu.composants!.find((c) => c.nom === "web")!.pile, { allowedPrograms: AUTORISES });
+    expect("error" in web ? web.error : web.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "features/steps" }]);
+    const api = parseStackProfile(relu.composants!.find((c) => c.nom === "api")!.pile, { allowedPrograms: AUTORISES });
+    expect("error" in api ? api.error : api.profile.bdd).toBeUndefined();
+  });
+});

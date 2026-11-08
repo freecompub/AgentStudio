@@ -2,7 +2,7 @@
  * Modèle d'état unifié du pipeline skraft (SPEC-skraft §5.1) : un seul type, un seul validateur
  * (défaut C2 rendu impossible). Types purs, sérialisables, persistés par le moteur.
  */
-import type { EcartDeclare, LigneDuPlan } from "./distill.js";
+import type { EcartDeclare, LigneDuPlan, TestAvant } from "./distill.js";
 import { z } from "zod";
 import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSurvivant } from "./deliver.js";
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
@@ -181,6 +181,11 @@ export interface SkraftState {
   qualityCheckpoint?: string;
   branch: string;
   checkpoints: Partial<Record<Phase, string>>;
+  /**
+   * `.feature` présents au début de DISTILL (ADR 0074, run du 08/11) : ceux des stories précédentes.
+   * Les portes ne jugent que les scénarios nouveaux, et DELIVER ne reçoit que ceux-là.
+   */
+  gherkinAvant?: { path: string; content: string }[];
   artifacts: Record<Phase, ArtifactRecord[]>;
   reviews: Record<Phase, ReviewRecord[]>;
   attempts: number;
@@ -249,6 +254,13 @@ export interface SkraftState {
   acceptanceHash: string | null;
   /** Tests d'acceptance déjà verts, requalifiés en non-régression avec justification. */
   regressions: string[];
+  /**
+   * Tests au relevé d'INIT (ADR 0074 §4) : ceux des stories précédentes. RESEARCH et DESIGN n'écrivent
+   * aucun test : c'est encore la suite au début de DISTILL.
+   */
+  testsAvant?: TestAvant[];
+  /** Tests d'acceptance de la story, relevés à la porte de DISTILL : DELIVER n'en fait pas d'autres scénarios. */
+  testsDeLaStory?: string[];
   /** Granularité imposée par réglage, sinon choisie selon la difficulté. */
   granularitySetting: Granularity | null;
   /** Skills chargées à la demande par `load_skill`, tracées par rôle et par phase (D26) ; absent d'un état antérieur. */
@@ -271,12 +283,14 @@ export type SkraftEvent =
       story: Story;
       baseSha: string;
       qualityCheckpoint?: string;
+      /** Tests au relevé d'INIT : ceux des stories précédentes (ADR 0074 §4). */
+      testsAvant?: TestAvant[];
       branch: string;
       indicators: DifficultyIndicators;
     }
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
-  | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
+  | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string; gherkinAvant?: { path: string; content: string }[] }
   | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
@@ -292,6 +306,7 @@ export type SkraftEvent =
       recherche?: { conventions: string; existant: string };
       acceptanceHash?: string;
       regressions?: string[];
+      testsDeLaStory?: string[];
       /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
       facts?: string[];
       notes?: string[];
@@ -411,6 +426,9 @@ const stateSchema = z.object({
   qualityCheckpoint: z.string().optional(),
   branch: z.string(),
   checkpoints: z.record(z.string(), z.string()),
+  gherkinAvant: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
+  testsAvant: z.array(z.object({ id: z.string(), status: z.enum(["passed", "failed", "skipped"]) })).optional(),
+  testsDeLaStory: z.array(z.string()).optional(),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
   reviews: byPhase(z.object({ attempt: z.number(), lenses: z.array(z.unknown()), verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]), reportPath: z.string() })),
   attempts: z.number().int().min(0),

@@ -39,16 +39,22 @@ import {
 } from "@agent-studio/extension-host";
 import {
   createNodeProcessRunner,
+  createComposedAdapter,
   createProfileAdapter,
   detecte,
   diagnoseProfile,
   globToRegExp,
   runCanaries,
+  MANIFESTE,
   parseStackProfile,
   FICHIER_PROJET,
+  ecrireComposantsDansProjet,
   ecrirePileDansProjet,
   lireFichierProjet,
   selectStackAdapter,
+  type ComposantDeclare,
+  type Composant,
+  type StackProfile,
   type StackAdapter,
 } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
@@ -169,18 +175,30 @@ export class AucunePile extends Error {
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
-    const declare = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const pileDuProjet = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const declare = pileDuProjet?.adapter ?? null;
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
     let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
     let choisie = detected;
+    let composantsDeLaPile = pileDuProjet?.composants;
     if (pileFournie !== undefined) {
       if (choisie)
         onPost("agent-studio", `La pile fournie par l'appelant est ignorée : le projet a la sienne, **${choisie.id}** (${declare ? `profil \`${PROFIL_PROJET}\`` : "détection automatique"}).`);
       else {
         // Même contrôle qu'un profil du projet : schéma, et programmes de la liste de l'administrateur.
-        const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
-        if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
-        choisie = createProfileAdapter(lu.profile);
+        // Au format composants (ADR 0074), chaque pile l'est à son tour.
+        const enComposants = lireFichierProjet(pileFournie);
+        if (!("error" in enComposants) && enComposants.composants) {
+          const lu = profilsDesComposants(enComposants.composants, cfg.allowedPrograms ?? []);
+          if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
+          const p = pileComposee(lu.composants);
+          choisie = p.adapter;
+          composantsDeLaPile = p.composants;
+        } else {
+          const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
+          if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
+          choisie = createProfileAdapter(lu.profile);
+        }
         source = "client";
         onPost("agent-studio", `Stack du projet : **${choisie.id}**, fournie par l'appelant.`);
       }
@@ -492,7 +510,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
             accord: resumeAccord(a.workflow),
           })),
         ),
-      pile: () => ({ id: stack.id, source }),
+      pile: () => ({ id: stack.id, source, ...((source === "projet" || source === "client") && composantsDeLaPile ? { composants: composantsDeLaPile } : {}) }),
       lancerWorkflow,
       async rapportWorkflow(taskId) {
         const r = (await engine.list()).find((t) => t.id === taskId);
@@ -530,6 +548,8 @@ interface SourceDuProfil {
   libelle: string;
   /** Profil en YAML ; `null` : le fichier de projet n'a pas de section `pile`. */
   brut: string | null;
+  /** Composants déclarés (ADR 0074), à la place de la section `pile`. */
+  composants?: ComposantDeclare[];
   erreur?: string;
   avertissements: string[];
 }
@@ -550,6 +570,7 @@ async function lireSourceDuProfil(root: string): Promise<SourceDuProfil | null> 
     const avertissements = ancien !== null ? [`\`${PROFIL_PROJET}\` est ignoré : \`${FICHIER_PROJET}\` fait foi, supprime-le (ADR 0071).`] : [];
     const p = lireFichierProjet(projet);
     if ("error" in p) return { libelle: `\`${FICHIER_PROJET}\``, brut: null, erreur: p.error, avertissements };
+    if (p.composants) return { libelle: `\`${FICHIER_PROJET}\` (section composants)`, brut: null, composants: p.composants, avertissements };
     return { libelle: `\`${FICHIER_PROJET}\` (section pile)`, brut: p.pile ?? null, avertissements };
   }
   if (ancien !== null)
@@ -567,9 +588,19 @@ async function lireProfilDeclare(root: string, allowedPrograms: readonly string[
   const src = await lireSourceDuProfil(root);
   if (!src) return null; // pas de profil : la détection s'applique, sans rien dire
   if (src.erreur) return { error: src.erreur };
+  if (src.composants) {
+    const lu = profilsDesComposants(src.composants, allowedPrograms);
+    return "error" in lu ? { error: `${src.libelle}, ${lu.error}` } : lu;
+  }
   if (src.brut === null) return null;
   const lu = parseStackProfile(src.brut, { allowedPrograms });
   return "error" in lu ? { error: `${src.libelle} : ${lu.error}` } : lu;
+}
+
+/** Pile du projet, et ses composants quand il en déclare (ADR 0074). */
+interface PileDuProjet {
+  adapter: StackAdapter;
+  composants?: { nom: string; racine: string; id: string }[];
 }
 
 async function lireProfilDuProjet(
@@ -577,7 +608,7 @@ async function lireProfilDuProjet(
   allowedPrograms: readonly string[],
   onPost: (extensionId: string, markdown: string) => void,
   logger?: Logger,
-): Promise<StackAdapter | null> {
+): Promise<PileDuProjet | null> {
   const src = await lireSourceDuProfil(root);
   for (const a of src?.avertissements ?? []) onPost("agent-studio", a);
   const lu = await lireProfilDeclare(root, allowedPrograms);
@@ -587,7 +618,25 @@ async function lireProfilDuProjet(
     onPost("agent-studio", `**Le profil de stack du projet est refusé.** ${lu.error}\n\nL'application se rabat sur la détection automatique ; corrigez ${src?.libelle ?? `\`${FICHIER_PROJET}\``} puis rouvrez le projet.`);
     return null;
   }
-  return createProfileAdapter(lu.profile);
+  if ("composants" in lu) return pileComposee(lu.composants);
+  return { adapter: createProfileAdapter(lu.profile) };
+}
+
+/** Composants (ADR 0074) : chaque pile validée comme une pile seule, contre la liste de l'administrateur ; une seule refusée suffit. */
+function profilsDesComposants(declares: readonly ComposantDeclare[], allowedPrograms: readonly string[]): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
+  const composants = [];
+  for (const c of declares) {
+    const lu = parseStackProfile(c.pile, { allowedPrograms });
+    if ("error" in lu) return { error: `composant « ${c.nom} » : ${lu.error}` };
+    composants.push({ nom: c.nom, racine: c.racine, profile: lu.profile });
+  }
+  return { composants };
+}
+
+/** Un adaptateur composé, et ce que la pile dit de ses composants. */
+function pileComposee(profils: readonly { nom: string; racine: string; profile: StackProfile }[]): PileDuProjet {
+  const composants: Composant[] = profils.map((c) => ({ nom: c.nom, racine: c.racine, adapter: createProfileAdapter(c.profile) }));
+  return { adapter: createComposedAdapter(composants), composants: composants.map((c) => ({ nom: c.nom, racine: c.racine, id: c.adapter.id })) };
 }
 
 /**
@@ -605,6 +654,21 @@ function stackCommandDeps(args: {
 }): StackCommandDeps {
   const { workspace, allowedPrograms, stack, declaree, confirmer, onPost } = args;
   const fichiers = () => workspace.files.list();
+  /** Fichiers sous une racine, chemins relatifs à elle ; `.` : tout le projet. */
+  const sous = (tous: readonly string[], racine: string) => tous.flatMap((f) => (racine === "." ? [f] : f.startsWith(`${racine}/`) ? [f.slice(racine.length + 1)] : []));
+  /**
+   * Manifestes (dépendances) sous une racine, lus pour la détection du lanceur BDD (ADR 0074 §2.5).
+   * Dépendances installées et dossiers cachés écartés ; un manifeste illisible est ignoré.
+   */
+  const manifestesSous = async (tous: readonly string[], racine: string) => {
+    const ignore = (seg: string) => seg.startsWith(".") || ["node_modules", "bin", "obj", "target", "dist", "vendor"].includes(seg);
+    const out: { path: string; content: string }[] = [];
+    for (const rel of sous(tous, racine).filter((f) => MANIFESTE.test(f) && !f.split("/").some(ignore)).slice(0, 50)) {
+      const content = await workspace.files.read(racine === "." ? rel : `${racine}/${rel}`).catch(() => null);
+      if (content !== null) out.push({ path: rel, content });
+    }
+    return out;
+  };
 
   return {
     // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
@@ -618,6 +682,45 @@ function stackCommandDeps(args: {
       const r = ecrirePileDansProjet(existant, yaml);
       if (typeof r !== "string") throw new Error(r.error);
       await workspace.files.write(FICHIER_PROJET, r);
+    },
+
+    async ecrireComposants(yaml) {
+      const existant = await workspace.files.read(FICHIER_PROJET).catch(() => null);
+      const r = ecrireComposantsDansProjet(existant, yaml);
+      if (typeof r !== "string") throw new Error(r.error);
+      await workspace.files.write(FICHIER_PROJET, r);
+    },
+
+    /**
+     * Dossiers jusqu'à 4 niveaux sous la racine (ADR 0074), dépendances installées et dossiers
+     * cachés écartés : chacun avec ses fichiers de premier niveau et les dépendances de son
+     * `package.json`, pour que `proposeProfile` le reconnaisse comme il reconnaît la racine.
+     */
+    async sousProjets() {
+      const tous = await fichiers();
+      const ignore = (seg: string) => seg.startsWith(".") || ["node_modules", "bin", "obj", "target", "dist", "vendor"].includes(seg);
+      const parDossier = new Map<string, string[]>();
+      for (const f of tous) {
+        const segs = f.split("/");
+        const dossier = segs.slice(0, -1);
+        if (dossier.length > 4 || dossier.some(ignore)) continue;
+        const cle = dossier.join("/") || ".";
+        parDossier.set(cle, [...(parDossier.get(cle) ?? []), segs.at(-1)!]);
+      }
+      const out = [];
+      for (const [racine, noms] of [...parDossier].sort(([a], [b]) => a.localeCompare(b))) {
+        let dependances: string[] = [];
+        if (noms.includes("package.json"))
+          try {
+            const pkg = JSON.parse(await workspace.files.read(racine === "." ? "package.json" : `${racine}/package.json`)) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+            dependances = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})];
+          } catch {
+            /* illisible : on s'en tient aux fichiers */
+          }
+        // BDD (ADR 0074) : tous les fichiers et les manifestes du sous-projet, relatifs à sa racine.
+        out.push({ racine, indices: { fichiers: noms, dependances, arborescence: sous(tous, racine), manifestes: await manifestesSous(tous, racine) } });
+      }
+      return out;
     },
 
     async indices() {
@@ -635,33 +738,38 @@ function stackCommandDeps(args: {
       } catch {
         /* pas de package.json lisible : on s'en tient aux fichiers */
       }
-      return { fichiers: racine, dependances };
+      return { fichiers: racine, dependances, arborescence: tous, manifestes: await manifestesSous(tous, ".") };
     },
 
     /**
      * Éprouve le profil en l'exécutant, dans une copie isolée jetable (§8.6, point 4). Jamais
      * dans le répertoire de l'utilisateur : l'un des canaris ne compile pas volontairement.
      */
-    async canaris(profile) {
+    async canaris(profile, racine = ".") {
       const copie = await workspace.repo.worktree();
       try {
-        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: copie.root });
+        // Composant (ADR 0074) : les canaris tournent dans sa racine, au sein de la copie isolée.
+        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: racine === "." ? copie.root : join(copie.root, racine) });
         return constats;
       } finally {
         await copie.dispose();
       }
     },
 
-    async diagnostiquer(profile) {
-      const tous = await fichiers();
+    async diagnostiquer(profile, racine = ".") {
+      // Composant (ADR 0074) : ses chemins sont relatifs à sa racine.
+      const projet = await fichiers();
+      const tous = sous(projet, racine);
       return diagnoseProfile(profile, {
+        // BDD déclaré : son lanceur est-il cité par un manifeste du composant (ADR 0074) ?
+        manifestes: await manifestesSous(projet, racine),
         programmeTrouvable: (p) => dansLePath(p),
         cheminExiste: (glob) => {
           const re = globToRegExp(glob);
           return tous.some((f) => re.test(f));
         },
         // Même règle que l'adaptateur : un élément au contenu se vérifie dans le fichier (ADR 0072).
-        fichiersDeDetectionPresents: await detecte(profile.detect, workspace.root),
+        fichiersDeDetectionPresents: await detecte(profile.detect, racine === "." ? workspace.root : join(workspace.root, racine)),
       });
     },
   };

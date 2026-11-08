@@ -4,7 +4,7 @@ import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
 import type { InteractionDto, TaskCardDto } from "../src/dto.js";
@@ -69,9 +69,13 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
+  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
+    for (const [rel, contenu] of Object.entries(opts.contenus ?? {})) {
+      await mkdir(dirname(join(racine, rel)), { recursive: true });
+      await writeFile(join(racine, rel), contenu);
+    }
     if (opts.profil !== undefined || opts.projet !== undefined) await mkdir(join(racine, ".agent-studio"), { recursive: true });
     if (opts.profil !== undefined) await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
     if (opts.projet !== undefined) await writeFile(join(racine, ".agent-studio", "projet.yaml"), opts.projet);
@@ -192,6 +196,68 @@ infrastructureModules: [django]
     expect(ecrits[0]).toContain("# barre de l'équipe");
     expect(ecrits[0]).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
     expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
+    await cleanup();
+  });
+
+  it("/stack init sur un dépôt mixte (ADR 0074) : un composant par sous-projet reconnu, jusqu'à 4 niveaux ; dépendances et dossiers cachés écartés ; la section qualite gardée", async () => {
+    const fichiers = [
+      "services/api/pyproject.toml",
+      "web/package.json",
+      "a/b/c/d/pyproject.toml",
+      "a/b/c/d/e/pyproject.toml",
+      "node_modules/x/pyproject.toml",
+      ".git/hooks/pyproject.toml",
+      "README.md",
+    ];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, projet: "qualite:\n  couverture:\n    reste: 70\n" });
+    // `web/package.json` n'est pas sur le disque : sans dépendance `vitest` lisible, `web` n'est pas reconnu.
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    const ecrit = ecrits[0]!;
+    expect(ecrit).toMatch(/^\.agent-studio\/projet\.yaml\n/);
+    expect(ecrit).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
+    expect(ecrit).not.toMatch(/^pile:/m);
+    expect([...ecrit.matchAll(/racine: (\S+)/g)].map((m) => m[1])).toEqual(["a/b/c/d", "services/api"]);
+    await cleanup();
+  });
+
+  it("/stack init détecte le BDD (ADR 0074 §2.5) : lanceur cité par un manifeste, dossier des .feature, dossier des étapes", async () => {
+    const fichiers = ["pyproject.toml", "tests/features/panier.feature", "tests/steps/test_panier.py", "src/panier.py"];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "pyproject.toml": 'dependencies = ["pytest-bdd>=7"]\n' } });
+    await services.route("/stack init");
+    expect(ecrits[0]).toMatch(/bdd:\n\s+- lanceur: pytest-bdd\n\s+features: tests\/features\n\s+etapes: tests\/steps/);
+    await cleanup();
+  });
+
+  it("/stack init sur un sous-projet en BDD : chemins relatifs à sa racine", async () => {
+    const fichiers = ["services/api/pyproject.toml", "services/api/features/a.feature", "services/api/features/steps/test_a.py", "web/README.md"];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "services/api/pyproject.toml": 'dependencies = ["behave"]\n' } });
+    await services.route("/stack init");
+    expect(ecrits[0]).toMatch(/racine: services\/api/);
+    expect(ecrits[0]).toMatch(/lanceur: behave\n\s+features: features\n\s+etapes: features\/steps/);
+    await cleanup();
+  });
+
+  it("/stack doctor vérifie le BDD déclaré : dossiers présents, lanceur cité par un manifeste", async () => {
+    const profil = `${PROFIL_VALIDE}bdd:\n  - { lanceur: pytest-bdd, features: tests/features, etapes: tests/steps }\n`;
+    const fichiers = ["pyproject.toml", "tests/features/a.feature", "tests/steps/test_a.py"];
+    const { services, posts, cleanup } = await ouvrir({ profil, allowedPrograms: ["pytest"], confirmer: "deny", fichiers, contenus: { "pyproject.toml": 'dependencies = ["pytest-bdd"]\n' } });
+    await services.route("/stack doctor");
+    expect(posts.at(-1)).toContain("BDD : le lanceur `pytest-bdd` est cité par un manifeste du projet.");
+    expect(posts.at(-1)).toContain("BDD : des `.feature` dans `tests/features`.");
+    await cleanup();
+  });
+
+  it("/stack doctor sur un projet à composants : chaque composant diagnostiqué dans sa racine (ADR 0074)", async () => {
+    const pile = ["id: python", "detect: [pyproject.toml]", "tests:", '  command: [pytest, "--junit-xml={rapport}"]', "  report: junit-xml", "layout:", '  unitTests: ["tests/**"]', '  sources: ["src/**"]'];
+    const projet = `composants:\n  - nom: api\n    racine: api\n    pile:\n${pile.map((l) => `      ${l}`).join("\n")}\n`;
+    const { services, posts, cleanup } = await ouvrir({ confirmer: "allow-once", allowedPrograms: ["pytest"], fichiers: ["api/pyproject.toml", "api/tests/test_a.py", "api/src/a.py"], projet });
+    await services.route("/stack doctor");
+    const rapport = posts.at(-1)!;
+    expect(rapport).toMatch(/## Composant `api` \(`api`\) — profil `python`/);
+    // Les emplacements sont cherchés sous la racine du composant : `api/tests/test_a.py` correspond à `tests/**`.
+    expect(rapport).toMatch(/`unitTests` : tests\/\*\*\./);
+    expect(rapport).not.toMatch(/aucun fichier ne correspond à tests/);
     await cleanup();
   });
 

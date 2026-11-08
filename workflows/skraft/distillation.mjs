@@ -4,8 +4,8 @@
 * d'acceptance exécuté par le code (D20), puis gel des tests d'acceptance (D21) et revue.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.mjs";
-import { checkGherkin } from "./gherkin.mjs";
+import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.mjs";
+import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
@@ -13,6 +13,9 @@ import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 export async function distiller(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
   const faite = await w.phase("DISTILL", async (cp, relance) => {
+    // Gherkin déjà là au début de la phase (ADR 0074, run du 08/11) : celui des stories précédentes.
+    // Relevé ici, au point de départ, que retrouve aussi une relance : le disque y est rembobiné.
+    d.gherkinAvant = await gherkinDuDisque(w, d.slug, (await w.disposition()).bdd);
     // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
     await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
     await ecrireRapports(w, d.slug, "DISTILL", suivi);
@@ -24,6 +27,7 @@ export async function distiller(w, d, lentilles, max) {
     apresRembobinage: () => {
       d.acceptanceHash = null;
       d.regressions = [];
+      d.testsDeLaStory = null;
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
       oublierLeRun(suivi);
       return creerDossiers(w, d.slug);
@@ -39,7 +43,7 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
     const disp = await w.disposition();
     // Seul l'emplacement est dynamique : il vient de la stack ; la norme vit dans l'agent (ADR 0024, 0043).
     await specialiste(w, d, s, "DISTILL", "skraft-acceptance", motifs, `\nTests d'acceptance à écrire dans : ${disp.acceptanceTests.join(", ")}`);
-    const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai);
+    const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai, disp.bdd);
     if (porte.motifs.length)
       return porte;
     const faits = [
@@ -63,12 +67,16 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
 * Porte gherkin AVANT la porte valeurs : un scénario couplé à un détail technique doit être refusé
 * avant la revue et le gel définitif de DISTILL. Puis RED d'acceptance (ADR 0041).
 */
-async function portes(w, d, s, cp, globsAcceptance, essai) {
+async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   const dir = `.skraft/${d.slug}/distill`;
   const fichiers = await w.listerFichiers();
   const lire = async (chemins) => Promise.all(chemins.map(async (path) => ({ path, content: await w.lireFichier(path) })));
-  const features = await lire(fichiers.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
-  const gherkin = checkGherkin(features);
+  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
+  // Seuls les scénarios de la story sont jugés ; toucher à ceux d'une story précédente est refusé.
+  const { features, modifies } = gherkinDeLaStory(d.gherkinAvant ?? [], await gherkinDuDisque(w, d.slug, bdd));
+  if (modifies.length)
+    return { motifs: modifies, porte: "gherkin" };
+  const gherkin = [...checkGherkin(features), ...(bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkin.length)
     return { motifs: gherkin, porte: "gherkin" };
   const valeurs = checkValues({ criteria: d.story.criteria, features, acceptanceTests: await lire(fichiers.filter((f) => matchesAny(globsAcceptance, f))) });
@@ -98,7 +106,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)
     return { motifs: ["Les tests ont dépassé le délai."], porte: "RED d'acceptance" };
-  const red = checkAcceptanceRed({ criteria: d.story.criteria, testPlan, results: run.results });
+  const red = checkAcceptanceRed({ criteria: d.story.criteria, testPlan, results: run.results, avant: d.testsAvant });
   if (red.reasons.length)
     return { motifs: red.reasons, porte: "RED d'acceptance" };
   const compte = (st) => run.results.filter((r) => r.status === st).length;
@@ -106,6 +114,7 @@ async function portes(w, d, s, cp, globsAcceptance, essai) {
   await enregistrerLivrables(w, s, (await w.fichiersModifies(cp)).filter((f) => f.status !== "deleted").map((f) => f.path), essai, sha256);
   d.acceptanceHash = await w.empreinte(["@stack:acceptanceTests"]);
   d.regressions = red.regressions;
+  d.testsDeLaStory = testsDeLaStory(run.results, d.testsAvant);
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
   d.planDeTest = planDeTest(testPlan);
   return { motifs: [], porte: "" };

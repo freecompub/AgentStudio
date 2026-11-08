@@ -1,14 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { FailureKind, ProcessRunner, TestResult } from "../protocols.js";
-import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { cheminSous } from "./chemin-sur.js";
 import type { Constat } from "./constat.js";
-import { lireTests } from "./read-report.js";
+import { executerTests } from "./execution-tests.js";
 import { JETON_MARQUE, type CanaryKind, type StackProfile } from "./stack-profile.js";
-import { substituer } from "./tokens.js";
 
 /**
  * Canaris de `/stack doctor` (§8.6). Le code écrit un test dont il connaît d'avance la bonne
@@ -139,6 +136,53 @@ export function jugerCanari(o: CanaryObservation): Constat {
   };
 }
 
+export interface CanariBddObservation {
+  rapportLu: boolean;
+  /** Résultats portant la marque du canari, et eux seuls. */
+  results: readonly TestResult[];
+  /** Le dossier `features` du couple éprouvé, pour les messages. */
+  features: string;
+}
+
+/**
+ * Canari BDD (ADR 0074 §3) : un scénario dont une étape n'a pas de définition n'a rien vérifié.
+ * La porte de DISTILL refuse `other_error` et les tests ignorés, et rien d'autre : ce scénario doit
+ * donc ressortir dans l'un des deux. Réussi, ou classé comme un rouge légitime, il franchit la porte.
+ */
+export function jugerCanariBdd(o: CanariBddObservation): Constat {
+  const prefixe = `Canari BDD (\`${o.features}\`, étape sans définition)`;
+  if (!o.rapportLu)
+    return {
+      gravite: "avertissement",
+      message: `${prefixe} : la commande n'a produit aucun rapport. Rien n'a pu passer à tort, mais une étape manquante fera échouer toute la suite, et la porte ne saura pas dire laquelle.`,
+    };
+  if (o.results.length === 0)
+    return {
+      gravite: "avertissement",
+      message:
+        `${prefixe} : le lanceur n'a pas exécuté le .feature écrit dans \`${o.features}\`. Soit ce dossier n'est pas découvert — et les scénarios de DISTILL n'y tourneront pas —, ` +
+        `soit le lanceur n'exécute un .feature que si les définitions d'étapes le chargent. Dans le second cas, ce qu'il fait d'une étape sans définition n'est pas vérifié.`,
+    };
+  if (o.results.some((r) => r.status === "passed"))
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : le scénario est rendu réussi. Un scénario qui n'a rien vérifié passerait pour vert : configurez le lanceur pour qu'une étape non définie fasse échouer le test.`,
+    };
+  const franchissent = o.results.filter((r) => r.status === "failed" && FRANCHIT_LA_PORTE_RED(r.failureKind));
+  if (franchissent.length > 0)
+    return {
+      gravite: "probleme",
+      message:
+        `${prefixe} : l'échec est classé ${liste(franchissent.map((r) => r.failureKind))}. La porte ne refuse que \`other_error\` : ` +
+        `ce scénario passerait pour un rouge légitime alors qu'il n'a rien vérifié. Resserrez les motifs du lecteur.`,
+    };
+  return { gravite: "ok", message: `${prefixe} : le scénario est refusé par la porte (échec \`other_error\` ou test ignoré).` };
+}
+
+/** Le .feature du canari BDD : Gherkin ne dépend d'aucun langage ; la langue est imposée, une autre par défaut ne lirait pas ces mots-clés. */
+const featureCanari = (marque: string) =>
+  `# language: en\nFeature: ${marque} canary\n\n  Scenario: ${marque} canary\n    When the step ${marque} has no definition at all\n`;
+
 export interface RunCanariesDeps {
   runner: ProcessRunner;
   /**
@@ -184,6 +228,26 @@ export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps):
       : { gravite: "ok", message: `La commande de test s'exécute et son rapport est lisible : ${initial.results.length} test(s) relevé(s).` },
   );
 
+  // Canari BDD : écrit par le code, dans le dossier `features` de chaque couple déclaré.
+  for (const couple of profile.bdd ?? []) {
+    const marque = `c${randomBytes(4).toString("hex")}`;
+    const chemin = await cheminSous(deps.sandboxRoot, join(couple.features, `${marque}.feature`));
+    if (chemin === null) {
+      constats.push({ gravite: "probleme", message: `Canari BDD : \`${couple.features}\` sort de la copie isolée une fois les liens symboliques résolus ; il n'a pas été écrit.` });
+      continue;
+    }
+    await mkdir(dirname(chemin), { recursive: true });
+    await writeFile(chemin, featureCanari(marque));
+    try {
+      const run = await lancer(profile, deps);
+      // Un lanceur peut changer la casse du titre (`C1A2…Canary`) : la marque est cherchée sans elle.
+      const sienne = (r: TestResult) => `${r.id} ${r.file}`.toLowerCase().includes(marque);
+      constats.push(jugerCanariBdd({ rapportLu: run.rapportLu, results: run.results.filter(sienne), features: couple.features }));
+    } finally {
+      await rm(chemin, { force: true });
+    }
+  }
+
   if (profile.canaries.length === 0) {
     constats.push({
       gravite: "avertissement",
@@ -227,12 +291,6 @@ export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps):
   return { constats, observations };
 }
 
-/** Le motif est validé à la lecture du profil ; un refus ici ne peut donc venir que d'un profil forgé. */
-function lireErreurs(spec: NonNullable<StackProfile["buildErrors"]>, sortie: string, root: string): TestResult[] {
-  const compile = compileBuildErrorSpec(spec);
-  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
-}
-
 interface Lancement {
   rapportLu: boolean;
   results: TestResult[];
@@ -240,32 +298,17 @@ interface Lancement {
   sortie: string;
 }
 
+/** Même lancement que l'adaptateur (`executerTests`) : ce que les canaris éprouvent est ce que les portes reçoivent. */
 async function lancer(profile: StackProfile, deps: RunCanariesDeps): Promise<Lancement> {
-  // Le rapport est écrit hors de la copie isolée : il ne doit pas se retrouver dans le diff.
-  const rapport = join(tmpdir(), `agent-studio-canari-${randomBytes(6).toString("hex")}.${profile.tests.report === "junit-xml" ? "xml" : "json"}`);
   try {
-    const r = await deps.runner.run(profile.tests.command[0]!, substituer(profile.tests.command.slice(1), rapport, []), {
+    const e = await executerTests(profile, deps.runner, {
       cwd: deps.sandboxRoot,
       timeoutMs: deps.timeoutMs ?? 5 * 60_000,
       ...(deps.onOutput ? { onOutput: deps.onOutput } : {}),
     });
-    const sortie = `${r.stdout}${r.stderr}`.slice(-20_000);
-    const brut = r.timedOut ? null : await readFile(rapport, "utf8").catch(() => null);
-    if (brut === null) {
-      // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent. Si le
-      // profil dit comment lire les erreurs de compilation, ces erreurs SONT le résultat — et le
-      // canari `missing_symbol` devient éprouvable là où il ne l'était pas.
-      const erreurs = profile.buildErrors ? lireErreurs(profile.buildErrors, sortie, deps.sandboxRoot) : [];
-      if (erreurs.length > 0) return { rapportLu: true, results: erreurs, exitCode: r.exitCode, sortie };
-      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
-    }
-    try {
-      return { rapportLu: true, results: lireTests(profile.tests.report, brut, deps.sandboxRoot), exitCode: r.exitCode, sortie };
-    } catch {
-      // Un rapport présent mais illisible vaut un rapport absent : rien n'en est tiré.
-      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
-    }
-  } finally {
-    await rm(rapport, { force: true });
+    return { rapportLu: e.results !== null, results: e.results ?? [], exitCode: e.exitCode, sortie: e.sortie };
+  } catch {
+    // Un rapport présent mais illisible vaut un rapport absent : rien n'en est tiré.
+    return { rapportLu: false, results: [], exitCode: null, sortie: "" };
   }
 }

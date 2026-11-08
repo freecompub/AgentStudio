@@ -49,7 +49,15 @@ export interface MutationReport {
    * `killed` et `total` (mutants jugés) permettent de retirer un mutant du score, quand une
    * dérogation l'a reconnu équivalent (D22 de docs/12) ; `replacement` : le code du mutant.
    */
-  files: { file: string; score: number; killed?: number; total?: number; survived: { line: number; operator: string; replacement?: string }[] }[];
+  files: {
+    file: string;
+    score: number;
+    killed?: number;
+    total?: number;
+    /** Ligne de chaque mutant détecté : la porte peut ne juger que les lignes modifiées par une story (08/11). */
+    killedLines?: number[];
+    survived: { line: number; operator: string; replacement?: string }[];
+  }[];
 }
 
 /**
@@ -103,9 +111,27 @@ export interface StackLayout {
   sources: string[];
 }
 
+/**
+ * Un composant en BDD (ADR 0074) : ses `.feature` sont ses tests d'acceptance, liés par les
+ * définitions d'étapes du dossier `etapes`, et lancés par `lanceur` (Reqnroll, Cucumber…).
+ */
+export interface CoupleBdd {
+  lanceur: string;
+  features: string;
+  etapes: string;
+}
+
 export interface StackAdapter {
   readonly id: "typescript" | "dotnet";
   readonly layout: StackLayout;
+  /** Couples BDD du projet (ADR 0074) ; absent : pas de BDD, le TDD seul. */
+  readonly bdd?: CoupleBdd[];
+  /**
+   * Racines (relatives à celle du projet) des composants dont la pile ne dit rien du BDD : ni couples,
+   * ni `bdd: false` (08/11). skraft y cherche des signes de BDD avant de démarrer. Absent : l'adaptateur
+   * ne le sait pas, rien n'est vérifié.
+   */
+  readonly bddNonDecide?: readonly string[];
   /**
    * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
    * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `Microsoft.AspNetCore` ne veut

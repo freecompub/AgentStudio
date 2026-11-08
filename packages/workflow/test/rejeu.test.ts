@@ -240,6 +240,20 @@ describe("Workflow rejouable (ADR 0052)", () => {
     });
   });
 
+  it("w.disposition rend aussi les couples BDD de la pile (ADR 0074)", async () => {
+    const f = fauxContexte();
+    (f.ctx.stack as { bdd?: unknown }).bdd = [{ lanceur: "reqnroll", features: "tests/Features", etapes: "tests/Steps" }];
+    const t = await lancer(decl(async (w) => (await w.disposition()).bdd ?? null), f.ctx);
+    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: [{ lanceur: "reqnroll", features: "tests/Features", etapes: "tests/Steps" }] } });
+  });
+
+  it("w.disposition rend aussi les racines où rien ne décide le BDD (08/11)", async () => {
+    const f = fauxContexte();
+    (f.ctx.stack as { bddNonDecide?: unknown }).bddNonDecide = [".", "web"];
+    const t = await lancer(decl(async (w) => (await w.disposition()).bddNonDecide ?? null), f.ctx);
+    expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: [".", "web"] } });
+  });
+
   it("w.preuves rend les preuves de la tâche ; w.architecture contrôle les règles de dépendance", async () => {
     const f = fauxContexte();
     const t = await lancer(

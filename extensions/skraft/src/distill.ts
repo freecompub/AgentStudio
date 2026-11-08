@@ -71,16 +71,40 @@ export function checkValues(i: { criteria: Criterion[]; features: SourceFile[]; 
   return [...new Set(reasons)];
 }
 
+/** Un test au relevé d'INIT (ADR 0074 §4) : ceux des stories précédentes. */
+export interface TestAvant {
+  id: string;
+  status: "passed" | "failed" | "skipped";
+}
+const existaient = (avant: readonly TestAvant[] | undefined) => new Set((avant ?? []).map((t) => t.id));
+/**
+ * Tests d'acceptance de la story : marqués `ac-<n>` et absents du relevé d'INIT. Ceux d'une story
+ * précédente portent aussi un marqueur (run du 08/11) : DELIVER ne doit pas en faire des scénarios.
+ */
+export function testsDeLaStory(results: readonly { id: string }[], avant: readonly TestAvant[] | undefined): string[] {
+  const vus = existaient(avant);
+  return results.filter((r) => acOf(r.id) !== null && !vus.has(r.id)).map((r) => r.id);
+}
+
 /**
  * Porte RED d'acceptance : rouge sur assertion ou symbole manquant accepté ; autre erreur rejetée ;
  * test déjà vert requalifié en non-régression s'il est justifié dans test-plan.md, sinon rejeté.
  */
-export function checkAcceptanceRed(i: { criteria: Criterion[]; testPlan: string; results: AcceptanceResult[] }): { reasons: string[]; regressions: string[] } {
+export function checkAcceptanceRed(i: { criteria: Criterion[]; testPlan: string; results: AcceptanceResult[]; avant?: readonly TestAvant[] }): { reasons: string[]; regressions: string[] } {
   const reasons: string[] = [];
   const regressions: string[] = [];
+  // Un test qui passait au relevé d'INIT et échoue maintenant : DISTILL l'a cassé (ADR 0074 §4).
+  const passaient = new Set((i.avant ?? []).filter((t) => t.status === "passed").map((t) => t.id));
+  for (const r of i.results)
+    if (r.status === "failed" && passaient.has(r.id)) reasons.push(`Le test « ${r.id} » passait avant la story et échoue maintenant : DISTILL ne doit casser aucun test existant.`);
+  if (reasons.length) return { reasons, regressions };
   // `results` est la suite ENTIÈRE ; les tests d'acceptance s'y reconnaissent au marqueur que
   // skraft exige lui-même (ADR 0041), jamais à l'endroit où le langage range ses fichiers.
-  const acceptance = i.results.filter((r) => acOf(r.id) !== null);
+  const acceptance = i.results.filter((r) => acOf(r.id) !== null && !existaient(i.avant).has(r.id));
+  if (acceptance.length === 0 && i.results.some((r) => acOf(r.id) !== null)) {
+    const vus = i.results.filter((r) => acOf(r.id) !== null).slice(0, 3).map((r) => `« ${r.id} »`).join(", ");
+    return { reasons: [`Aucun nouveau test d'acceptance : les tests qui portent un marqueur « ac-<n> » existaient avant la story (vus : ${vus}…). Écris les tests d'acceptance de cette story.`], regressions };
+  }
   if (acceptance.length === 0) {
     // Deux situations que « aucun test d'acceptance » confondait, et qui n'appellent pas la même
     // correction : rien n'a tourné, ou tout a tourné sans porter de marqueur.

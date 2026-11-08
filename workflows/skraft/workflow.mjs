@@ -87,7 +87,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: [".skraft/**", "@stack:acceptanceTests", "@stack:sources"],
       outils: ["list_files", "run_tests", "report_blocker"],
-      skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
+      skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing", "bdd-step-definitions"] },
     },
     "skraft-test": {
       prompt: "agents/skraft-test.agent.md",
@@ -162,7 +162,7 @@ export const meta = {
 * celui du réducteur de skraft. Si le script n'est pas nettement plus simple que la partie du
 * réducteur qu'il remplace, on s'arrête là (ADR 0052, conséquences).
 */
-import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond } from "@agent-studio/workflow";
+import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsExistants, correspond, bddNonDeclare, estUnManifeste } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
@@ -181,7 +181,13 @@ const RELANCER_OU_ABANDONNER = [
 export default async function skraft(w, entree) {
   const { story, slug, indicateurs } = await preparer(w, entree.story);
   const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
-  const problems = problemesTestsExistants(run);
+  // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
+  const racinesMuettes = (await w.disposition()).bddNonDecide ?? [];
+  const tousLesFichiers = racinesMuettes.length ? await w.listerFichiers() : [];
+  const manifestes = [];
+  for (const path of tousLesFichiers.filter(estUnManifeste))
+    manifestes.push({ path, content: await w.lireFichier(path).catch((e) => (e instanceof PanneEnvironnement ? Promise.reject(e) : "")) });
+  const problems = [...problemesTestsExistants(run), ...bddNonDeclare(racinesMuettes, tousLesFichiers, manifestes)];
   if (problems.length) {
     await w.informer(`Lancement skraft bloqué avant tout appel d'agent :\n${problems.map((p) => `- ${p}`).join("\n")}`);
     throw new PanneEnvironnement(problems.join(" ; "));
@@ -212,6 +218,11 @@ export default async function skraft(w, entree) {
     adrs: [],
     regressions: [],
     acceptanceHash: null,
+    // Tests au relevé d'INIT : ceux des stories précédentes (ADR 0074 §4). RESEARCH et DESIGN n'écrivent
+    // aucun test : c'est encore la suite au début de DISTILL.
+    testsAvant: run.results.map((r) => ({ id: r.id, status: r.status })),
+    // Tests d'acceptance de la story, relevés à la porte de DISTILL : DELIVER n'en fait pas d'autres scénarios.
+    testsDeLaStory: null,
     qualityCheckpoint,
     // Mutants reconnus équivalents par arbitrage, exemptés de la porte de mutation (ADR 0065).
     derogations: [],
@@ -225,6 +236,9 @@ export default async function skraft(w, entree) {
     planDeTest: null,
     ecartsAuPlan: [],
   };
+  // Les questions de la story sont tranchées avant RESEARCH (décision du 08/11, ADR 0014 révisé) :
+  // le chercheur reçoit leurs réponses, au lieu de s'arrêter pour les poser lui-même.
+  await trancher(w, vue, story.id);
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
     const faite = await w.phase("RESEARCH", async (_cp, relance) => (await rechercher(w, vue, effets.maxAttempts, relance), true), {
@@ -239,16 +253,8 @@ export default async function skraft(w, entree) {
     else
       vue.phasesFaites = [{ phase: "RESEARCH", fichiers: [`.skraft/${slug}/research/research.md`] }];
   }
-  // Les questions ouvertes (story, recherche) sont tranchées avant DESIGN, toutes à la fois.
-  // Étapes annoncées avec le vocabulaire de l'extension skraft : les deux se comparent (docs/10 §3).
-  // Comme l'extension, ROUTE n'existe que s'il reste des questions (D11 de docs/12).
-  if (vue.questions.length)
-    await w.etape("ROUTE");
-  const reponses = await poserLesQuestions(w, vue.questions, story.id);
-  vue.questions = vue.questions.map((q, i) => {
-    const d = reponses[i];
-    return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
-  });
+  // Celles que la recherche a levées sont tranchées avant DESIGN.
+  await trancher(w, vue, story.id);
   if (await concevoir(w, vue, effets.lenses, effets.maxAttempts))
     vue.phasesFaites = [...vue.phasesFaites, { phase: "DESIGN", fichiers: [] }];
   else
@@ -312,6 +318,23 @@ function bilan(d, confirmee) {
       : []),
     ...notesDuBilan(d.notesHorsChangement ?? [], d.testsObsoletes ?? []),
   ].join("\n");
+}
+/**
+* Questions ouvertes sans réponse, posées toutes à la fois. Étapes annoncées avec le vocabulaire de
+* l'extension skraft : les deux se comparent (docs/10 §3). Comme l'extension, ROUTE n'existe que s'il
+* reste des questions (D11 de docs/12) ; une question tranchée n'est jamais reposée.
+*/
+async function trancher(w, vue, storyId) {
+  const ouvertes = vue.questions.filter((q) => q.answer === undefined);
+  if (!ouvertes.length)
+    return;
+  await w.etape("ROUTE");
+  const reponses = await poserLesQuestions(w, ouvertes, storyId);
+  const reponseDe = new Map(ouvertes.map((q, i) => [q.id, reponses[i]]));
+  vue.questions = vue.questions.map((q) => {
+    const d = reponseDe.get(q.id);
+    return d ? { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" } : q;
+  });
 }
 /**
 * Questions ouvertes, posées toutes à la fois, hors de toute phase. Une panne à la création d'une
