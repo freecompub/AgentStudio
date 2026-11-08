@@ -230,6 +230,9 @@ export default async function skraft(w, entree) {
     planDeTest: null,
     ecartsAuPlan: [],
   };
+  // Les questions de la story sont tranchées avant RESEARCH (décision du 08/11, ADR 0014 révisé) :
+  // le chercheur reçoit leurs réponses, au lieu de s'arrêter pour les poser lui-même.
+  await trancher(w, vue, story.id);
   if (!effets.skipResearch) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
     const faite = await w.phase("RESEARCH", async (_cp, relance) => (await rechercher(w, vue, effets.maxAttempts, relance), true), {
@@ -244,16 +247,8 @@ export default async function skraft(w, entree) {
     else
       vue.phasesFaites = [{ phase: "RESEARCH", fichiers: [`.skraft/${slug}/research/research.md`] }];
   }
-  // Les questions ouvertes (story, recherche) sont tranchées avant DESIGN, toutes à la fois.
-  // Étapes annoncées avec le vocabulaire de l'extension skraft : les deux se comparent (docs/10 §3).
-  // Comme l'extension, ROUTE n'existe que s'il reste des questions (D11 de docs/12).
-  if (vue.questions.length)
-    await w.etape("ROUTE");
-  const reponses = await poserLesQuestions(w, vue.questions, story.id);
-  vue.questions = vue.questions.map((q, i) => {
-    const d = reponses[i];
-    return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
-  });
+  // Celles que la recherche a levées sont tranchées avant DESIGN.
+  await trancher(w, vue, story.id);
   if (await concevoir(w, vue, effets.lenses, effets.maxAttempts))
     vue.phasesFaites = [...vue.phasesFaites, { phase: "DESIGN", fichiers: [] }];
   else
@@ -317,6 +312,23 @@ function bilan(d, confirmee) {
       : []),
     ...notesDuBilan(d.notesHorsChangement ?? [], d.testsObsoletes ?? []),
   ].join("\n");
+}
+/**
+* Questions ouvertes sans réponse, posées toutes à la fois. Étapes annoncées avec le vocabulaire de
+* l'extension skraft : les deux se comparent (docs/10 §3). Comme l'extension, ROUTE n'existe que s'il
+* reste des questions (D11 de docs/12) ; une question tranchée n'est jamais reposée.
+*/
+async function trancher(w, vue, storyId) {
+  const ouvertes = vue.questions.filter((q) => q.answer === undefined);
+  if (!ouvertes.length)
+    return;
+  await w.etape("ROUTE");
+  const reponses = await poserLesQuestions(w, ouvertes, storyId);
+  const reponseDe = new Map(ouvertes.map((q, i) => [q.id, reponses[i]]));
+  vue.questions = vue.questions.map((q) => {
+    const d = reponseDe.get(q.id);
+    return d ? { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" } : q;
+  });
 }
 /**
 * Questions ouvertes, posées toutes à la fois, hors de toute phase. Une panne à la création d'une

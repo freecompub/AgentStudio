@@ -28,6 +28,18 @@ avant la phase suivante.
    le dossier de passation.
 4. Les demandes d'interaction gagnent `freeText`. L'interface affiche alors un champ de réponse.
 
+## Révision du 08/11 : les questions de la story avant RESEARCH
+
+Décidée par le responsable le 08/11. Aux deux runs réels du jour (US-2), le chercheur s'est arrêté
+pour poser lui-même une question que la story annonçait dans ses « Questions ouvertes » : un tour de
+plus à chaque fois, la réponse n'arrivant qu'après RESEARCH.
+
+1. Les questions **de la story** sont tranchées en `ROUTE` **avant RESEARCH** ; le chercheur reçoit
+   leurs réponses dans son dossier de passation (et `passation.md`).
+2. Les questions **levées par la recherche** sont tranchées avant DESIGN, comme avant.
+3. Une question tranchée n'est jamais reposée. Extension (`route`, réducteur) et workflow
+   (`trancher`, `workflow.mjs`).
+
 ## Conséquences
 
 - `ROUTE` devient un stage d'attente persisté en plus d'un calcul transitoire ; les invariants

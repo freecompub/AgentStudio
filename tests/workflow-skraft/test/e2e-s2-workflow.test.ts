@@ -421,13 +421,27 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(difficulty!.title).toMatch(/^Difficulté de US-12 : /);
     await app.interactions.respond(difficulty!.id, difficulty!.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
 
-    // Présélection par le code dans le dossier de passation de RESEARCH.
+    // Décision du 08/11 : la question de la story est posée AVANT RESEARCH, pour que le chercheur
+    // reçoive sa réponse au lieu de s'arrêter pour la poser.
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
+    const [avant] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
+    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
+    // Comme l'extension (stade ROUTE) : les questions ouvertes sont une étape à part (docs/10 §3).
+    expect((await app.engine.status(id))!.phase).toBe("ROUTE");
+    expect(researchPrompts).toHaveLength(0);
+    const option = (q: NonNullable<typeof avant>, action: string) => q.options.find((o) => o.id.endsWith(`:${action}`))!.id;
+    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond.
+    await expect(app.interactions.respond(avant!.id, option(avant!, "answer"), "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
+    await app.interactions.respond(avant!.id, option(avant!, "answer"), "par prise", { role: "po" });
+
+    // Présélection par le code, et la réponse, dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
     expect(researchPrompts[0]).toContain("Fichiers utiles (présélection) :");
     expect(researchPrompts[0]).toContain("src/domain/bolus-calculator.ts");
+    expect(researchPrompts[0]).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
 
-    // Porte citations : rejet précis, relance ciblée, puis questions posées à la fin de RESEARCH.
-    await until(async () => (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte")).length === 2);
+    // Porte citations : rejet précis, relance ciblée, puis la seule question de la recherche, à la fin de RESEARCH.
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
     expect(researchPrompts).toHaveLength(2);
     expect(researchPrompts[1]).toContain("Rejet précédent :");
     expect(researchPrompts[1]).toContain("`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes.");
@@ -435,18 +449,11 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
     expect(rejets).toEqual([expect.objectContaining({ porte: "citations", motifs: ["`src/domain/bolus-calculator.ts:40-72` : plage hors du fichier, qui compte 55 lignes."] })]);
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
-    expect(questions.map((q) => q.detail)).toEqual(["Le plafond s'applique-t-il par prise ou par jour ?", "Le plafond est-il rappelé au patient ?"]);
-    expect(questions[0]).toMatchObject({ freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
-    // Comme l'extension (stade ROUTE) : les questions ouvertes sont une étape à part (docs/10 §3).
+    expect(questions.map((q) => q.detail)).toEqual(["Le plafond est-il rappelé au patient ?"]);
     expect((await app.engine.status(id))!.phase).toBe("ROUTE");
     // RESEARCH est commitée avant les questions, avec le message du réducteur.
     expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): research de us-12");
-
-    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond, puis reporte l'autre.
-    const option = (q: (typeof questions)[number], action: string) => q.options.find((o) => o.id.endsWith(`:${action}`))!.id;
-    await expect(app.interactions.respond(questions[0]!.id, option(questions[0]!, "answer"), "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
-    await app.interactions.respond(questions[0]!.id, option(questions[0]!, "answer"), "par prise", { role: "po" });
-    await app.interactions.respond(questions[1]!.id, option(questions[1]!, "defer"), undefined, { role: "po" });
+    await app.interactions.respond(questions[0]!.id, option(questions[0]!, "defer"), undefined, { role: "po" });
 
     // DESIGN reçoit les réponses et la phase RESEARCH dans son dossier de passation.
     await until(async () => designBrief !== "");
@@ -468,9 +475,11 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       "skraft-researcher": async (t) => void (await t.callTool("report_phase", { summary: "rien", files: [] })),
     });
     const app = await assemble(root, runtime, tasksDir);
+    // La question de la story est posée avant RESEARCH (08/11) : le répondeur la tranche.
+    answerQuestions(app);
     await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase RESEARCH")), 60_000);
-    const [escalade] = await app.interactions.pending();
+    const [escalade] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Phase RESEARCH"));
     expect(escalade!.title).toBe("Phase RESEARCH : Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md");
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role.endsWith("skraft-researcher"))).toHaveLength(2);
     expect(escalade!.requiredRoles).toEqual(["developpeur", "architecte", "administrateur"]);

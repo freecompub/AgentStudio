@@ -496,8 +496,9 @@ function route(s: SkraftState): Out {
   if (pendingAdrs.length) return { state: { ...s, stage: "RATIFICATION" }, effects: pendingAdrs.map((adr) => ({ kind: "askRatification", adr })) };
   const next = s.phaseOrder.find((p) => !s.phasesCompleted.includes(p) && !s.skipPhases.includes(p));
   if (!next) return { state: { ...s, stage: "DONE", phase: null }, effects: [{ kind: "finalReport" }] };
-  // Les questions ouvertes (story, recherche) sont tranchées avant toute phase autre que RESEARCH.
-  const unanswered = next === "RESEARCH" ? [] : s.openQuestions.filter((q) => q.answer === undefined);
+  // Les questions ouvertes sont tranchées avant toute phase, RESEARCH comprise (décision du 08/11,
+  // ADR 0014 révisé) : celles de la story avant RESEARCH, celles de la recherche avant DESIGN.
+  const unanswered = s.openQuestions.filter((q) => q.answer === undefined);
   if (unanswered.length) {
     const toAsk = unanswered.filter((q) => !s.questionsAsked.includes(q.id));
     return {

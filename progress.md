@@ -26,6 +26,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Questions ouvertes de la story posées avant RESEARCH (ADR 0014 révisé)
+
+- **Pourquoi** : aux deux runs du jour, le chercheur s'arrêtait (`blocker`) pour poser une question
+  que la story annonçait ; un tour de plus (≈ 0,20 $). Demandé par le responsable : poser les
+  questions de la story avant la recherche.
+- **Fait** : extension, `route` du réducteur sans l'exception « sauf avant RESEARCH » ; workflow,
+  `trancher` (questions sans réponse seulement) appelée avant RESEARCH et avant DESIGN.
+- Tests : réducteur (3 réécrits, 3 attentes mises à jour, l'aide `toFirstPhase` répond à la question
+  quand RESEARCH a lieu) ; bout en bout S2 dans les deux implémentations (question posée avant
+  RESEARCH, réponse dans le dossier du chercheur, seule la question de la recherche ensuite), vus
+  rouges avec l'ancien ordre ; deux tests `--auto` reçoivent le répondeur.
+- **Le réfutateur** : il ne juge que les défauts `blocker`/`major` des lentilles (ADR 0069), jamais
+  une porte du code ; au second run, défauts mineurs seulement, il n'a pas été appelé. Le rejet
+  `ArgumentNullException` relève de la porte de cohérence : prochaine brique.
+
 ## 08/11 — Aucun test unitaire en DELIVER : règle de l'ADR 0045 gardée, scénario déjà vert noté
 
 - **Constat** (second run) : ce n'est ni un défaut ni une faute d'agent. Le testeur a usé de `coveredBy`
