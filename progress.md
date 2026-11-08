@@ -26,6 +26,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Run réel US-2 en BDD, Claude, par le serveur MCP (`docs/runs/2026-11-08-us-2-bdd-claude/`)
+
+- Départ : `main` GitHub d'`exemple-dotnet-tdd` (`19583a4`, US-1 déjà en BDD Reqnroll), pile
+  donnée par l'argument `pile` (`--pile=` ajouté à `scripts/essai-mcp-skraft.ts`). Demandé par le
+  responsable (« Lance un test l'exemple à partir de sa branche main »).
+- Résultat : **fini, 23m28, 8 rejets, 12,18 $**, `dotnet test` 10/10. Le `.feature` va au projet,
+  titres `AC-n`, étapes dans `Steps/` : le chemin BDD fonctionne de bout en bout.
+- **Deux défauts de nos portes, à corriger avant de passer `bdd-par-composant` à `true`** :
+  1. la porte des titres `AC-n` juge **tous** les `.feature` du dossier : l'agent a renommé les
+     scénarios de l'**US-1** pour la satisfaire ;
+  2. les marqueurs `ac-n` de **deux stories se confondent** : les scénarios renommés de l'US-1
+     sont pris pour des tests de l'US-2 (« passe déjà »), requalifiés en régression ; 8 scénarios
+     pour 5 critères. Le défaut existe aussi hors BDD, dès qu'une story précédente laisse des
+     tests `Ac<n>_…`.
+- Autres constats : aucun test unitaire écrit en DELIVER (un seul pas) ; DESIGN 7,98 $ sur 12,18
+  (même incohérence entre architectes qu'au 07/11) ; RESEARCH refusé pour des citations venues de
+  l'ADR-002 périmé du projet.
+- Branche du run (`skraft/us-2`, clone `/tmp/essai-mcp-skraft-zqGCsb`) **non poussée**.
+
 ## 08/11 — Plusieurs rapports de tests pour une commande (`{rapports}`, ADR 0072 révisé)
 
 - **Trouvé en préparant le run BDD** (vérification gratuite, sans LLM, avant de lancer) : le

@@ -1,0 +1,78 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "806636cd9017232bbfbdc628c086e4dc8c8ee1c4956b70d41e93d05fcb832f58",
+    "adrs": [],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-2#2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-1#2",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-3",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-3#2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.UnitTests.Features.ChiffrerUnPanierLigneALigneFeature.AC_2LeClientChiffrePlusieursLignes",
+      "Tarification.UnitTests.Features.ChiffrerUnPanierLigneALigneFeature.AC_3LeClientChiffreUnPanierVide",
+      "Tarification.UnitTests.Features.ChiffrerUnPanierLigneALigneFeature.AC_1LeClientChiffreUneLigneDePlusieursArticles",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_5SansPalierConfigureAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_1UneLigneSousLePalierNobtientAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_4LaRemiseSeCalculeParLigneJamaisSurLePanierEntier"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : aucun.\nRemarques hors du changement de la story :\n- .skraft/us-2/design/contracts.md:107 (cold-reader, minor) : Le nom de l'opération qui applique un taux à un montant est incohérent : domain-model.md:74 et :127 la nomment `Applique(TauxDeRemise)`, alors que contracts.md:107-108 dit que son nom est laissé à l'implémentation. Un lecteur ne sait pas si `Applique` est ferme.\n- .skraft/us-2/design/domain-model.md:75 (cold-reader, minor) : Faute de français et formulation lourde : « restant non négative » (Montant est masculin : « non négatif »). Le terme « Core » pour le contexte est aussi du jargon sans glose pour une personne du métier.\n- .skraft/us-2/design/event-model.md:13 (cold-reader, minor) : `AjouterUneLigne` et `LigneAjoutee` sont des termes absents de la story, qui ne parle que de « ligne » et de « panier ». Le document précise que l'événement est conceptuel, mais le lien avec le « Soit » de la story pourrait être dit plus tôt dans le modèle. `ATPayer` (nom existant du code) n'est pas expliqué.\n- .skraft/us-2/design/adr-a-reconsiderer.md:7 (architecture, minor) : domain-model.md:25-26 : le document dit que les paliers de remise sont exigés dans le domaine par adr-001:25-26. Or ces lignes portent sur la visibilité de la dépendance dans le .csproj. Les paliers sont seulement cités comme exemple de règle à adr-001:8. La conclusion reste correcte ; seule la citation est imprécise (même citation dans adr-a-reconsiderer.md:7 et contracts.md:13).\n- src/Tarification.Application/Calc
+
+Rapport complet : /tmp/essai-mcp-skraft-zqGCsb/rapport.json
+Clone : /tmp/essai-mcp-skraft-zqGCsb/projet
