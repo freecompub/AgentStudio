@@ -38,8 +38,13 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   RESEARCH, réponse dans le dossier du chercheur, seule la question de la recherche ensuite), vus
   rouges avec l'ancien ordre ; deux tests `--auto` reçoivent le répondeur.
 - **Le réfutateur** : il ne juge que les défauts `blocker`/`major` des lentilles (ADR 0069), jamais
-  une porte du code ; au second run, défauts mineurs seulement, il n'a pas été appelé. Le rejet
-  `ArgumentNullException` relève de la porte de cohérence : prochaine brique.
+  une porte du code ; au second run, défauts mineurs seulement, il n'a pas été appelé.
+- **Rejet `ArgumentNullException` (DESIGN, second run) : pas un faux positif**, lu dans la trace.
+  `contracts.md` promettait des gardes contre les nuls (lignes 23, 85, 94) ; l'architecte du modèle a
+  vérifié que le projet n'en a aucune (`Nullable` activé, avertissements bloquants,
+  `Directory.Build.props:4, 7-8`), l'a documenté, et le contrat a été corrigé. **Décision du
+  responsable : porte inchangée**, à revoir seulement si un rejet sans enjeu de conception apparaît
+  (un nom du framework cité en passant). N'exiger que les noms déclarés aurait laissé passer celui-ci.
 
 ## 08/11 — Aucun test unitaire en DELIVER : règle de l'ADR 0045 gardée, scénario déjà vert noté
 
