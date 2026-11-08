@@ -299,6 +299,9 @@ async function escaladeScenario(w, motif, o = {}) {
 async function derouler(w, d, L, i, cpScenario, motifs, max) {
   const sc = L.scenarios[i];
   const dejaVert = L.baseline.passed.includes(sc.acceptanceTestId);
+  // Le code d'un pas précédent en a fait plus que demandé : noté, sans refus (décision du 08/11).
+  if (dejaVert)
+    L.notes = uniq([...L.notes, `Scénario ${sc.id} : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.`]);
   let point = cpScenario;
   const unitTests = [];
   let retour = motifs;

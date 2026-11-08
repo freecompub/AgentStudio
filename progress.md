@@ -26,6 +26,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Aucun test unitaire en DELIVER : règle de l'ADR 0045 gardée, scénario déjà vert noté
+
+- **Constat** (second run) : ce n'est ni un défaut ni une faute d'agent. Le testeur a usé de `coveredBy`
+  (ADR 0045, option A du 03/10) pour `ac-2` ; le développeur a écrit toute la remise en un pas ; `ac-3`
+  était déjà vert (code écrit sans test rouge qui le demande). La mutation des lignes de la story est
+  passée : les scénarios tuent ses mutants.
+- **Décision du responsable** : garder la règle 1 (le scénario peut tenir lieu de rouge) ; les tests
+  unitaires complètent quand les scénarios ne suffisent pas, ce que font déjà les portes de fin (mutant
+  survivant → testeur ; ligne non couverte → testeur si le projet a un seuil de couverture, aucun par
+  défaut). ADR 0045 complété.
+- **Fait** : note « Scénario ac-n : déjà vert avant son premier pas ; … » quand un scénario pilote est
+  vert à son tour (extension `deliver-machine.ts`, workflow `livraison.mjs`). Test du réducteur et trois
+  attentes exactes de bout en bout (S1, S5 ; ordre : après les notes de la porte du scénario précédent)
+  vues rouges puis vertes.
+- Précision donnée au responsable : en DISTILL, l'agent d'acceptance **peut** écrire dans les sources
+  (signatures minimales pour compiler) ; le code borne l'emplacement, pas le contenu (pas de logique :
+  consigne seulement). Au second run : `BaremeDeRemises` vide, deux types-valeurs, un constructeur.
+
 ## 08/11 — Second run réel US-2 en BDD (`docs/runs/2026-11-08-us-2-bdd-claude-2/`)
 
 - Demandé par le responsable (« Aller on relance »), après les quatre corrections du jour ; même

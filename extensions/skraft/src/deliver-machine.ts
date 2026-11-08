@@ -21,6 +21,9 @@ const otherAgent = (t: DefectThread) => (t.target === "test" ? "code" : "test");
  * pour tracer chaque rejet avec `lastRejection`. Chaque rejet doit passer par ici, porte nommée
  * comme dans le workflow, sinon le banc compare des traces inégales (D21 de docs/12).
  */
+/** Scénario pilote déjà vert avant son premier pas : noté (décision du 08/11). */
+export const dejaVert = (id: string) => `Scénario ${id} : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.`;
+
 export function bumpRetries(s: SkraftState, key: string): SkraftState {
   const retries = s.retries ?? {};
   return { ...s, retries: { ...retries, [key]: (retries[key] ?? 0) + 1 }, rejections: (s.rejections ?? 0) + 1 };
@@ -75,7 +78,8 @@ export function deliverTransition(s0: SkraftState, e: Ev): Out | null {
     case "SCENARIO_STARTED": {
       const nd: DeliverState = { ...d, scenarioCheckpoint: e.checkpointId, stepCheckpoint: e.checkpointId };
       // Déjà vert (un scénario précédent l'a fait passer) : directement la porte de fin de scénario.
-      if (d.baseline.passed.includes(scenario.acceptanceTestId)) return scenarioGate(s, nd);
+      // Le code d'un pas précédent en a fait plus que demandé : noté, sans refus (décision du 08/11).
+      if (d.baseline.passed.includes(scenario.acceptanceTestId)) return scenarioGate(s, { ...nd, notes: [...new Set([...nd.notes, dejaVert(scenario.id)])] });
       return agent(s, { ...nd, step: "test" }, nd.feedback);
     }
 

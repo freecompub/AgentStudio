@@ -317,6 +317,8 @@ describe("skraft — critères de sortie de S1", () => {
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
       "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
       "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+      "Scénario ac-2 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
+      "Scénario ac-3 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
       "Mutation non mesurée : la stack du projet ne propose pas d'outil de mutation.",
     ]);
     // Le rapport final est publié par un effet, après la transition vers DONE : on l'attend.

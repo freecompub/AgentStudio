@@ -69,6 +69,8 @@ describe("skraft en workflow — porte de fin de scénario (pile simulée)", () 
       "Couverture non mesurée : la commande de test du projet n'en produit pas.",
       "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
       "Format non mesuré : la pile du projet ne déclare pas de commande `format`.",
+      "Scénario ac-2 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
+      "Scénario ac-3 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
     ]);
     // Après la reprise : sessions séparées pour le vert puis le nettoyage.
     const deliverRoles = roles.filter((r) => r === "skraft-test" || r === "skraft-dev");

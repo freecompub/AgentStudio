@@ -43,6 +43,20 @@ disait pas ce qu'est un test suffisant et laissait deux agents en décider avec 
    manquant, chercher le comportement dans les tests d'acceptance ; s'il y est, ce n'est pas un
    défaut.
 
+## Confirmation du 08/11, avec les scénarios BDD
+
+Au second run réel du 08/11 (US-2 en BDD), DELIVER n'a écrit aucun test unitaire : le testeur a
+désigné le scénario `ac-2` (`coveredBy`), le développeur a écrit toute la remise en un pas, et
+`ac-3` était déjà vert à son tour. Le responsable **garde cette règle** (« TDD toujours » : le cycle
+rouge, vert, nettoyage s'applique toujours, et le rouge peut être le scénario).
+
+1. Les tests unitaires **complètent** les scénarios quand ceux-ci ne suffisent pas : c'est le rôle des
+   portes de fin de DELIVER, qui adressent au testeur chaque mutant survivant des lignes de la story
+   (ADR 0049, révisé le 08/11) et, si le projet déclare un seuil de couverture, chaque ligne modifiée
+   non couverte. Rien de plus à coder.
+2. **Un scénario pilote déjà vert avant son premier pas est noté**, sans refus : le code d'un pas
+   précédent l'a fait passer sans test rouge qui le demande. La note dit si cela se répète.
+
 ## Conséquences
 
 - Le conflit de US-2 disparaît des deux côtés : le testeur a une sortie vérifiée, la revue ne

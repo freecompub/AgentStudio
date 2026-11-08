@@ -657,6 +657,8 @@ describe("Réducteur skraft — sous-machine DELIVER (§7.4)", () => {
     const base = [...toDeliver(), PLANNED, STARTED, REP_TEST, RED_OK(1), REP_DEV, GREEN_OK(true, 1, passedAll), { type: "SCENARIO_OK", notes: [] } as Ev];
     const r = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }]);
     expect(r.effects).toEqual([{ kind: "scenarioGate", scenarioId: "ac-2", since: "cp-s2", unitTests: [], pending: [] }]);
+    // Le code d'un pas précédent l'a fait passer sans test rouge qui le demande : noté, sans refus (08/11).
+    expect(r.state.deliver?.notes).toContain("Scénario ac-2 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.");
     const end = play([...base, { type: "SCENARIO_STARTED", checkpointId: "cp-s2" }, { type: "SCENARIO_OK", notes: [] }]);
     expect(end.state.stage).toBe("ARTIFACT_GATE");
     expect(end.effects).toEqual([{ kind: "runGate", phase: "DELIVER", attempt: 1 }]);
