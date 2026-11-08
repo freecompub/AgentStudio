@@ -9,7 +9,7 @@ export const DEMO_MANIFEST: ExtensionManifest = {
   main: "index.mjs",
   permissions: ["fs:read", "shell:test", "copilot:sessions"],
   contributes: {
-    commands: ["hello", "commit", "read-system", "crash", "files"].map((name) => ({ name, title: name, description: `Démo ${name}` })),
+    commands: ["hello", "commit", "read-system", "crash", "files", "pile"].map((name) => ({ name, title: name, description: `Démo ${name}` })),
     tasks: [{ name: "count", title: "Compteur", states: { A: "A" } }],
     tools: [{ name: "shout", description: "Met un texte en majuscules" }],
     agents: [{ name: "echoer", title: "Écho", role: "Tu réponds fort.", output: "report_phase", tools: ["shout"] }],

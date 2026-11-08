@@ -10,7 +10,7 @@
  * La porte ne juge pas le style. Elle refuse ce qui est reconnaissable sans interprétation.
  */
 import { describe, expect, it } from "vitest";
-import { checkGherkin } from "../../../workflows/skraft/gherkin.mjs";
+import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "../../../workflows/skraft/gherkin.mjs";
 
 const scenario = (corps: string, tags = "@ac-1") => [{ path: "features/x.feature", content: `Fonctionnalité: F\n\n  ${tags}\n  ${corps}\n` }];
 
@@ -97,5 +97,28 @@ describe("Ce que la porte ne fait pas", () => {
   it("les lignes de commentaire et les tableaux d'exemples ne sont pas analysés comme des étapes", () => {
     const r = checkGherkin(scenario("Scénario: s\n    # Quand j'appelle POST /api/x — note pour plus tard\n    Quand le client commande\n    Alors la remise appliquée est de 1,00 €"));
     expect(r).toEqual([]);
+  });
+});
+
+/**
+ * BDD (ADR 0074) : le `.feature` de DISTILL va au projet, et le titre de chaque scénario commence par
+ * son critère (`AC-1 …`). C'est ce qui relie le scénario à son test : Reqnroll nomme le test d'après
+ * le titre (`AC_1LeClient…`), et l'enregistreur JUnit ne garde pas le tag `@ac-1`.
+ */
+describe("BDD : où vit le Gherkin, et titres AC-n (ADR 0074)", () => {
+  it("sans BDD, le dossier de DISTILL ; en BDD, les dossiers features des couples", () => {
+    expect(dossiersDesFeatures("us-2", undefined)).toEqual([".skraft/us-2/distill/features"]);
+    expect(dossiersDesFeatures("us-2", [{ lanceur: "reqnroll", features: "tests/A/Features", etapes: "tests/A/Steps" }, { lanceur: "reqnroll", features: "web/features", etapes: "web/steps" }])).toEqual(["tests/A/Features", "web/features"]);
+  });
+
+  it("chaque scénario @ac-<n> commence son titre par AC-<n> ; casse et séparateur libres", () => {
+    const f = (corps: string) => [{ path: "tests/A/Features/panier.feature", content: `# language: fr\nFonctionnalité: Chiffrer\n${corps}` }];
+    expect(checkTitresBdd(f("  @ac-1\n  Scénario: AC-1 Le client chiffre une ligne\n    Soit un panier\n  @ac-2\n  Scénario: ac2 — le client chiffre deux lignes\n    Soit un panier\n"))).toEqual([]);
+    expect(checkTitresBdd(f("  @ac-1 @happy-path\n  Scénario: Le client chiffre une ligne\n    Soit un panier\n"))).toEqual([
+      "tests/A/Features/panier.feature : le titre du scénario « Le client chiffre une ligne » (@ac-1) doit commencer par « AC-1 » : c'est ce qui le relie à son test.",
+    ]);
+    expect(checkTitresBdd(f("  @ac-2\n  Scénario: AC-1 mauvais critère\n    Soit un panier\n"))).toEqual([
+      "tests/A/Features/panier.feature : le titre du scénario « AC-1 mauvais critère » (@ac-2) doit commencer par « AC-2 » : c'est ce qui le relie à son test.",
+    ]);
   });
 });

@@ -62,3 +62,14 @@ describe("Réponses de l'utilisateur, citables", async () => {
     expect(buildBrief(base, "DESIGN", [])).not.toContain("passation.md");
   });
 });
+
+/** BDD (ADR 0074) : le dossier de passation dit où écrire le `.feature` et ses étapes, et la règle du titre. */
+describe("Consigne BDD du dossier de passation", async () => {
+  const { ligneBdd } = await import("../src/brief.js");
+  it("sans BDD, rien ; en BDD, dossiers du .feature et des étapes, lanceur, titre qui commence par le critère", () => {
+    expect(ligneBdd(undefined)).toBe("");
+    expect(ligneBdd([{ lanceur: "reqnroll", features: "tests/A/Features", etapes: "tests/A/Steps" }])).toBe(
+      "BDD (ADR 0074) : les scénarios Gherkin sont les tests d'acceptance du projet. Écris le `.feature` dans tests/A/Features (et non dans `.skraft/`), et ses définitions d'étapes dans tests/A/Steps (lanceur : reqnroll). Le titre de chaque scénario commence par son critère : « Scénario: AC-1 … » pour `@ac-1`.",
+    );
+  });
+});

@@ -9,6 +9,7 @@ import { declaredIdentifiers } from "./text-analysis.js";
 import type { SkraftEffect, SkraftState } from "./model.js";
 import type { Ev } from "./reducer.js";
 import type { DefectTarget } from "./review.js";
+import { dossiersDesFeatures } from "./gherkin.js";
 
 type Fx<K extends SkraftEffect["kind"]> = Extract<SkraftEffect, { kind: K }>;
 interface Run {
@@ -121,7 +122,9 @@ export async function runDeliverAgent(e: Fx<"runDeliverAgent">, { ctx, state, ta
   const d = state.deliver!;
   const sc = d.scenarios.find((x) => x.id === e.scenarioId)!;
   const criterion = state.story?.criteria.find((c) => c.n === sc.ac);
-  const features = (await ctx.workspace.listFiles()).filter((f) => f.startsWith(`.skraft/${state.slug}/distill/features/`) && f.endsWith(".feature"));
+  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet.
+  const dossiers = dossiersDesFeatures(state.slug, ctx.stack.bdd);
+  const features = (await ctx.workspace.listFiles()).filter((f) => dossiers.some((d) => f.startsWith(`${d}/`)) && f.endsWith(".feature"));
   let gherkin = "";
   for (const f of features) gherkin ||= featureScenarios(await ctx.workspace.readFile(f)).get(sc.ac) ?? "";
   const { unitTests, sources } = ctx.stack.layout;

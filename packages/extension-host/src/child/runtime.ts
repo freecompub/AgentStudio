@@ -10,6 +10,8 @@ export interface ActivationRequest {
   layout: { acceptanceTests: string[]; unitTests: string[]; sources: string[] };
   /** Ce que la stack tient pour de l'infrastructure : transmis, l'extension ne le devine pas. */
   infrastructureModules: string[];
+  /** Couples BDD de la pile (ADR 0074), transmis comme les emplacements. */
+  bdd?: { lanceur: string; features: string; etapes: string }[];
   /** Chemin absolu de l'entrée compilée de l'extension. */
   entry: string;
   testFilePattern: string;
@@ -136,6 +138,7 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
         id: r.stackId,
         layout: r.layout,
         infrastructureModules: r.infrastructureModules,
+        ...(r.bdd ? { bdd: r.bdd } : {}),
         mutation: (opts) => call("stack.mutation", [], opts?.signal),
         architecture: (rules) => call("stack.architecture", [rules]),
         lint: (opts) => call("stack.lint", [opts?.files ? { files: opts.files } : undefined], opts?.signal),

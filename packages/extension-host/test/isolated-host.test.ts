@@ -81,8 +81,9 @@ afterAll(async () => {
   for (const handle of launched) await handle.deactivate();
 });
 
-async function activate(extra: { hookTimeoutMs?: number } = {}) {
+async function activate(extra: { hookTimeoutMs?: number } = {}, pile: Partial<StackAdapter> = {}) {
   const env = deps();
+  env.d.stack = { ...env.d.stack, ...pile };
   const handle = await activateIsolated(
     { manifest: DEMO_MANIFEST, directory: extDir, entry: join(extDir, "index.mjs") },
     env.d,
@@ -93,6 +94,13 @@ async function activate(extra: { hookTimeoutMs?: number } = {}) {
 }
 
 describe("Hôte d'extension isolé (processus Node réel)", () => {
+  it("l'extension isolée voit les couples BDD de la pile (ADR 0074)", async () => {
+    const { d, posted } = await activate({}, { bdd: [{ lanceur: "reqnroll", features: "tests/Features", etapes: "tests/Steps" }] });
+    await d.registry.command("pile")!.handler("");
+    await until(() => posted.length > 0);
+    expect(posted[0]).toBe('bdd : [{"lanceur":"reqnroll","features":"tests/Features","etapes":"tests/Steps"}]');
+  }, 30_000);
+
   it("l'extension tourne dans un autre processus et répond par RPC", async () => {
     const { d, posted, handle } = await activate();
     expect(handle.pid).toBeGreaterThan(0);

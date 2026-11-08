@@ -5,7 +5,7 @@
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.mjs";
-import { checkGherkin } from "./gherkin.mjs";
+import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
@@ -39,7 +39,7 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
     const disp = await w.disposition();
     // Seul l'emplacement est dynamique : il vient de la stack ; la norme vit dans l'agent (ADR 0024, 0043).
     await specialiste(w, d, s, "DISTILL", "skraft-acceptance", motifs, `\nTests d'acceptance à écrire dans : ${disp.acceptanceTests.join(", ")}`);
-    const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai);
+    const porte = await portes(w, d, s, cp, disp.acceptanceTests, essai, disp.bdd);
     if (porte.motifs.length)
       return porte;
     const faits = [
@@ -63,12 +63,14 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
 * Porte gherkin AVANT la porte valeurs : un scénario couplé à un détail technique doit être refusé
 * avant la revue et le gel définitif de DISTILL. Puis RED d'acceptance (ADR 0041).
 */
-async function portes(w, d, s, cp, globsAcceptance, essai) {
+async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   const dir = `.skraft/${d.slug}/distill`;
   const fichiers = await w.listerFichiers();
   const lire = async (chemins) => Promise.all(chemins.map(async (path) => ({ path, content: await w.lireFichier(path) })));
-  const features = await lire(fichiers.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
-  const gherkin = checkGherkin(features);
+  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
+  const dossiers = dossiersDesFeatures(d.slug, bdd);
+  const features = await lire(fichiers.filter((f) => dossiers.some((x) => f.startsWith(`${x}/`)) && f.endsWith(".feature")));
+  const gherkin = [...checkGherkin(features), ...(bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkin.length)
     return { motifs: gherkin, porte: "gherkin" };
   const valeurs = checkValues({ criteria: d.story.criteria, features, acceptanceTests: await lire(fichiers.filter((f) => matchesAny(globsAcceptance, f))) });

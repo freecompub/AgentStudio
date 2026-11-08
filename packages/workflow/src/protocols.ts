@@ -151,7 +151,8 @@ export interface W {
   format(fichiers?: readonly string[]): Promise<FormatReport | null>;
   mutation(): Promise<MutationReport | null>;
   /** Pile du projet (identifiant de l'adaptateur) et ses emplacements (tests d'acceptance, tests unitaires, sources), en motifs. */
-  disposition(): Promise<{ pile: string; acceptanceTests: string[]; unitTests: string[]; sources: string[]; infrastructureModules: string[] }>;
+  /** Emplacements de la pile ; `bdd`, ses couples quand elle en déclare (ADR 0074). */
+  disposition(): Promise<{ pile: string; acceptanceTests: string[]; unitTests: string[]; sources: string[]; infrastructureModules: string[]; bdd?: { lanceur: string; features: string; etapes: string }[] }>;
   /** Empreinte des fichiers correspondant aux motifs : geler des tests, puis vérifier le gel (D21). */
   empreinte(motifs: readonly string[]): Promise<string>;
   brancher(nom: string): Promise<void>;

@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/11 — BDD (ADR 0074), brique 3b : DISTILL et DELIVER en BDD, extension et workflow
+
+- Les couples BDD atteignent les extensions et les workflows : `ctx.stack.bdd` (en processus, et
+  isolée par la requête d'activation) et `w.disposition().bdd`.
+- Fonctions pures en deux copies (`gherkin.ts` / `gherkin.mjs`, `brief.ts` / `brief.mjs`) :
+  `dossiersDesFeatures` (dossiers `features` des couples, sinon `.skraft/<slug>/distill/features`),
+  `checkTitresBdd` (titre d'un scénario `@ac-<n>` qui commence par `AC-<n>`, casse et séparateur
+  libres), `ligneBdd` (consigne du dossier de passation de DISTILL).
+- Branché des deux côtés : la porte `gherkin` de DISTILL lit les `.feature` du projet et refuse un
+  titre sans critère ; le dossier de passation de DISTILL dit où écrire le `.feature` et ses étapes ;
+  DELIVER lit le scénario dans le projet. Le gel et l'empreinte n'ont rien demandé : les dossiers BDD
+  sont déjà dans `acceptanceTests` (brique 3a).
+- Agent d'acceptance (deux copies) : le cas BDD mentionné, sans nommer d'outil d'agent-studio.
+- Tests de bout en bout des deux côtés (`e2e-bdd`) vus rouges puis verts : story livrée, `.feature`
+  commité dans le projet et rien dans `.skraft/` ; titres sans critère refusés par la porte `gherkin`.
+- **Reste** : détection BDD par `/stack init` (lanceur dans les manifestes, dossiers `.feature` et
+  étapes) ; skill par lanceur (Reqnroll d'abord) ; run réel sur la version BDD d'`exemple-dotnet-tdd`.
+
 ## 08/11 — BDD (ADR 0074), vérification sur Reqnroll et brique 3a : le réglage `bdd`
 
 - **Vérifié sur la version installée** (clone du `main` BDD d'`exemple-dotnet-tdd`, Reqnroll 3.3.4,

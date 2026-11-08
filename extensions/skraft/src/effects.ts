@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { baselineProblems, coverageForChanges, EnvFailureError, WorkDefectError } from "@agent-studio/extension-api";
 import type { AgentRunResult, EffectContext, ExtensionContext, TerminalOutput, TerminalToolName } from "@agent-studio/extension-api";
-import { buildBrief, ecrirePassation, lignePile } from "./brief.js";
+import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.js";
 import { computeIndicators, type Difficulty, type RepositoryShape } from "./difficulty.js";
 import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.js";
 import type { DefectThread } from "./review-thread.js";
@@ -11,7 +11,7 @@ import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.js";
-import { checkGherkin } from "./gherkin.js";
+import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
@@ -175,6 +175,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       if (effect.phase === "DESIGN" || effect.phase === "DISTILL") brief += `\n${lignePile(ctx.stack.id, ctx.stack.layout)}`;
+      // BDD (ADR 0074) : DISTILL écrit le `.feature` dans le projet, titres qui commencent par le critère.
+      if (effect.phase === "DISTILL" && ctx.stack.bdd?.length) brief += `\n${ligneBdd(ctx.stack.bdd)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
       const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase) });
@@ -569,7 +571,9 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const dir = `.skraft/${state.slug}/distill`;
   const files = await ctx.workspace.listFiles();
   const read = async (paths: string[]) => Promise.all(paths.map(async (path) => ({ path, content: await ctx.workspace.readFile(path) })));
-  const features = await read(files.filter((f) => f.startsWith(`${dir}/features/`) && f.endsWith(".feature")));
+  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
+  const dossiers = dossiersDesFeatures(state.slug, ctx.stack.bdd);
+  const features = await read(files.filter((f) => dossiers.some((d) => f.startsWith(`${d}/`)) && f.endsWith(".feature")));
   const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
   const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];
@@ -577,7 +581,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   // Porte `gherkin` AVANT la porte `valeurs` : un scénario couplé à un détail technique doit être
   // refusé même s'il contient les bonnes valeurs, et surtout avant le gel des tests d'acceptance —
   // passé ce point, plus personne ne peut le réécrire.
-  const gherkinReasons = checkGherkin(features);
+  const gherkinReasons = [...checkGherkin(features), ...(ctx.stack.bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkinReasons.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: gherkinReasons };
 
   const valueReasons = checkValues({ criteria, features, acceptanceTests });

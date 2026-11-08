@@ -101,3 +101,26 @@ export function checkGherkin(features) {
     }
   return reasons;
 }
+// ---------- BDD (ADR 0074) ----------------------------------------------------------------
+/** Où vit le Gherkin de la story : les dossiers `features` des couples BDD, sinon le dossier de DISTILL. */
+export function dossiersDesFeatures(slug, bdd) {
+  return bdd?.length ? bdd.map((c) => c.features) : [`.skraft/${slug}/distill/features`];
+}
+/**
+* En BDD, le titre de chaque scénario `@ac-<n>` commence par `AC-<n>` (décision du 08/11) : c'est
+* ce qui le relie à son test, le lanceur nommant le test d'après le titre (Reqnroll : `AC_1LeClient…`)
+* et l'enregistreur JUnit ne gardant pas le tag.
+*/
+export function checkTitresBdd(features) {
+  const out = [];
+  for (const f of features)
+    for (const sc of scenarios(f)) {
+      const n = /@ac-(\d+)\b/i.exec(sc.tags)?.[1];
+      if (n === undefined)
+        continue;
+      if (new RegExp(`^ac[-_ ]?${n}(?![0-9])`, "i").test(sc.titre))
+        continue;
+      out.push(`${f.path} : le titre du scénario « ${sc.titre} » (@ac-${n}) doit commencer par « AC-${n} » : c'est ce qui le relie à son test.`);
+    }
+  return out;
+}

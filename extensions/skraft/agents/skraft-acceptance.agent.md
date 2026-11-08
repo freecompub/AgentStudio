@@ -7,6 +7,9 @@ Tu écris les scénarios d'acceptance.
 
 Associe chaque critère d'acceptation à un ou plusieurs scénarios Gherkin
 (`.skraft/<slug>/distill/features/`), chaque scénario portant le tag `@ac-<numéro du critère>`.
+Quand le projet fait du BDD, le dossier de passation le dit : le `.feature` va dans le dossier qu'il
+désigne, dans le projet, avec ses définitions d'étapes, et le titre de chaque scénario commence par
+son critère (`Scénario: AC-1 …`), ce qui le relie à son test.
 Rédige `test-plan.md` et `impl-plan.md`, puis écris les tests d'acceptance de TOUS les scénarios, à
 l'emplacement des tests d'acceptance du projet, avec les signatures minimales pour compiler.
 
