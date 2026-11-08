@@ -195,9 +195,9 @@
     {
       "id": "bdd-par-composant",
       "title": "Le BDD se décide par composant (`bdd: false` ou couples lanceur, features, étapes) : DISTILL écrit les .feature exécutés et leurs étapes, gelés, reliés à leur test par le titre AC-n, sans rien de propre à un langage (ADR 0074)",
-      "verify": "pnpm vitest run --project stack-adapters test/bdd-profil.test.ts && pnpm vitest run --project ext-skraft test/gherkin.test.ts test/brief.test.ts test/e2e-bdd.test.ts && pnpm vitest run --project workflow-skraft test/gherkin.test.ts test/brief.test.ts test/e2e-bdd-workflow.test.ts",
+      "verify": "pnpm vitest run --project stack-adapters test/bdd-profil.test.ts test/canari-bdd.test.ts && pnpm vitest run --project ext-skraft test/gherkin.test.ts test/brief.test.ts test/e2e-bdd.test.ts && pnpm vitest run --project workflow-skraft test/gherkin.test.ts test/brief.test.ts test/e2e-bdd-workflow.test.ts",
       "passes": false,
-      "notes": "ADR 0074 accepté ; TDD toujours, BDD au choix. Fait le 08/11 : réglage bdd du profil (3a), DISTILL et DELIVER en BDD dans l'extension et le workflow (3b) : .feature au projet, titres AC-n vérifiés, gel couvrant features et étapes. Révisé le 08/11 : aucun skill par lanceur. Reste à false tant que le canari BDD (étape sans définition = mauvaise raison), le skill de méthode bdd-step-definitions, la détection par /stack init et le run réel ne sont pas faits."
+      "notes": "ADR 0074 accepté ; TDD toujours, BDD au choix. Fait le 08/11 : réglage bdd du profil (3a), DISTILL et DELIVER en BDD dans l'extension et le workflow (3b) : .feature au projet, titres AC-n vérifiés, gel couvrant features et étapes. Révisé le 08/11 : aucun skill par lanceur. Canari BDD fait le 08/11 (étape sans définition refusée par la porte, vérifié sur Reqnroll). Reste à false tant que le skill de méthode bdd-step-definitions, la détection par /stack init et le run réel ne sont pas faits."
     },
     {
       "id": "lentilles-informees-des-portes-jugees",

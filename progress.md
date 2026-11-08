@@ -16,9 +16,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   test vient du titre, le tag n'arrive pas au rapport JUnit, d'où le lien par le titre. Un autre
   lanceur peut se comporter autrement : c'est au canari de le dire, pas à une hypothèse.
 - **Reste, pour passer le critère `bdd-par-composant` à `true`** :
-  1. **Canari BDD** dans `/stack doctor` : un scénario dont une étape n'a pas de définition doit
-     ressortir en mauvaise raison (`other_error`), jamais en assertion ni en test ignoré. Vérifier
-     d'abord comment les lecteurs de rapport traitent un test ignoré ou en attente.
+  1. ~~**Canari BDD**~~ **fait** (voir l'entrée suivante).
   2. **Skill `bdd-step-definitions`**, de méthode, sans langage (idées de *GOOS*, reformulées),
      dans les deux copies ; l'agent d'acceptance le charge pour un composant en BDD. Le propre du
      lanceur vient des conventions du projet et du profil.
@@ -29,6 +27,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Ne pas commiter** `docs/Growing Object-Oriented Software, Guided by Tests.pdf` (sous droits).
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
+
+## 08/11 — Canari BDD de `/stack doctor` (ADR 0074 §3)
+
+- **Quoi** : pour chaque couple `bdd` du profil, `runCanaries` écrit lui-même
+  `<features>/<marque>.feature` (Gherkin, `# language: en` imposé), dont l'étape n'a aucune
+  définition, lance la commande de test et juge le résultat (`jugerCanariBdd`, `canaries.ts`).
+  Rien n'est à déclarer dans le profil : Gherkin ne dépend d'aucun langage.
+- **Oracle** : la porte de DISTILL ne refuse que `other_error` et les tests ignorés. Le canari est
+  donc `ok` pour ces deux-là ; `probleme` si le scénario est réussi, classé `assertion`,
+  `missing_symbol` ou non classé (le pire l'emporte) ; `avertissement` s'il est absent du rapport
+  (dossier non découvert, ou lanceur qui n'exécute un .feature que chargé par ses étapes, comme
+  jest-cucumber ou pytest-bdd) ou s'il n'y a aucun rapport.
+- **Piège** : la marque est cherchée **sans casse**. Vérifié en vrai (Reqnroll 3.3.4, xUnit,
+  JunitXml) : le test s'appelle `…C1A2B3C4CanaryFeature.C1A2B3C4Canary`, et l'échec
+  `XUnitPendingStepException … No matching step definition found` est classé `other_error`
+  par notre lecteur → `ok`. Les autres lanceurs ne sont pas vérifiés : c'est le canari qui le dira
+  sur leur projet.
+- Tests : `packages/stack-adapters/test/canari-bdd.test.ts` (13 ; 12 vus rouges, le 13e — « sans
+  BDD, aucun .feature » — est une garde ; la recherche sans casse vérifiée en la cassant).
 
 ## 08/11 — BDD (ADR 0074), brique 3b : DISTILL et DELIVER en BDD, extension et workflow
 

@@ -139,6 +139,53 @@ export function jugerCanari(o: CanaryObservation): Constat {
   };
 }
 
+export interface CanariBddObservation {
+  rapportLu: boolean;
+  /** Résultats portant la marque du canari, et eux seuls. */
+  results: readonly TestResult[];
+  /** Le dossier `features` du couple éprouvé, pour les messages. */
+  features: string;
+}
+
+/**
+ * Canari BDD (ADR 0074 §3) : un scénario dont une étape n'a pas de définition n'a rien vérifié.
+ * La porte de DISTILL refuse `other_error` et les tests ignorés, et rien d'autre : ce scénario doit
+ * donc ressortir dans l'un des deux. Réussi, ou classé comme un rouge légitime, il franchit la porte.
+ */
+export function jugerCanariBdd(o: CanariBddObservation): Constat {
+  const prefixe = `Canari BDD (\`${o.features}\`, étape sans définition)`;
+  if (!o.rapportLu)
+    return {
+      gravite: "avertissement",
+      message: `${prefixe} : la commande n'a produit aucun rapport. Rien n'a pu passer à tort, mais une étape manquante fera échouer toute la suite, et la porte ne saura pas dire laquelle.`,
+    };
+  if (o.results.length === 0)
+    return {
+      gravite: "avertissement",
+      message:
+        `${prefixe} : le lanceur n'a pas exécuté le .feature écrit dans \`${o.features}\`. Soit ce dossier n'est pas découvert — et les scénarios de DISTILL n'y tourneront pas —, ` +
+        `soit le lanceur n'exécute un .feature que si les définitions d'étapes le chargent. Dans le second cas, ce qu'il fait d'une étape sans définition n'est pas vérifié.`,
+    };
+  if (o.results.some((r) => r.status === "passed"))
+    return {
+      gravite: "probleme",
+      message: `${prefixe} : le scénario est rendu réussi. Un scénario qui n'a rien vérifié passerait pour vert : configurez le lanceur pour qu'une étape non définie fasse échouer le test.`,
+    };
+  const franchissent = o.results.filter((r) => r.status === "failed" && FRANCHIT_LA_PORTE_RED(r.failureKind));
+  if (franchissent.length > 0)
+    return {
+      gravite: "probleme",
+      message:
+        `${prefixe} : l'échec est classé ${liste(franchissent.map((r) => r.failureKind))}. La porte ne refuse que \`other_error\` : ` +
+        `ce scénario passerait pour un rouge légitime alors qu'il n'a rien vérifié. Resserrez les motifs du lecteur.`,
+    };
+  return { gravite: "ok", message: `${prefixe} : le scénario est refusé par la porte (échec \`other_error\` ou test ignoré).` };
+}
+
+/** Le .feature du canari BDD : Gherkin ne dépend d'aucun langage ; la langue est imposée, une autre par défaut ne lirait pas ces mots-clés. */
+const featureCanari = (marque: string) =>
+  `# language: en\nFeature: ${marque} canary\n\n  Scenario: ${marque} canary\n    When the step ${marque} has no definition at all\n`;
+
 export interface RunCanariesDeps {
   runner: ProcessRunner;
   /**
@@ -183,6 +230,26 @@ export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps):
         }
       : { gravite: "ok", message: `La commande de test s'exécute et son rapport est lisible : ${initial.results.length} test(s) relevé(s).` },
   );
+
+  // Canari BDD : écrit par le code, dans le dossier `features` de chaque couple déclaré.
+  for (const couple of profile.bdd ?? []) {
+    const marque = `c${randomBytes(4).toString("hex")}`;
+    const chemin = await cheminSous(deps.sandboxRoot, join(couple.features, `${marque}.feature`));
+    if (chemin === null) {
+      constats.push({ gravite: "probleme", message: `Canari BDD : \`${couple.features}\` sort de la copie isolée une fois les liens symboliques résolus ; il n'a pas été écrit.` });
+      continue;
+    }
+    await mkdir(dirname(chemin), { recursive: true });
+    await writeFile(chemin, featureCanari(marque));
+    try {
+      const run = await lancer(profile, deps);
+      // Un lanceur peut changer la casse du titre (`C1A2…Canary`) : la marque est cherchée sans elle.
+      const sienne = (r: TestResult) => `${r.id} ${r.file}`.toLowerCase().includes(marque);
+      constats.push(jugerCanariBdd({ rapportLu: run.rapportLu, results: run.results.filter(sienne), features: couple.features }));
+    } finally {
+      await rm(chemin, { force: true });
+    }
+  }
 
   if (profile.canaries.length === 0) {
     constats.push({
