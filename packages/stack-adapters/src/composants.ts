@@ -40,6 +40,10 @@ export function createComposedAdapter(composants: readonly Composant[]): StackAd
     // L'identifiant du port reste fermé : celui du premier composant, comme le fait un profil.
     id: composants[0]!.adapter.id,
     layout,
+    // Couples BDD des composants (ADR 0074), ramenés à la racine du projet.
+    ...(composants.some((c) => c.adapter.bdd)
+      ? { bdd: composants.flatMap((c) => (c.adapter.bdd ?? []).map((b) => ({ ...b, features: vers(c, b.features), etapes: vers(c, b.etapes) }))) }
+      : {}),
     infrastructureModules: [...new Set(composants.flatMap((c) => c.adapter.infrastructureModules))],
     async detect(root) {
       for (const c of composants) if (await c.adapter.detect(racineDe(root, c))) return true;

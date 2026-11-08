@@ -103,9 +103,21 @@ export interface StackLayout {
   sources: string[];
 }
 
+/**
+ * Un composant en BDD (ADR 0074) : ses `.feature` sont ses tests d'acceptance, liés par les
+ * définitions d'étapes du dossier `etapes`, et lancés par `lanceur` (Reqnroll, Cucumber…).
+ */
+export interface CoupleBdd {
+  lanceur: string;
+  features: string;
+  etapes: string;
+}
+
 export interface StackAdapter {
   readonly id: "typescript" | "dotnet";
   readonly layout: StackLayout;
+  /** Couples BDD du projet (ADR 0074) ; absent : pas de BDD, le TDD seul. */
+  readonly bdd?: CoupleBdd[];
   /**
    * Modules et frameworks que cet écosystème tient pour de l'infrastructure ou de l'interface :
    * ce qu'un domaine ne devrait pas importer. La liste dépend du langage — `Microsoft.AspNetCore` ne veut

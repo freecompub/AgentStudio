@@ -64,6 +64,9 @@ export type CanaryKind = (typeof CANARY_KINDS)[number];
 /** Marque unique injectée par le code, qui permet de retrouver les résultats du canari. */
 export const JETON_MARQUE = "{marque}";
 
+/** Lanceurs BDD connus (ADR 0074) : un profil les nomme, il n'en invente pas. */
+export const LANCEURS_BDD = ["reqnroll", "specflow", "cucumber-js", "jest-cucumber", "cucumber-jvm", "pytest-bdd", "behave"] as const;
+
 /** Chemin relatif à la racine, sans `..` : un profil ne désigne rien hors du projet. */
 const cheminDuProjet = (champ: string) =>
   z
@@ -158,6 +161,21 @@ const schema = z
       })
       .strict()
       .optional(),
+    /**
+     * BDD (ADR 0074) : `false` ou absent, le TDD seul ; une liste de couples, les `.feature` du
+     * projet sont les tests d'acceptance, liés par les définitions d'étapes de `etapes`. Le TDD reste
+     * la boucle interne dans les deux cas.
+     */
+    // `false` vaut « absent » ; une union de zod perdrait le chemin précis de chaque erreur.
+    bdd: z.preprocess(
+      (v) => (v === false ? undefined : v),
+      z
+        .array(z.object({ lanceur: z.enum(LANCEURS_BDD), features: cheminDuProjet("features"), etapes: cheminDuProjet("etapes") }).strict(), {
+          error: "`bdd` : une liste de couples `{ lanceur, features, etapes }`, ou `false`.",
+        })
+        .min(1, "`bdd` : au moins un couple `{ lanceur, features, etapes }`, ou `false`.")
+        .optional(),
+    ),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */

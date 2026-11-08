@@ -76,7 +76,10 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   const motifs = (globs: readonly string[]) => globs.map((g) => globToRegExp(g));
   /** Pour le GEL des tests : insensible à la casse (ADR 0035), sinon une majuscule le contourne. */
   const motifsSansCasse = (globs: readonly string[]) => globs.map((g) => globToRegExp(g, "i"));
-  const testGlobs = [...profile.layout.unitTests, ...profile.layout.acceptanceTests];
+  // BDD (ADR 0074) : les `.feature` et leurs étapes sont des tests d'acceptance, que le gel couvre.
+  const bdd = profile.bdd ? profile.bdd.map((c) => ({ lanceur: c.lanceur, features: c.features.replace(/\/+$/, ""), etapes: c.etapes.replace(/\/+$/, "") })) : undefined;
+  const layout = bdd ? { ...profile.layout, acceptanceTests: [...profile.layout.acceptanceTests, ...bdd.flatMap((c) => [`${c.features}/**`, `${c.etapes}/**`])] } : profile.layout;
+  const testGlobs = [...layout.unitTests, ...layout.acceptanceTests];
   // Motif d'import compilé une fois ; le profil a déjà été validé à la lecture (`parseStackProfile`).
   const compile = profile.architecture ? compilerMotifSur("architecture.import", profile.architecture.import, ["module"]) : null;
   const architecture = compile && "re" in compile ? compile.re : null;
@@ -84,7 +87,8 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
   return {
     // L'identifiant du port reste fermé tant que d'autres stacks ne sont pas déclarées ailleurs.
     id: profile.id as StackAdapter["id"],
-    layout: profile.layout,
+    layout,
+    ...(bdd ? { bdd } : {}),
     infrastructureModules: profile.infrastructureModules,
     // `[].join("|")` rend la chaîne vide, et `new RegExp("")` reconnaît TOUT. L'extension
     // reconstruit un RegExp depuis ce motif (extension-host) : un motif vide y ferait de chaque

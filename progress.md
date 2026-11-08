@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 08/11 — BDD (ADR 0074), vérification sur Reqnroll et brique 3a : le réglage `bdd`
+
+- **Vérifié sur la version installée** (clone du `main` BDD d'`exemple-dotnet-tdd`, Reqnroll 3.3.4,
+  xUnit, JunitXml.TestLogger 4.1.0, .NET 10) : le nom du test vient du titre du scénario
+  (`LeClientChiffreUneLigneDePlusieursArticles`, classe `…ChiffrerUnPanierLigneALigneFeature`) ; le tag
+  `@ac-1` devient `Trait("Category","ac-1")` dans le `.feature.cs` généré, mais **l'enregistreur JUnit
+  n'écrit aucun attribut** (sa documentation le dit). Un titre « AC-1 Le client… » donne
+  `AC_1LeClient…`, que `acOf` reconnaît déjà. Le Gherkin du projet est en français.
+- **Décisions du responsable (08/11)** : le `.feature` de DISTILL va au projet, tel quel ; le titre de
+  chaque scénario commence par son critère (`AC-n`) ; le code vérifie à chaque porte que le `.feature`
+  du projet est exactement celui de DISTILL (empreinte).
+- **Brique 3a** : `bdd` dans le profil de pile (`false` = absent ; liste de couples `{ lanceur,
+  features, etapes }`, lanceurs connus : Reqnroll, SpecFlow, Cucumber-JS, jest-cucumber,
+  Cucumber-JVM, pytest-bdd, behave). Les dossiers d'un couple rejoignent `acceptanceTests` : le gel
+  de DISTILL et `isTestFile` les couvrent. `StackAdapter.bdd` expose les couples ; l'adaptateur
+  composé les ramène à la racine du projet. **Piège** : une union zod (`false` ou liste) perdait le
+  chemin de l'erreur (« bdd — Invalid input ») ; `false` est ramené à « absent » avant la validation.
+
 ## 07/11 — Composants (ADR 0074), brique 2 : /stack, /stack doctor, /stack init, serveur MCP
 
 - `/stack` dit les composants (nom, pile, racine) ; `/stack doctor` en fait un diagnostic chacun,
