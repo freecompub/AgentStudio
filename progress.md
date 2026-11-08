@@ -5,20 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
-## 08/11 — État du BDD et suite (ADR 0074)
+## 08/11 — État du BDD et suite (ADR 0074, révisé)
 
-- **Fait** : vérification sur Reqnroll 3.3.4 (nom du test tiré du titre ; tag `@ac-1` absent du rapport
-  JUnit ; titre « AC-1 … » → `AC_1…`, relié par `acOf`) ; 3a, réglage `bdd` du profil (`8c605e8`) ;
-  3b, DISTILL et DELIVER en BDD dans l'extension et le workflow (`5831500`).
+- **Principe rappelé par le responsable** : skraft ne connaît aucun langage. Tout ce qui dépend de
+  la pile passe par le profil et l'adaptateur ; un skill ou une porte qui nomme un langage ou un
+  lanceur est à refuser. ADR 0074 §3 révisé en ce sens (le « skill par lanceur » est abandonné).
+- **Fait** : 3a, réglage `bdd` du profil (`8c605e8`) ; 3b, DISTILL et DELIVER en BDD dans
+  l'extension et le workflow (`5831500`) : `.feature` au projet, titres `AC-n` vérifiés, gel des
+  dossiers `features` et `etapes`. Constat sur un premier lanceur (Reqnroll 3.3.4) : le nom du
+  test vient du titre, le tag n'arrive pas au rapport JUnit, d'où le lien par le titre. Un autre
+  lanceur peut se comporter autrement : c'est au canari de le dire, pas à une hypothèse.
 - **Reste, pour passer le critère `bdd-par-composant` à `true`** :
-  1. **Détection par `/stack init`** : lanceur trouvé dans les manifestes, couple de dossiers
-     `.feature` et étapes, confirmé par l'utilisateur. Limite : `/stack init` ne propose pas encore
-     de profil .NET ; pour Reqnroll, la détection servira surtout à `/stack doctor` (lanceur et
-     dossiers déclarés présents).
-  2. **Skill Reqnroll** pour l'agent d'acceptance (écriture des étapes, Gherkin en français),
-     contenu partageable (ADR 0024).
-  3. **Run réel** sur la version BDD d'`exemple-dotnet-tdd` (`main`, Reqnroll), avec l'accord du
-     responsable (consomme des requêtes).
+  1. **Canari BDD** dans `/stack doctor` : un scénario dont une étape n'a pas de définition doit
+     ressortir en mauvaise raison (`other_error`), jamais en assertion ni en test ignoré. Vérifier
+     d'abord comment les lecteurs de rapport traitent un test ignoré ou en attente.
+  2. **Skill `bdd-step-definitions`**, de méthode, sans langage (idées de *GOOS*, reformulées),
+     dans les deux copies ; l'agent d'acceptance le charge pour un composant en BDD. Le propre du
+     lanceur vient des conventions du projet et du profil.
+  3. **Détection par `/stack init`** : lanceur nommé dans un manifeste, dossiers `.feature` et
+     d'étapes ; un couple complet est confirmé, une moitié fait demander l'autre.
+  4. **Run réel** sur un projet BDD (le premier : la version BDD d'`exemple-dotnet-tdd`), avec
+     l'accord du responsable.
+- **Ne pas commiter** `docs/Growing Object-Oriented Software, Guided by Tests.pdf` (sous droits).
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 

@@ -78,7 +78,8 @@ d'acceptance, et seulement pour un composant qui le choisit.
    `features` du composant (plus dans `.skraft/`, décision du responsable le 08/11) ; l'agent
    d'acceptance écrit aussi les définitions d'étapes, avec les signatures minimales pour compiler,
    rouges pour la bonne raison — le même contrat qu'un test d'acceptance aujourd'hui. Les valeurs du
-   critère y sont recopiées à l'identique (porte inchangée). Un skill par lanceur.
+   critère y sont recopiées à l'identique (porte inchangée). **Un seul skill de méthode**,
+   `bdd-step-definitions`, sans langage ni lanceur (révisé le 08/11, voir plus bas).
 3. **Le gel** de fin de DISTILL couvre les `.feature` de la story **et** les définitions d'étapes
    qu'elle a écrites ; DELIVER ne les modifie pas (gel absolu, décision du 07/11). À chaque porte,
    le code vérifie que le `.feature` du projet est **exactement** celui que DISTILL a écrit, par son
@@ -99,14 +100,35 @@ d'acceptance, et seulement pour un composant qui le choisit.
 6. DELIVER garde sa boucle TDD à l'intérieur : un test unitaire rouge, puis le code, jusqu'à ce que
    le scénario du composant passe.
 
+### 3. Révision du 08/11 : aucun savoir propre à un langage dans skraft
+
+Décidé par le responsable le 08/11 (« notre travail n'est pas lié à un langage »). Le « skill par
+lanceur » du point 2.2 est abandonné : il en faudrait un par lanceur, chacun lié à un langage et
+tenu en double (extension, workflow). À la place :
+
+1. **Un skill de méthode**, `bdd-step-definitions`, sur la couche des étapes, valable pour tout
+   lanceur : étapes fines qui délèguent à des pilotes en langage métier, faux systèmes externes
+   minimaux, builders à valeurs par défaut (le scénario ne porte que les valeurs du critère),
+   diagnostics qui nomment la valeur métier, attente d'un effet observable plutôt qu'une pause.
+   Idées tirées de Freeman et Pryce, *Growing Object-Oriented Software, Guided by Tests* (ch. 5,
+   8, 10, 11, 21 à 23, 27), reformulées, rien de recopié ; exemples en Gherkin et pseudo-code.
+2. **Ce qui est propre au lanceur** (syntaxe des liaisons, configuration) vient du projet : les
+   conventions relevées par la recherche, et le lanceur et les dossiers déclarés dans le profil.
+3. **Ce que le code décide passe par le profil**, comme aujourd'hui : le classement des échecs
+   (`failureKind`) et ses canaris de `/stack doctor`. Un **canari BDD** prouve, pour chaque
+   composant en BDD, qu'un scénario dont une étape n'a pas de définition — le faux rouge propre au
+   BDD — ressort en mauvaise raison, jamais en assertion ni en test ignoré.
+4. Pas de porte sur les pauses fixes dans les étapes : elle demanderait des motifs par langage. La
+   règle reste dans le skill ; la lentille d'intégrité des tests la relève en revue.
+
 ## Ordre de mise en œuvre
 
 1. Composants : schéma, adaptateur composé ; tests sur un dépôt mixte simulé, puis réel. **Fait le
    07/11** (branche `feat/composants`), sans les composants touchés (reportés, point 4).
 2. `/stack init` et `/stack doctor` par composant. **Fait le 07/11.**
-3. BDD : schéma, détection, DISTILL (agent, skill Reqnroll), gel, lien scénario-test ; tests de
-   bout en bout dans les deux implémentations, puis un run réel sur la version BDD
-   d'`exemple-dotnet-tdd`.
+3. BDD : schéma, DISTILL et DELIVER, gel, lien scénario-test, tests de bout en bout dans les deux
+   implémentations (**faits le 08/11**) ; puis canari BDD, skill de méthode, détection, et un run
+   réel sur un projet BDD (le premier : la version BDD d'`exemple-dotnet-tdd`).
 
 ## Conséquences
 
