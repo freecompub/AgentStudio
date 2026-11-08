@@ -130,7 +130,7 @@ export const ROLE_SKILLS = {
   researcher: {},
   architectModel: { mandatory: ["architecture-patterns"], onDemand: ["architecture-decisions", ...SKILLS_D_ARCHITECTURE] },
   architectDecide: { mandatory: ["architecture-decisions", "adr-eligibility-gate"], onDemand: ["architecture-patterns", ...SKILLS_D_ARCHITECTURE] },
-  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
+  acceptance: { mandatory: ["bdd-methodology", "test-design-mandates"], onDemand: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing", "bdd-step-definitions"] },
   test: { mandatory: ["test-design-mandates", "outside-in-tdd#RED"], onDemand: ["test-refactoring-catalog", "clean-architecture-testing", ...SKILLS_D_ARCHITECTURE] },
   dev: { mandatory: ["craft-discipline", "outside-in-tdd#SYNTHESIZE-GREEN"], onDemand: ["clean-architecture-testing", "test-refactoring-catalog", ...SKILLS_D_ARCHITECTURE] },
   lens: { onDemand: ["adversarial-review-lenses", "acceptance-review-criteria", "architecture-review-criteria"] },
@@ -156,4 +156,6 @@ export const SKILLS = [
   "adversarial-review-lenses",
   "acceptance-review-criteria",
   "architecture-review-criteria",
+  // Écrite pour agent-studio (ADR 0074 §3), pas reprise : les définitions d'étapes d'un projet en BDD.
+  "bdd-step-definitions",
 ] as const;

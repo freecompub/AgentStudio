@@ -17,9 +17,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   lanceur peut se comporter autrement : c'est au canari de le dire, pas à une hypothèse.
 - **Reste, pour passer le critère `bdd-par-composant` à `true`** :
   1. ~~**Canari BDD**~~ **fait** (voir l'entrée suivante).
-  2. **Skill `bdd-step-definitions`**, de méthode, sans langage (idées de *GOOS*, reformulées),
-     dans les deux copies ; l'agent d'acceptance le charge pour un composant en BDD. Le propre du
-     lanceur vient des conventions du projet et du profil.
+  2. ~~**Skill `bdd-step-definitions`**~~ **fait** (voir l'entrée suivante).
   3. **Détection par `/stack init`** : lanceur nommé dans un manifeste, dossiers `.feature` et
      d'étapes ; un couple complet est confirmé, une moitié fait demander l'autre.
   4. **Run réel** sur un projet BDD (le premier : la version BDD d'`exemple-dotnet-tdd`), avec
@@ -27,6 +25,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Ne pas commiter** `docs/Growing Object-Oriented Software, Guided by Tests.pdf` (sous droits).
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
+
+## 08/11 — Skill `bdd-step-definitions` (ADR 0074 §3)
+
+- **Quoi** : `skills/bdd-step-definitions/SKILL.md`, dans l'extension et le workflow (copies
+  identiques). Écrit pour agent-studio, en français, à partir des idées de *GOOS* (Freeman et
+  Pryce, ch. 5, 8, 10, 11, 21 à 23, 27), reformulées, provenance en commentaire. Aucun langage ni
+  lanceur : exemples en Gherkin et pseudo-code. Contenu partageable (ADR 0024), aucun outil
+  d'agent-studio nommé.
+- **Contenu** : trois étages (scénario, étapes, pilotes) ; étape en une ligne ; pilotes en langage
+  métier (impératif pour agir, description pour vérifier) ; faux systèmes externes minimaux, ne
+  doubler que ses types ; builders à valeurs par défaut (le scénario ne porte que les valeurs du
+  critère, intactes jusqu'au pilote) ; contexte neuf par scénario ; un rouge sur la vérification
+  métier, jamais une étape sans définition ; attendre un effet, jamais une durée ; une étape qui
+  résiste fait poser la question.
+- **Branchement** : à la demande de l'agent d'acceptance (`ROLE_SKILLS.acceptance`, `meta.agents`
+  du workflow), et `ligneBdd` dit de la charger avant d'écrire les étapes. Ajoutée à `SKILLS` avec
+  un commentaire qui la distingue des reprises de skraft-plugin.
+- Tests : `brief.test.ts` (deux copies) et `agents-skills.test.ts` vus rouges ; nouveau
+  `tests/workflow-skraft/test/skills.test.ts`, dont la garde d'existence (une skill accordée doit
+  exister) passait déjà et a été vérifiée en retirant la copie.
 
 ## 08/11 — Canari BDD de `/stack doctor` (ADR 0074 §3)
 

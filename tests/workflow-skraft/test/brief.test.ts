@@ -61,7 +61,7 @@ describe("Consigne BDD du dossier de passation", async () => {
   it("sans BDD, rien ; en BDD, dossiers du .feature et des étapes, lanceur, titre qui commence par le critère", () => {
     expect(ligneBdd(undefined)).toBe("");
     expect(ligneBdd([{ lanceur: "reqnroll", features: "tests/A/Features", etapes: "tests/A/Steps" }])).toBe(
-      "BDD (ADR 0074) : les scénarios Gherkin sont les tests d'acceptance du projet. Écris le `.feature` dans tests/A/Features (et non dans `.skraft/`), et ses définitions d'étapes dans tests/A/Steps (lanceur : reqnroll). Le titre de chaque scénario commence par son critère : « Scénario: AC-1 … » pour `@ac-1`.",
+      "BDD (ADR 0074) : les scénarios Gherkin sont les tests d'acceptance du projet. Écris le `.feature` dans tests/A/Features (et non dans `.skraft/`), et ses définitions d'étapes dans tests/A/Steps (lanceur : reqnroll). Le titre de chaque scénario commence par son critère : « Scénario: AC-1 … » pour `@ac-1`. Charge la skill `bdd-step-definitions` avant d'écrire les étapes.",
     );
   });
 });

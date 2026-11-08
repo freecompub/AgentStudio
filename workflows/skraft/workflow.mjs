@@ -87,7 +87,7 @@ export const meta = {
       sortie: "report_phase",
       ecriture: [".skraft/**", "@stack:acceptanceTests", "@stack:sources"],
       outils: ["list_files", "run_tests", "report_blocker"],
-      skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing"] },
+      skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing", "bdd-step-definitions"] },
     },
     "skraft-test": {
       prompt: "agents/skraft-test.agent.md",
