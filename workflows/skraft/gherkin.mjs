@@ -124,3 +124,64 @@ export function checkTitresBdd(features) {
     }
   return out;
 }
+
+/** Début d'un scénario : mêmes mots-clés que `scenarios`. */
+const TITRE_SCENARIO = /^\s*(?:Scénario|Scenario|Plan du scénario|Scenario Outline)\s*:\s*(.*)$/i;
+/**
+ * Un fichier `.feature` en en-tête (langue, tags et titre de la fonctionnalité, contexte partagé) et
+ * blocs de scénario, chacun avec ses tags. Texte brut, pour comparer deux versions d'un fichier.
+ */
+function decouper(content) {
+  const lignes = content.split("\n").map((l) => l.replace(/\s+$/, ""));
+  const debuts = [];
+  lignes.forEach((l, i) => {
+    if (!TITRE_SCENARIO.test(l)) return;
+    let d = i;
+    while (d > 0 && /^\s*@/.test(lignes[d - 1])) d--;
+    debuts.push(d);
+  });
+  return {
+    entete: lignes.slice(0, debuts[0] ?? lignes.length),
+    blocs: debuts.map((d, k) => lignes.slice(d, debuts[k + 1] ?? lignes.length)),
+  };
+}
+/** Lignes vides et espaces de fin ne changent pas un scénario. */
+const cle = (lignes) => lignes.map((l) => l.trim()).filter(Boolean).join("\n");
+const titreDe = (bloc) => TITRE_SCENARIO.exec(bloc.find((l) => TITRE_SCENARIO.test(l)) ?? "")?.[1]?.trim() ?? "";
+const NE_PAS_TOUCHER = "Il appartient à une story précédente : n'y touche pas ; si cette story change ce comportement, pose la question.";
+/**
+ * Le Gherkin de la story (ADR 0074, run du 08/11) : en BDD, le dossier `features` contient aussi les
+ * scénarios des stories précédentes. `avant` est relevé au début de DISTILL. Les scénarios nouveaux
+ * sont ceux de la story, rendus avec l'en-tête de leur fichier : ce sont eux seuls que les portes
+ * jugent et que DELIVER reçoit. Un scénario existant modifié ou supprimé, ou l'en-tête d'un fichier
+ * existant modifié, est refusé (décision du responsable le 08/11) : il change une autre story.
+ */
+export function gherkinDeLaStory(avant, apres) {
+  const modifies = [];
+  const maintenant = new Map(apres.map((f) => [f.path, decouper(f.content)]));
+  const anciens = new Map();
+  for (const f of avant) {
+    const a = decouper(f.content);
+    anciens.set(f.path, new Set(a.blocs.map(cle)));
+    const n = maintenant.get(f.path);
+    if (n && cle(a.entete) !== cle(n.entete))
+      modifies.push(`${f.path} : l'en-tête du fichier (fonctionnalité, contexte partagé) existait avant DISTILL et a été modifié. ${NE_PAS_TOUCHER}`);
+    const restants = new Set((n?.blocs ?? []).map(cle));
+    for (const b of a.blocs)
+      if (!restants.has(cle(b))) modifies.push(`${f.path} : le scénario « ${titreDe(b)} » existait avant DISTILL et a été modifié ou supprimé. ${NE_PAS_TOUCHER}`);
+  }
+  const features = [];
+  for (const f of apres) {
+    const n = maintenant.get(f.path);
+    const vus = anciens.get(f.path) ?? new Set();
+    const neufs = n.blocs.filter((b) => !vus.has(cle(b)));
+    if (neufs.length) features.push({ path: f.path, content: `${[...n.entete, ...neufs.flat()].join("\n")}\n` });
+  }
+  return { features, modifies };
+}
+/** Les `.feature` de la story, sur le disque : dossiers `features` en BDD, sinon celui de DISTILL. */
+export async function gherkinDuDisque(w, slug, bdd) {
+  const dossiers = dossiersDesFeatures(slug, bdd);
+  const chemins = (await w.listerFichiers()).filter((f) => dossiers.some((x) => f.startsWith(`${x}/`)) && f.endsWith(".feature"));
+  return Promise.all(chemins.map(async (path) => ({ path, content: await w.lireFichier(path) })));
+}

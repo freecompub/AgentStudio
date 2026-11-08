@@ -9,7 +9,7 @@
  * La porte ne juge pas le style. Elle refuse ce qui est reconnaissable sans interprétation.
  */
 import { describe, expect, it } from "vitest";
-import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "../src/gherkin.js";
+import { checkGherkin, checkTitresBdd, dossiersDesFeatures, gherkinDeLaStory } from "../src/gherkin.js";
 
 const scenario = (corps: string, tags = "@ac-1") => [{ path: "features/x.feature", content: `Fonctionnalité: F\n\n  ${tags}\n  ${corps}\n` }];
 
@@ -119,5 +119,80 @@ describe("BDD : où vit le Gherkin, et titres AC-n (ADR 0074)", () => {
     expect(checkTitresBdd(f("  @ac-2\n  Scénario: AC-1 mauvais critère\n    Soit un panier\n"))).toEqual([
       "tests/A/Features/panier.feature : le titre du scénario « AC-1 mauvais critère » (@ac-2) doit commencer par « AC-2 » : c'est ce qui le relie à son test.",
     ]);
+  });
+});
+
+/**
+ * Le Gherkin de la story (ADR 0074, run du 08/11) : en BDD, le dossier `features` contient aussi les
+ * scénarios des stories précédentes. Les portes ne jugent que les scénarios nouveaux, et un scénario
+ * existant modifié ou supprimé est refusé : il appartient à une autre story.
+ */
+describe("Gherkin de la story : nouveaux scénarios seulement, les existants intouchables", () => {
+  const US1 = `# language: fr
+@US-1
+Fonctionnalité: Chiffrer un panier
+
+  @ac-1 @happy-path
+  Scénario: Le client chiffre une ligne
+    Soit un panier vide
+    Alors la somme est de 13.50 euros
+
+  @ac-2
+  Scénario: Le client chiffre deux lignes
+    Soit un panier vide
+    Alors la somme est de 15.90 euros
+`;
+  const US2 = `# language: fr
+Fonctionnalité: Remise par palier
+
+  @ac-1
+  Scénario: AC-1 Une ligne sous le palier
+    Soit le palier « 10 articles ou plus : 5 % »
+    Alors la remise est de 0,00 €
+`;
+  const avant = [{ path: "F/panier-chiffrage.feature", content: US1 }];
+
+  it("un nouveau fichier : tous ses scénarios sont ceux de la story ; les fichiers inchangés n'en donnent aucun", () => {
+    const r = gherkinDeLaStory(avant, [...avant, { path: "F/panier-remise.feature", content: US2 }]);
+    expect(r.modifies).toEqual([]);
+    expect(r.features.map((f) => f.path)).toEqual(["F/panier-remise.feature"]);
+    // Les portes qui jugent la story ne voient plus les titres de l'US-1.
+    expect(checkTitresBdd(r.features)).toEqual([]);
+  });
+
+  it("des scénarios ajoutés à un fichier existant : seuls ceux-là, avec l'en-tête du fichier", () => {
+    const ajout = `${US1}\n  @ac-3\n  Scénario: AC-3 Le client chiffre un panier vide\n    Soit un panier vide\n    Alors la somme est de 0.00 euros\n`;
+    const r = gherkinDeLaStory(avant, [{ path: "F/panier-chiffrage.feature", content: ajout }]);
+    expect(r.modifies).toEqual([]);
+    expect(r.features).toHaveLength(1);
+    expect(r.features[0]!.content).toContain("# language: fr");
+    expect(r.features[0]!.content).toContain("Scénario: AC-3 Le client chiffre un panier vide");
+    expect(r.features[0]!.content).not.toContain("Le client chiffre une ligne");
+  });
+
+  it("un scénario existant renommé est refusé, avec son titre d'origine et la conduite à tenir", () => {
+    const renomme = US1.replace("Scénario: Le client chiffre une ligne", "Scénario: AC-1 Le client chiffre une ligne");
+    const r = gherkinDeLaStory(avant, [{ path: "F/panier-chiffrage.feature", content: renomme }]);
+    expect(r.modifies).toEqual([
+      "F/panier-chiffrage.feature : le scénario « Le client chiffre une ligne » existait avant DISTILL et a été modifié ou supprimé. Il appartient à une story précédente : n'y touche pas ; si cette story change ce comportement, pose la question.",
+    ]);
+  });
+
+  it("un scénario existant supprimé, ou son fichier, est refusé de même", () => {
+    const sans = US1.slice(0, US1.indexOf("  @ac-2"));
+    expect(gherkinDeLaStory(avant, [{ path: "F/panier-chiffrage.feature", content: sans }]).modifies).toHaveLength(1);
+    expect(gherkinDeLaStory(avant, []).modifies).toHaveLength(2);
+  });
+
+  it("l'en-tête d'un fichier existant modifié (contexte partagé, fonctionnalité) est refusé : il change ses scénarios", () => {
+    const contexte = US1.replace("Fonctionnalité: Chiffrer un panier\n", "Fonctionnalité: Chiffrer un panier\n\n  Contexte:\n    Soit un client connecté\n");
+    expect(gherkinDeLaStory(avant, [{ path: "F/panier-chiffrage.feature", content: contexte }]).modifies).toEqual([
+      "F/panier-chiffrage.feature : l'en-tête du fichier (fonctionnalité, contexte partagé) existait avant DISTILL et a été modifié. Il appartient à une story précédente : n'y touche pas ; si cette story change ce comportement, pose la question.",
+    ]);
+  });
+
+  it("lignes vides et espaces de fin ne comptent pas comme une modification", () => {
+    const aere = US1.replaceAll("\n", "  \n").replace("@ac-2", "\n\n  @ac-2");
+    expect(gherkinDeLaStory(avant, [{ path: "F/panier-chiffrage.feature", content: aere }])).toEqual({ features: [], modifies: [] });
   });
 });

@@ -26,6 +26,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — DISTILL ne juge que le Gherkin de la story (ADR 0074 §4)
+
+- **Défaut** (run BDD du 08/11) : la porte des titres `AC-n` jugeait tous les `.feature` du dossier,
+  dont celui de l'US-1 ; l'agent a renommé ses scénarios. Trouvé aussi en lisant le code : DELIVER
+  prenait le premier scénario `@ac-n` du dossier, donc celui de l'US-1 (`panier-chiffrage` avant
+  `panier-remise`).
+- **Fait, extension et workflow** : `gherkinDeLaStory(avant, après)` (`gherkin.ts`, `gherkin.mjs`)
+  découpe chaque fichier en en-tête et blocs de scénario ; nouveaux blocs = la story (rendus avec
+  l'en-tête du fichier) ; bloc existant modifié ou supprimé, ou en-tête modifié = refus (porte
+  `gherkin`). Relevé `avant` : workflow, au début du callback de `w.phase("DISTILL")` dans `d` ;
+  extension, dans l'effet `checkpointPhase` de DISTILL, porté par `PHASE_CHECKPOINTED.gherkinAvant`
+  jusqu'à l'état (`SkraftState.gherkinAvant`, schéma zod). Portes et DELIVER passent par
+  `gherkinDuDisque` + `gherkinDeLaStory`.
+- Décision du responsable : un scénario d'une story précédente **doit** être refusé s'il est touché.
+- Tests : 6 de `gherkinDeLaStory` dans chaque copie, et 3 de bout en bout dans chaque
+  implémentation (US-1 déjà en BDD : livrée sans juger ses titres ; renommer un scénario de l'US-1
+  refusé, motif exact ; DELIVER reçoit le scénario de la story). Tous vus rouges pour la bonne raison ;
+  le refus vérifié en le retirant.
+- **Reste** : les tests d'une story précédente portent aussi `ac-n` (porte du rouge d'acceptance) ;
+  prochaine brique, relevé des tests au début de DISTILL.
+
 ## 08/11 — Porte de cohérence de DESIGN : un nom d'un seul mot n'était jamais reconnu dans le modèle
 
 - **Défaut** (trouvé en lisant les refus du run BDD) : `conceptsAbsentsDuModele` comparait les noms
@@ -55,8 +76,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   titres `AC-n`, étapes dans `Steps/` : le chemin BDD fonctionne de bout en bout.
 - **Défaut de DESIGN** : `Panier` refusé à tort (nom d'un seul mot), **corrigé** (entrée précédente).
 - **Deux défauts de nos portes, à corriger avant de passer `bdd-par-composant` à `true`** :
-  1. la porte des titres `AC-n` juge **tous** les `.feature` du dossier : l'agent a renommé les
-     scénarios de l'**US-1** pour la satisfaire ;
+  1. ~~la porte des titres `AC-n` juge **tous** les `.feature` du dossier~~ **corrigé** (ADR 0074 §4) ;
   2. les marqueurs `ac-n` de **deux stories se confondent** : les scénarios renommés de l'US-1
      sont pris pour des tests de l'US-2 (« passe déjà »), requalifiés en régression ; 8 scénarios
      pour 5 critères. Le défaut existe aussi hors BDD, dès qu'une story précédente laisse des

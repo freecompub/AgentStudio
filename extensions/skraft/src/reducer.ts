@@ -120,7 +120,12 @@ export function transition(s0: SkraftState, e: Ev): Out {
       if (e.type === "PHASE_CHECKPOINTED" && e.phase === p) {
         // Le rejet « commit » d'une phase précédente, continuée sans commit, a été tracé : il ne
         // concerne pas cette phase (D19 de docs/12).
-        const ns = { ...s, checkpoints: { ...s.checkpoints, [p]: e.checkpointId }, ...(s.lastRejection?.gate === "commit" ? { lastRejection: null } : {}) };
+        const ns = {
+          ...s,
+          checkpoints: { ...s.checkpoints, [p]: e.checkpointId },
+          ...(e.gherkinAvant ? { gherkinAvant: e.gherkinAvant } : {}),
+          ...(s.lastRejection?.gate === "commit" ? { lastRejection: null } : {}),
+        };
         return lancer(ns, []);
       }
       if (e.type === "AGENT_REPORTED") {

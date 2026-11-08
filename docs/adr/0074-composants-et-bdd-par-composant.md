@@ -121,6 +121,25 @@ tenu en double (extension, workflow). À la place :
 4. Pas de porte sur les pauses fixes dans les étapes : elle demanderait des motifs par langage. La
    règle reste dans le skill ; la lentille d'intégrité des tests la relève en revue.
 
+### 4. Le Gherkin de la story, et celui des stories précédentes (08/11)
+
+Constaté au run réel du 08/11 (US-2 sur la version BDD d'`exemple-dotnet-tdd`, où l'US-1 est déjà
+en BDD) : le dossier `features` contient les scénarios de **toutes** les stories. La porte des titres
+`AC-n` jugeait ceux de l'US-1, et l'agent les a renommés pour la passer ; DELIVER pouvait recevoir le
+scénario de l'US-1 qui porte le même critère.
+
+1. Le code relève les `.feature` au **début de DISTILL** (le point de départ de la phase, que
+   retrouve aussi une relance). Les scénarios de la story sont ceux qui n'y figuraient pas ; les
+   portes `gherkin`, titres et valeurs ne jugent qu'eux, et DELIVER ne reçoit qu'eux.
+2. **Un scénario existant modifié ou supprimé, ou l'en-tête d'un fichier existant modifié, est
+   refusé** (décision du responsable le 08/11) : il appartient à une story précédente. Le motif dit
+   de poser la question si la story change ce comportement. Lignes vides et espaces de fin ne
+   comptent pas.
+3. Hors BDD, rien ne change : le Gherkin vit dans `.skraft/<slug>/`, vide au début de DISTILL.
+4. Reste : les **tests** d'une story précédente portent aussi des marqueurs `ac-n`, que la porte du
+   rouge d'acceptance confond avec ceux de la story (même run). À traiter de la même façon, par un
+   relevé des tests au début de DISTILL.
+
 ## Ordre de mise en œuvre
 
 1. Composants : schéma, adaptateur composé ; tests sur un dépôt mixte simulé, puis réel. **Fait le

@@ -11,7 +11,7 @@ import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.js";
-import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "./gherkin.js";
+import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
@@ -159,6 +159,8 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
 
     case "checkpointPhase": {
       const cp = await ctx.workspace.checkpoint(`skraft ${state.slug} : début de ${effect.phase}`);
+      // Gherkin déjà là au début de DISTILL (ADR 0074, run du 08/11) : celui des stories précédentes.
+      if (effect.phase === "DISTILL") return { type: "PHASE_CHECKPOINTED", phase: effect.phase, checkpointId: cp.id, gherkinAvant: await gherkinDuDisque(ctx, state.slug) };
       return { type: "PHASE_CHECKPOINTED", phase: effect.phase, checkpointId: cp.id };
     }
 
@@ -572,8 +574,9 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const files = await ctx.workspace.listFiles();
   const read = async (paths: string[]) => Promise.all(paths.map(async (path) => ({ path, content: await ctx.workspace.readFile(path) })));
   // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
-  const dossiers = dossiersDesFeatures(state.slug, ctx.stack.bdd);
-  const features = await read(files.filter((f) => dossiers.some((d) => f.startsWith(`${d}/`)) && f.endsWith(".feature")));
+  // Seuls les scénarios de la story sont jugés ; toucher à ceux d'une story précédente est refusé.
+  const { features, modifies } = gherkinDeLaStory(state.gherkinAvant ?? [], await gherkinDuDisque(ctx, state.slug));
+  if (modifies.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: modifies };
   const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
   const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];

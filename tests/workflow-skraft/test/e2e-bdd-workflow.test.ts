@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testing";
 import type { StackAdapter } from "@agent-studio/stack-adapters";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, fakeStack, git, implPlanDe, put, shutdownHosts, simulatedAgents, testPlanDe, until } from "./support/harness.js";
+import { answerQuestions, assemble, createProject, fakeStack, git, implPlanDe, put, shutdownHosts, simulatedAgents, testPlanDe, unitTestWriter, until } from "./support/harness.js";
 import { fin, lancerWorkflow } from "./support/fin.js";
 
 const FEATURES = "tests/features";
@@ -65,5 +65,56 @@ describe("skraft en workflow — BDD au choix (ADR 0074)", () => {
     await until(async () => ((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).some((r) => r.porte === "gherkin"), 90_000);
     const rejet = ((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string; motifs: string[] }[]).find((r) => r.porte === "gherkin")!;
     expect(rejet.motifs[0]).toMatch(/tests\/features\/plafond\.feature : le titre du scénario « critère 1 » \(@ac-1\) doit commencer par « AC-1 »/);
+  }, 180_000);
+
+  // Run du 08/11 : le dossier `features` contient déjà les scénarios d'une story précédente.
+  const US1 = (titre: string) => `# language: fr\nFonctionnalité: chiffrage\n\n  @ac-1\n  Scénario: ${titre}\n    Alors la somme est de 13.50 euros\n`;
+  const avecUs1 = async (titre: string) => {
+    await put(root, `${FEATURES}/aaa-us1.feature`, US1(titre));
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "us-1");
+  };
+  /** Agent d'acceptance qui, comme au run du 08/11, renomme aussi les scénarios de l'US-1. */
+  const renommeUs1: ScriptedBehavior = async (t) => {
+    await acceptanceBdd(root, { titres: true })(t);
+    await put(root, `${FEATURES}/aaa-us1.feature`, US1("AC-1 Le client chiffre une ligne"));
+  };
+
+  it("story précédente en BDD : ses titres ne sont pas jugés, la story est livrée, son .feature reste intact", async () => {
+    await avecUs1("Le client chiffre une ligne");
+    const app = await assemble(root, simulatedAgents(new ScriptedRuntime(), root, { "skraft-acceptance": acceptanceBdd(root, { titres: true }) }), tasksDir, { stack: pileBdd() });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await fin(app, id, 120_000);
+    expect(((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).map((r) => r.porte)).not.toContain("gherkin");
+    expect(git(root, "show", `HEAD:${FEATURES}/aaa-us1.feature`)).toBe(US1("Le client chiffre une ligne").trimEnd());
+  }, 180_000);
+
+  it("un scénario d'une story précédente modifié : DISTILL refusée, le motif le nomme", async () => {
+    await avecUs1("Le client chiffre une ligne");
+    const app = await assemble(root, simulatedAgents(new ScriptedRuntime(), root, { "skraft-acceptance": renommeUs1 }), tasksDir, { stack: pileBdd() });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await until(async () => ((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string }[]).some((r) => r.porte === "gherkin"), 90_000);
+    const rejet = ((await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string; motifs: string[] }[]).find((r) => r.porte === "gherkin")!;
+    expect(rejet.motifs).toContain(
+      `${FEATURES}/aaa-us1.feature : le scénario « Le client chiffre une ligne » existait avant DISTILL et a été modifié ou supprimé. Il appartient à une story précédente : n'y touche pas ; si cette story change ce comportement, pose la question.`,
+    );
+  }, 180_000);
+
+  it("DELIVER reçoit le scénario de la story, pas celui d'une story précédente au même critère", async () => {
+    await avecUs1("AC-1 Ancien critère de l'US-1");
+    const prompts: string[] = [];
+    const testeur: ScriptedBehavior = async (t) => {
+      prompts.push(t.prompt);
+      await unitTestWriter(root)(t);
+    };
+    const app = await assemble(root, simulatedAgents(new ScriptedRuntime(), root, { "skraft-acceptance": acceptanceBdd(root, { titres: true }), "skraft-test": testeur }), tasksDir, { stack: pileBdd() });
+    answerQuestions(app);
+    const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
+    await fin(app, id, 120_000);
+    const ac1 = prompts.find((p) => /Scénario en cours : ac-1\b/.test(p))!;
+    expect(ac1).toContain("Scénario: AC-1 critère 1");
+    expect(ac1).not.toContain("Ancien critère de l'US-1");
   }, 180_000);
 });

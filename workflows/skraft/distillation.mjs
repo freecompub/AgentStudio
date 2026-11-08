@@ -5,7 +5,7 @@
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest } from "./distill.mjs";
-import { checkGherkin, checkTitresBdd, dossiersDesFeatures } from "./gherkin.mjs";
+import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
@@ -13,6 +13,9 @@ import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 export async function distiller(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
   const faite = await w.phase("DISTILL", async (cp, relance) => {
+    // Gherkin déjà là au début de la phase (ADR 0074, run du 08/11) : celui des stories précédentes.
+    // Relevé ici, au point de départ, que retrouve aussi une relance : le disque y est rembobiné.
+    d.gherkinAvant = await gherkinDuDisque(w, d.slug, (await w.disposition()).bdd);
     // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
     await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
     await ecrireRapports(w, d.slug, "DISTILL", suivi);
@@ -68,8 +71,10 @@ async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   const fichiers = await w.listerFichiers();
   const lire = async (chemins) => Promise.all(chemins.map(async (path) => ({ path, content: await w.lireFichier(path) })));
   // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
-  const dossiers = dossiersDesFeatures(d.slug, bdd);
-  const features = await lire(fichiers.filter((f) => dossiers.some((x) => f.startsWith(`${x}/`)) && f.endsWith(".feature")));
+  // Seuls les scénarios de la story sont jugés ; toucher à ceux d'une story précédente est refusé.
+  const { features, modifies } = gherkinDeLaStory(d.gherkinAvant ?? [], await gherkinDuDisque(w, d.slug, bdd));
+  if (modifies.length)
+    return { motifs: modifies, porte: "gherkin" };
   const gherkin = [...checkGherkin(features), ...(bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkin.length)
     return { motifs: gherkin, porte: "gherkin" };

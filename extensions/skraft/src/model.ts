@@ -181,6 +181,11 @@ export interface SkraftState {
   qualityCheckpoint?: string;
   branch: string;
   checkpoints: Partial<Record<Phase, string>>;
+  /**
+   * `.feature` présents au début de DISTILL (ADR 0074, run du 08/11) : ceux des stories précédentes.
+   * Les portes ne jugent que les scénarios nouveaux, et DELIVER ne reçoit que ceux-là.
+   */
+  gherkinAvant?: { path: string; content: string }[];
   artifacts: Record<Phase, ArtifactRecord[]>;
   reviews: Record<Phase, ReviewRecord[]>;
   attempts: number;
@@ -276,7 +281,7 @@ export type SkraftEvent =
     }
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
-  | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string }
+  | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string; gherkinAvant?: { path: string; content: string }[] }
   | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
@@ -411,6 +416,7 @@ const stateSchema = z.object({
   qualityCheckpoint: z.string().optional(),
   branch: z.string(),
   checkpoints: z.record(z.string(), z.string()),
+  gherkinAvant: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
   reviews: byPhase(z.object({ attempt: z.number(), lenses: z.array(z.unknown()), verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]), reportPath: z.string() })),
   attempts: z.number().int().min(0),

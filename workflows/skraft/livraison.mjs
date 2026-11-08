@@ -11,7 +11,7 @@ import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./br
 import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
 import { levelEffects } from "./difficulty.mjs";
 import { acOf, featureScenarios, verifierEcarts } from "./distill.mjs";
-import { dossiersDesFeatures } from "./gherkin.mjs";
+import { gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, minorThreads } from "./review-thread.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser } from "./revue.mjs";
@@ -400,9 +400,9 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
   const critere = d.story.criteria.find((c) => c.n === sc.ac);
   let gherkin = "";
   // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet.
-  const dossiers = dossiersDesFeatures(d.slug, L.disp.bdd);
-  for (const f of (await w.listerFichiers()).filter((x) => dossiers.some((y) => x.startsWith(`${y}/`)) && x.endsWith(".feature")))
-    gherkin ||= featureScenarios(await w.lireFichier(f)).get(sc.ac) ?? "";
+  // Seuls ceux de la story : un scénario d'une story précédente peut porter le même critère.
+  for (const f of gherkinDeLaStory(d.gherkinAvant ?? [], await gherkinDuDisque(w, d.slug, L.disp.bdd)).features)
+    gherkin ||= featureScenarios(f.content).get(sc.ac) ?? "";
   // Correction de revue : chaque agent reçoit les défauts qui le concernent, à chaque relance.
   const routes = etape === "fix-test" ? (correction?.retourTests ?? []) : etape === "fix" ? [...(correction?.retourDev ?? []), ...(correction?.cibles.length ? [`Tests ajoutés par la correction côté tests, rouges : fais-les passer. ${correction.cibles.join(", ")}`] : [])] : [];
   const rejet = etape === "fix" || etape === "fix-test" ? uniq([...routes, ...motifs]) : motifs;
