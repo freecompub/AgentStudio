@@ -26,6 +26,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Second run réel US-2 en BDD (`docs/runs/2026-11-08-us-2-bdd-claude-2/`)
+
+- Demandé par le responsable (« Aller on relance »), après les quatre corrections du jour ; même
+  départ, pile complétée (`mutation` Stryker, `format`). Serveur MCP reconstruit.
+- **Fini : 16m13, 1 rejet, 5,18 $** (premier : 23m28, 8 rejets, 12,18 $). DESIGN 3,20 $ (au lieu de
+  7,98) sans refus sur `Panier`, ADR-003 ratifié ; DISTILL en un essai, `.feature` de l'US-1 intact ;
+  5 scénarios pour 5 critères ; mutation mesurée, 5 survivants anciens de `Montant.cs` notés hors du
+  changement ; `dotnet test` 10/10.
+- **À examiner** : (1) le seul rejet, `ArgumentNullException` exigé dans le modèle parce que cité par
+  `contracts.md` (type du framework, faux positif probable) ; (2) **aucun test unitaire écrit** en
+  DELIVER, pour la seconde fois (« TDD toujours ») ; (3) notes : commentaire de `Facture` périmé,
+  justification de requalification devenue fausse après DELIVER.
+- Branche du run (`skraft/us-2`, clone `/tmp/essai-mcp-skraft-R89Ove`) non poussée.
+
 ## 08/11 — Mutation : vérifiée en vrai, puis jugée sur les lignes modifiées (ADR 0049 révisé)
 
 - **Pourquoi** : le run BDD n'avait pas mesuré la mutation ; la pile fournie (reprise de `a7cf6db`)

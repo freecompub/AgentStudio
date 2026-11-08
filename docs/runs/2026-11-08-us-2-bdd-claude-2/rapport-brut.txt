@@ -1,0 +1,104 @@
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "76c09c2c68ba82a888c6fd1f5c369add6bc2b1f0a19e9874f2dc6482b5f22c94",
+    "adrs": [
+      {
+        "id": "ADR-003",
+        "path": "docs/adr/adr-003-remise-par-palier-dans-l-agregat-panier.md",
+        "status": "Accepted"
+      }
+    ],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Mutation hors du changement : src/Tarification.Domaine/Montant.cs, 5 mutant(s) survivant(s) sur des lignes que la story ne modifie pas (ligne 14 (String mutation), ligne 21 (Conditional (false) mutation), ligne 21 (Equality mutation), ligne 21 (String mutation (non couvert)), ligne 27 (String mutation (non couvert))) ; non jugés."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_5SansPalierConfigureIlNyAAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_4LaRemiseSeCalculeParLigneEtNonSurLePanierEntier",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_1UneLigneSousLePalierNobtientAucuneRemise"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : ADR-003 (Accepted).\nRemarques hors du changement de la story :\n- src/Tarification.Application/CalculDuPanier.cs:6 (cold-reader, minor) : Le commentaire de `Facture` dit que les remises restent à zéro tant que leur story n'est pas livrée. C'est faux depuis US-2 : `Remise` est maintenant calculée. Il ne dit pas non plus que `ATPayer` ne déduit pas la remise, ce qui surprendra un lecteur.\n- src/Tarification.Application/CalculDuPanier.cs:6 (quality-gates, minor) : La doc de Facture annonce que les remises restent à zéro tant que les stories ne sont pas livrées (« mieux vaut un champ visiblement vide »). Or Chiffrer calcule désormais la remise (ligne 29, panier.RemiseTotale(_bareme)) : le commentaire est faux.\n- .skraft/us-2/distill/test-plan.md:14 (quality-gates, minor) : Hors périmètre DELIVER, mais à signaler à l'humain : la justification de la requalification (« la remise est déjà à 0,00 €, Montant.Zero en dur ») n'est plus vraie, puisque CalculDuPanier.cs:29 calcule la remise. Les lignes 15-16 reprennent la même justification."
+  ],
+  "dernierRejet": {
+    "gate": "cohérence",
+    "reasons": [
+      "`ArgumentNullException` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."
+    ]
+  },
+  "arbitrages": [],
+  "etapes": [
+    {
+      "phase": "INIT",
+      "essai": 1,
+      "debut": "2026-11-08T15:26:59.002Z",
+      "fin": "2026-11-08T15:27:14.193Z",
+      "dureeMs": 15191,
+      "tours": 0,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0,
+      "modeles": []
+    },
+    {
+      "phase": "CLASSIFY",
+      "essai": 1,
+      "debut": "2026-11-08T15:27:14.193Z",
+      "fin": "2026-11-08T15:27:21.643Z",
+      "dureeMs": 7450,
+      "tours": 1,
+      "rejets": [],
+      "aiu": 0,
+      "coutUsd": 0.0016,
+      "modeles": [
+        "claude-haiku-5-5"
+      ]
+    },
+    {
+      "phase": "CONFIRM_DIFFICULTY",
+      "essai": 1,
+      "debut": "2026-11-08T15:
+
+Rapport complet : /tmp/essai-mcp-skraft-R89Ove/rapport.json
+Clone : /tmp/essai-mcp-skraft-R89Ove/projet
