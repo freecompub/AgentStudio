@@ -26,6 +26,29 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Plusieurs rapports de tests pour une commande (`{rapports}`, ADR 0072 révisé)
+
+- **Trouvé en préparant le run BDD** (vérification gratuite, sans LLM, avant de lancer) : le
+  `main` BDD d'`exemple-dotnet-tdd` a deux projets de test (`Tarification.UnitTests` : Reqnroll ;
+  `Tarification.Tests` : xUnit). Avec `LogFilePath={rapport}`, le second rapport écrasait le
+  premier : 3 tests relevés sur 5, et les canaris `missing_symbol` et `syntax` « pas vus ». Le run
+  aurait jugé DELIVER sans ses tests unitaires.
+- **Fait** (`stack-adapters` seulement ; l'extension, le workflow et le serveur MCP en profitent) :
+  jeton `{rapports}` (dossier, tous les fichiers réunis) ; erreurs de compilation **ajoutées** aux
+  rapports présents ; couvertures **réunies** par ligne ; `executerTests` (`execution-tests.ts`)
+  partagé par l'adaptateur et les canaris, qui recevaient `{couverture}` vide.
+- **Vérifié en vrai** (`dotnet`, copie du `main` GitHub) : 5 tests relevés, six constats `ok`
+  (dont le canari BDD), couverture réunie de 5 fichiers.
+- **Piège** : avant, `lireCouverture` gardait le premier rapport Cobertura (« le premier lisible
+  fait foi ») : avec deux projets, la porte de couverture aurait vu la moitié des lignes.
+- **Remarqué, non traité** : les fichiers de la couverture .NET sortent sans `src/`
+  (`Tarification.Domaine/Panier.cs`), comme avant ce changement.
+- Tests : `test/rapports-multiples.test.ts` (12) ; vus rouges sauf deux qui passaient déjà
+  (acceptation du jeton ; dossier vide lu comme absent, par accident). L'ajout des erreurs de
+  compilation et la fusion de couverture vérifiés en les cassant.
+- Pile de l'essai BDD : `LogFilePath={rapports}/{assembly}.xml`, `unitTests` dans
+  `tests/Tarification.Tests`, `acceptanceTests: []` plus le couple `bdd` Reqnroll.
+
 ## 08/11 — Skill `bdd-step-definitions` (ADR 0074 §3)
 
 - **Quoi** : `skills/bdd-step-definitions/SKILL.md`, dans l'extension et le workflow (copies

@@ -1,14 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { FailureKind, ProcessRunner, TestResult } from "../protocols.js";
-import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { cheminSous } from "./chemin-sur.js";
 import type { Constat } from "./constat.js";
-import { lireTests } from "./read-report.js";
+import { executerTests } from "./execution-tests.js";
 import { JETON_MARQUE, type CanaryKind, type StackProfile } from "./stack-profile.js";
-import { substituer } from "./tokens.js";
 
 /**
  * Canaris de `/stack doctor` (§8.6). Le code écrit un test dont il connaît d'avance la bonne
@@ -294,12 +291,6 @@ export async function runCanaries(profile: StackProfile, deps: RunCanariesDeps):
   return { constats, observations };
 }
 
-/** Le motif est validé à la lecture du profil ; un refus ici ne peut donc venir que d'un profil forgé. */
-function lireErreurs(spec: NonNullable<StackProfile["buildErrors"]>, sortie: string, root: string): TestResult[] {
-  const compile = compileBuildErrorSpec(spec);
-  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
-}
-
 interface Lancement {
   rapportLu: boolean;
   results: TestResult[];
@@ -307,32 +298,17 @@ interface Lancement {
   sortie: string;
 }
 
+/** Même lancement que l'adaptateur (`executerTests`) : ce que les canaris éprouvent est ce que les portes reçoivent. */
 async function lancer(profile: StackProfile, deps: RunCanariesDeps): Promise<Lancement> {
-  // Le rapport est écrit hors de la copie isolée : il ne doit pas se retrouver dans le diff.
-  const rapport = join(tmpdir(), `agent-studio-canari-${randomBytes(6).toString("hex")}.${profile.tests.report === "junit-xml" ? "xml" : "json"}`);
   try {
-    const r = await deps.runner.run(profile.tests.command[0]!, substituer(profile.tests.command.slice(1), rapport, []), {
+    const e = await executerTests(profile, deps.runner, {
       cwd: deps.sandboxRoot,
       timeoutMs: deps.timeoutMs ?? 5 * 60_000,
       ...(deps.onOutput ? { onOutput: deps.onOutput } : {}),
     });
-    const sortie = `${r.stdout}${r.stderr}`.slice(-20_000);
-    const brut = r.timedOut ? null : await readFile(rapport, "utf8").catch(() => null);
-    if (brut === null) {
-      // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent. Si le
-      // profil dit comment lire les erreurs de compilation, ces erreurs SONT le résultat — et le
-      // canari `missing_symbol` devient éprouvable là où il ne l'était pas.
-      const erreurs = profile.buildErrors ? lireErreurs(profile.buildErrors, sortie, deps.sandboxRoot) : [];
-      if (erreurs.length > 0) return { rapportLu: true, results: erreurs, exitCode: r.exitCode, sortie };
-      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
-    }
-    try {
-      return { rapportLu: true, results: lireTests(profile.tests.report, brut, deps.sandboxRoot), exitCode: r.exitCode, sortie };
-    } catch {
-      // Un rapport présent mais illisible vaut un rapport absent : rien n'en est tiré.
-      return { rapportLu: false, results: [], exitCode: r.exitCode, sortie };
-    }
-  } finally {
-    await rm(rapport, { force: true });
+    return { rapportLu: e.results !== null, results: e.results ?? [], exitCode: e.exitCode, sortie: e.sortie };
+  } catch {
+    // Un rapport présent mais illisible vaut un rapport absent : rien n'en est tiré.
+    return { rapportLu: false, results: [], exitCode: null, sortie: "" };
   }
 }

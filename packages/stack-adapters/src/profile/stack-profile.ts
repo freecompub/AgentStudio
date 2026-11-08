@@ -2,7 +2,7 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { compileBuildErrorSpec } from "./build-errors.js";
 import { compilerMotifSur } from "./motif-sur.js";
-import { JETON_RAPPORT } from "./tokens.js";
+import { JETON_RAPPORT, JETON_RAPPORTS } from "./tokens.js";
 
 /**
  * Profil de stack déclaratif (J5, O11) : un projet décrit sa chaîne au lieu qu'un adaptateur
@@ -235,10 +235,15 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     // Le lint est lu sur la sortie standard, jamais dans un fichier : `{rapport}` y devenait la
     // chaîne vide, l'outil écrivait nulle part, et la porte disait « rien n'a été jugé » sans
     // jamais dire pourquoi.
-    if (section === "lint" && c.command.some((a) => a.includes(JETON_RAPPORT)))
+    if (section === "lint" && c.command.some((a) => a.includes(JETON_RAPPORT) || a.includes(JETON_RAPPORTS)))
       return {
-        error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` n'a pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
+        error: `Profil de stack refusé : lint.command — \`${JETON_RAPPORT}\` et \`${JETON_RAPPORTS}\` n'ont pas de sens pour \`lint\`, dont la sortie est lue sur la sortie standard.`,
       };
+    // `{rapports}` (un dossier, plusieurs rapports) n'est lu que pour les tests.
+    if (section === "mutation" && c.command.some((a) => a.includes(JETON_RAPPORTS)))
+      return { error: `Profil de stack refusé : mutation.command — \`${JETON_RAPPORTS}\` n'est lu que pour les tests ; la mutation écrit dans \`${JETON_RAPPORT}\` ou \`{dossier}\`.` };
+    if (section === "tests" && c.command.some((a) => a.includes(JETON_RAPPORT)) && c.command.some((a) => a.includes(JETON_RAPPORTS)))
+      return { error: `Profil de stack refusé : tests.command — \`${JETON_RAPPORT}\` et \`${JETON_RAPPORTS}\` ensemble : on ne saurait pas lequel lire. Gardez \`${JETON_RAPPORTS}\` si la commande écrit plusieurs rapports.` };
   }
 
   // Le format lance un programme lui aussi : même liste que les autres sections.

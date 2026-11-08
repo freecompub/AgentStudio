@@ -75,6 +75,28 @@ chemins), comme pour `buildErrors`.
      --test-reporter-destination={rapport}`), sinon sur la **sortie standard** : `prove` et `bats`
      n'écrivent qu'à cet endroit.
 
+## Révision du 08/11 : plusieurs rapports pour une seule commande
+
+Décidée par le responsable le 08/11 (« Ok »), après une vérification sur la version BDD
+d'`exemple-dotnet-tdd` : sa solution a deux projets de test, et `dotnet test` à la racine écrivait
+leurs deux rapports JUnit dans le même `{rapport}`, le second écrasant le premier. Le relevé ne
+comptait que 3 tests sur 5, et les portes auraient jugé sans les tests unitaires.
+
+1. **Jeton `{rapports}`** : un dossier temporaire hors du projet, où la commande de test écrit un
+   rapport par projet. Tous les fichiers qu'il contient, sous-dossiers compris, sont lus et réunis.
+   Ce qui entoure le jeton passe tel quel : `junit;LogFilePath={rapports}/{assembly}.xml` laisse
+   au lanceur son propre jeton. `{rapport}` reste valable. Les deux ensemble sont refusés ;
+   `{rapports}` est refusé ailleurs que dans `tests`.
+2. **Les erreurs de compilation s'ajoutent aux rapports présents**, au lieu de n'être lues qu'en
+   l'absence de tout rapport : un symbole absent n'arrête que la compilation de SON projet, et
+   l'autre produit son rapport. Sinon, le rouge le plus courant du pas RED disparaîtrait.
+3. **Les rapports de couverture sont réunis** : une ligne est couverte si l'un des rapports la
+   couvre. Auparavant, seul le premier fichier trouvé était lu.
+4. **L'adaptateur et les canaris de `/stack doctor` lancent les tests par la même fonction**
+   (`execution-tests.ts`). Les canaris recevaient une chaîne vide pour `{couverture}`, et
+   `dotnet test --results-directory ""` plantait : `/stack doctor` ne fonctionnait sur aucun profil
+   qui mesure la couverture.
+
 ## Conséquences
 
 - Un profil peut désormais faire tout ce que fait l'adaptateur TypeScript écrit à la main, sauf

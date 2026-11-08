@@ -7,7 +7,8 @@ import type { FormatReport, LintReport, ProcessRunner, StackAdapter } from "../p
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
 import { parseCoberturaReport } from "../coverage/cobertura-report.js";
 import { lireLint, lireTests } from "./read-report.js";
-import { JETON_RAPPORT, substituer } from "./tokens.js";
+import { JETON_RAPPORT, JETON_RAPPORTS, substituer } from "./tokens.js";
+import { executerTests } from "./execution-tests.js";
 import { parseStrykerReport } from "../mutation/stryker-report.js";
 import { globToRegExp } from "../glob.js";
 import type { StackProfile } from "./stack-profile.js";
@@ -31,22 +32,6 @@ export interface ProfileAdapterDeps {
 
 
 /**
- * Couverture, si le profil déclare un lecteur. Un rapport absent ou illisible rend `undefined` :
- * la porte doit pouvoir dire « non mesurée » plutôt que de conclure à une couverture nulle.
- */
-async function lireCouverture(profile: StackProfile, dossier: string, root: string) {
-  if (!profile.tests.coverage || !dossier) return undefined;
-  // Le rapport est cherché dans l'arborescence : `dotnet test` le range sous un sous-dossier dont
-  // il choisit le nom, `vitest` l'écrit à plat. Le premier fichier lisible fait foi.
-  for (const chemin of await fichiersXml(dossier)) {
-    const brut = await readFile(chemin, "utf8").catch(() => null);
-    const lu = brut === null ? null : parseCoberturaReport(brut, root);
-    if (lu) return lu;
-  }
-  return undefined;
-}
-
-/**
  * Rapport de mutation rangé par l'outil dans son dossier de sortie : `mutation-report.json` de
  * préférence (Stryker), sinon le premier `.json` trouvé. `null` si rien n'a été écrit.
  */
@@ -55,19 +40,6 @@ async function rapportDansDossier(dossier: string): Promise<string | null> {
   const json = entrees.filter((e) => e.isFile() && e.name.endsWith(".json"));
   const choisi = json.find((e) => e.name === "mutation-report.json") ?? json[0];
   return choisi ? readFile(join(choisi.parentPath, choisi.name), "utf8") : null;
-}
-
-/** Fichiers `.xml` du dossier, récursivement. Vide si le dossier n'existe pas : rien n'a été écrit. */
-async function fichiersXml(dossier: string): Promise<string[]> {
-  const entrees = await readdir(dossier, { withFileTypes: true, recursive: true }).catch(() => []);
-  return entrees.filter((e) => e.isFile() && e.name.endsWith(".xml")).map((e) => join(e.parentPath, e.name));
-}
-
-/** Erreurs de compilation, si le profil dit comment les lire. Le motif est déjà validé à la lecture. */
-function erreursDeCompilation(profile: StackProfile, sortie: string, root: string) {
-  if (!profile.buildErrors) return [];
-  const compile = compileBuildErrorSpec(profile.buildErrors);
-  return "error" in compile ? [] : readBuildErrors(sortie, compile.spec, root);
 }
 
 export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapterDeps = {}): StackAdapter {
@@ -105,48 +77,25 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
     },
 
     async runTests(opts) {
-      const rapport = fichierTemporaire({ "junit-xml": "xml", tap: "tap" }[profile.tests.report as string] ?? "json");
-      // TAP sans `{rapport}` dans la commande : `prove`, `bats` n'écrivent que sur la sortie standard (ADR 0072).
-      const surLaSortie = profile.tests.report === "tap" && !profile.tests.command.some((a) => a.includes(JETON_RAPPORT));
-      // Même exécution pour les deux : mesurer la couverture ne doit pas coûter un second passage
-      // de toute la suite. L'outil écrit où le profil le lui dit, via `{couverture}`.
-      const couverture = profile.tests.coverage ? fichierTemporaire("couverture") : "";
-      if (couverture) await mkdir(couverture, { recursive: true });
-      const args = substituer(profile.tests.command.slice(1), rapport, [], couverture);
-      try {
-        const r = await runner.run(profile.tests.command[0]!, args, {
-          cwd: opts.root,
-          timeoutMs: opts.timeoutMs ?? deps.defaultTimeoutMs ?? 10 * 60_000,
-          ...(opts.signal ? { signal: opts.signal } : {}),
-          ...(opts.onOutput ? { onOutput: opts.onOutput } : {}),
-        });
-        const output = `${r.stdout}${r.stderr}`.slice(-20_000);
-        if (r.timedOut) return { results: [], exitCode: r.exitCode, timedOut: true, output, durationMs: r.durationMs };
-        const brut = surLaSortie ? r.stdout : await readFile(rapport, "utf8").catch(() => null);
-        if (brut === null) {
-          // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent — la
-          // compilation s'arrête avant d'exécuter quoi que ce soit. Le profil dit comment lire ces
-          // erreurs ; sans cette section, le rouge légitime du pas RED n'atteindrait pas la porte.
-          const erreurs = erreursDeCompilation(profile, output, opts.root);
-          if (erreurs.length > 0) return { results: erreurs, exitCode: r.exitCode, timedOut: false, output, durationMs: r.durationMs };
-          throw new Error(
-            `Rapport de tests absent (code ${r.exitCode}) : la commande déclarée écrit-elle bien dans {rapport} ?` +
-              `${profile.buildErrors ? "" : " Si ce projet est compilé, déclarez `buildErrors` pour que les erreurs de compilation soient lues."}\n${output.slice(-2000)}`,
-          );
-        }
-        const lu = await lireCouverture(profile, couverture, opts.root);
-        return {
-          results: lireTests(profile.tests.report, brut, opts.root),
-          exitCode: r.exitCode,
-          timedOut: false,
-          output,
-          durationMs: r.durationMs,
-          ...(lu ? { coverage: lu } : {}),
-        };
-      } finally {
-        await rm(rapport, { force: true });
-        if (couverture) await rm(couverture, { recursive: true, force: true });
+      const e = await executerTests(profile, runner, {
+        cwd: opts.root,
+        timeoutMs: opts.timeoutMs ?? deps.defaultTimeoutMs ?? 10 * 60_000,
+        ...(opts.signal ? { signal: opts.signal } : {}),
+        ...(opts.onOutput ? { onOutput: opts.onOutput } : {}),
+      });
+      const base = { exitCode: e.exitCode, output: e.sortie, durationMs: e.durationMs };
+      if (e.timedOut) return { ...base, results: [], timedOut: true };
+      if (e.results === null) {
+        // Pas de rapport : sur un langage compilé, c'est le cas normal d'un symbole absent — la
+        // compilation s'arrête avant d'exécuter quoi que ce soit. Le profil dit comment lire ces
+        // erreurs ; sans cette section, le rouge légitime du pas RED n'atteindrait pas la porte.
+        const jeton = profile.tests.command.some((a) => a.includes(JETON_RAPPORTS)) ? JETON_RAPPORTS : JETON_RAPPORT;
+        throw new Error(
+          `Rapport de tests absent (code ${e.exitCode}) : la commande déclarée écrit-elle bien dans ${jeton} ?` +
+            `${profile.buildErrors ? "" : " Si ce projet est compilé, déclarez `buildErrors` pour que les erreurs de compilation soient lues."}\n${e.sortie.slice(-2000)}`,
+        );
       }
+      return { ...base, results: e.results, timedOut: false, ...(e.coverage ? { coverage: e.coverage } : {}) };
     },
 
     ...(profile.lint
