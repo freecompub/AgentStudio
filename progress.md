@@ -26,6 +26,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — Détection du BDD par `/stack init` et `/stack doctor` (ADR 0074 §5) ; critère `bdd-par-composant` à `true`
+
+- **Fait** : `detecterBdd` et `blocBdd` (`stack-adapters/src/profile/detection-bdd.ts`, purs) : lanceur
+  lu comme un nom entier dans le texte des manifestes (table de marques par lanceur, table des noms de
+  manifestes), dossier des `.feature` (parent commun), dossier des étapes (unique dossier au nom usuel).
+  `proposeProfileEtBdd` ajoute la section `bdd` (couple complet) ou un commentaire « à compléter »
+  (une moitié) ; `/stack init` l'emploie à la racine et pour chaque composant. `diagnoseProfile` vérifie
+  les couples déclarés (`.feature` présents, dossier d'étapes, lanceur cité). `IndicesDuProjet` gagne
+  `arborescence` et `manifestes`, remplis par `workspace-services` (`sous`, `manifestesSous`, aussi
+  pour `diagnostiquer`).
+- **Choix** : la confirmation n'admet qu'un oui ou un non, la moitié manquante n'est donc pas demandée
+  mais dite en commentaire, sans rien deviner.
+- **Vérifié en vrai** sur la copie du `main` BDD d'`exemple-dotnet-tdd` : `reqnroll`,
+  `tests/Tarification.UnitTests/Features`, `…/Steps`, le couple écrit à la main pour les runs.
+- **Limite** : `/stack init` ne propose de profil que pour TypeScript et Python (pas .NET).
+- Tests : `test/detection-bdd.test.ts` (12), `stack-command.test.ts` (3), `workspace-services.test.ts` (3),
+  vus rouges. Suite entière : 2364 tests.
+- **Critère `bdd-par-composant` passé à `true`** après son verify : tout l'ordre de mise en œuvre de
+  l'ADR 0074 est fait, et deux runs réels l'ont confirmé.
+
 ## 08/11 — Questions ouvertes de la story posées avant RESEARCH (ADR 0014 révisé)
 
 - **Pourquoi** : aux deux runs du jour, le chercheur s'arrêtait (`blocker`) pour poser une question

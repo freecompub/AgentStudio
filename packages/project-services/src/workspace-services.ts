@@ -45,6 +45,7 @@ import {
   diagnoseProfile,
   globToRegExp,
   runCanaries,
+  MANIFESTE,
   parseStackProfile,
   FICHIER_PROJET,
   ecrireComposantsDansProjet,
@@ -653,6 +654,21 @@ function stackCommandDeps(args: {
 }): StackCommandDeps {
   const { workspace, allowedPrograms, stack, declaree, confirmer, onPost } = args;
   const fichiers = () => workspace.files.list();
+  /** Fichiers sous une racine, chemins relatifs à elle ; `.` : tout le projet. */
+  const sous = (tous: readonly string[], racine: string) => tous.flatMap((f) => (racine === "." ? [f] : f.startsWith(`${racine}/`) ? [f.slice(racine.length + 1)] : []));
+  /**
+   * Manifestes (dépendances) sous une racine, lus pour la détection du lanceur BDD (ADR 0074 §2.5).
+   * Dépendances installées et dossiers cachés écartés ; un manifeste illisible est ignoré.
+   */
+  const manifestesSous = async (tous: readonly string[], racine: string) => {
+    const ignore = (seg: string) => seg.startsWith(".") || ["node_modules", "bin", "obj", "target", "dist", "vendor"].includes(seg);
+    const out: { path: string; content: string }[] = [];
+    for (const rel of sous(tous, racine).filter((f) => MANIFESTE.test(f) && !f.split("/").some(ignore)).slice(0, 50)) {
+      const content = await workspace.files.read(racine === "." ? rel : `${racine}/${rel}`).catch(() => null);
+      if (content !== null) out.push({ path: rel, content });
+    }
+    return out;
+  };
 
   return {
     // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
@@ -701,7 +717,8 @@ function stackCommandDeps(args: {
           } catch {
             /* illisible : on s'en tient aux fichiers */
           }
-        out.push({ racine, indices: { fichiers: noms, dependances } });
+        // BDD (ADR 0074) : tous les fichiers et les manifestes du sous-projet, relatifs à sa racine.
+        out.push({ racine, indices: { fichiers: noms, dependances, arborescence: sous(tous, racine), manifestes: await manifestesSous(tous, racine) } });
       }
       return out;
     },
@@ -721,7 +738,7 @@ function stackCommandDeps(args: {
       } catch {
         /* pas de package.json lisible : on s'en tient aux fichiers */
       }
-      return { fichiers: racine, dependances };
+      return { fichiers: racine, dependances, arborescence: tous, manifestes: await manifestesSous(tous, ".") };
     },
 
     /**
@@ -741,8 +758,11 @@ function stackCommandDeps(args: {
 
     async diagnostiquer(profile, racine = ".") {
       // Composant (ADR 0074) : ses chemins sont relatifs à sa racine.
-      const tous = (await fichiers()).flatMap((f) => (racine === "." ? [f] : f.startsWith(`${racine}/`) ? [f.slice(racine.length + 1)] : []));
+      const projet = await fichiers();
+      const tous = sous(projet, racine);
       return diagnoseProfile(profile, {
+        // BDD déclaré : son lanceur est-il cité par un manifeste du composant (ADR 0074) ?
+        manifestes: await manifestesSous(projet, racine),
         programmeTrouvable: (p) => dansLePath(p),
         cheminExiste: (glob) => {
           const re = globToRegExp(glob);

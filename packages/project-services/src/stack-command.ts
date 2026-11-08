@@ -1,5 +1,5 @@
 import type { ConfirmAnswer } from "@agent-studio/core";
-import { proposeProfile, type Constat, type IndicesDuProjet, type StackProfile } from "@agent-studio/stack-adapters";
+import { proposeProfileEtBdd, type Constat, type IndicesDuProjet, type StackProfile } from "@agent-studio/stack-adapters";
 
 /**
  * Commande `/stack` (SPEC §8.6). Elle donne accès, depuis la conversation, à ce qui n'existait
@@ -200,14 +200,15 @@ async function init(deps: StackCommandDeps): Promise<void> {
   // Sous-projets (ADR 0074) : plusieurs reconnus, ou un seul hors de la racine, deviennent des composants.
   if (deps.sousProjets && deps.ecrireComposants) {
     const reconnus = (await deps.sousProjets())
-      .map((p) => ({ racine: p.racine, yaml: proposeProfile(p.indices) }))
+      .map((p) => ({ racine: p.racine, yaml: proposeProfileEtBdd(p.indices) }))
       .filter((p): p is { racine: string; yaml: string } => p.yaml !== null);
     if (reconnus.length > 1 || (reconnus.length === 1 && reconnus[0]!.racine !== "."))
       return initComposants(deps, deps.ecrireComposants, reconnus);
   }
 
   const indices = await deps.indices();
-  const yaml = proposeProfile(indices);
+  // Le BDD détecté (ADR 0074 §2.5) est ajouté au profil : confirmé avec lui, ou signalé à compléter.
+  const yaml = proposeProfileEtBdd(indices);
   if (yaml === null)
     return deps.post(
       `**Rien de reconnu dans ce projet**, et je préfère ne rien proposer plutôt que de deviner. ` +

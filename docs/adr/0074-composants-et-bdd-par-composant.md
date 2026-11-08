@@ -144,6 +144,25 @@ scénario de l'US-1 qui porte le même critère.
    passait et échoue à la porte est refusé (DISTILL ne casse rien) ; DELIVER ne fait de scénarios
    que des tests de la story. Vaut aussi hors BDD.
 
+### 5. La détection, mise en œuvre (08/11)
+
+1. `detecterBdd` (`stack-adapters`, pure) : le **lanceur** est cherché, comme un nom entier, dans le
+   texte des manifestes du composant (`package.json`, `pyproject.toml`, `setup.cfg`,
+   `requirements*.txt`, `*.csproj`, `pom.xml`, `build.gradle*`) d'après une table de marques par
+   lanceur (`Reqnroll`, `SpecFlow`, `@cucumber/cucumber`, `jest-cucumber`, `io.cucumber`,
+   `pytest-bdd`, `behave`) ; deux lanceurs cités, aucun n'est retenu. Le dossier des `.feature` est
+   leur parent commun ; le dossier des étapes, l'unique dossier au nom usuel. Dépendances et dossiers
+   cachés écartés.
+2. `/stack init` ajoute la section `bdd` au profil proposé pour un couple complet (confirmée avec
+   lui) ; pour une moitié, **un commentaire** dit ce qui est trouvé et ce qui manque — la
+   confirmation n'admet qu'un oui ou un non, la moitié manquante n'est pas demandée ; rien, pas de
+   section.
+3. `/stack doctor` vérifie, pour chaque couple déclaré, des `.feature` dans `features`, un dossier
+   `etapes` présent, et le lanceur cité par un manifeste (avertissements).
+4. Limite : `/stack init` ne propose de profil que pour TypeScript et Python ; un projet .NET ou Java
+   n'a donc pas encore de proposition, BDD compris. Vérifié sur le `main` BDD d'`exemple-dotnet-tdd` :
+   la détection rend `reqnroll`, `tests/Tarification.UnitTests/Features`, `…/Steps`.
+
 ## Ordre de mise en œuvre
 
 1. Composants : schéma, adaptateur composé ; tests sur un dépôt mixte simulé, puis réel. **Fait le

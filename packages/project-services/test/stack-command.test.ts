@@ -321,3 +321,46 @@ layout:
     expect(h.ecrits).toEqual([]);
   });
 });
+
+/** Détection du BDD par /stack init (ADR 0074 §2.5) : un couple complet proposé, une moitié signalée, rien sinon. */
+describe("/stack init — le BDD du projet", () => {
+  const cucumber = { path: "package.json", content: '{"devDependencies":{"vitest":"4","@cucumber/cucumber":"10"}}' };
+
+  it("couple complet : la section bdd est dans le profil proposé, confirmée et écrite avec lui", async () => {
+    const h = harnais({
+      indices: async () => ({ fichiers: ["package.json"], dependances: ["vitest", "@cucumber/cucumber"], arborescence: ["features/panier.feature", "features/steps/panier.steps.ts", "src/a.ts"], manifestes: [cucumber] }),
+    });
+    await h.lancer("init");
+    expect(h.postes[0]).toMatch(/bdd:\n {2}- lanceur: cucumber-js\n {4}features: features\n {4}etapes: features\/steps/);
+    expect(h.ecrits).toHaveLength(1);
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "features/steps" }]);
+  });
+
+  it("une moitié seulement : dite en commentaire dans le profil, sans rien écrire de deviné", async () => {
+    const h = harnais({ indices: async () => ({ fichiers: ["package.json"], dependances: ["vitest"], arborescence: ["features/panier.feature"], manifestes: [] }) });
+    await h.lancer("init");
+    expect(h.postes[0]).toMatch(/# bdd \(ADR 0074\) : à compléter\. Trouvé : dossier des \.feature features\. Introuvable : lanceur, dossier des étapes\./);
+    const r = parseStackProfile(h.ecrits[0]!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.bdd).toBeUndefined();
+  });
+
+  it("composants : chacun reçoit son BDD, chemins relatifs à sa racine", async () => {
+    const ecrits: string[] = [];
+    const h = harnais({
+      sousProjets: async () => [
+        { racine: "services/api", indices: { fichiers: ["pyproject.toml"], dependances: [] } },
+        { racine: "web", indices: { fichiers: ["package.json"], dependances: ["vitest"], arborescence: ["features/a.feature", "features/steps/a.ts"], manifestes: [cucumber] } },
+      ],
+      ecrireComposants: async (yaml) => void ecrits.push(yaml),
+    });
+    await h.lancer("init");
+    const { lireFichierProjet } = await import("@agent-studio/stack-adapters");
+    const relu = lireFichierProjet(`composants:\n${ecrits[0]!.split("\n").map((l) => (l ? `  ${l}` : l)).join("\n")}`);
+    if ("error" in relu) throw new Error(relu.error);
+    const web = parseStackProfile(relu.composants!.find((c) => c.nom === "web")!.pile, { allowedPrograms: AUTORISES });
+    expect("error" in web ? web.error : web.profile.bdd).toEqual([{ lanceur: "cucumber-js", features: "features", etapes: "features/steps" }]);
+    const api = parseStackProfile(relu.composants!.find((c) => c.nom === "api")!.pile, { allowedPrograms: AUTORISES });
+    expect("error" in api ? api.error : api.profile.bdd).toBeUndefined();
+  });
+});

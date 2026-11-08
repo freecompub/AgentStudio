@@ -4,7 +4,7 @@ import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
 import type { InteractionDto, TaskCardDto } from "../src/dto.js";
@@ -69,9 +69,13 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[] }) {
+  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
+    for (const [rel, contenu] of Object.entries(opts.contenus ?? {})) {
+      await mkdir(dirname(join(racine, rel)), { recursive: true });
+      await writeFile(join(racine, rel), contenu);
+    }
     if (opts.profil !== undefined || opts.projet !== undefined) await mkdir(join(racine, ".agent-studio"), { recursive: true });
     if (opts.profil !== undefined) await writeFile(join(racine, ".agent-studio", "stack.yaml"), opts.profil);
     if (opts.projet !== undefined) await writeFile(join(racine, ".agent-studio", "projet.yaml"), opts.projet);
@@ -214,6 +218,33 @@ infrastructureModules: [django]
     expect(ecrit).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
     expect(ecrit).not.toMatch(/^pile:/m);
     expect([...ecrit.matchAll(/racine: (\S+)/g)].map((m) => m[1])).toEqual(["a/b/c/d", "services/api"]);
+    await cleanup();
+  });
+
+  it("/stack init détecte le BDD (ADR 0074 §2.5) : lanceur cité par un manifeste, dossier des .feature, dossier des étapes", async () => {
+    const fichiers = ["pyproject.toml", "tests/features/panier.feature", "tests/steps/test_panier.py", "src/panier.py"];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "pyproject.toml": 'dependencies = ["pytest-bdd>=7"]\n' } });
+    await services.route("/stack init");
+    expect(ecrits[0]).toMatch(/bdd:\n\s+- lanceur: pytest-bdd\n\s+features: tests\/features\n\s+etapes: tests\/steps/);
+    await cleanup();
+  });
+
+  it("/stack init sur un sous-projet en BDD : chemins relatifs à sa racine", async () => {
+    const fichiers = ["services/api/pyproject.toml", "services/api/features/a.feature", "services/api/features/steps/test_a.py", "web/README.md"];
+    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "services/api/pyproject.toml": 'dependencies = ["behave"]\n' } });
+    await services.route("/stack init");
+    expect(ecrits[0]).toMatch(/racine: services\/api/);
+    expect(ecrits[0]).toMatch(/lanceur: behave\n\s+features: features\n\s+etapes: features\/steps/);
+    await cleanup();
+  });
+
+  it("/stack doctor vérifie le BDD déclaré : dossiers présents, lanceur cité par un manifeste", async () => {
+    const profil = `${PROFIL_VALIDE}bdd:\n  - { lanceur: pytest-bdd, features: tests/features, etapes: tests/steps }\n`;
+    const fichiers = ["pyproject.toml", "tests/features/a.feature", "tests/steps/test_a.py"];
+    const { services, posts, cleanup } = await ouvrir({ profil, allowedPrograms: ["pytest"], confirmer: "deny", fichiers, contenus: { "pyproject.toml": 'dependencies = ["pytest-bdd"]\n' } });
+    await services.route("/stack doctor");
+    expect(posts.at(-1)).toContain("BDD : le lanceur `pytest-bdd` est cité par un manifeste du projet.");
+    expect(posts.at(-1)).toContain("BDD : des `.feature` dans `tests/features`.");
     await cleanup();
   });
 
