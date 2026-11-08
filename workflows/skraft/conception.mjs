@@ -6,7 +6,7 @@
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { avecStory, parseAdr, setAdrStatus, storyDe } from "./adr.mjs";
-import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.mjs";
+import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -61,7 +61,15 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
   let retour = motifs;
   for (;;) {
     const avant = await instantaneAdrs(w);
-    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour);
+    // Les noms du modèle, tels que la porte de cohérence les lira (08/11).
+    const docs = {};
+    for (const doc of MODEL_DOCS) {
+      const md = await w.lireFichier(`.skraft/${d.slug}/design/${doc}`).catch((e) => (e instanceof PanneEnvironnement ? Promise.reject(e) : undefined));
+      if (md !== undefined)
+        docs[doc] = md;
+    }
+    const noms = ligneNomsDuModele(d.slug, docs);
+    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, noms ? `\n${noms}` : "");
     const horsStory = await controlerAdrs(w, d, avant);
     if (horsStory.length)
       return { motifs: horsStory, porte: "adr" };

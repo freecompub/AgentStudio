@@ -9,7 +9,7 @@ import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
 import { checkResearch, extraireInventaire } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
-import { checkDesign, matriceDeCoherence, matriceMarkdown } from "./design.js";
+import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.js";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.js";
 import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.js";
 import { matchesAny } from "@agent-studio/extension-api";
@@ -183,6 +183,16 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       // est statique et vit dans `agents/skraft-acceptance.agent.md` (ADR 0024, 0043).
       if (effect.phase === "DISTILL") brief += `\nTests d'acceptance à écrire dans : ${ctx.stack.layout.acceptanceTests.join(", ")}`;
       if (effect.phase === "DESIGN" || effect.phase === "DISTILL") brief += `\n${lignePile(ctx.stack.id, ctx.stack.layout)}`;
+      // L'architecte qui décide reçoit les noms du modèle, tels que la porte de cohérence les lira (08/11).
+      if (effect.role === "skraft-architect-decide") {
+        const docs: Record<string, string> = {};
+        for (const d of MODEL_DOCS) {
+          const md = await ctx.workspace.readFile(`.skraft/${state.slug}/design/${d}`).catch(() => null);
+          if (md !== null) docs[d] = md;
+        }
+        const ligne = ligneNomsDuModele(state.slug, docs);
+        if (ligne) brief += `\n${ligne}`;
+      }
       // BDD (ADR 0074) : DISTILL écrit le `.feature` dans le projet, titres qui commencent par le critère.
       if (effect.phase === "DISTILL" && ctx.stack.bdd?.length) brief += `\n${ligneBdd(ctx.stack.bdd)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
