@@ -378,7 +378,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     "skraft_pile",
     {
       description:
-        "Propose la pile du projet (comment lancer ses tests, où vivent ses fichiers, son BDD) et l'écrit dans .agent-studio/projet.yaml après l'accord de l'utilisateur, que le client lui demande ; ou, avec action « diagnostiquer », vérifie la pile déclarée (programmes trouvés, emplacements, canaris qui lancent vraiment les tests). À appeler quand skraft n'a pas de pile. Montre la réponse à l'utilisateur telle quelle.",
+        "Fait découvrir la pile du projet par un agent (comment lancer ses tests, où vivent ses fichiers, son BDD), la vérifie en l'exécutant, et l'écrit dans .agent-studio/projet.yaml après l'accord de l'utilisateur, que le client lui demande ; ou, avec action « diagnostiquer », vérifie la pile déclarée (programmes trouvés, emplacements, canaris qui lancent vraiment les tests). À appeler quand skraft n'a pas de pile. Montre la réponse à l'utilisateur telle quelle.",
       inputSchema: {
         action: z.enum(["proposer", "diagnostiquer"]).optional().describe("proposer (par défaut) ou diagnostiquer."),
         lanceur: sansEspace("Le lanceur BDD").optional().describe("Lanceur BDD, s'il n'a pas été trouvé (reqnroll, cucumber-js, pytest-bdd…)."),
@@ -393,6 +393,11 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         const r = await resoudre(a.projet);
         if (!r.ok) return erreur(r.motif);
         const diagnostic = a.action === "diagnostiquer";
+        // Proposer fait travailler l'agent de découverte (ADR 0076) : il faut une connexion utilisable.
+        if (!diagnostic) {
+          const c = await o.connexion.verifier();
+          if (!c.ok) return erreur(c.motif);
+        }
         return await o.projets.pourLaPile(r.root, confirmer.peutDemander() ? { confirmerProgrammes: confirmer } : {}, async (p) => {
           if (!diagnostic) {
             const refus = enConsultation(p.mode(), "Écris la pile");

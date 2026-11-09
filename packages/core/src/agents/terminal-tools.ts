@@ -96,6 +96,21 @@ export const terminalSchemas = {
       .max(100)
       .optional(),
   }),
+  // Pile proposée par l'agent de découverte (ADR 0076) : le code la vérifie — schéma, programmes,
+  // diagnostic, canaris — avant que rien ne soit écrit.
+  submit_pile: z.object({
+    piles: z
+      .array(
+        z.object({
+          racine: z.string().min(1).max(500).describe("Dossier de la pile, relatif à la racine du projet ; « . » pour le projet entier"),
+          nom: z.string().min(1).max(60).optional().describe("Nom du composant, s'il y en a plusieurs"),
+          yaml: z.string().min(1).max(20_000).describe("Le profil de pile, en YAML, au format décrit"),
+        }),
+      )
+      .min(1)
+      .max(20),
+    justification: z.string().min(1).max(2_000).describe("Ce qui, dans le projet, justifie ces choix"),
+  }),
   report_blocker: z.object({
     question: z.string().min(1).max(2_000).describe("Question métier ou technique qui bloque"),
     choices: z.array(z.string().min(1).max(300)).max(10).describe("Réponses possibles, si elles sont connues"),
@@ -110,6 +125,7 @@ const DESCRIPTIONS: Record<TerminalToolName, string> = {
   submit_plan: "Soumets la liste ordonnée des comportements à implémenter : cet appel clôt ton tour.",
   submit_difficulty: "Soumets le niveau de difficulté retenu et sa justification : cet appel clôt ton tour.",
   submit_lens_verdict: "Soumets ton verdict de revue et les défauts trouvés : cet appel clôt ton tour.",
+  submit_pile: "Soumets la pile du projet, une par racine : cet appel clôt ton tour, et le code la vérifie.",
   report_blocker: "Signale une question qui t'empêche de continuer (valeur ou règle manquante) : ta tâche est suspendue jusqu'à la réponse.",
 };
 

@@ -34,7 +34,7 @@ export type ReportReader = (typeof REPORT_READERS)[number];
  * `mutation: { report: vitest-json }` : le schéma l'acceptait, et l'adaptateur appelait de toute
  * façon le lecteur de mutation — le lecteur annoncé n'était jamais honoré, et rien ne le disait.
  */
-const LECTEURS_PAR_SECTION = {
+export const LECTEURS_PAR_SECTION = {
   tests: ["junit-xml", "vitest-json", "tap"],
   lint: ["eslint-json"],
   mutation: ["stryker-json"],

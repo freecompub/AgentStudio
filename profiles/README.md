@@ -5,8 +5,10 @@ l'application n'ait pas besoin d'un adaptateur écrit en TypeScript pour ce lang
 
 ## S'en servir
 
-Copier l'exemple qui convient dans `.agent-studio/projet.yaml`, à la racine du projet, puis
-l'ajuster (ADR 0071). Le fichier a deux sections, validées chacune selon ses règles :
+`/stack init` (ou l'outil `skraft_pile` du serveur MCP) fait découvrir la pile par un agent, qui
+lit le projet ; le code la vérifie — programmes, schéma, diagnostic, canaris lancés dans une copie —
+avant de l'écrire après votre accord (ADR 0076). Sinon, copier l'exemple qui convient dans
+`.agent-studio/projet.yaml`, à la racine du projet, puis l'ajuster (ADR 0071). Le fichier a deux sections, validées chacune selon ses règles :
 
 - `pile` — **comment** lancer les outils : tests, lint, format, mutation, emplacements, canaris.
   Elle est lue à l'ouverture et **l'emporte sur la détection automatique** ; refusée, la raison

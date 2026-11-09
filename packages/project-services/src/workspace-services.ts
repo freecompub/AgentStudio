@@ -64,6 +64,8 @@ import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore 
 import type { Workspace } from "@agent-studio/workspace";
 import type { ConfirmAnswer, UserConfirmer } from "@agent-studio/core";
 import { createProgrammesAcceptesFichier, type ProgrammesAcceptes } from "./programmes-acceptes.js";
+import { createDecouverteParAgent } from "./decouverte-de-pile-agent.js";
+import type { Decouverte } from "./decouverte-de-pile.js";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
 import type { SourcePile, WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
 import { activerWorkflow, createJsonAccordStore, lireEntrees, rapportDuWorkflow, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type EtatWorkflow, type WorkflowTrouve } from "@agent-studio/workflow";
@@ -345,7 +347,25 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         title: "Stack du projet",
         description: "Affiche la stack employée ; `init` propose un profil à déclarer, `doctor` dit ce qu'il vaut.",
         handler: createStackCommand(
-          stackCommandDeps({ workspace, programmes: programmesDuProjet, stack, declaree: declare !== null, confirmer: confirmerPile, onPost }),
+          stackCommandDeps({
+            workspace,
+            programmes: programmesDuProjet,
+            stack,
+            declaree: declare !== null,
+            confirmer: confirmerPile,
+            onPost,
+            // La pile découverte par un agent, vérifiée par le code (ADR 0076). Les programmes hors
+            // de la liste sont demandés avant toute lecture, donc avant toute exécution (ADR 0075).
+            decouverte: createDecouverteParAgent({
+              agents: () => agents,
+              programmes: programmesDuProjet,
+              lirePile: async (yaml) => {
+                const lu = parseStackProfile(yaml, await accepter([yaml]));
+                return "error" in lu ? { error: lu.error } : { profile: lu.profile };
+              },
+              ...(modelFor ? { modele: () => modelFor("standard") } : {}),
+            }),
+          }),
         ),
       });
 
@@ -732,6 +752,7 @@ function stackCommandDeps(args: {
   declaree: boolean;
   confirmer: UserConfirmer;
   onPost: (extensionId: string, markdown: string) => void;
+  decouverte?: Decouverte;
 }): StackCommandDeps {
   const { workspace, programmes, stack, declaree, confirmer, onPost } = args;
   const fichiers = () => workspace.files.list();
@@ -758,6 +779,7 @@ function stackCommandDeps(args: {
     stackActive: () => ({ id: stack.id, declaree }),
     post: (markdown) => onPost("agent-studio", markdown),
     confirmer: (req) => confirmer.confirm(req),
+    ...(args.decouverte ? { decouverte: args.decouverte } : {}),
     async ecrireProfil(yaml) {
       const existant = await workspace.files.read(FICHIER_PROJET).catch(() => null);
       const r = ecrirePileDansProjet(existant, yaml);

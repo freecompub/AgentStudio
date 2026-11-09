@@ -5,6 +5,33 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/11 — La pile découverte par un agent, vérifiée par le code (ADR 0076)
+
+- **Pourquoi** (demande du responsable) : les règles du code ne reconnaissaient que deux modèles.
+  Pour tout autre projet, il fallait écrire la pile à la main.
+- **Fait** :
+  - un agent `agent-studio/decouvreur-de-pile`, en lecture seule, qui rend sa proposition par
+    `submit_pile` (une pile par racine) ou pose une question (`report_blocker`). Son prompt est une
+    constante (`decouverte-de-pile-agent.ts`) et ne nomme aucun langage ni outil. Lanceurs BDD et
+    lecteurs de rapport arrivent dans la demande, tirés des tables du code ;
+  - les détections du code deviennent des **indices** (`indicesPourLAgent`) : fichiers,
+    dépendances, arborescence bornée, modèle reconnu, BDD détecté ;
+  - la vérification par le code (`verifierPiles`) : racine, programmes (accord avant toute
+    exécution), schéma, BDD, diagnostic, puis canaris réels dans une copie. Des canaris impossibles
+    à lancer comptent comme un refus. Trois essais au plus ; un refus repart avec ses motifs ;
+  - `/stack init` passe par l'agent quand les services en ont un (bureau et MCP). Sans
+    `decouverte`, l'ancien chemin par les règles reste, et ses tests aussi ;
+  - `skraft_pile` exige une connexion pour proposer.
+- **Tests** : les tests des services et du serveur font tourner de **vrais canaris** sous
+  `node --test` (support partagé `test/support/pile-node.ts`), dans un dossier temporaire qui tient
+  lieu de worktree.
+- **Essais réels** (Copilot CLI) : un projet uv (19 s), et un projet `node --test` inconnu des règles.
+  Tous deux sont vérifiés et écrits.
+- **Reste** : une question de l'agent n'a pas encore de réponse possible dans l'outil. Elle est
+  montrée, rien n'est écrit, et il faut écrire la pile à la main.
+
+---
+
 ## 09/11 — Commandes et autorisations du serveur MCP : point 0, le refus d'un programme s'explique
 
 - **Pourquoi** : sur un autre poste (Copilot CLI, projet Python géré par uv), trois blocages. Le projet

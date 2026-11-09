@@ -1212,6 +1212,13 @@
       "verify": "pnpm vitest run --project ext-skraft test/assertions-booleennes.test.ts && pnpm vitest run --project workflow-skraft test/assertions-booleennes.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09, demande du responsable (« Il faut pas que ça soit lié à un langage »). Consigne aux agents, sans porte du code ; non essayée en run réel."
+    },
+    {
+      "id": "pile-decouverte-par-agent",
+      "title": "/stack init (et skraft_pile) fait découvrir la pile par un agent en lecture seule (submit_pile), à partir des indices du code ; le code la vérifie (racine, programmes avec accord avant exécution, schéma, BDD, diagnostic, canaris réels), trois essais au plus, puis l'écrit après accord (ADR 0076)",
+      "verify": "pnpm vitest run --project core test/terminal-tools.test.ts && pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp), choix du responsable : notre agent, détections du code en indices. Essais réels avec Copilot CLI : projet uv, et projet node --test inconnu des règles, tous deux vérifiés et écrits."
     }
   ]
 }

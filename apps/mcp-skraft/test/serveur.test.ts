@@ -2,7 +2,7 @@
  * Le serveur MCP de bout en bout (ADR 0068), piloté par un vrai client MCP en mémoire, avec les
  * vrais services d'un projet et un workflow exécuté isolé ; agents scriptés, aucun LLM.
  */
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -19,6 +19,8 @@ import { createDepotsFichier, type Depots } from "../src/depots.js";
 import { createPilesFichiers } from "../src/piles.js";
 import { createProjets } from "../src/projets.js";
 import { createServeurSkraft } from "../src/serveur.js";
+import { ROLE_DECOUVREUR } from "../../../packages/project-services/src/decouverte-de-pile-agent.js";
+import { FICHIERS_NODE, PILE_NODE } from "../../../packages/project-services/test/support/pile-node.js";
 import { ouvrirServicesSansFenetre } from "../src/services.js";
 import { prendreVerrou } from "../src/verrou.js";
 
@@ -80,9 +82,10 @@ async function poser(base: string, fichiers: Record<string, string>) {
 }
 
 /** Projet partagé par les serveurs d'un même test : mêmes stockages, comme sur le disque. */
-async function projet(o: { surDisque?: boolean; fichiers?: string[] } = {}) {
+async function projet(o: { surDisque?: boolean; fichiers?: string[]; contenus?: Record<string, string> } = {}) {
   const root = await mkdtemp(join(racine, "projet-"));
   await mkdir(join(root, ".git"));
+  await poser(root, o.contenus ?? {});
   const ecrits: string[] = [];
   const consignes: string[] = [];
   const runtime = new ScriptedRuntime();
@@ -94,9 +97,15 @@ async function projet(o: { surDisque?: boolean; fichiers?: string[] } = {}) {
   const stockages = o.surDisque ? {} : { taskStore: new MemoryTaskStore(), evidenceStore: new MemoryEvidenceStore(), taskSessionStore: new MemoryTaskSessionStore() };
   const workspace = {
     root,
-    files: { read: async () => "", write: async (p: string) => void ecrits.push(p), ensureDir: async () => {}, list: async () => o.fichiers ?? [] },
+    files: { read: async () => "", write: async (p: string) => void ecrits.push(p), ensureDir: async () => {}, list: async () => o.fichiers ?? Object.keys(o.contenus ?? {}) },
     checkpoints: { create: async (label: string) => ({ id: "cp", sha: "s", head: "h", label, createdAt: "" }), list: async () => [], diff: async () => ({ files: [], patch: "" }), rollback: async () => {} },
-    repo: { worktree: async () => { throw new Error("non"); }, head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+    // Une copie du projet pour les canaris (ADR 0076) : un dossier temporaire tient lieu de worktree.
+    repo: {
+      worktree: async () => {
+        const copie = await mkdtemp(join(racine, "copie-"));
+        await cp(root, copie, { recursive: true });
+        return { root: copie, dispose: () => rm(copie, { recursive: true, force: true }) };
+      }, head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
   } as unknown as Workspace;
   return { root, ecrits, consignes, runtime, stockages, workspace };
 }
@@ -482,37 +491,58 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
    * puis `/stack doctor`. Sans question possible, la proposition est rendue et rien n'est écrit.
    */
   describe("skraft_pile", () => {
-    it("proposer : la pile est proposée, et écrite après l'accord de l'utilisateur", async () => {
-      const p = await projet({ fichiers: ["pyproject.toml"] });
+    /** L'agent de découverte (ADR 0076), scripté : il soumet la pile `node --test`, que le code éprouve pour de vrai. */
+    const decouvreur = (p: Projet, prompts: string[] = []) =>
+      p.runtime.behave(ROLE_DECOUVREUR, async (t) => {
+        prompts.push(t.prompt);
+        await t.callTool("submit_pile", { piles: [{ racine: ".", yaml: PILE_NODE }], justification: "package.json et tests/." });
+      });
+
+    it("proposer : la pile de l'agent est vérifiée, puis écrite après l'accord de l'utilisateur", async () => {
+      const p = await projet({ contenus: FICHIERS_NODE });
+      decouvreur(p);
       const questions: string[] = [];
       const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false, repondre: (q) => (questions.push(q), "Oui, cette fois") });
       const r = await s.appel("skraft_pile", {});
       expect(r.erreur).toBe(false);
-      expect(r.texte).toMatch(/```yaml\n.*id: python/s);
+      expect(r.texte).toMatch(/Profil proposé par l'agent de découverte/);
+      expect(r.texte).toMatch(/```yaml\n.*id: maison/s);
       expect(r.texte).toMatch(/Profil écrit/);
       // Les consignes de `/stack` sont dites dans les termes de l'outil : le client n'a pas ces commandes.
       expect(r.texte).not.toMatch(/\/stack|Rouvrez/);
       expect(r.texte).toMatch(/Il prend effet au prochain appel de skraft/);
-      expect(questions).toEqual([expect.stringMatching(/^Écrire le profil de stack dans \.agent-studio\/projet\.yaml \?/)]);
+      // `node` n'est pas dans la liste du serveur de test : demandé avant d'être lancé, puis l'écriture.
+      expect(questions).toEqual([expect.stringMatching(/^Autoriser « node » pour ce projet \?/), expect.stringMatching(/^Écrire le profil de stack dans \.agent-studio\/projet\.yaml \?/)]);
       expect(p.ecrits).toContain(".agent-studio/projet.yaml");
       await s.fermer();
-    }, 30_000);
+    }, 60_000);
 
-    it("proposer, client qui ne sait pas demander : la proposition est rendue, rien n'est écrit", async () => {
-      const p = await projet({ fichiers: ["pyproject.toml"] });
+    it("proposer, client qui ne sait pas demander : la pile est refusée sans être lancée, rien n'est écrit", async () => {
+      const p = await projet({ contenus: FICHIERS_NODE });
+      decouvreur(p);
       const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false });
       const r = await s.appel("skraft_pile", {});
-      expect(r.texte).toMatch(/```yaml/);
       expect(r.texte).toMatch(/Rien n'a été écrit/);
+      expect(r.texte).toMatch(/« node » \(tests\) n'est pas un programme autorisé/);
       expect(p.ecrits).toEqual([]);
       await s.fermer();
-    }, 30_000);
+    }, 60_000);
 
-    it("les options du BDD passent à /stack init ; une option avec un espace est refusée", async () => {
-      const p = await projet({ fichiers: ["pyproject.toml", "features/a.feature"] });
+    it("les options passent à la découverte ; une option avec un espace est refusée", async () => {
+      const p = await projet({ contenus: FICHIERS_NODE });
+      const prompts: string[] = [];
+      decouvreur(p, prompts);
       const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false });
-      expect((await s.appel("skraft_pile", { sansBdd: true })).texte).toMatch(/bdd: false/);
+      await s.appel("skraft_pile", { sansBdd: true });
+      expect(prompts[0]).toMatch(/sans BDD/);
       expect((await s.appel("skraft_pile", { etapes: "deux mots" })).erreur).toBe(true);
+      await s.fermer();
+    }, 60_000);
+
+    it("proposer fait travailler un agent : sans connexion, refusé avec ce qu'il faut faire", async () => {
+      const p = await projet({ contenus: FICHIERS_NODE });
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false, nonConnecte: true });
+      expect(await s.appel("skraft_pile", {})).toEqual({ erreur: true, texte: expect.stringMatching(/skraft_connexion/) });
       await s.fermer();
     }, 30_000);
 
