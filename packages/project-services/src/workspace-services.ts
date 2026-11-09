@@ -192,8 +192,11 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
   const programmes: ParseOptions = { allowedPrograms: cfg.allowedPrograms ?? [], ...(cfg.origineDesProgrammes ? { origine: cfg.origineDesProgrammes } : {}) };
   const acceptes = cfg.programmesAcceptes ?? createProgrammesAcceptesFichier(join(cfg.tasksDir, "programmes-acceptes.json"));
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, confirmerProgrammes, repliPermis, modelFor, pileFournie }) => {
+    // « Oui, cette fois » vaut tant que ces services vivent : sinon chaque essai de la découverte de la
+    // pile (ADR 0076) redemandait, et la question attendait pendant que le client abandonnait l'appel.
+    const acceptesCetteFois = new Set<string>();
     const accepter = (bruts: readonly string[]) =>
-      accepterLesProgrammes({ root: workspace.root, bruts, programmes, actif: cfg.programConsent === true, acceptes, ...(confirmerProgrammes ? { confirmer: confirmerProgrammes } : {}), onPost, ...(cfg.logger ? { logger: cfg.logger } : {}) });
+      accepterLesProgrammes({ root: workspace.root, bruts, programmes, actif: cfg.programConsent === true, acceptes, acceptesCetteFois, ...(confirmerProgrammes ? { confirmer: confirmerProgrammes } : {}), onPost, ...(cfg.logger ? { logger: cfg.logger } : {}) });
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
     const programmesDuProjet = await accepter(brutsDuProfil(await lireSourceDuProfil(workspace.root)));
     const pileDuProjet = await lireProfilDuProjet(workspace.root, programmesDuProjet, onPost, cfg.logger);
@@ -364,6 +367,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
                 return "error" in lu ? { error: lu.error } : { profile: lu.profile };
               },
               ...(modelFor ? { modele: () => modelFor("standard") } : {}),
+              ...(cfg.logger ? { logger: cfg.logger.child({ component: "decouverte-de-pile" }) } : {}),
             }),
           }),
         ),
@@ -601,6 +605,8 @@ async function accepterLesProgrammes(o: {
   programmes: ParseOptions;
   actif: boolean;
   acceptes: ProgrammesAcceptes;
+  /** Acceptés « cette fois » pendant la vie de ces services. */
+  acceptesCetteFois: Set<string>;
   confirmer?: UserConfirmer;
   onPost: (extensionId: string, markdown: string) => void;
   logger?: Logger;
@@ -610,7 +616,7 @@ async function accepterLesProgrammes(o: {
   const hors = [...new Set(nommes.map((n) => n.programme))].filter((p) => !o.programmes.allowedPrograms.includes(p) && !/[/\\]/.test(p) && p !== "." && p !== "..");
   const ajoutes: string[] = [];
   for (const programme of hors) {
-    if (await o.acceptes.accepte(o.root, programme)) {
+    if (o.acceptesCetteFois.has(programme) || (await o.acceptes.accepte(o.root, programme))) {
       ajoutes.push(programme);
       continue;
     }
@@ -634,6 +640,7 @@ async function accepterLesProgrammes(o: {
     o.logger?.info("programme hors liste", { root: o.root, programme, reponse });
     if (reponse === "deny") continue;
     if (reponse === "allow-always") await o.acceptes.ajouter(o.root, programme);
+    o.acceptesCetteFois.add(programme);
     ajoutes.push(programme);
     o.onPost("agent-studio", `« ${programme} » accepté par l'utilisateur pour ce projet (${reponse === "allow-always" ? "toujours" : "cette fois"}).`);
   }

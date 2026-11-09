@@ -539,6 +539,25 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
       await s.fermer();
     }, 60_000);
 
+    it("l'agent pose une question : elle dit de répondre par `reponse`, et la réponse lui parvient au rappel", async () => {
+      const p = await projet({ contenus: FICHIERS_NODE });
+      const prompts: string[] = [];
+      let n = 0;
+      p.runtime.behave(ROLE_DECOUVREUR, async (t) => {
+        prompts.push(t.prompt);
+        if (n++ === 0) await t.callTool("report_blocker", { question: "Quelle commande lance les tests ?", choices: ["make test", "node --test"] });
+        else await t.callTool("submit_pile", { piles: [{ racine: ".", yaml: PILE_NODE }], justification: "la réponse de l'utilisateur" });
+      });
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false, repondre: () => "Oui, cette fois" });
+      const q = await s.appel("skraft_pile", {});
+      expect(q.texte).toMatch(/Quelle commande lance les tests \?[\s\S]*`skraft_pile` avec `reponse`/);
+      expect(q.texte).not.toMatch(/\/stack/);
+      const r = await s.appel("skraft_pile", { reponse: "les tests se lancent avec node --test" });
+      expect(prompts[1]).toMatch(/## Réponse de l'utilisateur\n\nles tests se lancent avec node --test/);
+      expect(r.texte).toMatch(/Profil écrit/);
+      await s.fermer();
+    }, 60_000);
+
     it("proposer fait travailler un agent : sans connexion, refusé avec ce qu'il faut faire", async () => {
       const p = await projet({ contenus: FICHIERS_NODE });
       const s = await serveur(p, { pid: 1, vivants: new Set([1]), detecte: false, nonConnecte: true });

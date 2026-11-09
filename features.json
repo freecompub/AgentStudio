@@ -1219,6 +1219,13 @@
       "verify": "pnpm vitest run --project core test/terminal-tools.test.ts && pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp), choix du responsable : notre agent, détections du code en indices. Essais réels avec Copilot CLI : projet uv, et projet node --test inconnu des règles, tous deux vérifiés et écrits."
+    },
+    {
+      "id": "pile-reponse-a-l-agent",
+      "title": "Une question de l'agent de découverte dit comment y répondre (/stack init --reponse, argument reponse de skraft_pile) ; la réponse lui parvient avec ses indices ; un programme accepté « cette fois » ne se redemande pas aux essais suivants ; propositions et refus sont journalisés",
+      "verify": "pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09. Essai réel avec Copilot sur un projet ambigu : question posée, puis réponse donnée, découverte aboutie en 53 s. Limite connue : Copilot abandonne un appel d'outil après 3 minutes."
     }
   ]
 }

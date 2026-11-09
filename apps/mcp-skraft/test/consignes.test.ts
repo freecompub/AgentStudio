@@ -20,6 +20,7 @@ describe("consignesPourLeClient", () => {
     expect(consignesPourLeClient("Donne ce qui manque : `/stack init --etapes <dossier>`, `/stack init --lanceur <nom>` ; sinon `/stack init --sans-bdd`.")).toBe(
       "Donne ce qui manque : `skraft_pile` avec `etapes`, `skraft_pile` avec `lanceur` ; sinon `skraft_pile` avec `sansBdd: true`.",
     );
+    expect(consignesPourLeClient("Réponds par `/stack init --reponse <ta réponse>`.")).toBe("Réponds par `skraft_pile` avec `reponse`.");
     expect(consignesPourLeClient("Pour le savoir : `/stack doctor` ; `/stack init` peut le proposer.")).toBe(
       "Pour le savoir : `skraft_pile` avec action « diagnostiquer » ; `skraft_pile` peut le proposer.",
     );

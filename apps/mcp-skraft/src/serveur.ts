@@ -385,6 +385,12 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         features: sansEspace("Le dossier des .feature").optional().describe("Dossier des .feature, s'il n'a pas été trouvé."),
         etapes: sansEspace("Le dossier des étapes").optional().describe("Dossier des définitions d'étapes, s'il n'a pas été trouvé."),
         sansBdd: z.boolean().optional().describe("Le projet ne fait pas de BDD."),
+        reponse: z
+          .string()
+          .min(1)
+          .max(2_000)
+          .optional()
+          .describe("La réponse de l'utilisateur à la question de l'agent de découverte, en une phrase complète : l'agent ne revoit pas sa question."),
         projet,
       },
     },
@@ -408,6 +414,8 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
             ...(a.features ? ["--features", a.features] : []),
             ...(a.etapes ? ["--etapes", a.etapes] : []),
             ...(a.sansBdd ? ["--sans-bdd"] : []),
+            // En dernier : `--reponse` prend toute la fin de la ligne.
+            ...(a.reponse ? ["--reponse", a.reponse] : []),
           ];
           const avant = p.messages();
           await p.services.route(diagnostic ? "/stack doctor" : ["/stack init", ...options].join(" "));

@@ -363,6 +363,7 @@ infrastructureModules: [django]
  */
 describe("/stack init : la pile découverte par un agent, vérifiée par le code", () => {
   async function ouvrir(o: { reponses: object[]; programmes?: string[]; confirmer?: "allow-once" | "deny"; confirmerProgrammes?: "allow-once" | "deny"; projet?: string; contenus?: Record<string, string> }) {
+    const questionsProgrammes: string[] = [];
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-decouverte-"));
     const contenus = { ...FICHIERS, ...o.contenus };
     for (const [rel, c] of Object.entries(contenus)) {
@@ -415,13 +416,13 @@ describe("/stack init : la pile découverte par un agent, vérifiée par le code
       onInteractions: () => {},
       onPost: (_e, md) => posts.push(md),
       ...(o.confirmer ? { confirmer: { confirm: async () => o.confirmer! } } : {}),
-      ...(o.confirmerProgrammes ? { confirmerProgrammes: { confirm: async () => o.confirmerProgrammes! } } : {}),
+      ...(o.confirmerProgrammes ? { confirmerProgrammes: { confirm: async (q: { title: string }) => (questionsProgrammes.push(q.title), o.confirmerProgrammes!) } } : {}),
     });
     const cleanup = async () => {
       await services.dispose();
       await rm(racine, { recursive: true, force: true });
     };
-    return { services, posts, ecrits, prompts, copies, cleanup };
+    return { services, posts, ecrits, prompts, copies, questionsProgrammes, cleanup };
   }
   const une = (yaml = PILE_NODE, racine = ".") => ({ piles: [{ racine, yaml }], justification: "un manifeste et des tests sous tests/." });
 
@@ -462,6 +463,18 @@ describe("/stack init : la pile découverte par un agent, vérifiée par le code
     expect(h.copies).toEqual([]);
     expect(h.ecrits).toEqual([]);
     expect(h.posts.at(-1)).toMatch(/« node » \(tests\) n'est pas un programme autorisé/);
+    await h.cleanup();
+  }, 60_000);
+
+  // Essai réel du 09/11 : « Oui, cette fois » redemandé au deuxième essai ; la question a attendu, et
+  // Copilot a abandonné l'appel au bout de 3 minutes.
+  it("un programme accepté « cette fois » ne se redemande pas aux essais suivants", async () => {
+    const fausse = PILE_NODE.replace("assert.strictEqual(1, 2);", "assert.strictEqual(1, 2); :::");
+    const h = await ouvrir({ reponses: [une(fausse), une()], programmes: [], confirmer: "allow-once", confirmerProgrammes: "allow-once" });
+    await h.services.route("/stack init");
+    expect(h.prompts).toHaveLength(2);
+    expect(h.questionsProgrammes).toEqual(["Autoriser « node » pour ce projet ?", "Écrire le profil de stack dans .agent-studio/projet.yaml ?"]);
+    expect(h.ecrits).toHaveLength(1);
     await h.cleanup();
   }, 60_000);
 

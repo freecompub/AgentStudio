@@ -3,7 +3,7 @@
  * nomment des commandes de l'application, que le client MCP n'a pas : on les dit dans les termes de
  * l'outil. Pur. Un test de `skraft_pile` vérifie qu'aucune ne reste.
  */
-const OPTION: Record<string, string> = { "--lanceur": "`lanceur`", "--features": "`features`", "--etapes": "`etapes`", "--sans-bdd": "`sansBdd: true`" };
+const OPTION: Record<string, string> = { "--lanceur": "`lanceur`", "--features": "`features`", "--etapes": "`etapes`", "--sans-bdd": "`sansBdd: true`", "--reponse": "`reponse`" };
 
 export function consignesPourLeClient(texte: string): string {
   return texte

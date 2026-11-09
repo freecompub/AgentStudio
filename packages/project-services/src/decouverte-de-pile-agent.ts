@@ -1,5 +1,5 @@
 import { LANCEURS_BDD, LECTEURS_PAR_SECTION, type ParseOptions } from "@agent-studio/stack-adapters";
-import type { TaskAgentRunner } from "@agent-studio/core";
+import type { Logger, TaskAgentRunner } from "@agent-studio/core";
 import type { Decouverte, DemandeDecouverte, ReponseDecouverte } from "./decouverte-de-pile.js";
 
 /**
@@ -73,10 +73,13 @@ export function createDecouverteParAgent(o: {
   lirePile: Decouverte["lirePile"];
   /** Modèle de la classe `standard` (ADR 0048), s'il y en a un. */
   modele?(): Promise<string | undefined>;
+  logger?: Logger;
 }): Decouverte {
   return {
     lirePile: o.lirePile,
     async decouvrir(d: DemandeDecouverte): Promise<ReponseDecouverte> {
+      // Un essai raté doit se comprendre après coup : sans ces lignes, le journal ne disait que « session ouverte ».
+      if (d.precedent) o.logger?.info("pile refusée par le code", { motifs: d.precedent.motifs.join("\n") });
       const permis = o.programmes.allowedPrograms.length ? `Programmes autorisés : ${o.programmes.allowedPrograms.join(", ")}.` : "Aucun programme n'est autorisé.";
       const prompt = [
         "# Indices trouvés par le code",
@@ -99,7 +102,11 @@ export function createDecouverteParAgent(o: {
       try {
         const modele = await o.modele?.();
         const r = await o.agents().run({ role: ROLE_DECOUVREUR, systemPrompt: PROMPT_DECOUVREUR, writable: [], output: "submit_pile", blocker: true, ...(modele ? { model: modele } : {}) }, prompt);
-        if (r.blocker) return { question: r.blocker.question, choix: r.blocker.choices };
+        if (r.blocker) {
+          o.logger?.info("question de l'agent de découverte", { question: r.blocker.question });
+          return { question: r.blocker.question, choix: r.blocker.choices };
+        }
+        o.logger?.info("pile proposée par l'agent", { racines: r.output.piles.map((p) => p.racine).join(", "), justification: r.output.justification });
         return { piles: r.output.piles.map((p) => ({ racine: p.racine, yaml: p.yaml, ...(p.nom ? { nom: p.nom } : {}) })), justification: r.output.justification };
       } catch (e) {
         return { erreur: e instanceof Error ? e.message : String(e) };

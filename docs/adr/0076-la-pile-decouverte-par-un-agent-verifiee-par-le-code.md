@@ -28,7 +28,10 @@ vérifié par le code avant d'être écrit.
      (`.` pour le projet entier, sinon un composant), en YAML au format de la section `pile`, et
      une justification.
    - S'il lui manque une information, il pose sa question (`report_blocker`). Rien n'est écrit, et
-     la question est rendue à l'utilisateur.
+     la question est rendue à l'utilisateur, avec la façon d'y répondre : `/stack init --reponse
+     <ta réponse>`, ou l'argument `reponse` de `skraft_pile`. La réponse prend toute la fin de la
+     ligne. Elle arrive à l'agent avec ses indices, dans une session neuve qui ne revoit pas sa
+     question : elle doit donc se suffire à elle-même.
 2. **Les détections du code deviennent des indices.** L'agent reçoit en faits de départ :
    - les fichiers de la racine et les dépendances déclarées ;
    - l'arborescence, bornée ;
@@ -69,3 +72,16 @@ vérifié par le code avant d'être écrit.
   - projet JavaScript testé par `node --test`, que les règles du code ne reconnaissent pas : l'agent
     propose `node --test` avec un rapport JUnit et quatre canaris. Le code demande « Autoriser
     « node » ? » avant de le lancer, les canaris passent, le profil est écrit.
+  - projet ambigu (un `Makefile` qui appelle un script absent, et `npm test` qui lance
+    `node --test`) : l'agent demande quelle commande déclarer. Avec la réponse, la découverte
+    aboutit en 53 s. Un premier essai est refusé : le canari `missing_symbol` est classé
+    `other_error` avec le reporter JUnit de `node --test`. L'agent passe au reporter TAP et l'essai
+    suivant passe.
+- **Deux défauts vus à l'essai, corrigés** :
+  - un programme accepté « cette fois » était redemandé à chaque essai ; il vaut désormais tant
+    que les services vivent ;
+  - les motifs d'un refus n'étaient pas journalisés ; chaque proposition et chaque refus le sont.
+- **Limite** : Copilot CLI abandonne un appel d'outil au bout de 3 minutes (`Request timed out`,
+  vu le 09/11). Le serveur continue, mais l'hôte n'a plus la réponse. Trois essais, avec un
+  utilisateur lent à répondre, peuvent dépasser cette durée. Si cela se produit, il faudra lancer
+  la découverte en arrière-plan et la suivre, comme un run.

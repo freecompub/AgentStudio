@@ -52,6 +52,17 @@ describe("createDecouverteParAgent", () => {
     expect(prompt).toMatch(/refusée[\s\S]*id: ancien[\s\S]*« curl » n'est pas un programme autorisé\./);
   });
 
+  it("le journal dit chaque proposition et les motifs du refus précédent : un essai raté se comprend après coup", async () => {
+    const lignes: { msg: string; data: unknown }[] = [];
+    const logger = { info: (msg: string, data?: unknown) => void lignes.push({ msg, data }), warn: () => {}, error: () => {}, debug: () => {}, child: () => logger };
+    const runtime = new ScriptedRuntime().behave(ROLE_DECOUVREUR, async (t) => void (await t.callTool("submit_pile", { piles: [PILE], justification: "j" })));
+    const agents = createTaskAgentRunner({ runtime, root: "/projets/demo", idleMs: 60_000 });
+    const deco = createDecouverteParAgent({ agents: () => agents, programmes: { allowedPrograms: [] }, lirePile: async () => ({ error: "" }), logger: logger as never });
+    await deco.decouvrir({ indices: "faits", precedent: { piles: [PILE], motifs: ["Canari assertion : classé other_error."] } });
+    expect(lignes).toContainEqual({ msg: "pile refusée par le code", data: { motifs: "Canari assertion : classé other_error." } });
+    expect(lignes).toContainEqual({ msg: "pile proposée par l'agent", data: { racines: ".", justification: "j" } });
+  });
+
   it("une question de l'agent est rendue avec ses réponses possibles", async () => {
     const { deco } = monter(async (t) => {
       await t.callTool("report_blocker", { question: "Quelle commande ?", choices: ["a", "b"] });

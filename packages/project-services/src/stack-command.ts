@@ -194,6 +194,8 @@ async function diagnostic(deps: StackCommandDeps, profile: StackProfile, racine?
 interface OptionsInit {
   donne: Partial<Record<PartieBdd, string>>;
   sansBdd: boolean;
+  /** Réponse de l'utilisateur à une question de l'agent de découverte (ADR 0076) : toute la fin de la ligne. */
+  reponse?: string;
 }
 const OPTION_DE: Record<string, PartieBdd> = { "--lanceur": "lanceur", "--features": "features", "--etapes": "etapes" };
 
@@ -202,11 +204,17 @@ function lireOptions(mots: readonly string[]): OptionsInit | { error: string } {
   for (let i = 0; i < mots.length; i++) {
     const m = mots[i]!;
     if (m === "--sans-bdd") o.sansBdd = true;
-    else if (OPTION_DE[m]) {
+    else if (m === "--reponse") {
+      // La réponse est une phrase : elle prend toute la fin de la ligne, espaces compris.
+      const reponse = mots.slice(i + 1).join(" ").trim();
+      if (!reponse) return { error: "`--reponse` attend ta réponse, en une phrase : `/stack init --reponse <ta réponse>`." };
+      o.reponse = reponse;
+      break;
+    } else if (OPTION_DE[m]) {
       const v = mots[++i];
       if (!v || v.startsWith("--")) return { error: `\`${m}\` attend une valeur : \`/stack init ${m} <${m === "--lanceur" ? "nom" : "dossier"}>\`.` };
       o.donne[OPTION_DE[m]!] = v;
-    } else return { error: `Option inconnue : \`${m}\`. Options de \`/stack init\` : \`--lanceur <nom>\`, \`--features <dossier>\`, \`--etapes <dossier>\`, \`--sans-bdd\`.` };
+    } else return { error: `Option inconnue : \`${m}\`. Options de \`/stack init\` : \`--lanceur <nom>\`, \`--features <dossier>\`, \`--etapes <dossier>\`, \`--sans-bdd\`, \`--reponse <ta réponse>\`.` };
   }
   return o;
 }
@@ -312,6 +320,7 @@ async function initParAgent(deps: StackCommandDeps, deco: Decouverte, options: O
     if ("error" in c) return deps.post(`**Rien n'a été écrit.** ${c.error}`);
     faits += `\n\n## BDD donné par l'utilisateur\n\n${partiesTrouvees(c.detection)}`;
   }
+  if (options.reponse) faits += `\n\n## Réponse de l'utilisateur\n\n${options.reponse}`;
   let precedent: { piles: PileProposee[]; motifs: string[] } | undefined;
   for (let essai = 1; essai <= ESSAIS_DE_DECOUVERTE; essai++) {
     const r = await deco.decouvrir({ indices: faits, ...(precedent ? { precedent } : {}) });
@@ -320,7 +329,8 @@ async function initParAgent(deps: StackCommandDeps, deco: Decouverte, options: O
       return deps.post(
         `**Rien n'a été écrit.** L'agent de découverte a besoin d'une réponse : ${r.question}` +
           (r.choix.length ? `\n\nRéponses possibles : ${r.choix.map((c) => `« ${c} »`).join(", ")}.` : "") +
-          `\n\nÉcris la pile dans \`${deps.chemin}\`, ou relance la découverte une fois la question tranchée dans le projet.`,
+          // Une session neuve ne connaît pas la question : la réponse doit se suffire à elle-même.
+          `\n\nRéponds par \`/stack init --reponse <ta réponse>\`, en une phrase complète (« les tests se lancent avec … ») : l'agent la recevra avec ses indices.`,
       );
     const v = await verifierPiles(r.piles, {
       lirePile: (y) => deco.lirePile(y),

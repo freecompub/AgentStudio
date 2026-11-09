@@ -502,6 +502,19 @@ describe("/stack init — découverte par un agent, vérifiée par le code", () 
     expect(h.postes.at(-1)).toMatch(/Quelle commande lance les tests \?[\s\S]*make test[\s\S]*pytest/);
   });
 
+  it("la question dit comment y répondre ; la réponse, toute la fin de la ligne, est donnée à l'agent", async () => {
+    const q = avecAgent([{ question: "Quelle commande lance les tests ?", choix: [] }]);
+    await q.lancer("init");
+    expect(q.postes.at(-1)).toMatch(/`\/stack init --reponse <ta réponse>`/);
+    const h = avecAgent([une()]);
+    await h.lancer("init --sans-bdd --reponse les tests se lancent avec pytest, pas make");
+    expect(h.demandes[0]!.indices).toMatch(/## Réponse de l'utilisateur\n\nles tests se lancent avec pytest, pas make$/);
+    expect(h.demandes[0]!.indices).toMatch(/sans BDD/);
+    const vide = avecAgent([une()]);
+    await vide.lancer("init --reponse");
+    expect(vide.postes.at(-1)).toMatch(/--reponse.*attend/);
+  });
+
   it("la découverte échoue (pas de runtime) : rien n'est écrit, et pourquoi", async () => {
     const h = avecAgent([{ erreur: "Non connecté à GitHub." }]);
     await h.lancer("init");

@@ -27,8 +27,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   lieu de worktree.
 - **Essais réels** (Copilot CLI) : un projet uv (19 s), et un projet `node --test` inconnu des règles.
   Tous deux sont vérifiés et écrits.
-- **Reste** : une question de l'agent n'a pas encore de réponse possible dans l'outil. Elle est
-  montrée, rien n'est écrit, et il faut écrire la pile à la main.
+- **Réponse à l'agent** : `/stack init --reponse <phrase>` ou l'argument `reponse` de `skraft_pile`.
+  La réponse prend la fin de la ligne et arrive à l'agent avec ses indices, en une phrase qui se
+  suffit à elle-même. Essai Copilot sur un projet ambigu : 53 s.
+- **Pièges vus à l'essai réel, corrigés** :
+  - « cette fois » était redemandé à chaque essai ; la question attendait, et Copilot a abandonné
+    l'appel à **3 minutes** (`Request timed out`). Désormais l'accord vaut tant que les services
+    vivent ;
+  - les motifs de refus n'étaient pas journalisés ; ils le sont, comme chaque proposition.
+- **À surveiller** :
+  - la limite de 3 minutes de Copilot : trois essais avec un utilisateur lent peuvent la dépasser.
+    La parade serait une découverte en arrière-plan, suivie comme un run ;
+  - avec le reporter JUnit de `node --test`, le canari `missing_symbol` est classé `other_error`.
+    L'agent est passé à TAP, mais le lecteur JUnit mériterait une vraie sortie de `node` en fixture.
 
 ---
 
