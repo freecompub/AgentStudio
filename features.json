@@ -1198,6 +1198,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts test/stack-doctor.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI dans un projet uv : profil proposé avec outils, canaris lancés avec le pytest de .venv. Le passage de racineDesOutils par les services aux canaris n'a pas de test unitaire, seulement l'essai réel."
+    },
+    {
+      "id": "junit-pytest-assertion",
+      "title": "Lecteur junit-xml : une assertion pytest est classée assertion (type d'exception lu sur l'attribut type et la dernière ligne du corps, jamais sur le corps entier), sur une vraie sortie de pytest 9.2",
+      "verify": "pnpm vitest run --project stack-adapters test/junit-xml.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 : trouvé par le diagnostic réel d'un projet uv via Copilot ; rejoué ensuite, quatre canaris sur quatre."
     }
   ]
 }

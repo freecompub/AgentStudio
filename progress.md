@@ -55,8 +55,14 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     - **Piège vu à l'essai réel** : les canaris tournent dans un worktree, sans `.venv` (ignoré par
       Git), d'où « aucun rapport lisible ». Ils prennent les outils du projet d'origine
       (`racineDesOutils`).
-    - **Défaut trouvé, pas encore traité** : avec un vrai pytest (junit-xml), le canari
-      `assertion` est classé `other_error`.
+    - **Défaut trouvé et corrigé** : avec un vrai pytest (junit-xml), le canari `assertion` était
+      classé `other_error`. pytest ne met que l'expression dans `message` (« assert 1 == 2 ») et le
+      type d'exception sur la dernière ligne du corps. Le classement lit maintenant `type`, le
+      message et cette dernière ligne (`XunitCase.raison`), jamais le corps entier : pytest y recopie
+      le code du test. Fixture réelle `fixtures/pytest-9.2.xml`. Diagnostic réel ensuite : aucun
+      problème, quatre canaris sur quatre.
+    - Le défaut « `Assert.True` avec message personnalisé » (.NET) n'est pas traité : il faudrait une
+      vraie sortie pour savoir si `type` suffit.
   - **Point 4, fait (ADR 0075 §6)** : `skraft_pile` reprend `/stack init` (`proposer`) et
     `/stack doctor` (`diagnostiquer`).
     - L'écriture se fait après la question du client (`confirmerProgrammes`).

@@ -115,6 +115,7 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
     (pas installé, comme dans un projet uv où il est dans `.venv/bin`) ;
   - dans un vrai projet uv (`uv init`, `uv add --dev pytest`), `skraft_pile` propose `outils`, et
     `diagnostiquer` lance les canaris avec le `pytest` du projet. Trois canaris sur quatre passent ;
-    `assertion` est classé `other_error` (défaut du lecteur, à part) ;
+    `assertion` était classé `other_error`. C'était un défaut du lecteur JUnit, corrigé à part ; le
+    diagnostic rejoué ne trouve ensuite aucun problème ;
   - il n'abandonne pas l'appel pendant que la question attend : une réponse donnée au bout de 75 s
     a abouti (appel de 1 min 17 s).
