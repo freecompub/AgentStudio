@@ -34,7 +34,7 @@ export type ReportReader = (typeof REPORT_READERS)[number];
  * `mutation: { report: vitest-json }` : le schéma l'acceptait, et l'adaptateur appelait de toute
  * façon le lecteur de mutation — le lecteur annoncé n'était jamais honoré, et rien ne le disait.
  */
-const LECTEURS_PAR_SECTION = {
+export const LECTEURS_PAR_SECTION = {
   tests: ["junit-xml", "vitest-json", "tap"],
   lint: ["eslint-json"],
   mutation: ["stryker-json"],
@@ -177,6 +177,12 @@ const schema = z
         .min(1, "`bdd` : au moins un couple `{ lanceur, features, etapes }`, ou `false`.")
         .optional(),
     ),
+    /**
+     * Dossiers du projet où vivent ses programmes (ADR 0075), mis en tête du PATH de chaque commande :
+     * `pytest` d'un environnement virtuel se lance sans lanceur intermédiaire. Le programme reste jugé
+     * par son nom contre la liste.
+     */
+    outils: z.array(cheminDuProjet("outils")).min(1).optional(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -189,6 +195,46 @@ export type StackProfile = z.infer<typeof schema>;
 export interface ParseOptions {
   /** Programmes que l'administrateur autorise à lancer (D47, O12). */
   allowedPrograms: readonly string[];
+  /**
+   * D'où vient la liste, cité dans un refus (09/11) : un fichier d'administration posé ailleurs que là
+   * où il est lu, ou une liste qui remplace celle par défaut, ne se voient pas autrement.
+   */
+  origine?: string;
+}
+
+/** Le refus d'un programme dit ce qui est permis et d'où vient la liste : l'utilisateur doit savoir quoi corriger. */
+function refusDuProgramme(programme: string, section: string, opts: ParseOptions): string {
+  const permis = opts.allowedPrograms.length ? `Programmes autorisés : ${opts.allowedPrograms.join(", ")}.` : "Aucun programme n'est autorisé.";
+  return [`Profil de stack refusé : « ${programme} » (${section}) n'est pas un programme autorisé.`, permis, ...(opts.origine ? [opts.origine] : [])].join(" ");
+}
+
+/** Un programme nommé par un profil, là où il l'est. */
+export interface ProgrammeNomme {
+  programme: string;
+  section: "tests" | "lint" | "mutation" | "format";
+  commande: string[];
+}
+
+/**
+ * Les programmes qu'un profil nomme, section par section, sans rien valider (ADR 0075) : pour demander
+ * à l'utilisateur d'accepter ceux qui manquent à la liste, avant de juger le profil. Un YAML illisible
+ * ou une commande mal formée n'en nomme aucun ; `parseStackProfile` dira pourquoi.
+ */
+export function programmesDuProfil(raw: string): ProgrammeNomme[] {
+  let brut: unknown;
+  try {
+    brut = parseYaml(raw);
+  } catch {
+    return [];
+  }
+  if (typeof brut !== "object" || brut === null) return [];
+  const out: ProgrammeNomme[] = [];
+  for (const section of ["tests", "lint", "mutation", "format"] as const) {
+    const commande = ((brut as Record<string, unknown>)[section] as { command?: unknown } | undefined)?.command;
+    if (Array.isArray(commande) && commande.length && commande.every((x): x is string => typeof x === "string" && x.length > 0))
+      out.push({ programme: commande[0]!, section, commande });
+  }
+  return out;
 }
 
 export function parseStackProfile(raw: string, opts: ParseOptions): { profile: StackProfile } | { error: string } {
@@ -223,7 +269,7 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
     if (!c) continue;
     const programme = c.command[0]!;
     if (!autorises.has(programme))
-      return { error: `Profil de stack refusé : « ${programme} » (${section}) n'est pas un programme autorisé.` };
+      return { error: refusDuProgramme(programme, section, opts) };
 
     // Le lecteur doit décrire ce que la section produit. Sinon l'adaptateur appelait celui de la
     // section quoi qu'il arrive, et le lecteur annoncé n'était jamais honoré.
@@ -250,7 +296,7 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
   // Le format lance un programme lui aussi : même liste que les autres sections.
   const format = parsed.data.format?.command[0];
   if (format !== undefined && !autorises.has(format))
-    return { error: `Profil de stack refusé : « ${format} » (format) n'est pas un programme autorisé.` };
+    return { error: refusDuProgramme(format, "format", opts) };
 
   // Les motifs sont compilés dès la lecture, pour que leur refus soit expliqué à l'auteur du profil
   // plutôt que découvert au milieu d'une porte.

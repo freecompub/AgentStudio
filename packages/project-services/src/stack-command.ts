@@ -1,4 +1,5 @@
 import type { ConfirmAnswer } from "@agent-studio/core";
+import { ESSAIS_DE_DECOUVERTE, indicesPourLAgent, verifierPiles, type Decouverte, type PileProposee, type PileVerifiee } from "./decouverte-de-pile.js";
 import { blocBdd, completerBdd, detecterBdd, LIBELLE_PARTIE, partiesManquantes, partiesTrouvees, proposeProfile, type Constat, type DetectionBdd, type IndicesDuProjet, type PartieBdd, type StackProfile } from "@agent-studio/stack-adapters";
 
 /**
@@ -50,6 +51,11 @@ export interface StackCommandDeps {
   canaris?(profile: StackProfile, racine?: string): Promise<Constat[]>;
   confirmer(req: { title: string; detail: string }): Promise<ConfirmAnswer>;
   post(markdown: string): void;
+  /**
+   * La pile découverte par un agent, vérifiée par le code (ADR 0076). Absente, les règles du code
+   * proposent, comme avant.
+   */
+  decouverte?: Decouverte;
 }
 
 const SOUS_COMMANDES = ["init", "doctor"] as const;
@@ -188,6 +194,8 @@ async function diagnostic(deps: StackCommandDeps, profile: StackProfile, racine?
 interface OptionsInit {
   donne: Partial<Record<PartieBdd, string>>;
   sansBdd: boolean;
+  /** Réponse de l'utilisateur à une question de l'agent de découverte (ADR 0076) : toute la fin de la ligne. */
+  reponse?: string;
 }
 const OPTION_DE: Record<string, PartieBdd> = { "--lanceur": "lanceur", "--features": "features", "--etapes": "etapes" };
 
@@ -196,11 +204,17 @@ function lireOptions(mots: readonly string[]): OptionsInit | { error: string } {
   for (let i = 0; i < mots.length; i++) {
     const m = mots[i]!;
     if (m === "--sans-bdd") o.sansBdd = true;
-    else if (OPTION_DE[m]) {
+    else if (m === "--reponse") {
+      // La réponse est une phrase : elle prend toute la fin de la ligne, espaces compris.
+      const reponse = mots.slice(i + 1).join(" ").trim();
+      if (!reponse) return { error: "`--reponse` attend ta réponse, en une phrase : `/stack init --reponse <ta réponse>`." };
+      o.reponse = reponse;
+      break;
+    } else if (OPTION_DE[m]) {
       const v = mots[++i];
       if (!v || v.startsWith("--")) return { error: `\`${m}\` attend une valeur : \`/stack init ${m} <${m === "--lanceur" ? "nom" : "dossier"}>\`.` };
       o.donne[OPTION_DE[m]!] = v;
-    } else return { error: `Option inconnue : \`${m}\`. Options de \`/stack init\` : \`--lanceur <nom>\`, \`--features <dossier>\`, \`--etapes <dossier>\`, \`--sans-bdd\`.` };
+    } else return { error: `Option inconnue : \`${m}\`. Options de \`/stack init\` : \`--lanceur <nom>\`, \`--features <dossier>\`, \`--etapes <dossier>\`, \`--sans-bdd\`, \`--reponse <ta réponse>\`.` };
   }
   return o;
 }
@@ -225,6 +239,8 @@ async function init(deps: StackCommandDeps, mots: readonly string[] = []): Promi
       `Des composants **existent déjà** dans \`${deps.chemin}\` (${declare.composants.map((c) => `\`${c.nom}\``).join(", ")}). ` +
         `\`/stack init\` ne les écrase pas. Pour savoir ce qu'ils valent : \`/stack doctor\` ; pour les changer, éditez-le.`,
     );
+
+  if (deps.decouverte) return initParAgent(deps, deps.decouverte, options);
 
   // Sous-projets (ADR 0074) : plusieurs reconnus, ou un seul hors de la racine, deviennent des composants.
   if (deps.sousProjets && deps.ecrireComposants) {
@@ -263,15 +279,13 @@ async function init(deps: StackCommandDeps, mots: readonly string[] = []): Promi
     if (manque.length) return deps.post(`**BDD détecté à moitié**, rien n'est écrit : sans lui, skraft refuserait de démarrer, ou partirait sans BDD.\n\n${demandeBdd(c.detection, manque)}`);
     bloc = blocBdd(c.detection);
   }
-  const yaml = `${profil}${bloc}`;
+  return proposerEtEcrire(deps, `${profil}${bloc}`, `Profil proposé pour ce projet, d'après ${indices.fichiers.length} fichier(s) repère(s) :`);
+}
+
+/** Montre le profil, le fait approuver en nommant ses programmes, puis l'écrit. */
+async function proposerEtEcrire(deps: StackCommandDeps, yaml: string, entete: string): Promise<void> {
   const programmes = programmesDe(yaml);
-  deps.post(
-    `Profil proposé pour ce projet, d'après ${indices.fichiers.length} fichier(s) repère(s) :\n\n` +
-      "```yaml\n" +
-      yaml +
-      "```\n\n" +
-      `Il sera écrit dans \`${deps.chemin}\` après votre accord.`,
-  );
+  deps.post(`${entete}\n\n` + "```yaml\n" + yaml + (yaml.endsWith("\n") ? "" : "\n") + "```\n\n" + `Il sera écrit dans \`${deps.chemin}\` après votre accord.`);
 
   const reponse = await deps.confirmer({
     title: `Écrire le profil de stack dans ${deps.chemin} ?`,
@@ -290,6 +304,60 @@ async function init(deps: StackCommandDeps, mots: readonly string[] = []): Promi
     `Profil écrit dans \`${deps.chemin}\`. Il est versionné avec le projet, donc partagé par toute l'équipe.\n\n` +
       `Rouvrez le projet pour qu'il prenne effet, puis \`/stack doctor\` pour voir ce qu'il vaut.`,
   );
+}
+
+/**
+ * `/stack init` par l'agent de découverte (ADR 0076) : il propose, le code vérifie, trois essais au
+ * plus ; seule une proposition qui a tout passé est montrée, confirmée et écrite.
+ */
+async function initParAgent(deps: StackCommandDeps, deco: Decouverte, options: OptionsInit): Promise<void> {
+  const indices = await deps.indices();
+  const arborescence = indices.arborescence ?? indices.fichiers;
+  // Une moitié du BDD donnée en option : vérifiée par le code, puis donnée à l'agent comme un fait.
+  let faits = indicesPourLAgent({ indices, sousProjets: deps.sousProjets ? await deps.sousProjets() : [], sansBdd: options.sansBdd });
+  if (Object.keys(options.donne).length) {
+    const c = completerBdd(detecterBdd({ fichiers: arborescence, manifestes: indices.manifestes ?? [] }), options.donne, arborescence);
+    if ("error" in c) return deps.post(`**Rien n'a été écrit.** ${c.error}`);
+    faits += `\n\n## BDD donné par l'utilisateur\n\n${partiesTrouvees(c.detection)}`;
+  }
+  if (options.reponse) faits += `\n\n## Réponse de l'utilisateur\n\n${options.reponse}`;
+  let precedent: { piles: PileProposee[]; motifs: string[] } | undefined;
+  for (let essai = 1; essai <= ESSAIS_DE_DECOUVERTE; essai++) {
+    const r = await deco.decouvrir({ indices: faits, ...(precedent ? { precedent } : {}) });
+    if ("erreur" in r) return deps.post(`**Rien n'a été écrit.** La découverte de la pile n'a pas abouti : ${r.erreur}`);
+    if ("question" in r)
+      return deps.post(
+        `**Rien n'a été écrit.** L'agent de découverte a besoin d'une réponse : ${r.question}` +
+          (r.choix.length ? `\n\nRéponses possibles : ${r.choix.map((c) => `« ${c} »`).join(", ")}.` : "") +
+          // Une session neuve ne connaît pas la question : la réponse doit se suffire à elle-même.
+          `\n\nRéponds par \`/stack init --reponse <ta réponse>\`, en une phrase complète (« les tests se lancent avec … ») : l'agent la recevra avec ses indices.`,
+      );
+    const v = await verifierPiles(r.piles, {
+      lirePile: (y) => deco.lirePile(y),
+      diagnostiquer: (p, racine) => deps.diagnostiquer(p, racine),
+      ...(deps.canaris ? { canaris: (p: StackProfile, racine: string) => deps.canaris!(p, racine) } : {}),
+      indices,
+      sansBdd: options.sansBdd,
+    });
+    if (!v.motifs.length) return ecrireLesPiles(deps, v.verifiees, r.justification);
+    precedent = { piles: r.piles, motifs: v.motifs };
+  }
+  deps.post(
+    `**Rien n'a été écrit.** La pile proposée par l'agent a été refusée ${ESSAIS_DE_DECOUVERTE} fois. Derniers motifs :\n\n` +
+      precedent!.motifs.map((m) => `- ${m}`).join("\n") +
+      "\n\nDernière proposition :\n\n" +
+      precedent!.piles.map((p) => `Racine \`${p.racine}\` :\n\n\`\`\`yaml\n${p.yaml.trimEnd()}\n\`\`\``).join("\n\n"),
+  );
+}
+
+/** Une pile à la racine va dans la section `pile` ; sinon, des composants (ADR 0074). */
+async function ecrireLesPiles(deps: StackCommandDeps, piles: readonly PileVerifiee[], justification: string): Promise<void> {
+  const verifie = "Vérifiée par le code : programmes, schéma, diagnostic" + (deps.canaris ? " et canaris lancés dans une copie du projet" : "") + ".";
+  if (piles.length === 1 && piles[0]!.racine === ".")
+    return proposerEtEcrire(deps, piles[0]!.yaml, `Profil proposé par l'agent de découverte : ${justification}\n\n${verifie}`);
+  if (!deps.ecrireComposants) return deps.post(`**Rien n'a été écrit.** La pile proposée a plusieurs composants, et ce projet ne sait pas en écrire.`);
+  deps.post(`Composants proposés par l'agent de découverte : ${justification}\n\n${verifie}`);
+  return initComposants(deps, deps.ecrireComposants, piles.map((p) => ({ racine: p.racine, yaml: p.yaml })));
 }
 
 /** Propose la section `composants`, la fait confirmer en nommant les programmes, puis l'écrit. */

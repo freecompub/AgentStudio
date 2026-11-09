@@ -8,9 +8,12 @@ import type { Role } from "@agent-studio/core";
 import { AucunePile } from "@agent-studio/project-services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { confirmerParLeClient } from "./confirmation.js";
+import { consignesPourLeClient } from "./consignes.js";
 import type { Connexion } from "./connexion.js";
+import type { Depots } from "./depots.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
-import { resoudreProjet } from "./projet.js";
+import { resoudreProjet, type ProjetResolu } from "./projet.js";
 import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
 
 export interface OptionsServeur {
@@ -26,6 +29,8 @@ export interface OptionsServeur {
   pid?: number;
   /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
   connexion: Pick<Connexion, "verifier" | "connecter">;
+  /** Dépôts acceptés « toujours » par l'utilisateur (ADR 0075) ; sans, « toujours » vaut pour ce serveur. */
+  depots?: Depots;
   version?: string;
 }
 
@@ -52,6 +57,40 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     }
   }
 
+  const confirmer = confirmerParLeClient(mcp.server);
+  /** Dépôts acceptés pour ce serveur ; une question en cours par dépôt, pour ne pas la poser deux fois. */
+  const acceptes = new Set<string>();
+  const enQuestion = new Map<string, Promise<boolean>>();
+
+  /**
+   * Dépôt hors des dossiers permis (ADR 0075) : si le client sait poser une question, on la pose à
+   * l'utilisateur ; c'est lui qui répond, pas le LLM de l'hôte. Sinon, le refus explique quoi faire.
+   */
+  async function resoudre(argument: string | undefined): Promise<ProjetResolu> {
+    const autorises = [...o.autorises, ...acceptes, ...((await o.depots?.liste()) ?? [])];
+    const r = await resoudreProjet({ ...(argument !== undefined ? { argument } : {}), roots: await roots(), cwd: o.cwd, autorises });
+    if (r.ok || !r.horsBornes || !r.root || !confirmer.peutDemander()) return r;
+    const root = r.root;
+    let question = enQuestion.get(root);
+    if (!question) {
+      question = (async () => {
+        const reponse = await confirmer.confirm({
+          title: "Ouvrir ce dépôt avec skraft ?",
+          detail:
+            `${root} n'est ni dans un dossier ouvert par le client, ni dans les dossiers autorisés par la configuration du serveur (« autorises »). ` +
+            "skraft y travaillera sur une branche, avec des checkpoints Git : ses agents y écriront, et les tests du projet y seront lancés. " +
+            "« Oui, toujours » le retient pour les prochaines sessions.",
+        });
+        if (reponse === "deny") return false;
+        if (reponse === "allow-always") await o.depots?.ajouter(root);
+        acceptes.add(root);
+        return true;
+      })().finally(() => enQuestion.delete(root));
+      enQuestion.set(root, question);
+    }
+    return (await question) ? { ok: true, root } : { ok: false, motif: `Projet refusé : l'accord demandé pour ${root} n'a pas été donné (refusé, ou personne pour répondre : un client non interactif refuse de lui-même). Rien n'a été ouvert.` };
+  }
+
   /**
    * Résout et ouvre le projet, puis exécute ; toute exception devient une erreur de l'outil.
    * `agents` : l'outil peut faire travailler les agents, il exige une connexion utilisable par Copilot.
@@ -63,9 +102,10 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
           const c = await o.connexion.verifier();
           if (!c.ok) return erreur(c.motif);
         }
-        const r = await resoudreProjet({ ...(a.projet !== undefined ? { argument: a.projet } : {}), roots: await roots(), cwd: o.cwd, autorises: o.autorises });
+        const r = await resoudre(a.projet);
         if (!r.ok) return erreur(r.motif);
-        return await fn(await o.projets.ouvrir(r.root, a.pile !== undefined ? { pile: a.pile } : {}), a);
+        // Un client qui ne sait pas demander n'a personne à qui poser la question : la liste seule.
+        return await fn(await o.projets.ouvrir(r.root, { ...(a.pile !== undefined ? { pile: a.pile } : {}), ...(confirmer.peutDemander() ? { confirmerProgrammes: confirmer } : {}) }), a);
       } catch (e) {
         if (e instanceof AucunePile) return erreur(`${e.message} Donne-la dans l'argument « pile » de skraft_demarrer (YAML, même format).`);
         return erreur(e instanceof Error ? e.message : String(e));
@@ -323,6 +363,66 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       try {
         const r = await o.connexion.connecter();
         return r.ok ? texte(r.texte) : erreur(r.texte);
+      } catch (e) {
+        return erreur(e instanceof Error ? e.message : String(e));
+      }
+    },
+  );
+
+  /**
+   * La pile du projet (ADR 0075) : `/stack init` et `/stack doctor`, tels quels. L'écriture du profil
+   * se fait après la question posée par le client à l'utilisateur ; sans elle, la proposition est
+   * rendue et rien n'est écrit. Le projet est ensuite relu.
+   */
+  mcp.registerTool(
+    "skraft_pile",
+    {
+      description:
+        "Fait découvrir la pile du projet par un agent (comment lancer ses tests, où vivent ses fichiers, son BDD), la vérifie en l'exécutant, et l'écrit dans .agent-studio/projet.yaml après l'accord de l'utilisateur, que le client lui demande ; ou, avec action « diagnostiquer », vérifie la pile déclarée (programmes trouvés, emplacements, canaris qui lancent vraiment les tests). À appeler quand skraft n'a pas de pile. Montre la réponse à l'utilisateur telle quelle.",
+      inputSchema: {
+        action: z.enum(["proposer", "diagnostiquer"]).optional().describe("proposer (par défaut) ou diagnostiquer."),
+        lanceur: sansEspace("Le lanceur BDD").optional().describe("Lanceur BDD, s'il n'a pas été trouvé (reqnroll, cucumber-js, pytest-bdd…)."),
+        features: sansEspace("Le dossier des .feature").optional().describe("Dossier des .feature, s'il n'a pas été trouvé."),
+        etapes: sansEspace("Le dossier des étapes").optional().describe("Dossier des définitions d'étapes, s'il n'a pas été trouvé."),
+        sansBdd: z.boolean().optional().describe("Le projet ne fait pas de BDD."),
+        reponse: z
+          .string()
+          .min(1)
+          .max(2_000)
+          .optional()
+          .describe("La réponse de l'utilisateur à la question de l'agent de découverte, en une phrase complète : l'agent ne revoit pas sa question."),
+        projet,
+      },
+    },
+    async (a) => {
+      try {
+        const r = await resoudre(a.projet);
+        if (!r.ok) return erreur(r.motif);
+        const diagnostic = a.action === "diagnostiquer";
+        // Proposer fait travailler l'agent de découverte (ADR 0076) : il faut une connexion utilisable.
+        if (!diagnostic) {
+          const c = await o.connexion.verifier();
+          if (!c.ok) return erreur(c.motif);
+        }
+        return await o.projets.pourLaPile(r.root, confirmer.peutDemander() ? { confirmerProgrammes: confirmer } : {}, async (p) => {
+          if (!diagnostic) {
+            const refus = enConsultation(p.mode(), "Écris la pile");
+            if (refus) return refus;
+          }
+          const options = [
+            ...(a.lanceur ? ["--lanceur", a.lanceur] : []),
+            ...(a.features ? ["--features", a.features] : []),
+            ...(a.etapes ? ["--etapes", a.etapes] : []),
+            ...(a.sansBdd ? ["--sans-bdd"] : []),
+            // En dernier : `--reponse` prend toute la fin de la ligne.
+            ...(a.reponse ? ["--reponse", a.reponse] : []),
+          ];
+          const avant = p.messages();
+          await p.services.route(diagnostic ? "/stack doctor" : ["/stack init", ...options].join(" "));
+          const dits = p.messages().filter((m) => !avant.includes(m));
+          // Le projet est relu au prochain appel ; les consignes de `/stack` sont dites dans les termes de l'outil.
+          return texte(dits.map(consignesPourLeClient).join("\n\n"));
+        });
       } catch (e) {
         return erreur(e instanceof Error ? e.message : String(e));
       }

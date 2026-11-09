@@ -33,3 +33,18 @@ describe("submit_lens_verdict : contrat de défaut enrichi", () => {
     expect(terminalSchemas.submit_lens_verdict.safeParse(verdict({ ...defaut, occurrences: Array.from({ length: 21 }, (_, i) => `src/x.ts:${i + 1}`) })).success).toBe(false);
   });
 });
+
+/** La pile proposée par l'agent de découverte (ADR 0076) : une par racine, en YAML, avec sa justification. */
+describe("submit_pile", () => {
+  const pile = { racine: ".", yaml: "id: python\n" };
+  it("une ou plusieurs piles, chacune avec sa racine et son YAML ; une justification", () => {
+    expect(terminalSchemas.submit_pile.safeParse({ piles: [pile], justification: "pyproject.toml et pytest." }).success).toBe(true);
+    expect(terminalSchemas.submit_pile.safeParse({ piles: [pile, { racine: "api", nom: "api", yaml: "id: x\n" }], justification: "deux sous-projets" }).success).toBe(true);
+  });
+
+  it("aucune pile, YAML vide ou justification absente : refusé, le modèle corrige", () => {
+    expect(terminalSchemas.submit_pile.safeParse({ piles: [], justification: "x" }).success).toBe(false);
+    expect(terminalSchemas.submit_pile.safeParse({ piles: [{ racine: ".", yaml: "" }], justification: "x" }).success).toBe(false);
+    expect(terminalSchemas.submit_pile.safeParse({ piles: [pile] }).success).toBe(false);
+  });
+});

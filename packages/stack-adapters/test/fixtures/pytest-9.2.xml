@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="0.053" timestamp="2026-11-09T00:00:00" hostname="hote"><testcase classname="tests.test_cas" name="test_assertion" time="0.001"><failure message="assert 1 == 2">def test_assertion():
+&gt;       assert 1 == 2
+E       assert 1 == 2
+
+tests/test_cas.py:4: AssertionError</failure></testcase><testcase classname="tests.test_cas" name="test_symbole" time="0.000"><failure message="NameError: name 'fonction_absente' is not defined">def test_symbole():
+&gt;       fonction_absente()
+        ^^^^^^^^^^^^^^^^
+E       NameError: name 'fonction_absente' is not defined
+
+tests/test_cas.py:7: NameError</failure></testcase><testcase classname="tests.test_cas" name="test_autre_erreur" time="0.000"><failure message="ValueError: pas une assertion">def test_autre_erreur():
+        t = unittest.TestCase()
+        t.assertEqual(1, 1)
+&gt;       raise ValueError("pas une assertion")
+E       ValueError: pas une assertion
+
+tests/test_cas.py:12: ValueError</failure></testcase></testsuite></testsuites>

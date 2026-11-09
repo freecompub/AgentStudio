@@ -611,6 +611,17 @@ describe("AppController — conversation", () => {
     expect(runtime.configs.get("fake-2")?.workingDirectory).toBe("/projets/b");
   });
 
+  it("accepter un programme hors de la liste se demande dans la fenêtre (ADR 0075)", async () => {
+    const { controller, emitted, getServicesArgs } = setup();
+    await controller["workspace:open"]({ path: "/projets/demo" });
+    const reponse = getServicesArgs()!.confirmerProgrammes!.confirm({ title: "Autoriser « uv » pour ce projet ?", detail: "tests : uv run pytest" });
+    await new Promise((r) => setTimeout(r, 0));
+    const req = emitted.find((e) => e.channel === "confirm:request")?.payload as { id: string; title: string };
+    expect(req.title).toBe("Autoriser « uv » pour ce projet ?");
+    await controller["confirm:respond"]({ id: req.id, answer: "allow-always" });
+    expect(await reponse).toBe("allow-always");
+  });
+
   it("les confirmations de la garde passent par la fenêtre", async () => {
     const { controller, runtime, emitted } = setup();
     await controller["workspace:open"]({ path: "/projets/demo" });

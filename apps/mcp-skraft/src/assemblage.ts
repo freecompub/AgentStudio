@@ -19,6 +19,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { cheminConfiguration, lireConfiguration } from "./config.js";
 import { createConnexion } from "./connexion.js";
 import { createConnexionClaude } from "./connexion-claude.js";
+import { createDepotsFichier } from "./depots.js";
 import { createPilesFichiers } from "./piles.js";
 import { createProjets, type Projets } from "./projets.js";
 import { createServeurSkraft } from "./serveur.js";
@@ -80,6 +81,8 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     extensions: [],
     stacks: [createTypeScriptAdapter()],
     allowedPrograms: admin.allowedPrograms,
+    origineDesProgrammes: admin.origineDesProgrammes,
+    programConsent: admin.programConsent,
     // Sans pile, refus qui dit quoi fournir (point 8) : un repli ferait échouer les portes.
     sansRepli: true,
     tasksDir: join(donnees, "tasks"),
@@ -92,12 +95,12 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
   });
   const cle = (root: string) => createHash("sha256").update(root).digest("hex").slice(0, 16);
   const projets = createProjets({
-    ouvrir: (root, journal, pileFournie) => ouvrirServicesSansFenetre({ factory, workspace: (r) => openWorkspace(r, { git }), runtime, journal, modelFor })(root, pileFournie),
+    ouvrir: (root, journal, ouverture) => ouvrirServicesSansFenetre({ factory, workspace: (r) => openWorkspace(r, { git }), runtime, journal, modelFor })(root, ouverture),
     // Hors du dépôt : les checkpoints capturent les fichiers non suivis (ADR 0068, point 5).
     verrou: (root) => prendreVerrou(join(donnees, "verrous", `${cle(root)}.lock`), { pid: process.pid, estVivant: processusVivant }),
     piles: createPilesFichiers(join(donnees, "piles")),
   });
-  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, cwd: o.cwd, connexion, version: o.version });
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, version: o.version });
   logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });
   return { ok: true, mcp, projets };
 }

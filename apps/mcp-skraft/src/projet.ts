@@ -17,7 +17,8 @@ export interface DemandeProjet {
   autorises: readonly string[];
 }
 
-export type ProjetResolu = { ok: true; root: string } | { ok: false; motif: string };
+/** `horsBornes` : un dépôt valide, seulement hors des dossiers permis ; l'utilisateur peut l'accepter (ADR 0075). */
+export type ProjetResolu = { ok: true; root: string } | { ok: false; motif: string; horsBornes?: true; root?: string };
 
 export async function resoudreProjet(d: DemandeProjet): Promise<ProjetResolu> {
   const base = d.roots[0] ?? d.cwd;
@@ -30,6 +31,8 @@ export async function resoudreProjet(d: DemandeProjet): Promise<ProjetResolu> {
   if (!bornes.some((b) => dedans(root, b)))
     return {
       ok: false,
+      horsBornes: true,
+      root,
       motif: `Projet refusé : ${root} est hors des dossiers ouverts par le client et des dossiers autorisés par la configuration du serveur (« autorises »). Ouvre le projet dans le client, ou ajoute son dossier à la configuration.`,
     };
   return { ok: true, root };

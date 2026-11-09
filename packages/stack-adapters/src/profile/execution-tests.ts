@@ -1,3 +1,4 @@
+import { envDesOutils } from "./outils.js";
 import { randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -26,6 +27,8 @@ export interface ExecutionTests {
 
 export interface ExecuterTestsOptions {
   cwd: string;
+  /** Où chercher les `outils` du profil, si ce n'est pas `cwd` : une copie Git n'a pas les outils installés (ADR 0075). */
+  racineDesOutils?: string;
   timeoutMs: number;
   signal?: AbortSignal;
   onOutput?: (chunk: string) => void;
@@ -115,6 +118,7 @@ export async function executerTests(profile: StackProfile, runner: ProcessRunner
   try {
     const r = await runner.run(profile.tests.command[0]!, substituer(profile.tests.command.slice(1), rapport, [], couverture, "", plusieurs ? rapport : ""), {
       cwd: opts.cwd,
+      env: envDesOutils(profile, opts.racineDesOutils ?? opts.cwd),
       timeoutMs: opts.timeoutMs,
       ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.onOutput ? { onOutput: opts.onOutput } : {}),

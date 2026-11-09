@@ -5,6 +5,132 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/11 — La pile découverte par un agent, vérifiée par le code (ADR 0076)
+
+- **Pourquoi** (demande du responsable) : les règles du code ne reconnaissaient que deux modèles.
+  Pour tout autre projet, il fallait écrire la pile à la main.
+- **Fait** :
+  - un agent `agent-studio/decouvreur-de-pile`, en lecture seule, qui rend sa proposition par
+    `submit_pile` (une pile par racine) ou pose une question (`report_blocker`). Son prompt est une
+    constante (`decouverte-de-pile-agent.ts`) et ne nomme aucun langage ni outil. Lanceurs BDD et
+    lecteurs de rapport arrivent dans la demande, tirés des tables du code ;
+  - les détections du code deviennent des **indices** (`indicesPourLAgent`) : fichiers,
+    dépendances, arborescence bornée, modèle reconnu, BDD détecté ;
+  - la vérification par le code (`verifierPiles`) : racine, programmes (accord avant toute
+    exécution), schéma, BDD, diagnostic, puis canaris réels dans une copie. Des canaris impossibles
+    à lancer comptent comme un refus. Trois essais au plus ; un refus repart avec ses motifs ;
+  - `/stack init` passe par l'agent quand les services en ont un (bureau et MCP). Sans
+    `decouverte`, l'ancien chemin par les règles reste, et ses tests aussi ;
+  - `skraft_pile` exige une connexion pour proposer.
+- **Tests** : les tests des services et du serveur font tourner de **vrais canaris** sous
+  `node --test` (support partagé `test/support/pile-node.ts`), dans un dossier temporaire qui tient
+  lieu de worktree.
+- **Essais réels** (Copilot CLI) : un projet uv (19 s), et un projet `node --test` inconnu des règles.
+  Tous deux sont vérifiés et écrits.
+- **Réponse à l'agent** : `/stack init --reponse <phrase>` ou l'argument `reponse` de `skraft_pile`.
+  La réponse prend la fin de la ligne et arrive à l'agent avec ses indices, en une phrase qui se
+  suffit à elle-même. Essai Copilot sur un projet ambigu : 53 s.
+- **Pièges vus à l'essai réel, corrigés** :
+  - « cette fois » était redemandé à chaque essai ; la question attendait, et Copilot a abandonné
+    l'appel à **3 minutes** (`Request timed out`). Désormais l'accord vaut tant que les services
+    vivent ;
+  - les motifs de refus n'étaient pas journalisés ; ils le sont, comme chaque proposition.
+- **À surveiller** :
+  - la limite de 3 minutes de Copilot : trois essais avec un utilisateur lent peuvent la dépasser.
+    La parade serait une découverte en arrière-plan, suivie comme un run ;
+  - avec le reporter JUnit de `node --test`, le canari `missing_symbol` est classé `other_error`.
+    L'agent est passé à TAP, mais le lecteur JUnit mériterait une vraie sortie de `node` en fixture.
+
+---
+
+## 09/11 — Commandes et autorisations du serveur MCP : point 0, le refus d'un programme s'explique
+
+- **Pourquoi** : sur un autre poste (Copilot CLI, projet Python géré par uv), trois blocages. Le projet
+  a été refusé, hors des roots et de `autorises`. `uv` puis `make` ont été refusés comme programmes de
+  pile. Il n'y avait aucun profil de pile.
+- **Ce que le code a montré** (et que j'avais mal dit à l'utilisateur) :
+  - `admin.json` se lit à un emplacement **système** (`/Library/Application Support/agent-studio/`
+    sur macOS, `/etc/agent-studio/` sur Linux) ou à `AGENT_STUDIO_ADMIN_CONFIG`, jamais dans
+    `~/.agent-studio`. Le fichier posé là n'était pas lu ;
+  - `allowedPrograms` remplace la liste : `["uv"]` aurait fait refuser `pytest` ;
+  - le vrai besoin de `uv` vient de ce qu'un profil lance son programme par le PATH, et que `pytest`
+    d'un projet uv est dans `.venv/bin`.
+- **Fait** (branche `feat/autorisations-mcp`) :
+  - `AdminConfig.origineDesProgrammes` : une phrase qui dit d'où vient la liste (fichier lu, clé absente,
+    fichier absent à tel endroit, fichier refusé) ;
+  - `ParseOptions.origine` ; le refus d'un programme cite la liste en vigueur et cette origine ;
+  - les services passent liste et origine ensemble (`programmes: ParseOptions`) ;
+  - README du serveur : les emplacements, la règle de remplacement, la liste par défaut complète.
+- **Le plan qui suit**, révisé après lecture du code :
+  - **Point 1, abandonné : accepter `uv run X` ou `npx X` si X est autorisé.** Chaque lanceur a ses
+    options (`uv run --with`), et `npx` télécharge.
+  - **Point 1, à la place** : le profil déclare où vivent les outils du projet (`outils: [.venv/bin]`).
+    Le programme reste jugé par son nom.
+  - **Point 3, fait (ADR 0075)** : un dépôt hors des dossiers permis est accepté par l'utilisateur.
+    - Le serveur pose la question par le client (*elicitation*), si celui-ci l'annonce
+      (`confirmerParLeClient`, `src/confirmation.ts`).
+    - « Oui, cette fois » vaut pour ce serveur. « Oui, toujours » est retenu dans
+      `~/.agent-studio/mcp-skraft/depots-acceptes.json` (`src/depots.ts`).
+    - Sans elicitation annoncée, ou sur un « non », le dépôt reste refusé.
+    - L'idée du dossier de lancement comme borne est abandonnée : le code la refusait déjà
+      (`projet.test.ts`, « pas accepté d'office »).
+  - **Point 2, fait (ADR 0075 §5)** : un programme hors liste est demandé à l'utilisateur à
+    l'ouverture du projet (`accepterLesProgrammes`, `workspace-services.ts`). La question passe par le
+    client MCP (elicitation) ou par la fenêtre du bureau, jamais par un argument d'outil.
+    - « Toujours » est retenu par projet dans `programmes-acceptes.json` (dossier des tâches).
+    - L'administrateur l'interdit par `programConsent: false`.
+    - Un nom avec chemin n'est jamais demandé.
+  - **Essai réel avec Copilot CLI 1.0.107 (09/11)** : `-p` ne montre rien, il refuse toute question.
+    Le mode interactif se pilote par **tmux** (`new-session -d`, `send-keys`, `capture-pane`) : un
+    pseudo-terminal nu ne suffit pas, Copilot attend des réponses du terminal avant de s'afficher.
+    - Copilot demande d'abord s'il fait confiance au dossier.
+    - Puis nos deux questions (le dépôt, puis `uv`), acceptées : la pile du projet est retenue.
+    - Une réponse après 75 s aboutit.
+    - `HOME` posé dans le bloc `env` du serveur isole ses données de la vraie configuration.
+    - Coût : environ 8 AIC pour les deux essais.
+  - **Point 1, fait (ADR 0075 §8)** : `outils` dans le profil (`.venv/bin`…), en tête du PATH de
+    chaque commande (`envDesOutils`) et du diagnostic. `/stack init` le propose pour `uv.lock`.
+    - **Piège vu à l'essai réel** : les canaris tournent dans un worktree, sans `.venv` (ignoré par
+      Git), d'où « aucun rapport lisible ». Ils prennent les outils du projet d'origine
+      (`racineDesOutils`).
+    - **Défaut trouvé et corrigé** : avec un vrai pytest (junit-xml), le canari `assertion` était
+      classé `other_error`. pytest ne met que l'expression dans `message` (« assert 1 == 2 ») et le
+      type d'exception sur la dernière ligne du corps. Le classement lit maintenant `type`, le
+      message et cette dernière ligne (`XunitCase.raison`), jamais le corps entier : pytest y recopie
+      le code du test. Fixture réelle `fixtures/pytest-9.2.xml`. Diagnostic réel ensuite : aucun
+      problème, quatre canaris sur quatre.
+    - Le défaut « `Assert.True` avec message personnalisé » est traité autrement, à la demande du
+      responsable : **l'assertion sur un booléen calculé est interdite**. Une comparaison faite dans
+      le test puis vérifiée « vraie » ne dit, en échouant, ni l'attendu ni l'obtenu.
+      - Elle est interdite dans `skraft-test` et `skraft-acceptance` (définitions d'étapes comprises).
+      - La lentille `test-integrity` la relève en `major`.
+      - Les deux copies sont faites (extension et workflow).
+      - La règle ne nomme aucun langage. Un test vérifie qu'aucun agent ne nomme `Assert.True`,
+        `assertTrue`… (`assertions-booleennes.test.ts`, dans les deux suites).
+      - Ce n'est qu'une consigne au LLM, aucune porte ne la vérifie : une porte devrait reconnaître
+        l'assertion dans chaque langage, donc passer par le profil. Pas d'essai réel, il faudrait un
+        run complet.
+  - **Point 4, fait (ADR 0075 §6)** : `skraft_pile` reprend `/stack init` (`proposer`) et
+    `/stack doctor` (`diagnostiquer`).
+    - L'écriture se fait après la question du client (`confirmerProgrammes`).
+    - Sans pile, le projet est ouvert pour ce seul appel, repli permis (`repliPermis`,
+      `Projets.pourLaPile`), puis refermé pour être relu.
+    - **Piège** : sans cela, `AucunePile` empêchait d'ouvrir le projet, précisément quand il faut
+      proposer sa pile.
+    - Les consignes « Rouvrez le projet », « `/stack doctor` » sont réécrites pour le client
+      (`consignes.ts`). Un test vérifie qu'aucun `/stack` ne reste.
+    - Essai Copilot : profil écrit ; le diagnostic dit `pytest` introuvable, absent de cette machine.
+      C'est le cas d'un projet uv : d'où le point 1.
+- **Le SDK Copilot ne change rien aux commandes** : nos agents n'ont aucun shell (`task-agent-guard.ts`),
+  les commandes de la pile sont lancées par notre code (`run_tests`), sans shell. Le serveur n'a aucun
+  canal vers l'humain (`SANS_FENETRE`) : l'accord ne peut venir que du client MCP.
+- **Essai Copilot CLI, d'abord refusé par le mode automatique de Claude Code, fait ensuite à la demande du responsable** (voir point 2) ; questions de départ :
+  à faire par l'utilisateur) : Copilot déclare-t-il des roots, dans quel dossier lance-t-il le serveur,
+  gère-t-il l'elicitation ? Et, sur l'autre poste, la connexion du SDK à l'hôte d'entreprise
+  (`hostname`, `GH_HOST`).
+
+---
+
 ## 09/11 — Le serveur MCP tient l'utilisateur au courant : `skraft_attendre` et la ligne de progression
 
 - **Pourquoi** (demande du responsable) : le serveur ne pousse rien, la progression ne se voyait que si

@@ -47,6 +47,9 @@ import {
   runCanaries,
   MANIFESTE,
   parseStackProfile,
+  type ParseOptions,
+  programmesDuProfil,
+  envDesOutils,
   FICHIER_PROJET,
   ecrireComposantsDansProjet,
   ecrirePileDansProjet,
@@ -59,7 +62,10 @@ import {
 } from "@agent-studio/stack-adapters";
 import { createJsonTaskStore, createTaskEngine, type TaskRecord, type TaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import type { UserConfirmer } from "@agent-studio/core";
+import type { ConfirmAnswer, UserConfirmer } from "@agent-studio/core";
+import { createProgrammesAcceptesFichier, type ProgrammesAcceptes } from "./programmes-acceptes.js";
+import { createDecouverteParAgent } from "./decouverte-de-pile-agent.js";
+import type { Decouverte } from "./decouverte-de-pile.js";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
 import type { SourcePile, WorkspaceServices, WorkspaceServicesFactory } from "./protocols.js";
 import { activerWorkflow, createJsonAccordStore, lireEntrees, rapportDuWorkflow, resumeAccord, syntaxeCommande, trouverWorkflows, type AccordStore, type EtatWorkflow, type WorkflowTrouve } from "@agent-studio/workflow";
@@ -75,6 +81,15 @@ export interface WorkspaceServicesConfig {
   stacks: StackAdapter[];
   /** Programmes qu'un profil de stack peut lancer (D47, O12) ; vide = aucun profil n'est accepté. */
   allowedPrograms?: readonly string[];
+  /** D'où vient cette liste (`AdminConfig.origineDesProgrammes`), citée quand un programme est refusé. */
+  origineDesProgrammes?: string;
+  /**
+   * L'administrateur permet-il à l'utilisateur d'accepter un programme hors de la liste (ADR 0075) ?
+   * Sans, ni question ni accord retenu : la liste seule.
+   */
+  programConsent?: boolean;
+  /** Programmes acceptés « toujours » ; par défaut un fichier du dossier des tâches, hors du dépôt. */
+  programmesAcceptes?: ProgrammesAcceptes;
   /**
    * Aucune pile (ni profil, ni détection, ni pile fournie) est une erreur, au lieu du repli averti
    * sur le premier adaptateur : un repli ferait échouer toutes les portes pour une mauvaise raison
@@ -173,9 +188,18 @@ export class AucunePile extends Error {
 
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
+  // La liste et son origine voyagent ensemble : un refus doit pouvoir dire d'où vient la liste (09/11).
+  const programmes: ParseOptions = { allowedPrograms: cfg.allowedPrograms ?? [], ...(cfg.origineDesProgrammes ? { origine: cfg.origineDesProgrammes } : {}) };
+  const acceptes = cfg.programmesAcceptes ?? createProgrammesAcceptesFichier(join(cfg.tasksDir, "programmes-acceptes.json"));
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, confirmerProgrammes, repliPermis, modelFor, pileFournie }) => {
+    // « Oui, cette fois » vaut tant que ces services vivent : sinon chaque essai de la découverte de la
+    // pile (ADR 0076) redemandait, et la question attendait pendant que le client abandonnait l'appel.
+    const acceptesCetteFois = new Set<string>();
+    const accepter = (bruts: readonly string[]) =>
+      accepterLesProgrammes({ root: workspace.root, bruts, programmes, actif: cfg.programConsent === true, acceptes, acceptesCetteFois, ...(confirmerProgrammes ? { confirmer: confirmerProgrammes } : {}), onPost, ...(cfg.logger ? { logger: cfg.logger } : {}) });
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
-    const pileDuProjet = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const programmesDuProjet = await accepter(brutsDuProfil(await lireSourceDuProfil(workspace.root)));
+    const pileDuProjet = await lireProfilDuProjet(workspace.root, programmesDuProjet, onPost, cfg.logger);
     const declare = pileDuProjet?.adapter ?? null;
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
     let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
@@ -188,14 +212,16 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         // Même contrôle qu'un profil du projet : schéma, et programmes de la liste de l'administrateur.
         // Au format composants (ADR 0074), chaque pile l'est à son tour.
         const enComposants = lireFichierProjet(pileFournie);
-        if (!("error" in enComposants) && enComposants.composants) {
-          const lu = profilsDesComposants(enComposants.composants, cfg.allowedPrograms ?? []);
+        const composantsFournis = !("error" in enComposants) ? enComposants.composants : undefined;
+        const programmesFournis = await accepter(composantsFournis ? composantsFournis.map((c) => c.pile) : [pileFournie]);
+        if (composantsFournis) {
+          const lu = profilsDesComposants(composantsFournis, programmesFournis);
           if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
           const p = pileComposee(lu.composants);
           choisie = p.adapter;
           composantsDeLaPile = p.composants;
         } else {
-          const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
+          const lu = parseStackProfile(pileFournie, programmesFournis);
           if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
           choisie = createProfileAdapter(lu.profile);
         }
@@ -203,7 +229,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         onPost("agent-studio", `Stack du projet : **${choisie.id}**, fournie par l'appelant.`);
       }
     }
-    if (!choisie && cfg.sansRepli)
+    if (!choisie && cfg.sansRepli && !repliPermis)
       throw new AucunePile(
         `Aucune pile pour ce projet : ni profil \`${PROFIL_PROJET}\`, ni adaptateur qui le reconnaisse (${cfg.stacks.map((s) => s.id).join(", ") || "aucun"}). Fournis une pile au format de \`${PROFIL_PROJET}\`.`,
       );
@@ -314,15 +340,36 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const registry = createRegistry();
 
     // `/stack` appartient au cœur, pas à une extension : elle décrit le projet lui-même, et
-    // doit rester disponible même quand aucune extension n'est installée.
-    if (confirmer)
+    // doit rester disponible même quand aucune extension n'est installée. Écrire un profil autorise
+    // des programmes : la question va d'abord à qui les accepte (ADR 0075, le client MCP).
+    const confirmerPile = confirmerProgrammes ?? confirmer;
+    if (confirmerPile)
       registry.addCommand({
         extensionId: "agent-studio",
         name: "stack",
         title: "Stack du projet",
         description: "Affiche la stack employée ; `init` propose un profil à déclarer, `doctor` dit ce qu'il vaut.",
         handler: createStackCommand(
-          stackCommandDeps({ workspace, allowedPrograms: cfg.allowedPrograms ?? [], stack, declaree: declare !== null, confirmer, onPost }),
+          stackCommandDeps({
+            workspace,
+            programmes: programmesDuProjet,
+            stack,
+            declaree: declare !== null,
+            confirmer: confirmerPile,
+            onPost,
+            // La pile découverte par un agent, vérifiée par le code (ADR 0076). Les programmes hors
+            // de la liste sont demandés avant toute lecture, donc avant toute exécution (ADR 0075).
+            decouverte: createDecouverteParAgent({
+              agents: () => agents,
+              programmes: programmesDuProjet,
+              lirePile: async (yaml) => {
+                const lu = parseStackProfile(yaml, await accepter([yaml]));
+                return "error" in lu ? { error: lu.error } : { profile: lu.profile };
+              },
+              ...(modelFor ? { modele: () => modelFor("standard") } : {}),
+              ...(cfg.logger ? { logger: cfg.logger.child({ component: "decouverte-de-pile" }) } : {}),
+            }),
+          }),
         ),
       });
 
@@ -539,6 +586,67 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
   };
 }
 
+/** Les profils en YAML d'une source : sa section pile, ou la pile de chacun de ses composants. */
+function brutsDuProfil(src: SourceDuProfil | null): string[] {
+  if (!src) return [];
+  if (src.composants) return src.composants.map((c) => c.pile);
+  return src.brut !== null ? [src.brut] : [];
+}
+
+/**
+ * Programmes que la pile nomme hors de la liste de l'administrateur (ADR 0075) : acceptés s'ils l'ont
+ * été « toujours » pour ce projet, sinon demandés à l'utilisateur s'il y a quelqu'un à qui demander.
+ * Rend la liste élargie de ceux-là ; le profil est ensuite jugé contre elle, comme avant. Un nom avec
+ * un chemin n'est jamais demandé : il échapperait à la liste. Inactif, la liste seule.
+ */
+async function accepterLesProgrammes(o: {
+  root: string;
+  bruts: readonly string[];
+  programmes: ParseOptions;
+  actif: boolean;
+  acceptes: ProgrammesAcceptes;
+  /** Acceptés « cette fois » pendant la vie de ces services. */
+  acceptesCetteFois: Set<string>;
+  confirmer?: UserConfirmer;
+  onPost: (extensionId: string, markdown: string) => void;
+  logger?: Logger;
+}): Promise<ParseOptions> {
+  if (!o.actif) return o.programmes;
+  const nommes = o.bruts.flatMap(programmesDuProfil);
+  const hors = [...new Set(nommes.map((n) => n.programme))].filter((p) => !o.programmes.allowedPrograms.includes(p) && !/[/\\]/.test(p) && p !== "." && p !== "..");
+  const ajoutes: string[] = [];
+  for (const programme of hors) {
+    if (o.acceptesCetteFois.has(programme) || (await o.acceptes.accepte(o.root, programme))) {
+      ajoutes.push(programme);
+      continue;
+    }
+    if (!o.confirmer) continue;
+    const commandes = nommes.filter((n) => n.programme === programme).map((n) => `${n.section} : ${n.commande.join(" ")}`);
+    let reponse: ConfirmAnswer;
+    try {
+      reponse = await o.confirmer.confirm({
+        title: `Autoriser « ${programme} » pour ce projet ?`,
+        detail: [
+          `La pile du projet lance « ${programme} », qui n'est pas dans la liste des programmes autorisés :`,
+          ...commandes,
+          ...(o.programmes.origine ? [o.programmes.origine] : []),
+          "Accepté, il s'exécutera sans shell, dans le projet, aux portes de test, de lint, de format ou de mutation, avec les droits de l'utilisateur, réseau compris. « Toujours » le retient pour ce projet.",
+        ].join("\n"),
+      });
+    } catch {
+      reponse = "deny";
+    }
+    // Chaque accord est journalisé (ADR 0075), refus compris.
+    o.logger?.info("programme hors liste", { root: o.root, programme, reponse });
+    if (reponse === "deny") continue;
+    if (reponse === "allow-always") await o.acceptes.ajouter(o.root, programme);
+    o.acceptesCetteFois.add(programme);
+    ajoutes.push(programme);
+    o.onPost("agent-studio", `« ${programme} » accepté par l'utilisateur pour ce projet (${reponse === "allow-always" ? "toujours" : "cette fois"}).`);
+  }
+  return ajoutes.length ? { ...o.programmes, allowedPrograms: [...o.programmes.allowedPrograms, ...ajoutes] } : o.programmes;
+}
+
 /** Ancien emplacement du profil (avant l'ADR 0071), relu le temps de la transition. */
 const PROFIL_PROJET = ".agent-studio/stack.yaml";
 
@@ -584,16 +692,16 @@ async function lireSourceDuProfil(root: string): Promise<SourceDuProfil | null> 
  * détection habituelle reprend la main. Le fichier vient du dépôt, donc d'une source que
  * l'agent peut modifier : les programmes qu'il nomme sont soumis à la liste de l'administrateur.
  */
-async function lireProfilDeclare(root: string, allowedPrograms: readonly string[]): Promise<ProfilDeclare> {
+async function lireProfilDeclare(root: string, programmes: ParseOptions): Promise<ProfilDeclare> {
   const src = await lireSourceDuProfil(root);
   if (!src) return null; // pas de profil : la détection s'applique, sans rien dire
   if (src.erreur) return { error: src.erreur };
   if (src.composants) {
-    const lu = profilsDesComposants(src.composants, allowedPrograms);
+    const lu = profilsDesComposants(src.composants, programmes);
     return "error" in lu ? { error: `${src.libelle}, ${lu.error}` } : lu;
   }
   if (src.brut === null) return null;
-  const lu = parseStackProfile(src.brut, { allowedPrograms });
+  const lu = parseStackProfile(src.brut, programmes);
   return "error" in lu ? { error: `${src.libelle} : ${lu.error}` } : lu;
 }
 
@@ -605,13 +713,13 @@ interface PileDuProjet {
 
 async function lireProfilDuProjet(
   root: string,
-  allowedPrograms: readonly string[],
+  programmes: ParseOptions,
   onPost: (extensionId: string, markdown: string) => void,
   logger?: Logger,
 ): Promise<PileDuProjet | null> {
   const src = await lireSourceDuProfil(root);
   for (const a of src?.avertissements ?? []) onPost("agent-studio", a);
-  const lu = await lireProfilDeclare(root, allowedPrograms);
+  const lu = await lireProfilDeclare(root, programmes);
   if (lu === null) return null;
   if ("error" in lu) {
     logger?.warn("profil de stack refusé", { root, error: lu.error });
@@ -623,10 +731,10 @@ async function lireProfilDuProjet(
 }
 
 /** Composants (ADR 0074) : chaque pile validée comme une pile seule, contre la liste de l'administrateur ; une seule refusée suffit. */
-function profilsDesComposants(declares: readonly ComposantDeclare[], allowedPrograms: readonly string[]): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
+function profilsDesComposants(declares: readonly ComposantDeclare[], programmes: ParseOptions): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
   const composants = [];
   for (const c of declares) {
-    const lu = parseStackProfile(c.pile, { allowedPrograms });
+    const lu = parseStackProfile(c.pile, programmes);
     if ("error" in lu) return { error: `composant « ${c.nom} » : ${lu.error}` };
     composants.push({ nom: c.nom, racine: c.racine, profile: lu.profile });
   }
@@ -646,13 +754,14 @@ function pileComposee(profils: readonly { nom: string; racine: string; profile: 
  */
 function stackCommandDeps(args: {
   workspace: Workspace;
-  allowedPrograms: readonly string[];
+  programmes: ParseOptions;
   stack: StackAdapter;
   declaree: boolean;
   confirmer: UserConfirmer;
   onPost: (extensionId: string, markdown: string) => void;
+  decouverte?: Decouverte;
 }): StackCommandDeps {
-  const { workspace, allowedPrograms, stack, declaree, confirmer, onPost } = args;
+  const { workspace, programmes, stack, declaree, confirmer, onPost } = args;
   const fichiers = () => workspace.files.list();
   /** Fichiers sous une racine, chemins relatifs à elle ; `.` : tout le projet. */
   const sous = (tous: readonly string[], racine: string) => tous.flatMap((f) => (racine === "." ? [f] : f.startsWith(`${racine}/`) ? [f.slice(racine.length + 1)] : []));
@@ -673,10 +782,11 @@ function stackCommandDeps(args: {
   return {
     // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
     chemin: FICHIER_PROJET,
-    profilDeclare: () => lireProfilDeclare(workspace.root, allowedPrograms),
+    profilDeclare: () => lireProfilDeclare(workspace.root, programmes),
     stackActive: () => ({ id: stack.id, declaree }),
     post: (markdown) => onPost("agent-studio", markdown),
     confirmer: (req) => confirmer.confirm(req),
+    ...(args.decouverte ? { decouverte: args.decouverte } : {}),
     async ecrireProfil(yaml) {
       const existant = await workspace.files.read(FICHIER_PROJET).catch(() => null);
       const r = ecrirePileDansProjet(existant, yaml);
@@ -749,7 +859,8 @@ function stackCommandDeps(args: {
       const copie = await workspace.repo.worktree();
       try {
         // Composant (ADR 0074) : les canaris tournent dans sa racine, au sein de la copie isolée.
-        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: racine === "." ? copie.root : join(copie.root, racine) });
+        // Les outils installés (`outils`, ADR 0075) sont ignorés par Git : la copie ne les a pas, on prend ceux du projet.
+        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: racine === "." ? copie.root : join(copie.root, racine), racineDesOutils: join(workspace.root, racine) });
         return constats;
       } finally {
         await copie.dispose();
@@ -763,7 +874,8 @@ function stackCommandDeps(args: {
       return diagnoseProfile(profile, {
         // BDD déclaré : son lanceur est-il cité par un manifeste du composant (ADR 0074) ?
         manifestes: await manifestesSous(projet, racine),
-        programmeTrouvable: (p) => dansLePath(p),
+        // Les `outils` du profil passent devant le PATH, comme au lancement (ADR 0075).
+        programmeTrouvable: (p) => dansLePath(p, Object.values(envDesOutils(profile, join(workspace.root, racine)))[0]),
         cheminExiste: (glob) => {
           const re = globToRegExp(glob);
           return tous.some((f) => re.test(f));
@@ -776,8 +888,8 @@ function stackCommandDeps(args: {
 }
 
 /** Le programme est-il lançable ? Recherche dans le PATH, sans exécuter quoi que ce soit. */
-function dansLePath(programme: string): boolean {
-  const chemins = (process.env["PATH"] ?? "").split(delimiter).filter(Boolean);
+function dansLePath(programme: string, path = process.env["PATH"]): boolean {
+  const chemins = (path ?? "").split(delimiter).filter(Boolean);
   const suffixes = process.platform === "win32" ? (process.env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";") : [""];
   for (const base of chemins)
     for (const suffixe of suffixes) {

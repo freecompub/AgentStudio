@@ -55,21 +55,43 @@ Facultatif ; `SKRAFT_MCP_CONFIG` en désigne un autre. Une clé inconnue est ref
 
 | Clé | Défaut | Rôle |
 |---|---|---|
-| `autorises` | `[]` | Dossiers (absolus, `~` accepté) où un projet est accepté, en plus des roots déclarés par le client. Un projet doit être un dépôt Git situé dans l'un ou l'autre ; tout autre chemin est refusé. |
+| `autorises` | `[]` | Dossiers (absolus, `~` accepté) où un projet est accepté, en plus des roots déclarés par le client. Un projet doit être un dépôt Git situé dans l'un ou l'autre. Ailleurs, si le client sait poser une question (*elicitation*), le serveur demande à l'utilisateur d'accepter le dépôt : une fois, ou toujours (retenu dans `~/.agent-studio/mcp-skraft/depots-acceptes.json`) ; sinon il refuse (ADR 0075). |
 | `hostname` | `github.com` | Hôte GitHub (ou GitHub Enterprise) pour la connexion Copilot. |
 | `runtime` | `copilot` | `copilot` ou `claude` : qui fait travailler les agents. |
 | `modeles` | défaut du runtime | Modèle par classe de rôle : `strong` (les deux architectes, le réfutateur), `standard` (chercheur, acceptance, testeur, développeur, arbitre de mutation, lentilles cold-reader, test-integrity, architecture), `light` (classifieur, lentille quality-gates). Avec Claude : `opus`, `sonnet`, `haiku` par défaut. |
 
 ### L'utilisateur et les programmes : `admin.json`
 
-Comme pour l'application de bureau (`AGENT_STUDIO_ADMIN_CONFIG` pour le désigner) : le **profil** de
-l'utilisateur (qui décide de quelles questions, voir « Les questions » ; `developpeur` sans fichier)
-et les **programmes** qu'une pile a le droit de lancer (`allowedPrograms` ; sans la clé, une liste par
-défaut : `pytest`, `dotnet`, `vitest`, `jest`, `mvn`, `gradle`…).
+Comme pour l'application de bureau : le **profil** de l'utilisateur (qui décide de quelles
+questions, voir « Les questions » ; `developpeur` sans fichier) et les **programmes** qu'une pile a
+le droit de lancer (`allowedPrograms`).
+
+Le fichier est cherché à un emplacement **système**, pas dans le dossier personnel :
+
+| Système | Emplacement |
+|---|---|
+| macOS | `/Library/Application Support/agent-studio/admin.json` |
+| Linux | `/etc/agent-studio/admin.json` |
+| Windows | `%ProgramData%\agent-studio\admin.json` |
+
+La variable `AGENT_STUDIO_ADMIN_CONFIG` en désigne un autre ; pour le serveur, la poser dans le
+bloc `env` de sa déclaration chez le client. Le fichier est lu au démarrage du serveur : redémarrer
+le client après l'avoir changé.
+
+`allowedPrograms` **remplace** la liste par défaut, il ne s'y ajoute pas. Sans la clé, la liste par
+défaut s'applique : `pytest`, `go`, `cargo`, `gradle`, `mvn`, `dotnet`, `vitest`, `jest`, `phpunit`,
+`rspec`, des linters (`eslint`, `ruff`…), `prettier` et des outils de mutation (`stryker`, `mutmut`,
+`pitest`). Un fichier illisible n'autorise aucun programme.
 
 ```json
 { "profile": { "role": "architecte" }, "allowedPrograms": ["dotnet", "pytest"] }
 ```
+
+Un programme que la pile nomme hors de la liste n'est pas refusé d'emblée, si le client sait poser
+une question (Copilot CLI en mode interactif, par exemple) : le serveur demande à l'utilisateur de
+l'accepter pour ce projet, une fois ou toujours (ADR 0075). L'administrateur l'interdit par
+`"programConsent": false`. Sans question possible, ou sur un « non », la pile est refusée, avec la
+liste en vigueur et son origine : le fichier lu, ou celui qui était attendu et manquait.
 
 ## La pile du projet
 
@@ -139,6 +161,7 @@ buildErrors:
 |---|---|---|
 | `skraft_connexion` | — | Connexion du runtime. Copilot : rend un code et une adresse à valider dans le navigateur. Claude : vérifie `claude auth status`, sinon dit de lancer `claude auth login`. Rappeler pour vérifier. |
 | `skraft_demarrer` | `story` (chemin relatif au projet), `auto`, `archi`, `pile`, `accord`, `projet` | Démarre un run, en arrière-plan. Au premier lancement, rend le **résumé à faire accepter** (agents, droits d'écriture, questions) sans rien démarrer ; rappeler avec les mêmes arguments et `accord: "une-fois"` ou `"toujours"` (retenu tant que le workflow ne change pas). `auto` : retient la difficulté proposée sans la faire confirmer. `archi` : skill d'architecture par son nom ou son langage (`java`) ; par défaut la clean architecture. |
+| `skraft_pile` | `action` (`proposer` par défaut, ou `diagnostiquer`), `lanceur`, `features`, `etapes`, `sansBdd`, `reponse`, `projet` | **La pile du projet** (ADR 0075, 0076). `proposer` : un agent découvre la pile en lisant le projet (BDD compris), le code la vérifie en l'exécutant (canaris) et l'écrit dans `.agent-studio/projet.yaml` après l'accord de l'utilisateur, que le client lui demande ; sans question possible, la proposition est rendue et rien n'est écrit. `lanceur`, `features`, `etapes` : la moitié du BDD qui n'a pas été trouvée ; `sansBdd` : le projet n'en fait pas. `reponse` : la réponse à une question de l'agent de découverte, en une phrase complète. `diagnostiquer` : programmes trouvés, emplacements, et canaris qui lancent vraiment les tests, dans une copie du projet. Le projet est relu au prochain appel. |
 | `skraft_etat` | `projet` | JSON : mode du serveur (pilote ou consultation), workflow et accord, pile retenue, runs (phase, étape, dernier rejet, usage, et **`progression`**, la ligne à montrer telle quelle), **questions en attente** (identifiant, options, profils, réponse libre), derniers messages. |
 | `skraft_attendre` | `tache`, `delai` (secondes, 30 par défaut, 50 au plus : un client MCP abandonne souvent un appel au-delà de 60 s), `projet` | **Attend un changement**, puis rend ce qui a changé **depuis le dernier appel** (phase, étape, rejet avec sa porte et son motif, lus dans la trace du run, question à poser, réponse reçue, message, fin), la ligne de progression de chaque run, les questions en attente et `termine`. Rien ne se perd entre deux appels. Run déjà fini : réponse immédiate. |
 | `skraft_repondre` | `question`, `option`, `texte`, `projet` | Répond à une question en attente, par l'identifiant et l'option lus dans `skraft_etat` ; `texte` : réponse libre ou commentaire. L'hôte pose la question à l'utilisateur, il ne répond jamais à sa place. |
@@ -206,7 +229,8 @@ Comptes rendus : `docs/runs/`.
 ## Données
 
 Tout ce que le serveur garde est dans `~/.agent-studio/mcp-skraft/` : tâches, journaux de rejeu et
-traces (`tasks/`), piles fournies (`piles/`), verrous (`verrous/`), état du CLI Copilot (`copilot/`),
+traces (`tasks/`), piles fournies (`piles/`), dépôts acceptés « toujours » (`depots-acceptes.json`),
+verrous (`verrous/`), état du CLI Copilot (`copilot/`),
 journal (`logs/mcp-skraft.log`). Rien n'est écrit dans le dépôt en dehors du travail de skraft.
 
 ## Licence

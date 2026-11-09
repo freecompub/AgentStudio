@@ -41,7 +41,8 @@ describe("Projet de l'appelant (ADR 0068, point 6)", () => {
 
   it("hors des roots du client et des dossiers autorisés : refusé, avec ce qu'il faut faire", async () => {
     const r = await resoudreProjet({ argument: autre, roots: [depot], cwd: depot, autorises: [join(base, "roots")] });
-    expect(r).toEqual({ ok: false, motif: expect.stringMatching(/hors des dossiers.*autorises/s) });
+    // `horsBornes` : le seul refus que l'utilisateur peut lever en acceptant le dépôt (ADR 0075).
+    expect(r).toEqual({ ok: false, horsBornes: true, root: autre, motif: expect.stringMatching(/hors des dossiers.*autorises/s) });
     // Sans root ni dossier autorisé, le dossier courant n'est pas accepté d'office.
     expect(await resoudreProjet({ roots: [], cwd: depot, autorises: [] })).toMatchObject({ ok: false });
   });

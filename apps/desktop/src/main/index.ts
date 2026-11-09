@@ -198,6 +198,8 @@ async function createController(): Promise<AppController> {
       stacks: [createTypeScriptAdapter()],
       // Programmes qu'un profil peut nommer : la liste vient de l'administrateur (D47, O12).
       allowedPrograms: admin.allowedPrograms,
+      origineDesProgrammes: admin.origineDesProgrammes,
+      programConsent: admin.programConsent,
       tasksDir: join(userData, "tasks"),
       clock: { now: () => new Date() },
       ids: { next: () => randomUUID() },

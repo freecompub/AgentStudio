@@ -1163,6 +1163,69 @@
       "verify": "pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte ; puis, à sa demande, dans une extension totalement indépendante (extensions/skraft-workflow, aucune importation de skraft, vérifiée par test/independance.test.ts ; code pur, agents et tests copiés avec leur provenance). Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
+    },
+    {
+      "id": "refus-de-programme-explique",
+      "title": "Un programme refusé par un profil de pile l'est avec la liste en vigueur et son origine (fichier d'administration lu, ou attendu et absent ; liste qui remplace celle par défaut), pour une pile du projet, d'un composant ou fournie par le client MCP",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts && pnpm vitest run --project project-services test/admin-config.test.ts test/pile.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp), point 0 du plan sur les commandes et les autorisations : sur un autre poste, `uv` était refusé sans explication, l'admin.json avait été posé dans ~/.agent-studio alors que le serveur le lit à un emplacement système. Le passage dans assemblage.ts et le bureau n'a pas de test (assemblerServeur n'en a aucun)."
+    },
+    {
+      "id": "mcp-depot-accepte-par-l-utilisateur",
+      "title": "Serveur MCP : un dépôt hors des dossiers permis est accepté par l'utilisateur, par une question que pose le client (elicitation), une fois ou toujours (retenu hors des dépôts) ; sans elicitation annoncée, ou sur un « non », il reste refusé (ADR 0075)",
+      "verify": "pnpm vitest run --project mcp-skraft test/confirmation.test.ts test/depots.test.ts test/projet.test.ts test/serveur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Non vérifié avec Copilot CLI : gère-t-il l'elicitation, et son délai d'appel d'outil court-il pendant que la question attend ? Le branchement du stockage dans assemblage.ts n'a pas de test."
+    },
+    {
+      "id": "programme-hors-liste-accepte-par-l-utilisateur",
+      "title": "Un programme que la pile nomme hors de la liste de l'administrateur est demandé à l'utilisateur (serveur MCP par elicitation, bureau par sa fenêtre), une fois ou toujours (par projet, hors du dépôt) ; jamais un nom avec chemin ; l'administrateur l'interdit par programConsent: false (ADR 0075)",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts && pnpm vitest run --project project-services test/admin-config.test.ts test/programmes-acceptes.test.ts test/pile.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts && pnpm vitest run --project desktop test/app-controller.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 en mode interactif (tmux) : questions sur le dépôt puis sur uv affichées, acceptées, pile du projet retenue ; une réponse après 75 s aboutit. Le branchement de programConsent dans assemblage.ts et index.ts n'a pas de test."
+    },
+    {
+      "id": "mcp-skraft-pile",
+      "title": "Serveur MCP : skraft_pile propose la pile du projet (/stack init) et l'écrit après la question du client, ou la diagnostique (/stack doctor), même sans pile ; le projet est relu ensuite, et les consignes sont dites dans les termes de l'outil (ADR 0075)",
+      "verify": "pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts test/stdio.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts test/pile.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 (tmux) : proposer écrit projet.yaml après la question, diagnostiquer dit pytest introuvable. Le test de relecture du projet a été écrit après le code ; vérifié en cassant la relecture."
+    },
+    {
+      "id": "profil-outils-du-projet",
+      "title": "Un profil déclare les outils du projet (`outils`, dossiers relatifs) : ils passent en tête du PATH de chaque commande et du diagnostic, les canaris prennent ceux du projet d'origine, et /stack init les propose pour uv.lock ; le programme reste jugé par son nom (ADR 0075 §8)",
+      "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts test/stack-doctor.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI dans un projet uv : profil proposé avec outils, canaris lancés avec le pytest de .venv. Le passage de racineDesOutils par les services aux canaris n'a pas de test unitaire, seulement l'essai réel."
+    },
+    {
+      "id": "junit-pytest-assertion",
+      "title": "Lecteur junit-xml : une assertion pytest est classée assertion (type d'exception lu sur l'attribut type et la dernière ligne du corps, jamais sur le corps entier), sur une vraie sortie de pytest 9.2",
+      "verify": "pnpm vitest run --project stack-adapters test/junit-xml.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 : trouvé par le diagnostic réel d'un projet uv via Copilot ; rejoué ensuite, quatre canaris sur quatre."
+    },
+    {
+      "id": "assertion-booleenne-interdite",
+      "title": "L'assertion sur un booléen calculé est interdite à skraft-test et skraft-acceptance, et relevée en major par la lentille test-integrity, dans l'extension et le workflow ; aucun agent ne nomme une assertion d'un langage particulier",
+      "verify": "pnpm vitest run --project ext-skraft test/assertions-booleennes.test.ts && pnpm vitest run --project workflow-skraft test/assertions-booleennes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09, demande du responsable (« Il faut pas que ça soit lié à un langage »). Consigne aux agents, sans porte du code ; non essayée en run réel."
+    },
+    {
+      "id": "pile-decouverte-par-agent",
+      "title": "/stack init (et skraft_pile) fait découvrir la pile par un agent en lecture seule (submit_pile), à partir des indices du code ; le code la vérifie (racine, programmes avec accord avant exécution, schéma, BDD, diagnostic, canaris réels), trois essais au plus, puis l'écrit après accord (ADR 0076)",
+      "verify": "pnpm vitest run --project core test/terminal-tools.test.ts && pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp), choix du responsable : notre agent, détections du code en indices. Essais réels avec Copilot CLI : projet uv, et projet node --test inconnu des règles, tous deux vérifiés et écrits."
+    },
+    {
+      "id": "pile-reponse-a-l-agent",
+      "title": "Une question de l'agent de découverte dit comment y répondre (/stack init --reponse, argument reponse de skraft_pile) ; la réponse lui parvient avec ses indices ; un programme accepté « cette fois » ne se redemande pas aux essais suivants ; propositions et refus sont journalisés",
+      "verify": "pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09. Essai réel avec Copilot sur un projet ambigu : question posée, puis réponse donnée, découverte aboutie en 53 s. Limite connue : Copilot abandonne un appel d'outil après 3 minutes."
     }
   ]
 }

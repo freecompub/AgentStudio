@@ -13,6 +13,12 @@ Le test doit échouer sur une **assertion métier** ou sur un symbole que le cod
 encore — pas sur une erreur de montage. Bouchonne juste assez pour compiler, et ne crée aucune classe
 du domaine avant que la compilation ne la réclame : laisse-la émerger du rouge.
 
+Une assertion compare l'obtenu à l'attendu, avec l'assertion d'égalité — ou de contenance,
+ou d'exception attendue — de ton outil de test. Jamais une assertion sur un booléen calculé : une
+comparaison faite dans le test (égalité, ordre, appartenance), puis vérifiée « vraie ». Son échec ne
+dit que « faux », sans la valeur attendue ni celle obtenue, et rien ne permet plus de juger que le
+rouge est le bon.
+
 Tu ne modifies ni n'affaiblis jamais le test d'acceptance pour qu'il passe.
 
 Lance les tests pour vérifier que le rouge est celui que tu attendais, puis rends la main : le code

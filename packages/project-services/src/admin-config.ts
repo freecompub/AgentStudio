@@ -47,6 +47,8 @@ const schema = z.object({
   developerMode: z.boolean().default(false),
   /** Remplace la liste par défaut — un poste administré doit pouvoir restreindre, pas seulement élargir. */
   allowedPrograms: z.array(nomDeProgramme).optional(),
+  /** L'utilisateur peut-il accepter un programme hors de la liste, quand on le lui demande (ADR 0075) ? */
+  programConsent: z.boolean().default(true),
   revocation: z.object({ file: z.string().optional(), url: z.string().url().optional(), rootPublicKeyPem: z.string() }).optional(),
 });
 
@@ -58,6 +60,10 @@ export interface AdminConfig {
   developerMode: boolean;
   /** Programmes qu'un profil de stack peut lancer (D47, O12). */
   allowedPrograms: string[];
+  /** D'où vient cette liste, en une phrase à citer quand un programme est refusé (09/11). */
+  origineDesProgrammes: string;
+  /** L'utilisateur peut accepter un programme hors de la liste, si on peut le lui demander (ADR 0075). */
+  programConsent: boolean;
   revocation: { file?: string; url?: string; rootPublicKeyPem: string } | null;
   error?: string;
 }
@@ -75,7 +81,16 @@ export async function loadAdminConfig(path: string): Promise<AdminConfig> {
     raw = await readFile(path, "utf8");
   } catch {
     // Poste personnel sans administration : développeur, sans éditeur tiers approuvé.
-    return { source: "défaut", profile: profileFor("developpeur"), trustedPublishers: [], developerMode: false, allowedPrograms: [...DEFAULT_ALLOWED_PROGRAMS], revocation: null };
+    return {
+      source: "défaut",
+      profile: profileFor("developpeur"),
+      trustedPublishers: [],
+      developerMode: false,
+      allowedPrograms: [...DEFAULT_ALLOWED_PROGRAMS],
+      programConsent: true,
+      origineDesProgrammes: `Liste par défaut : aucun fichier d'administration à ${path}. Pour la changer, y écrire \`allowedPrograms\` (qui remplace la liste par défaut, sans s'y ajouter), ou désigner un autre fichier par la variable AGENT_STUDIO_ADMIN_CONFIG.`,
+      revocation: null,
+    };
   }
   let parsed: z.infer<typeof schema>;
   try {
@@ -86,7 +101,8 @@ export async function loadAdminConfig(path: string): Promise<AdminConfig> {
     // Fichier présent mais illisible : profil le plus restreint, jamais le plus permissif.
     // Configuration refusée : on n'autorise aucun programme. Retomber sur la liste par défaut
     // appliquerait des permissions que l'administrateur n'a pas relues.
-    return { source: path, profile: profileFor("testeur"), trustedPublishers: [], developerMode: false, allowedPrograms: [], revocation: null, error: err instanceof Error ? err.message : String(err) };
+    const error = err instanceof Error ? err.message : String(err);
+    return { source: path, profile: profileFor("testeur"), trustedPublishers: [], developerMode: false, allowedPrograms: [], programConsent: false, origineDesProgrammes: `${path} est refusé (${error}) : aucun programme n'est autorisé.`, revocation: null, error };
   }
   const p = parsed.profile;
   const profile = p
@@ -100,6 +116,10 @@ export async function loadAdminConfig(path: string): Promise<AdminConfig> {
     developerMode: parsed.developerMode,
     // Le fichier remplace la liste ; sans mention, celle par défaut s'applique.
     allowedPrograms: parsed.allowedPrograms ?? [...DEFAULT_ALLOWED_PROGRAMS],
+    programConsent: parsed.programConsent,
+    origineDesProgrammes: parsed.allowedPrograms
+      ? `Liste de \`allowedPrograms\` dans ${path} ; elle remplace la liste par défaut, qui ne s'applique donc pas.`
+      : `Liste par défaut : ${path} ne contient pas \`allowedPrograms\`. L'y ajouter remplace la liste par défaut, sans s'y ajouter.`,
     revocation: rev ? { rootPublicKeyPem: rev.rootPublicKeyPem, ...(rev.file ? { file: rev.file } : {}), ...(rev.url ? { url: rev.url } : {}) } : null,
   };
 }

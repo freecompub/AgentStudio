@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { envDesOutils } from "./outils.js";
 import { createNodeProcessRunner } from "../process/node-process-runner.js";
 import type { FormatReport, LintReport, ProcessRunner, StackAdapter } from "../protocols.js";
 import { compileBuildErrorSpec, readBuildErrors } from "./build-errors.js";
@@ -108,6 +109,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
             const r = await runner
               .run(c.command[0]!, args, {
                 cwd: opts.root,
+                env: envDesOutils(profile, opts.root),
                 timeoutMs: opts.timeoutMs ?? 5 * 60_000,
                 ...(opts.signal ? { signal: opts.signal } : {}),
               })
@@ -137,6 +139,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
             const r = await runner
               .run(c.command[0]!, substituer(c.command.slice(1), "", opts.files ?? []), {
                 cwd: opts.root,
+                env: envDesOutils(profile, opts.root),
                 timeoutMs: opts.timeoutMs ?? 5 * 60_000,
                 ...(opts.signal ? { signal: opts.signal } : {}),
               })
@@ -161,6 +164,7 @@ export function createProfileAdapter(profile: StackProfile, deps: ProfileAdapter
             try {
               const r = await runner.run(c.command[0]!, substituer(c.command.slice(1), rapport, [], "", dossier), {
                 cwd: opts.root,
+                env: envDesOutils(profile, opts.root),
                 timeoutMs: opts.timeoutMs ?? 60 * 60_000,
                 ...(opts.signal ? { signal: opts.signal } : {}),
               });

@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSessionStore, ScriptedRuntime, sequentialIds } from "@agent-studio/core/testing";
+import type { ConfirmAnswer, ConfirmRequest } from "@agent-studio/core";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -29,8 +30,12 @@ layout:
   sources: ["src/**"]
 `;
 
-async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProjet?: string; fournie?: string; sansRepli?: boolean }) {
-  const root = await mkdtemp(join(base, "projet-"));
+/**
+ * `repondre` : l'utilisateur à qui l'on demande d'accepter un programme (ADR 0075) ; `consentement` :
+ * ce que permet l'administrateur (par défaut, oui) ; `root` : rouvrir un projet déjà créé.
+ */
+async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProjet?: string; fournie?: string; sansRepli?: boolean; repondre?: (q: ConfirmRequest) => ConfirmAnswer; consentement?: boolean; root?: string; taches?: string; repliPermis?: boolean }) {
+  const root = o.root ?? (await mkdtemp(join(base, "projet-")));
   if (o.profilProjet || o.fichierProjet) await mkdir(join(root, ".agent-studio"), { recursive: true });
   if (o.profilProjet) await writeFile(join(root, ".agent-studio", "stack.yaml"), o.profilProjet);
   if (o.fichierProjet) await writeFile(join(root, ".agent-studio", "projet.yaml"), o.fichierProjet);
@@ -39,8 +44,10 @@ async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProj
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: [], sources: [] }, infrastructureModules: [], detect: async () => o.detecte ?? false, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
     allowedPrograms: ["pytest"],
+    origineDesProgrammes: "Liste de `allowedPrograms` dans /etc/agent-studio/admin.json.",
+    programConsent: o.consentement ?? true,
     ...(o.sansRepli ? { sansRepli: true } : {}),
-    tasksDir: join(root, ".taches"),
+    tasksDir: o.taches ?? join(root, ".taches"),
     taskStore: new MemoryTaskStore(),
     evidenceStore: new MemoryEvidenceStore(),
     interactionStore: new MemoryInteractionStore(),
@@ -54,8 +61,10 @@ async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProj
     onInteractions: () => {},
     onPost: (_e, md) => void posts.push(md),
     ...(o.fournie !== undefined ? { pileFournie: o.fournie } : {}),
+    ...(o.repliPermis ? { repliPermis: true } : {}),
+    ...(o.repondre ? { confirmerProgrammes: { confirm: async (q: ConfirmRequest) => o.repondre!(q) } } : {}),
   });
-  return { services, posts };
+  return { services, posts, root };
 }
 
 describe("Pile du projet (ADR 0068, point 8)", () => {
@@ -137,8 +146,26 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
     await expect(ouvrir({ fournie: profil("python-client", "curl"), sansRepli: true })).rejects.toThrow(/curl/);
   });
 
+  it("le refus d'un programme dit d'où vient la liste, pour une pile fournie, une pile du projet et un composant (09/11)", async () => {
+    const origine = /Programmes autorisés : pytest\. Liste de `allowedPrograms` dans \/etc\/agent-studio\/admin\.json\./;
+    await expect(ouvrir({ fournie: profil("python-client", "uv"), sansRepli: true })).rejects.toThrow(origine);
+    const a = await ouvrir({ fichierProjet: `pile:\n${profil("python-projet", "uv").trim().split("\n").map((l) => `  ${l}`).join("\n")}\n`, detecte: true });
+    expect(a.posts.join("\n")).toMatch(origine);
+    await a.services.dispose();
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const b = await ouvrir({ fichierProjet: `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api", "uv"), 6)}\n`, detecte: true });
+    expect(b.posts.join("\n")).toMatch(origine);
+    await b.services.dispose();
+  });
+
   it("sans repli permis et sans aucune pile : refus qui dit quoi fournir", async () => {
     await expect(ouvrir({ sansRepli: true })).rejects.toThrow(/stack\.yaml/);
+  });
+
+  it("sans repli permis, mais ouvert pour proposer la pile (`skraft_pile`, ADR 0075) : le repli, sans refus", async () => {
+    const a = await ouvrir({ sansRepli: true, repliPermis: true });
+    expect(a.services.pile()).toEqual({ id: "typescript", source: "repli" });
+    await a.services.dispose();
   });
 
   it("repli permis (application de bureau) : premier adaptateur, source « repli », et l'avertissement habituel", async () => {
@@ -146,5 +173,80 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
     expect(a.services.pile()).toEqual({ id: "typescript", source: "repli" });
     expect(a.posts.join("\n")).toMatch(/reconnu par aucun adaptateur/);
     await a.services.dispose();
+  });
+});
+
+/**
+ * Un programme hors de la liste de l'administrateur (ADR 0075) : au lieu de refuser la pile, on demande
+ * à l'utilisateur, s'il y a quelqu'un à qui demander et que l'administrateur le permet.
+ */
+describe("Programme hors liste, accepté par l'utilisateur", () => {
+  const enPile = (t: string) => `pile:\n${t.trim().split("\n").map((l) => `  ${l}`).join("\n")}\n`;
+  const avecUv = enPile(profil("python-uv", "uv"));
+
+  it("« une fois » : la pile est retenue ; la question nomme le programme, la commande et l'origine de la liste ; rouvert, on redemande", async () => {
+    const questions: ConfirmRequest[] = [];
+    const a = await ouvrir({ fichierProjet: avecUv, repondre: (q) => (questions.push(q), "allow-once") });
+    expect(a.services.pile()).toEqual({ id: "python-uv", source: "projet" });
+    expect(questions).toHaveLength(1);
+    expect(questions[0]!.title).toBe("Autoriser « uv » pour ce projet ?");
+    expect(questions[0]!.detail).toContain("tests : uv --junit-xml={rapport}");
+    expect(questions[0]!.detail).toContain("Liste de `allowedPrograms` dans /etc/agent-studio/admin.json.");
+    expect(questions[0]!.detail).toMatch(/sans shell/);
+    expect(a.posts.join("\n")).toMatch(/« uv » accepté par l'utilisateur pour ce projet \(cette fois\)/);
+    await a.services.dispose();
+    const b = await ouvrir({ root: a.root, repondre: (q) => (questions.push(q), "allow-once") });
+    expect(questions).toHaveLength(2);
+    await b.services.dispose();
+  });
+
+  it("« toujours » : retenu hors du dépôt, rouvert sans question ; pas pour un autre projet", async () => {
+    const a = await ouvrir({ fichierProjet: avecUv, repondre: () => "allow-always" });
+    expect(a.services.pile().source).toBe("projet");
+    await a.services.dispose();
+    const b = await ouvrir({ root: a.root, repondre: () => { throw new Error("ne devait pas redemander"); } });
+    expect(b.services.pile()).toEqual({ id: "python-uv", source: "projet" });
+    await b.services.dispose();
+    const questions: string[] = [];
+    // Même dossier des tâches, autre projet : l'accord ne vaut que pour le projet accepté.
+    const c = await ouvrir({ fichierProjet: avecUv, detecte: true, taches: join(a.root, ".taches"), repondre: (q) => (questions.push(q.title), "deny") });
+    expect(questions).toEqual(["Autoriser « uv » pour ce projet ?"]);
+    await c.services.dispose();
+  });
+
+  it("« non », personne à qui demander, ou administrateur qui l'interdit : refusée comme avant", async () => {
+    // L'administrateur qui l'interdit : même si l'utilisateur dirait oui, on ne lui demande rien.
+    const poseesMalgre: string[] = [];
+    for (const o of [{ repondre: (): ConfirmAnswer => "deny" }, {}, { repondre: (q: ConfirmRequest): ConfirmAnswer => (poseesMalgre.push(q.title), "allow-always"), consentement: false }]) {
+      const a = await ouvrir({ fichierProjet: avecUv, detecte: true, ...o });
+      expect(a.services.pile().source).toBe("detection");
+      expect(a.posts.join("\n")).toMatch(/« uv » \(tests\) n'est pas un programme autorisé/);
+      await a.services.dispose();
+    }
+    expect(poseesMalgre).toEqual([]);
+  });
+
+  it("un programme désigné par un chemin n'est jamais demandé : il échapperait à la liste", async () => {
+    const posees: string[] = [];
+    const a = await ouvrir({ fichierProjet: enPile(profil("python-chemin", "./outils/lanceur")), detecte: true, repondre: (q) => (posees.push(q.title), "allow-always") });
+    expect(a.services.pile().source).toBe("detection");
+    expect(posees).toEqual([]);
+    await a.services.dispose();
+  });
+
+  it("pile fournie et composant : même question ; deux sections du même programme, une seule question", async () => {
+    const questions: ConfirmRequest[] = [];
+    const repondre = (q: ConfirmRequest): ConfirmAnswer => (questions.push(q), "allow-once");
+    const deuxSections = `${profil("python-uv", "uv")}lint:\n  command: [uv, run, ruff]\n  report: eslint-json\n`;
+    const a = await ouvrir({ fournie: deuxSections, sansRepli: true, repondre });
+    expect(a.services.pile()).toEqual({ id: "python-uv", source: "client" });
+    expect(questions).toHaveLength(1);
+    expect(questions[0]!.detail).toContain("lint : uv run ruff");
+    await a.services.dispose();
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const b = await ouvrir({ fichierProjet: `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api", "uv"), 6)}\n`, repondre });
+    expect(b.services.pile().source).toBe("projet");
+    expect(questions).toHaveLength(2);
+    await b.services.dispose();
   });
 });

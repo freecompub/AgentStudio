@@ -4,6 +4,12 @@ export interface XunitCase {
   status: "passed" | "failed" | "skipped";
   /** Message porté par `<failure>` ou `<error>` : sans lui, la raison de l'échec est inconnue. */
   message?: string;
+  /**
+   * Ce sur quoi classer l'échec : l'attribut `type` (JUnit), le message, et la dernière ligne du corps,
+   * où pytest écrit le type d'exception (« tests/a.py:4: AssertionError »). Jamais le corps entier :
+   * pytest y recopie le code du test, et un `assertEqual(` plus haut ferait d'une ValueError une assertion.
+   */
+  raison?: string;
 }
 
 const decode = (s: string) =>
@@ -25,7 +31,9 @@ export function parseXunit(xml: string): XunitCase[] {
     // Le message vit dans l'attribut `message`, sinon dans le contenu de la balise.
     const balise = /<(?:failure|error)\b([^>]*)(?:\/>|>([\s\S]*?)<\/(?:failure|error)>)/.exec(body);
     const message = balise ? attr(` ${balise[1] ?? ""}`, "message") || decode((balise[2] ?? "").trim()) : "";
-    cases.push({ classname: attr(` ${tag}`, "classname"), name: attr(` ${tag}`, "name"), status, ...(message ? { message } : {}) });
+    const derniereLigne = balise ? decode(balise[2] ?? "").trim().split("\n").at(-1)?.trim() ?? "" : "";
+    const raison = balise ? [attr(` ${balise[1] ?? ""}`, "type"), message, derniereLigne].filter(Boolean).join("\n") : "";
+    cases.push({ classname: attr(` ${tag}`, "classname"), name: attr(` ${tag}`, "name"), status, ...(message ? { message } : {}), ...(raison ? { raison } : {}) });
   }
   return cases;
 }

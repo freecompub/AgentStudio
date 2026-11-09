@@ -24,6 +24,14 @@ describe("proposeProfile — ce que /stack init écrirait", () => {
     expect("error" in r ? null : r.profile.detect).toEqual([{ fichier: "package.json", contient: '"vitest"' }]);
   });
 
+  it("un projet qui porte uv.lock : ses outils sont dans .venv, déclarés dans `outils` (ADR 0075)", () => {
+    // Sans eux, `pytest` du projet n'est pas dans le PATH, et la commande de test échoue.
+    const r = parseStackProfile(proposeProfile({ fichiers: ["pyproject.toml", "uv.lock"], dependances: [] })!, { allowedPrograms: AUTORISES });
+    expect("error" in r ? r.error : r.profile.outils).toEqual([".venv/bin", ".venv/Scripts"]);
+    const sans = parseStackProfile(proposeProfile({ fichiers: ["pyproject.toml"], dependances: [] })!, { allowedPrograms: AUTORISES });
+    expect("error" in sans ? sans.error : sans.profile.outils).toBeUndefined();
+  });
+
   it("ne propose rien plutôt que de deviner", () => {
     expect(proposeProfile({ fichiers: ["README.md"], dependances: [] })).toBeNull();
   });

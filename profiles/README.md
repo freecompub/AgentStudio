@@ -5,8 +5,10 @@ l'application n'ait pas besoin d'un adaptateur écrit en TypeScript pour ce lang
 
 ## S'en servir
 
-Copier l'exemple qui convient dans `.agent-studio/projet.yaml`, à la racine du projet, puis
-l'ajuster (ADR 0071). Le fichier a deux sections, validées chacune selon ses règles :
+`/stack init` (ou l'outil `skraft_pile` du serveur MCP) fait découvrir la pile par un agent, qui
+lit le projet ; le code la vérifie — programmes, schéma, diagnostic, canaris lancés dans une copie —
+avant de l'écrire après votre accord (ADR 0076). Sinon, copier l'exemple qui convient dans
+`.agent-studio/projet.yaml`, à la racine du projet, puis l'ajuster (ADR 0071). Le fichier a deux sections, validées chacune selon ses règles :
 
 - `pile` — **comment** lancer les outils : tests, lint, format, mutation, emplacements, canaris.
   Elle est lue à l'ouverture et **l'emporte sur la détection automatique** ; refusée, la raison
@@ -41,6 +43,24 @@ detect:
 
 Un élément qui correspond suffit. La sous-chaîne n'est pas une expression régulière, et le chemin
 est relatif à la racine, sans `..`.
+
+## Les outils du projet
+
+Un projet qui installe ses outils chez lui (un environnement virtuel, par exemple) les déclare dans
+`outils` (ADR 0075). Ces dossiers passent en tête du PATH de chaque commande du profil, comme si
+l'environnement était activé :
+
+```yaml
+outils: [.venv/bin, .venv/Scripts]   # Linux et macOS, puis Windows
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+```
+
+Le programme reste jugé par son nom contre la liste de l'administrateur : `pytest` se lance sans
+autoriser un lanceur comme `uv`, qui ferait aussi tout le reste (`uv run --with`, installations).
+Les chemins sont relatifs à la racine (du composant, s'il y en a), sans `..`. Les canaris tournent
+dans une copie Git du projet, qui n'a pas ces outils (ils sont ignorés par Git) : ils prennent ceux
+du projet. `/stack init` les propose quand le projet porte `uv.lock`.
 
 ## Les rapports de tests
 

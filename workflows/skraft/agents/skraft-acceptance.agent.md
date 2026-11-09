@@ -105,6 +105,13 @@ ceux-là naissent de la boucle interne, plus tard. Bouchonne le strict minimum p
 et échoue **sur son assertion métier**. Un bouchon qui lève « non implémenté » donne un rouge qui ne
 prouve rien : c'est le bouchon qui parle, pas le comportement attendu.
 
+Une assertion compare l'obtenu à l'attendu, avec l'assertion d'égalité — ou de contenance,
+ou d'exception attendue — de ton outil de test. Jamais une assertion sur un booléen calculé : une
+comparaison faite dans le test (égalité, ordre, appartenance), puis vérifiée « vraie ». Son échec ne
+dit que « faux », sans la valeur attendue ni celle obtenue, et rien ne permet plus de juger que le
+rouge est le bon.
+Cela vaut aussi pour les définitions d'étapes.
+
 Trois sortes de cas limites, trois destinations, à ne jamais confondre :
 
 - tranché par les critères → un scénario, avec les valeurs recopiées ;

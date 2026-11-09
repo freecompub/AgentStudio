@@ -18,7 +18,7 @@ export function lireTests(reader: StackProfile["tests"]["report"], brut: string,
       status: c.status,
       // La porte RED distingue un rouge légitime — assertion, symbole manquant — d'une erreur
       // de syntaxe. Sans classification, elle laisserait passer la seconde.
-      ...(c.status === "failed" ? { failureKind: classifyFailure(c.message ?? ""), ...(c.message ? { message: c.message } : {}) } : {}),
+      ...(c.status === "failed" ? { failureKind: classifyFailure(c.raison ?? c.message ?? ""), ...(c.message ? { message: c.message } : {}) } : {}),
     }));
   if (reader === "vitest-json") return parseVitestReport(JSON.parse(brut), root);
   if (reader === "tap") return parseTap(brut, root);

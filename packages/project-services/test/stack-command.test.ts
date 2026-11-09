@@ -409,3 +409,140 @@ describe("/stack init — le BDD du projet", () => {
     expect("error" in api ? api.error : api.profile.bdd).toBeUndefined();
   });
 });
+
+/**
+ * La pile découverte par un agent, vérifiée par le code (ADR 0076). L'agent est simulé : il rend ses
+ * propositions dans l'ordre. Le code juge chacune — lecture (programmes, schéma), BDD, diagnostic,
+ * canaris — et ne fait écrire qu'une pile qui a tout passé, après l'accord de l'utilisateur.
+ */
+describe("/stack init — découverte par un agent, vérifiée par le code", () => {
+  const PYTHON = "id: python\ndetect: [pyproject.toml]\ntests:\n  command: [pytest, \"--junit-xml={rapport}\"]\n  report: junit-xml\nlayout:\n  unitTests: [\"tests/**\"]\n";
+  type Reponse = Awaited<ReturnType<NonNullable<StackCommandDeps["decouverte"]>["decouvrir"]>>;
+  function avecAgent(reponses: Reponse[], over: Partial<StackCommandDeps> = {}) {
+    const demandes: Parameters<NonNullable<StackCommandDeps["decouverte"]>["decouvrir"]>[0][] = [];
+    const h = harnais({
+      decouverte: {
+        decouvrir: async (d) => {
+          demandes.push(d);
+          return reponses.shift() ?? { erreur: "plus de réponse scriptée" };
+        },
+        lirePile: async (yaml) => {
+          const r = parseStackProfile(yaml, { allowedPrograms: AUTORISES });
+          return "error" in r ? { error: r.error } : { profile: r.profile };
+        },
+      },
+      canaris: async () => [{ gravite: "ok", message: "canaris passés" }],
+      ...over,
+    });
+    return { ...h, demandes };
+  }
+  const une = (yaml = PYTHON, racine = ".") => ({ piles: [{ racine, yaml }], justification: "pyproject.toml et tests/." });
+
+  it("l'agent reçoit les indices du code ; sa pile vérifiée est montrée, confirmée, puis écrite", async () => {
+    const h = avecAgent([une()], { indices: async () => ({ fichiers: ["pyproject.toml", "uv.lock"], dependances: [], arborescence: ["pyproject.toml", "uv.lock", "tests/test_a.py"] }) });
+    await h.lancer("init");
+    expect(h.demandes).toHaveLength(1);
+    // Les indices : fichiers repères, arborescence, modèle reconnu par les règles, programmes autorisés.
+    expect(h.demandes[0]!.indices).toMatch(/uv\.lock/);
+    expect(h.demandes[0]!.indices).toMatch(/tests\/test_a\.py/);
+    expect(h.demandes[0]!.indices).toMatch(/outils: \[\.venv\/bin, \.venv\/Scripts\]/);
+    expect(h.postes.join("\n")).toMatch(/```yaml\n[\s\S]*id: python[\s\S]*```/);
+    expect(h.postes.join("\n")).toMatch(/pyproject\.toml et tests\//);
+    expect(h.ecrits).toEqual([PYTHON]);
+  });
+
+  it("une pile refusée repart à l'agent avec ses motifs ; la suivante, valide, est écrite", async () => {
+    const h = avecAgent([une(PYTHON.replace("pytest", "curl")), une()]);
+    await h.lancer("init");
+    expect(h.demandes).toHaveLength(2);
+    expect(h.demandes[1]!.precedent?.motifs.join("\n")).toMatch(/« curl » \(tests\) n'est pas un programme autorisé/);
+    expect(h.demandes[1]!.precedent?.piles[0]!.yaml).toContain("curl");
+    expect(h.ecrits).toEqual([PYTHON]);
+  });
+
+  it("le diagnostic et les canaris jugent aussi : un problème est un refus", async () => {
+    let n = 0;
+    const h = avecAgent([une(), une()], { canaris: async () => (n++ === 0 ? [{ gravite: "probleme", message: "Canari assertion : classé other_error." }] : [{ gravite: "ok", message: "ok" }]) });
+    await h.lancer("init");
+    expect(h.demandes[1]!.precedent?.motifs).toEqual(["Canari assertion : classé other_error."]);
+    expect(h.ecrits).toHaveLength(1);
+    const g = avecAgent([une(), une(), une()], { diagnostiquer: async () => [{ gravite: "probleme", message: "`pytest` est introuvable." }] });
+    await g.lancer("init");
+    expect(g.ecrits).toEqual([]);
+  });
+
+  it("des canaris impossibles à lancer : un motif de refus, pas une exception", async () => {
+    const h = avecAgent([une(), une(), une()], { canaris: async () => { throw new Error("copie isolée impossible"); } });
+    await h.lancer("init");
+    expect(h.demandes[1]!.precedent?.motifs).toEqual(["Les canaris n'ont pas pu être lancés : copie isolée impossible."]);
+    expect(h.ecrits).toEqual([]);
+  });
+
+  it("trois refus : rien n'est écrit, les derniers motifs et la dernière proposition sont montrés", async () => {
+    const h = avecAgent([une(PYTHON.replace("pytest", "curl")), une(PYTHON.replace("pytest", "curl")), une(PYTHON.replace("pytest", "wget"))]);
+    await h.lancer("init");
+    expect(h.demandes).toHaveLength(3);
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toMatch(/Rien n'a été écrit/);
+    expect(h.postes.at(-1)).toMatch(/wget/);
+  });
+
+  it("des signes de BDD sans `bdd` déclaré : refusé ; `bdd: false` ou un couple déclaré passe", async () => {
+    const indices = async () => ({ fichiers: ["pyproject.toml"], dependances: [], arborescence: ["features/a.feature", "pyproject.toml"] });
+    const h = avecAgent([une(), une(`${PYTHON}bdd: false\n`)], { indices });
+    await h.lancer("init");
+    expect(h.demandes[1]!.precedent?.motifs.join("\n")).toMatch(/BDD/);
+    expect(h.ecrits).toEqual([`${PYTHON}bdd: false\n`]);
+  });
+
+  it("l'agent pose une question : rien n'est écrit, la question est rendue avec ses réponses possibles", async () => {
+    const h = avecAgent([{ question: "Quelle commande lance les tests ?", choix: ["make test", "pytest"] }]);
+    await h.lancer("init");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toMatch(/Quelle commande lance les tests \?[\s\S]*make test[\s\S]*pytest/);
+  });
+
+  it("la question dit comment y répondre ; la réponse, toute la fin de la ligne, est donnée à l'agent", async () => {
+    const q = avecAgent([{ question: "Quelle commande lance les tests ?", choix: [] }]);
+    await q.lancer("init");
+    expect(q.postes.at(-1)).toMatch(/`\/stack init --reponse <ta réponse>`/);
+    const h = avecAgent([une()]);
+    await h.lancer("init --sans-bdd --reponse les tests se lancent avec pytest, pas make");
+    expect(h.demandes[0]!.indices).toMatch(/## Réponse de l'utilisateur\n\nles tests se lancent avec pytest, pas make$/);
+    expect(h.demandes[0]!.indices).toMatch(/sans BDD/);
+    const vide = avecAgent([une()]);
+    await vide.lancer("init --reponse");
+    expect(vide.postes.at(-1)).toMatch(/--reponse.*attend/);
+  });
+
+  it("la découverte échoue (pas de runtime) : rien n'est écrit, et pourquoi", async () => {
+    const h = avecAgent([{ erreur: "Non connecté à GitHub." }]);
+    await h.lancer("init");
+    expect(h.ecrits).toEqual([]);
+    expect(h.postes.at(-1)).toMatch(/Rien n'a été écrit[\s\S]*Non connecté à GitHub/);
+  });
+
+  it("une racine absolue, hors du projet ou en double : refusée", async () => {
+    const h = avecAgent([{ piles: [{ racine: "../ailleurs", yaml: PYTHON }], justification: "x" }, { piles: [{ racine: "api", yaml: PYTHON }, { racine: "api", yaml: PYTHON }], justification: "x" }, une()]);
+    await h.lancer("init");
+    expect(h.demandes[1]!.precedent?.motifs.join("\n")).toMatch(/\.\.\/ailleurs/);
+    expect(h.demandes[2]!.precedent?.motifs.join("\n")).toMatch(/api.*deux fois|deux fois.*api/);
+  });
+
+  it("plusieurs piles : la section composants est proposée, confirmée, puis écrite", async () => {
+    const composants: string[] = [];
+    const h = avecAgent([{ piles: [{ racine: "api", yaml: PYTHON }, { racine: "web", yaml: PYTHON }], justification: "deux sous-projets" }], { ecrireComposants: async (y) => void composants.push(y) });
+    await h.lancer("init");
+    expect(composants).toHaveLength(1);
+    expect(composants[0]).toMatch(/racine: api[\s\S]*racine: web/);
+  });
+
+  it("--sans-bdd : une pile qui déclare quand même un BDD est refusée", async () => {
+    const avecBdd = `${PYTHON}bdd:\n  - lanceur: pytest-bdd\n    features: features\n    etapes: tests/steps\n`;
+    const h = avecAgent([une(avecBdd), une(`${PYTHON}bdd: false\n`)]);
+    await h.lancer("init --sans-bdd");
+    expect(h.demandes[0]!.indices).toMatch(/sans BDD/i);
+    expect(h.demandes[1]!.precedent?.motifs.join("\n")).toMatch(/sans BDD/i);
+    expect(h.ecrits).toHaveLength(1);
+  });
+});

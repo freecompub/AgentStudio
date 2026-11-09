@@ -2,13 +2,15 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSess
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
 import type { InteractionDto, TaskCardDto } from "../src/dto.js";
 import { workspaceServicesFactory } from "../src/workspace-services.js";
+import { ROLE_DECOUVREUR } from "../src/decouverte-de-pile-agent.js";
+import { FICHIERS_NODE as FICHIERS, PILE_NODE } from "./support/pile-node.js";
 
 function fakeWorkspace(): Workspace {
   let n = 0;
@@ -69,7 +71,7 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
+  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; confirmerProgrammes?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
     for (const [rel, contenu] of Object.entries(opts.contenus ?? {})) {
@@ -113,6 +115,7 @@ describe("Services d'un projet (J2)", () => {
       onInteractions: () => {},
       onPost: (_e, md) => posts.push(md),
       ...(opts.confirmer ? { confirmer: { confirm: async () => opts.confirmer! } } : {}),
+      ...(opts.confirmerProgrammes ? { confirmerProgrammes: { confirm: async () => opts.confirmerProgrammes! } } : {}),
     });
     return { services, posts, ecrits, racine, cleanup };
   }
@@ -170,71 +173,14 @@ infrastructureModules: [django]
     await cleanup();
   });
 
-  it("/stack init propose un profil puis n'écrit rien quand l'utilisateur refuse", async () => {
-    const { services, posts, ecrits, cleanup } = await ouvrir({ confirmer: "deny", fichiers: ["pyproject.toml", "tests/test_a.py"] });
-    await services.route("/stack init");
-    expect(posts.at(-2)).toMatch(/```yaml/);
-    expect(posts.at(-1)).toMatch(/rien n'a été écrit/i);
-    expect(ecrits).toEqual([]);
-    await cleanup();
-  });
-
-  it("/stack init écrit le profil après accord, à l'emplacement versionné", async () => {
-    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"] });
-    await services.route("/stack init");
-    expect(ecrits).toHaveLength(1);
-    // Fichier de projet (ADR 0071) : le profil va dans la section pile.
-    expect(ecrits[0]).toMatch(/^\.agent-studio\/projet\.yaml\n/);
-    expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
-    await cleanup();
-  });
-
-  it("/stack init garde la section qualite d'un projet.yaml existant", async () => {
-    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers: ["pyproject.toml"], projet: "# barre de l'équipe\nqualite:\n  couverture:\n    reste: 70\n" });
-    await services.route("/stack init");
-    expect(ecrits).toHaveLength(1);
-    expect(ecrits[0]).toContain("# barre de l'équipe");
-    expect(ecrits[0]).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
-    expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
-    await cleanup();
-  });
-
-  it("/stack init sur un dépôt mixte (ADR 0074) : un composant par sous-projet reconnu, jusqu'à 4 niveaux ; dépendances et dossiers cachés écartés ; la section qualite gardée", async () => {
-    const fichiers = [
-      "services/api/pyproject.toml",
-      "web/package.json",
-      "a/b/c/d/pyproject.toml",
-      "a/b/c/d/e/pyproject.toml",
-      "node_modules/x/pyproject.toml",
-      ".git/hooks/pyproject.toml",
-      "README.md",
-    ];
-    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, projet: "qualite:\n  couverture:\n    reste: 70\n" });
-    // `web/package.json` n'est pas sur le disque : sans dépendance `vitest` lisible, `web` n'est pas reconnu.
-    await services.route("/stack init");
-    expect(ecrits).toHaveLength(1);
-    const ecrit = ecrits[0]!;
-    expect(ecrit).toMatch(/^\.agent-studio\/projet\.yaml\n/);
-    expect(ecrit).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
-    expect(ecrit).not.toMatch(/^pile:/m);
-    expect([...ecrit.matchAll(/racine: (\S+)/g)].map((m) => m[1])).toEqual(["a/b/c/d", "services/api"]);
-    await cleanup();
-  });
-
-  it("/stack init détecte le BDD (ADR 0074 §2.5) : lanceur cité par un manifeste, dossier des .feature, dossier des étapes", async () => {
-    const fichiers = ["pyproject.toml", "tests/features/panier.feature", "tests/steps/test_panier.py", "src/panier.py"];
-    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "pyproject.toml": 'dependencies = ["pytest-bdd>=7"]\n' } });
-    await services.route("/stack init");
-    expect(ecrits[0]).toMatch(/bdd:\n\s+- lanceur: pytest-bdd\n\s+features: tests\/features\n\s+etapes: tests\/steps/);
-    await cleanup();
-  });
-
-  it("/stack init sur un sous-projet en BDD : chemins relatifs à sa racine", async () => {
-    const fichiers = ["services/api/pyproject.toml", "services/api/features/a.feature", "services/api/features/steps/test_a.py", "web/README.md"];
-    const { services, ecrits, cleanup } = await ouvrir({ confirmer: "allow-once", fichiers, contenus: { "services/api/pyproject.toml": 'dependencies = ["behave"]\n' } });
-    await services.route("/stack init");
-    expect(ecrits[0]).toMatch(/racine: services\/api/);
-    expect(ecrits[0]).toMatch(/lanceur: behave\n\s+features: features\n\s+etapes: features\/steps/);
+  it.skipIf(process.platform === "win32")("/stack doctor trouve un programme dans les `outils` du profil, absent du PATH (ADR 0075)", async () => {
+    const profil = PROFIL_VALIDE.replace("pytest", "montest-outils").replace("detect: [pyproject.toml]", "detect: [pyproject.toml]\noutils: [outils/bin]");
+    const { services, posts, racine, cleanup } = await ouvrir({ profil, allowedPrograms: ["montest-outils"], confirmer: "deny" });
+    await mkdir(join(racine, "outils", "bin"), { recursive: true });
+    await writeFile(join(racine, "outils", "bin", "montest-outils"), "#!/bin/sh\nexit 0\n");
+    await chmod(join(racine, "outils", "bin", "montest-outils"), 0o755);
+    await services.route("/stack doctor");
+    expect(posts.join("\n")).toMatch(/`montest-outils` est lançable \(tests\)/);
     await cleanup();
   });
 
@@ -409,3 +355,155 @@ infrastructureModules: [django]
     expect(notifications.at(-1)).toMatch(/^Tâche à surveiller \| Cycle TDD/);
   });
 });
+
+/**
+ * `/stack init` dans les services (ADR 0076) : la pile proposée par un agent scripté, vérifiée pour de
+ * vrai — accord sur les programmes, schéma, diagnostic, et de vrais canaris lancés sous `node --test`
+ * dans une copie du projet (un dossier temporaire tient lieu de worktree Git). Aucun LLM.
+ */
+describe("/stack init : la pile découverte par un agent, vérifiée par le code", () => {
+  async function ouvrir(o: { reponses: object[]; programmes?: string[]; confirmer?: "allow-once" | "deny"; confirmerProgrammes?: "allow-once" | "deny"; projet?: string; contenus?: Record<string, string> }) {
+    const questionsProgrammes: string[] = [];
+    const racine = await mkdtemp(join(tmpdir(), "agent-studio-decouverte-"));
+    const contenus = { ...FICHIERS, ...o.contenus };
+    for (const [rel, c] of Object.entries(contenus)) {
+      await mkdir(dirname(join(racine, rel)), { recursive: true });
+      await writeFile(join(racine, rel), c);
+    }
+    if (o.projet !== undefined) {
+      await mkdir(join(racine, ".agent-studio"), { recursive: true });
+      await writeFile(join(racine, ".agent-studio", "projet.yaml"), o.projet);
+    }
+    const prompts: string[] = [];
+    const reponses = [...o.reponses];
+    const runtime = new ScriptedRuntime().behave(ROLE_DECOUVREUR, async (t) => {
+      prompts.push(t.prompt);
+      const r = reponses.shift();
+      if (r) await t.callTool("submit_pile", r);
+    });
+    const posts: string[] = [];
+    const ecrits: string[] = [];
+    const copies: string[] = [];
+    const services = await workspaceServicesFactory({
+      extensions: [],
+      stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
+      allowedPrograms: o.programmes ?? ["node"],
+      programConsent: true,
+      tasksDir: join(racine, ".taches"),
+      taskStore: new MemoryTaskStore(),
+      evidenceStore: new MemoryEvidenceStore(),
+      interactionStore: new MemoryInteractionStore(),
+      taskSessionStore: new MemoryTaskSessionStore(),
+      clock: fixedClock(),
+      ids: sequentialIds("id-"),
+    })({
+      workspace: {
+        ...fakeWorkspace(),
+        root: racine,
+        files: { ...fakeWorkspace().files, read: (rel: string) => readFile(join(racine, rel), "utf8"), list: async () => Object.keys(contenus), write: async (rel, c) => void ecrits.push(`${rel}\n${c}`) },
+        repo: {
+          ...fakeWorkspace().repo,
+          worktree: async () => {
+            const copie = await mkdtemp(join(tmpdir(), "agent-studio-copie-"));
+            await cp(racine, copie, { recursive: true });
+            copies.push(copie);
+            return { root: copie, dispose: () => rm(copie, { recursive: true, force: true }) };
+          },
+        },
+      },
+      runtime: async () => runtime,
+      onTask: () => {},
+      onInteractions: () => {},
+      onPost: (_e, md) => posts.push(md),
+      ...(o.confirmer ? { confirmer: { confirm: async () => o.confirmer! } } : {}),
+      ...(o.confirmerProgrammes ? { confirmerProgrammes: { confirm: async (q: { title: string }) => (questionsProgrammes.push(q.title), o.confirmerProgrammes!) } } : {}),
+    });
+    const cleanup = async () => {
+      await services.dispose();
+      await rm(racine, { recursive: true, force: true });
+    };
+    return { services, posts, ecrits, prompts, copies, questionsProgrammes, cleanup };
+  }
+  const une = (yaml = PILE_NODE, racine = ".") => ({ piles: [{ racine, yaml }], justification: "un manifeste et des tests sous tests/." });
+
+  it("la pile proposée passe les vrais canaris, puis est écrite dans la section pile après accord", async () => {
+    const h = await ouvrir({ reponses: [une()], confirmer: "allow-once" });
+    await h.services.route("/stack init");
+    expect(h.prompts).toHaveLength(1);
+    expect(h.prompts[0]).toContain("`package.json`");
+    expect(h.copies.length).toBeGreaterThan(0);
+    expect(h.ecrits).toHaveLength(1);
+    expect(h.ecrits[0]).toMatch(/^\.agent-studio\/projet\.yaml\n/);
+    expect(h.ecrits[0]).toMatch(/pile:\n\s+id: maison/);
+    await h.cleanup();
+  }, 60_000);
+
+  it("refusée par l'utilisateur : rien n'est écrit", async () => {
+    const h = await ouvrir({ reponses: [une()], confirmer: "deny" });
+    await h.services.route("/stack init");
+    expect(h.ecrits).toEqual([]);
+    expect(h.posts.at(-1)).toMatch(/rien n'a été écrit/i);
+    await h.cleanup();
+  }, 60_000);
+
+  it("un canari mal classé refuse la pile ; l'agent reçoit le motif et corrige", async () => {
+    // Un canari `assertion` qui, en vrai, ne compile pas : le code le voit en l'exécutant.
+    const fausse = PILE_NODE.replace("assert.strictEqual(1, 2);", "assert.strictEqual(1, 2); :::");
+    const h = await ouvrir({ reponses: [une(fausse), une()], confirmer: "allow-once" });
+    await h.services.route("/stack init");
+    expect(h.prompts).toHaveLength(2);
+    expect(h.prompts[1]).toMatch(/refusée[\s\S]*Canari/);
+    expect(h.ecrits).toHaveLength(1);
+    await h.cleanup();
+  }, 60_000);
+
+  it("un programme hors de la liste est demandé avant d'être lancé ; refusé, la pile l'est aussi", async () => {
+    const h = await ouvrir({ reponses: [une(), une(), une()], programmes: [], confirmer: "allow-once", confirmerProgrammes: "deny" });
+    await h.services.route("/stack init");
+    expect(h.copies).toEqual([]);
+    expect(h.ecrits).toEqual([]);
+    expect(h.posts.at(-1)).toMatch(/« node » \(tests\) n'est pas un programme autorisé/);
+    await h.cleanup();
+  }, 60_000);
+
+  // Essai réel du 09/11 : « Oui, cette fois » redemandé au deuxième essai ; la question a attendu, et
+  // Copilot a abandonné l'appel au bout de 3 minutes.
+  it("un programme accepté « cette fois » ne se redemande pas aux essais suivants", async () => {
+    const fausse = PILE_NODE.replace("assert.strictEqual(1, 2);", "assert.strictEqual(1, 2); :::");
+    const h = await ouvrir({ reponses: [une(fausse), une()], programmes: [], confirmer: "allow-once", confirmerProgrammes: "allow-once" });
+    await h.services.route("/stack init");
+    expect(h.prompts).toHaveLength(2);
+    expect(h.questionsProgrammes).toEqual(["Autoriser « node » pour ce projet ?", "Écrire le profil de stack dans .agent-studio/projet.yaml ?"]);
+    expect(h.ecrits).toHaveLength(1);
+    await h.cleanup();
+  }, 60_000);
+
+  it("la section qualite d'un projet.yaml existant est gardée", async () => {
+    const h = await ouvrir({ reponses: [une()], confirmer: "allow-once", projet: "# barre de l'équipe\nqualite:\n  couverture:\n    reste: 70\n" });
+    await h.services.route("/stack init");
+    expect(h.ecrits[0]).toContain("# barre de l'équipe");
+    expect(h.ecrits[0]).toMatch(/qualite:\n\s+couverture:\n\s+reste: 70/);
+    await h.cleanup();
+  }, 60_000);
+
+  it("des sous-projets : leurs indices sont donnés à l'agent, et ses piles deviennent des composants", async () => {
+    const contenus = Object.fromEntries(Object.entries(FICHIERS).map(([f, c]) => [`api/${f}`, c]));
+    const h = await ouvrir({ reponses: [une(PILE_NODE, "api")], confirmer: "allow-once", contenus });
+    await h.services.route("/stack init");
+    expect(h.prompts[0]).toContain("`api/package.json`");
+    expect(h.ecrits[0]).toMatch(/composants:[\s\S]*racine: api/);
+    await h.cleanup();
+  }, 60_000);
+
+  it("le BDD détecté par le code est un indice ; une pile qui l'ignore est refusée", async () => {
+    const contenus = { "features/a.feature": "Feature: a\n", "package.json": '{ "name": "demo", "type": "module", "devDependencies": { "@cucumber/cucumber": "^11" } }\n' };
+    const sansBdd = PILE_NODE.replace("bdd: false\n", "");
+    const h = await ouvrir({ reponses: [une(sansBdd), une()], confirmer: "allow-once", contenus });
+    await h.services.route("/stack init");
+    expect(h.prompts[0]).toMatch(/lanceur cucumber-js/);
+    expect(h.prompts[1]).toMatch(/signes de BDD/);
+    expect(h.ecrits).toHaveLength(1);
+    await h.cleanup();
+  }, 60_000);
+});
+

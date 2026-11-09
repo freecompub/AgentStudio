@@ -7,7 +7,7 @@
  * (D47, O12) — sans quoi un dépôt hostile ferait exécuter n'importe quoi.
  */
 import { describe, expect, it } from "vitest";
-import { parseStackProfile } from "../src/profile/stack-profile.js";
+import { parseStackProfile, programmesDuProfil } from "../src/profile/stack-profile.js";
 
 const MINIMAL = `
 id: python
@@ -67,6 +67,19 @@ describe("Lecture d'un profil de stack", () => {
     expect(erreur(MINIMAL.replace("pytest", "rm"))).toMatch(/autorisé/i);
   });
 
+  it("le refus dit quels programmes sont autorisés, et d'où vient la liste (09/11)", () => {
+    // Sur un autre poste, `uv` refusé sans autre explication : l'utilisateur a corrigé un
+    // `admin.json` que le serveur ne lisait pas, et ne pouvait pas le savoir.
+    const r = parseStackProfile(MINIMAL.replace("pytest", "uv"), { allowedPrograms: ["pytest", "ruff"], origine: "Liste par défaut : aucun fichier à /etc/agent-studio/admin.json." });
+    expect("error" in r && r.error).toBe(
+      "Profil de stack refusé : « uv » (tests) n'est pas un programme autorisé. Programmes autorisés : pytest, ruff. Liste par défaut : aucun fichier à /etc/agent-studio/admin.json.",
+    );
+  });
+
+  it("aucun programme autorisé : le refus le dit plutôt que de citer une liste vide", () => {
+    expect(erreur(MINIMAL, [])).toBe("Profil de stack refusé : « pytest » (tests) n'est pas un programme autorisé. Aucun programme n'est autorisé.");
+  });
+
   it("une commande vide est refusée", () => {
     expect(erreur(MINIMAL.replace(/command: \[pytest.*\]/, "command: []"))).toMatch(/command/);
   });
@@ -85,5 +98,33 @@ lint:
   it("les modules d'infrastructure sont déclarés par le projet, jamais devinés", () => {
     const p = ok(`${MINIMAL}\ninfrastructureModules: [django, sqlalchemy]\n`);
     expect(p.infrastructureModules).toEqual(["django", "sqlalchemy"]);
+  });
+});
+
+/**
+ * Les programmes qu'un profil nomme, section par section (ADR 0075) : pour demander à l'utilisateur
+ * d'accepter ceux qui manquent à la liste, avant de juger le profil. Rien n'est validé ici.
+ */
+describe("programmesDuProfil", () => {
+  it("le premier élément de chaque commande, avec sa section et la commande entière", () => {
+    const yaml = `${MINIMAL.replace('command: [pytest, "--junit-xml={rapport}"]', 'command: [uv, run, pytest, "--junit-xml={rapport}"]')}
+lint:
+  command: [uv, run, ruff, check]
+  report: ruff-json
+format:
+  command: [make, fmt]
+`;
+    expect(programmesDuProfil(yaml)).toEqual([
+      { programme: "uv", section: "tests", commande: ["uv", "run", "pytest", "--junit-xml={rapport}"] },
+      { programme: "uv", section: "lint", commande: ["uv", "run", "ruff", "check"] },
+      { programme: "make", section: "format", commande: ["make", "fmt"] },
+    ]);
+  });
+
+  it("YAML illisible, commande absente ou mal formée : rien", () => {
+    expect(programmesDuProfil(": : :")).toEqual([]);
+    expect(programmesDuProfil("id: x")).toEqual([]);
+    expect(programmesDuProfil("tests:\n  command: uv run")).toEqual([]);
+    expect(programmesDuProfil("tests:\n  command: [3, x]")).toEqual([]);
   });
 });
