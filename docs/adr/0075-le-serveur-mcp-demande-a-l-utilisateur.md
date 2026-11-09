@@ -75,6 +75,18 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
    - Les consignes des réponses (« Rouvrez le projet », « `/stack doctor` ») sont dites dans les
      termes de l'outil (`consignesPourLeClient`).
 7. **Usage possible** : l'accord sur le workflow, qui passe aujourd'hui par l'argument `accord`.
+8. **Les outils du projet, sans lanceur intermédiaire** (`outils` dans le profil).
+   - Pourquoi : un projet uv a son `pytest` dans `.venv/bin`, hors du PATH ; d'où `uv run pytest` et
+     un `uv` à autoriser, qui fait aussi tout le reste.
+   - Les dossiers déclarés passent en tête du PATH de chaque commande du profil (`envDesOutils`), et
+     dans la recherche du diagnostic. Le programme reste jugé par son nom contre la liste.
+   - Les chemins sont relatifs, sans `..`.
+   - Les canaris tournent dans un worktree, sans les outils installés (ignorés par Git) : ils
+     prennent ceux du projet (`racineDesOutils`). Vu à l'essai : sans cela, « aucun rapport lisible ».
+   - `/stack init` propose `outils: [.venv/bin, .venv/Scripts]` quand le projet porte `uv.lock`
+     (table `OUTILS_PAR_MARQUE`, une donnée, pas une règle de langage).
+   - Le risque reste le même : un dépôt qui fournirait son propre `.venv/bin/pytest` n'obtiendrait
+     rien de plus que ce que permet déjà un `conftest.py`.
 
 ## Écarté
 
@@ -82,8 +94,8 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
   C'était déjà refusé (`projet.test.ts` : « le dossier courant n'est pas accepté d'office ») : on ne
   sait pas où le client lance le serveur, peut-être dans le dossier personnel.
 - **Accepter `uv run X`, `poetry run X`, `npx X`… si X est autorisé.** Chaque lanceur a ses options
-  (`uv run --with` installe un paquet), et `npx` télécharge. À la place, le profil déclarera où vivent
-  les outils du projet (`.venv/bin`), et le programme restera jugé par son nom.
+  (`uv run --with` installe un paquet), et `npx` télécharge. À la place, le profil déclare où vivent
+  les outils du projet (point 8), et le programme reste jugé par son nom.
 - **Un accord par argument d'outil pour un dossier ou un programme** : c'est le LLM qui le donnerait.
 
 ## Conséquences
@@ -101,5 +113,8 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
   - `skraft_pile` dans un dépôt Python jetable sans profil : la question d'écriture nomme `pytest`,
     le profil est écrit, et `diagnostiquer` trouve que `pytest` est introuvable sur cette machine
     (pas installé, comme dans un projet uv où il est dans `.venv/bin`) ;
+  - dans un vrai projet uv (`uv init`, `uv add --dev pytest`), `skraft_pile` propose `outils`, et
+    `diagnostiquer` lance les canaris avec le `pytest` du projet. Trois canaris sur quatre passent ;
+    `assertion` est classé `other_error` (défaut du lecteur, à part) ;
   - il n'abandonne pas l'appel pendant que la question attend : une réponse donnée au bout de 75 s
     a abouti (appel de 1 min 17 s).

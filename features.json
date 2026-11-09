@@ -1191,6 +1191,13 @@
       "verify": "pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts test/stdio.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts test/pile.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 (tmux) : proposer écrit projet.yaml après la question, diagnostiquer dit pytest introuvable. Le test de relecture du projet a été écrit après le code ; vérifié en cassant la relecture."
+    },
+    {
+      "id": "profil-outils-du-projet",
+      "title": "Un profil déclare les outils du projet (`outils`, dossiers relatifs) : ils passent en tête du PATH de chaque commande et du diagnostic, les canaris prennent ceux du projet d'origine, et /stack init les propose pour uv.lock ; le programme reste jugé par son nom (ADR 0075 §8)",
+      "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts test/stack-doctor.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI dans un projet uv : profil proposé avec outils, canaris lancés avec le pytest de .venv. Le passage de racineDesOutils par les services aux canaris n'a pas de test unitaire, seulement l'essai réel."
     }
   ]
 }

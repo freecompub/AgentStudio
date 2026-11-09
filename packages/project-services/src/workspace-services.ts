@@ -49,6 +49,7 @@ import {
   parseStackProfile,
   type ParseOptions,
   programmesDuProfil,
+  envDesOutils,
   FICHIER_PROJET,
   ecrireComposantsDansProjet,
   ecrirePileDansProjet,
@@ -829,7 +830,8 @@ function stackCommandDeps(args: {
       const copie = await workspace.repo.worktree();
       try {
         // Composant (ADR 0074) : les canaris tournent dans sa racine, au sein de la copie isolée.
-        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: racine === "." ? copie.root : join(copie.root, racine) });
+        // Les outils installés (`outils`, ADR 0075) sont ignorés par Git : la copie ne les a pas, on prend ceux du projet.
+        const { constats } = await runCanaries(profile, { runner: createNodeProcessRunner(), sandboxRoot: racine === "." ? copie.root : join(copie.root, racine), racineDesOutils: join(workspace.root, racine) });
         return constats;
       } finally {
         await copie.dispose();
@@ -843,7 +845,8 @@ function stackCommandDeps(args: {
       return diagnoseProfile(profile, {
         // BDD déclaré : son lanceur est-il cité par un manifeste du composant (ADR 0074) ?
         manifestes: await manifestesSous(projet, racine),
-        programmeTrouvable: (p) => dansLePath(p),
+        // Les `outils` du profil passent devant le PATH, comme au lancement (ADR 0075).
+        programmeTrouvable: (p) => dansLePath(p, Object.values(envDesOutils(profile, join(workspace.root, racine)))[0]),
         cheminExiste: (glob) => {
           const re = globToRegExp(glob);
           return tous.some((f) => re.test(f));
@@ -856,8 +859,8 @@ function stackCommandDeps(args: {
 }
 
 /** Le programme est-il lançable ? Recherche dans le PATH, sans exécuter quoi que ce soit. */
-function dansLePath(programme: string): boolean {
-  const chemins = (process.env["PATH"] ?? "").split(delimiter).filter(Boolean);
+function dansLePath(programme: string, path = process.env["PATH"]): boolean {
+  const chemins = (path ?? "").split(delimiter).filter(Boolean);
   const suffixes = process.platform === "win32" ? (process.env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";") : [""];
   for (const base of chemins)
     for (const suffixe of suffixes) {

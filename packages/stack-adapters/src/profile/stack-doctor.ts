@@ -25,10 +25,18 @@ export function proposeProfile(indices: IndicesDuProjet): string | null {
   const a = (f: string) => indices.fichiers.includes(f);
   const dep = (d: string) => indices.dependances.includes(d);
 
-  if (dep("vitest")) return MODELES.typescript;
-  if (a("pyproject.toml") || a("setup.cfg")) return MODELES.python;
-  return null;
+  const modele = dep("vitest") ? MODELES.typescript : a("pyproject.toml") || a("setup.cfg") ? MODELES.python : null;
+  if (modele === null) return null;
+  // Un fichier qui dit où le projet installe ses outils (ADR 0075) : ils vont dans `outils`, après `detect`.
+  const outils = [...new Set(Object.entries(OUTILS_PAR_MARQUE).filter(([marque]) => a(marque)).flatMap(([, d]) => d))];
+  return outils.length ? modele.replace(/^(detect: .*\n)/m, `$1outils: [${outils.join(", ")}]\n`) : modele;
 }
+
+/** Marques d'un gestionnaire qui installe les outils du projet dans le projet, et où (ADR 0075). */
+const OUTILS_PAR_MARQUE: Record<string, readonly string[]> = {
+  // uv crée `.venv` à la racine : `bin` sous Linux et macOS, `Scripts` sous Windows.
+  "uv.lock": [".venv/bin", ".venv/Scripts"],
+};
 
 export type { Constat, Gravite } from "./constat.js";
 

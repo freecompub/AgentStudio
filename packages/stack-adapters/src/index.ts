@@ -9,6 +9,7 @@ export { parseXunit, type XunitCase } from "./reports/junit-xml.js";
 export { parseStrykerReport } from "./mutation/stryker-report.js";
 export { selectStackAdapter } from "./select-stack.js";
 export { parseStackProfile, CANARY_KINDS, REPORT_READERS, type CanaryKind, type ReportReader, type StackProfile, type ParseOptions, programmesDuProfil, type ProgrammeNomme } from "./profile/stack-profile.js";
+export { envDesOutils } from "./profile/outils.js";
 export { globToRegExp, matchesAny, matchesAnyIgnoringCase } from "./glob.js";
 export { createProfileAdapter, type ProfileAdapterDeps } from "./profile/profile-adapter.js";
 export { createComposedAdapter, type Composant } from "./composants.js";

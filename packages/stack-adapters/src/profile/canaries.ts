@@ -190,6 +190,11 @@ export interface RunCanariesDeps {
    * Jamais le répertoire du projet : les canaris y sont écrits, et l'un d'eux ne compile pas.
    */
   sandboxRoot: string;
+  /**
+   * Racine du projet d'origine, où sont installés les `outils` du profil (ADR 0075). La copie Git ne
+   * les a pas : ils sont ignorés par Git. Absente, ceux de la copie.
+   */
+  racineDesOutils?: string;
   timeoutMs?: number;
   onOutput?: (chunk: string) => void;
 }
@@ -303,6 +308,7 @@ async function lancer(profile: StackProfile, deps: RunCanariesDeps): Promise<Lan
   try {
     const e = await executerTests(profile, deps.runner, {
       cwd: deps.sandboxRoot,
+      ...(deps.racineDesOutils ? { racineDesOutils: deps.racineDesOutils } : {}),
       timeoutMs: deps.timeoutMs ?? 5 * 60_000,
       ...(deps.onOutput ? { onOutput: deps.onOutput } : {}),
     });

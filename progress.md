@@ -50,8 +50,13 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     - Une réponse après 75 s aboutit.
     - `HOME` posé dans le bloc `env` du serveur isole ses données de la vraie configuration.
     - Coût : environ 8 AIC pour les deux essais.
-  - **Point 1** : sans doute moins urgent. `uv run pytest` passe maintenant par un accord, mais
-    `outils: [.venv/bin]` éviterait de donner à `uv` tout ce qu'il sait faire.
+  - **Point 1, fait (ADR 0075 §8)** : `outils` dans le profil (`.venv/bin`…), en tête du PATH de
+    chaque commande (`envDesOutils`) et du diagnostic. `/stack init` le propose pour `uv.lock`.
+    - **Piège vu à l'essai réel** : les canaris tournent dans un worktree, sans `.venv` (ignoré par
+      Git), d'où « aucun rapport lisible ». Ils prennent les outils du projet d'origine
+      (`racineDesOutils`).
+    - **Défaut trouvé, pas encore traité** : avec un vrai pytest (junit-xml), le canari
+      `assertion` est classé `other_error`.
   - **Point 4, fait (ADR 0075 §6)** : `skraft_pile` reprend `/stack init` (`proposer`) et
     `/stack doctor` (`diagnostiquer`).
     - L'écriture se fait après la question du client (`confirmerProgrammes`).

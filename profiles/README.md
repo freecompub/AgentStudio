@@ -42,6 +42,24 @@ detect:
 Un élément qui correspond suffit. La sous-chaîne n'est pas une expression régulière, et le chemin
 est relatif à la racine, sans `..`.
 
+## Les outils du projet
+
+Un projet qui installe ses outils chez lui (un environnement virtuel, par exemple) les déclare dans
+`outils` (ADR 0075). Ces dossiers passent en tête du PATH de chaque commande du profil, comme si
+l'environnement était activé :
+
+```yaml
+outils: [.venv/bin, .venv/Scripts]   # Linux et macOS, puis Windows
+tests:
+  command: [pytest, "--junit-xml={rapport}"]
+```
+
+Le programme reste jugé par son nom contre la liste de l'administrateur : `pytest` se lance sans
+autoriser un lanceur comme `uv`, qui ferait aussi tout le reste (`uv run --with`, installations).
+Les chemins sont relatifs à la racine (du composant, s'il y en a), sans `..`. Les canaris tournent
+dans une copie Git du projet, qui n'a pas ces outils (ils sont ignorés par Git) : ils prennent ceux
+du projet. `/stack init` les propose quand le projet porte `uv.lock`.
+
 ## Les rapports de tests
 
 `tests.report` nomme le lecteur : `junit-xml`, `vitest-json` ou `tap` (ADR 0072). Un rapport TAP

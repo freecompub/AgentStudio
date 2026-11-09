@@ -177,6 +177,12 @@ const schema = z
         .min(1, "`bdd` : au moins un couple `{ lanceur, features, etapes }`, ou `false`.")
         .optional(),
     ),
+    /**
+     * Dossiers du projet où vivent ses programmes (ADR 0075), mis en tête du PATH de chaque commande :
+     * `pytest` d'un environnement virtuel se lance sans lanceur intermédiaire. Le programme reste jugé
+     * par son nom contre la liste.
+     */
+    outils: z.array(cheminDuProjet("outils")).min(1).optional(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */

@@ -2,7 +2,7 @@ import { fixedClock, MemoryEvidenceStore, MemoryInteractionStore, MemoryTaskSess
 import { manifest as tddManifest, tddExtension } from "@agent-studio/ext-tdd";
 import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createUsageRecorder } from "@agent-studio/core";
@@ -168,6 +168,17 @@ infrastructureModules: [django]
     await services.route("/stack doctor");
     expect(posts.at(-1)).toMatch(/Diagnostic du profil/);
     expect(posts.at(-1)).toMatch(/canari/i);
+    await cleanup();
+  });
+
+  it.skipIf(process.platform === "win32")("/stack doctor trouve un programme dans les `outils` du profil, absent du PATH (ADR 0075)", async () => {
+    const profil = PROFIL_VALIDE.replace("pytest", "montest-outils").replace("detect: [pyproject.toml]", "detect: [pyproject.toml]\noutils: [outils/bin]");
+    const { services, posts, racine, cleanup } = await ouvrir({ profil, allowedPrograms: ["montest-outils"], confirmer: "deny" });
+    await mkdir(join(racine, "outils", "bin"), { recursive: true });
+    await writeFile(join(racine, "outils", "bin", "montest-outils"), "#!/bin/sh\nexit 0\n");
+    await chmod(join(racine, "outils", "bin", "montest-outils"), 0o755);
+    await services.route("/stack doctor");
+    expect(posts.join("\n")).toMatch(/`montest-outils` est lançable \(tests\)/);
     await cleanup();
   });
 
