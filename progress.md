@@ -196,9 +196,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   US-1 intacte ; `dotnet test` 10/10.
 - **Vérifié en réel** : aucun refus « nom cité absent du modèle » (liste des noms) ; aucune question
   bloquante du chercheur (question de la story posée avant RESEARCH) ; note « ac-3 déjà vert » émise.
-- **Nouveau défaut de porte** (à corriger) : la porte de cohérence lit comme une relation entre contextes
-  une phrase qui dit qu'il n'y en a pas (« aucune flèche `A` → `B` à qualifier ») : patron manquant,
-  contextes `A` et `B` non classés. Coût : le second essai de DESIGN (1,58 $).
+- **Nouveau défaut de porte** (**reporté par le responsable le 09/11**, solution décidée mais non faite) :
+  la porte de cohérence lit comme une relation entre contextes une phrase qui dit qu'il n'y en a pas
+  (« aucune flèche `A` → `B` à qualifier ») : patron manquant, contextes `A` et `B` non classés. Coût :
+  le second essai de DESIGN (1,58 $). **Origine** : la consigne de l'architecte du modèle donne l'exemple
+  « `A` → `B` » et « `A` : Core » (`skraft-architect-model.agent.md:28-31`), repris tel quel.
+  **Solution proposée** : (1) `RELATION` (`design.mjs:267`, `design.ts`) ne lit qu'une ligne qui
+  **commence** par la relation (directement, ou après `-`, `*`, `|`), pas la prose ; (2) la consigne
+  écrit `<Contexte>` → `<Autre contexte>` : <patron>, et dit de n'écrire une flèche entre deux noms que
+  pour déclarer une relation. Deux copies, TDD (premier test : la phrase du run ne produit aucun refus).
+- **Cause secondaire** du même rejeu : après un refus de cohérence, l'essai relance les deux architectes,
+  même si un seul fichier est en cause ; le second a passé un tour à ne rien changer (trace, 23:27:20).
+  À examiner.
 - Erreur d'agent : citation à chemin incomplet en RESEARCH (`Steps/ChiffrageDuPanierSteps.cs`) ; la porte a
   raison. Piste : proposer le chemin complet dans le motif quand un seul fichier y correspond.
 
