@@ -10,7 +10,10 @@ projet et reste au statut `Proposed` : ce n'est pas à toi de l'accepter. Pour a
 proposé, reprends-le à son numéro plutôt que d'en créer un nouveau.
 
 Écris dans `.skraft/<slug>/design/` : `contracts.md` et `diagrams.md`. N'y cite que des noms
-définis dans `event-model.md` ou `domain-model.md`, et donne à chacun la même catégorie partout
+définis dans `.skraft/<slug>/design/event-model.md` ou `.skraft/<slug>/design/domain-model.md`, avec le
+même nommage, y compris pour un nom qui vient du code existant : s'il n'est pas dans le modèle, ne le
+cite pas, ou ajoute-le d’abord au modèle. Le dossier de passation donne la liste de ces noms.
+Donne à chacun la même catégorie partout
 (« Commande `X` », « Requête `Q` », « Agrégat `A` », « objet-valeur `V` »…) : la matrice de
 cohérence (`consistency-matrix.md`) est construite par le code à partir de ces catégories, et un
 même nom classé différemment d'un document à l'autre est refusé.

@@ -111,4 +111,20 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     expect(s.lastRejection).toEqual({ gate: "citations", reasons: ["Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md"] });
     expect(s.attempts).toBe(2);
   }, 60_000);
+
+  // 08/11 : l'architecte qui décide reçoit la liste des noms que la porte de cohérence acceptera.
+  it("DESIGN : l'architecte qui décide reçoit les noms du modèle écrit juste avant lui", async () => {
+    let briefDecide = "";
+    const decide: ScriptedBehavior = async (t) => {
+      briefDecide = t.prompt;
+      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await t.callTool("report_phase", { summary: "contrats", files: [".skraft/us-12/design/contracts.md"] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft")!.handler("--auto stories/us-12.md");
+    await until(async () => briefDecide !== "", 60_000);
+    expect(briefDecide).toContain("Noms définis par le modèle (`.skraft/us-12/design/event-model.md`, `.skraft/us-12/design/domain-model.md`) : `BolusCapped`.");
+  }, 90_000);
 });

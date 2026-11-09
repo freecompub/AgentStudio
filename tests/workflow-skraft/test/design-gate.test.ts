@@ -2,7 +2,7 @@
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import { describe, expect, it } from "vitest";
 import { renderAdr, supersessionLine } from "../../../workflows/skraft/adr.mjs";
-import { checkDesign, matriceDeCoherence, matriceMarkdown, type DesignInput } from "../../../workflows/skraft/design.mjs";
+import { checkDesign, ligneNomsDuModele, matriceDeCoherence, matriceMarkdown, type DesignInput } from "../../../workflows/skraft/design.mjs";
 
 const adr = (n: number, over: Record<string, unknown> = {}) =>
   renderAdr(n, { title: `Décision ${n}`, status: "Proposed", context: "c", decision: "d", consequences: "q", alternatives: "a", ...over } as never, "2026-09-23");
@@ -320,5 +320,29 @@ describe("Méthode de DESIGN vérifiée par le code (docs/15 §4.6)", () => {
       "contracts.md : le dépôt `BolusCalculationRepository` est déclaré dans l'infrastructure. Une interface est un contrat : elle appartient au domaine ou à l'application, l'infrastructure ne fait que l'implémenter.",
     ]);
     expect(checkDesign(input({ docs: { ...avec("Couche : Domaine\n"), ...dm } }))).toEqual([]);
+  });
+});
+
+/**
+ * Les noms du modèle donnés à l'architecte qui décide (08/11) : sa consigne disait de ne citer que des
+ * noms du modèle, et il citait ceux du code existant (`SommeDesArticles`, `PrixUnitaire`). Le code lui
+ * donne la liste que la porte de cohérence acceptera, calculée par la même règle.
+ */
+describe("Noms du modèle dans le dossier de l'architecte qui décide", () => {
+  it("noms des deux documents, d'un seul mot compris, une fois chacun, et la conduite à tenir", () => {
+    const docs = { "event-model.md": "Commande `ChiffrerLePanier` → événement `PanierChiffre`.\n", "domain-model.md": "### Agrégat `Panier`\nObjet-valeur `Montant`, et encore `Panier`.\n" };
+    expect(ligneNomsDuModele("us-2", docs)).toBe(
+      "Noms définis par le modèle (`.skraft/us-2/design/event-model.md`, `.skraft/us-2/design/domain-model.md`) : `ChiffrerLePanier`, `PanierChiffre`, `Panier`, `Montant`. " +
+        "`contracts.md`, `diagrams.md` et les ADR ne citent que ceux-là : un autre nom sera refusé. Ajoute-le d'abord au modèle, ou ne le cite pas.",
+    );
+  });
+
+  it("modèle encore vide : rien à dire", () => {
+    expect(ligneNomsDuModele("us-2", {})).toBe("");
+  });
+
+  it("la liste est exactement ce que la porte accepte : un nom de la liste cité dans un ADR passe", () => {
+    const docs = { "domain-model.md": "### Agrégat `Panier`\n" };
+    expect(ligneNomsDuModele("us-2", docs)).toContain("`Panier`");
   });
 });

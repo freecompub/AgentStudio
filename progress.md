@@ -26,6 +26,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
 
+## 08/11 — L'architecte qui décide reçoit les noms du modèle
+
+- **Pourquoi** : hors le défaut `Panier`, tous les refus de DESIGN des deux runs du jour étaient des noms
+  cités par les contrats sans être dans le modèle (`SommeDesArticles`, `FraisDePort`, `PrixUnitaire`,
+  `ArgumentNullException`), souvent pris dans le code existant de son dossier. La consigne le disait
+  déjà (ADR 0043 : une règle sans fait sous les yeux ne tient pas).
+- **Fait, extension et workflow** : `ligneNomsDuModele(slug, docs)` (`design.ts`, `design.mjs`), avec la
+  même règle que la porte (`nomsDuModele`) : la liste des noms des deux documents, et la conduite à tenir.
+  Ajoutée au dossier de `skraft-architect-decide` (extension `runSpecialist`, workflow `unEssai` de
+  `conception.mjs`, recalculée à chaque essai). Consigne de l'agent (deux copies) : chemins complets des
+  deux documents, et « même nommage, y compris pour un nom du code existant ».
+- Demandé par le responsable (chemins dans la consigne) et accepté (la liste calculée par le code).
+- Tests : 3 de `ligneNomsDuModele` par copie, 1 de bout en bout par implémentation (le dossier de
+  l'architecte qui décide contient la liste), vus rouges.
+- **Suite décidée** (pas commencée) : bilan des rejets entre les runs (`skraft_bilan`), puis un agent de
+  synthèse en fin de run qui **propose** des leçons, validées par l'humain avant d'entrer dans les
+  consignes (ADR à écrire). Motif : une leçon tirée d'un faux refus (`Panier`) aurait été nuisible.
+
 ## 08/11 — Un BDD muet ne démarre pas (ADR 0074 §6)
 
 - **Pourquoi** (remarque du responsable) : une détection partielle écrivait le profil sans `bdd`, et

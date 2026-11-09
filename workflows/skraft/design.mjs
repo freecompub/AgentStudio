@@ -358,3 +358,16 @@ export function contratsIncomplets(i) {
   });
   return reasons;
 }
+
+/**
+ * Les noms du modèle, donnés à l'architecte qui décide avant qu'il écrive (08/11) : la même règle que la
+ * porte de cohérence (`nomsDuModele`), donc exactement ce qu'elle acceptera. Sa consigne disait déjà de ne
+ * citer que ces noms ; il citait ceux du code existant, faute de les avoir sous les yeux.
+ */
+export function ligneNomsDuModele(slug, docs) {
+  const noms = [...new Set(MODEL_DOCS.flatMap((d) => nomsDuModele(docs[d] ?? "")))];
+  if (!noms.length)
+    return "";
+  const chemins = MODEL_DOCS.map((d) => `\`.skraft/${slug}/design/${d}\``).join(", ");
+  return `Noms définis par le modèle (${chemins}) : ${noms.map((n) => `\`${n}\``).join(", ")}. \`contracts.md\`, \`diagrams.md\` et les ADR ne citent que ceux-là : un autre nom sera refusé. Ajoute-le d'abord au modèle, ou ne le cite pas.`;
+}
