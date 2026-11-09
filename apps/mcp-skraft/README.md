@@ -62,14 +62,33 @@ Facultatif ; `SKRAFT_MCP_CONFIG` en désigne un autre. Une clé inconnue est ref
 
 ### L'utilisateur et les programmes : `admin.json`
 
-Comme pour l'application de bureau (`AGENT_STUDIO_ADMIN_CONFIG` pour le désigner) : le **profil** de
-l'utilisateur (qui décide de quelles questions, voir « Les questions » ; `developpeur` sans fichier)
-et les **programmes** qu'une pile a le droit de lancer (`allowedPrograms` ; sans la clé, une liste par
-défaut : `pytest`, `dotnet`, `vitest`, `jest`, `mvn`, `gradle`…).
+Comme pour l'application de bureau : le **profil** de l'utilisateur (qui décide de quelles
+questions, voir « Les questions » ; `developpeur` sans fichier) et les **programmes** qu'une pile a
+le droit de lancer (`allowedPrograms`).
+
+Le fichier est cherché à un emplacement **système**, pas dans le dossier personnel :
+
+| Système | Emplacement |
+|---|---|
+| macOS | `/Library/Application Support/agent-studio/admin.json` |
+| Linux | `/etc/agent-studio/admin.json` |
+| Windows | `%ProgramData%\agent-studio\admin.json` |
+
+La variable `AGENT_STUDIO_ADMIN_CONFIG` en désigne un autre ; pour le serveur, la poser dans le
+bloc `env` de sa déclaration chez le client. Le fichier est lu au démarrage du serveur : redémarrer
+le client après l'avoir changé.
+
+`allowedPrograms` **remplace** la liste par défaut, il ne s'y ajoute pas. Sans la clé, la liste par
+défaut s'applique : `pytest`, `go`, `cargo`, `gradle`, `mvn`, `dotnet`, `vitest`, `jest`, `phpunit`,
+`rspec`, des linters (`eslint`, `ruff`…), `prettier` et des outils de mutation (`stryker`, `mutmut`,
+`pitest`). Un fichier illisible n'autorise aucun programme.
 
 ```json
 { "profile": { "role": "architecte" }, "allowedPrograms": ["dotnet", "pytest"] }
 ```
+
+Un programme refusé l'est avec la liste en vigueur et son origine : le fichier lu, ou celui qui
+était attendu et manquait.
 
 ## La pile du projet
 

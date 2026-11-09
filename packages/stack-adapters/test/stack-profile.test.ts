@@ -67,6 +67,19 @@ describe("Lecture d'un profil de stack", () => {
     expect(erreur(MINIMAL.replace("pytest", "rm"))).toMatch(/autorisé/i);
   });
 
+  it("le refus dit quels programmes sont autorisés, et d'où vient la liste (09/11)", () => {
+    // Sur un autre poste, `uv` refusé sans autre explication : l'utilisateur a corrigé un
+    // `admin.json` que le serveur ne lisait pas, et ne pouvait pas le savoir.
+    const r = parseStackProfile(MINIMAL.replace("pytest", "uv"), { allowedPrograms: ["pytest", "ruff"], origine: "Liste par défaut : aucun fichier à /etc/agent-studio/admin.json." });
+    expect("error" in r && r.error).toBe(
+      "Profil de stack refusé : « uv » (tests) n'est pas un programme autorisé. Programmes autorisés : pytest, ruff. Liste par défaut : aucun fichier à /etc/agent-studio/admin.json.",
+    );
+  });
+
+  it("aucun programme autorisé : le refus le dit plutôt que de citer une liste vide", () => {
+    expect(erreur(MINIMAL, [])).toBe("Profil de stack refusé : « pytest » (tests) n'est pas un programme autorisé. Aucun programme n'est autorisé.");
+  });
+
   it("une commande vide est refusée", () => {
     expect(erreur(MINIMAL.replace(/command: \[pytest.*\]/, "command: []"))).toMatch(/command/);
   });

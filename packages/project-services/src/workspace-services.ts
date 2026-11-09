@@ -47,6 +47,7 @@ import {
   runCanaries,
   MANIFESTE,
   parseStackProfile,
+  type ParseOptions,
   FICHIER_PROJET,
   ecrireComposantsDansProjet,
   ecrirePileDansProjet,
@@ -75,6 +76,8 @@ export interface WorkspaceServicesConfig {
   stacks: StackAdapter[];
   /** Programmes qu'un profil de stack peut lancer (D47, O12) ; vide = aucun profil n'est accepté. */
   allowedPrograms?: readonly string[];
+  /** D'où vient cette liste (`AdminConfig.origineDesProgrammes`), citée quand un programme est refusé. */
+  origineDesProgrammes?: string;
   /**
    * Aucune pile (ni profil, ni détection, ni pile fournie) est une erreur, au lieu du repli averti
    * sur le premier adaptateur : un repli ferait échouer toutes les portes pour une mauvaise raison
@@ -173,9 +176,11 @@ export class AucunePile extends Error {
 
 /** Fabrique des services d'un projet : assemble registre, moteur, interactions et extensions. */
 export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): WorkspaceServicesFactory {
+  // La liste et son origine voyagent ensemble : un refus doit pouvoir dire d'où vient la liste (09/11).
+  const programmes: ParseOptions = { allowedPrograms: cfg.allowedPrograms ?? [], ...(cfg.origineDesProgrammes ? { origine: cfg.origineDesProgrammes } : {}) };
   return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, modelFor, pileFournie }) => {
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
-    const pileDuProjet = await lireProfilDuProjet(workspace.root, cfg.allowedPrograms ?? [], onPost, cfg.logger);
+    const pileDuProjet = await lireProfilDuProjet(workspace.root, programmes, onPost, cfg.logger);
     const declare = pileDuProjet?.adapter ?? null;
     const detected = declare ?? (await selectStackAdapter(workspace.root, cfg.stacks));
     let source: SourcePile = declare ? "projet" : detected ? "detection" : "repli";
@@ -189,13 +194,13 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         // Au format composants (ADR 0074), chaque pile l'est à son tour.
         const enComposants = lireFichierProjet(pileFournie);
         if (!("error" in enComposants) && enComposants.composants) {
-          const lu = profilsDesComposants(enComposants.composants, cfg.allowedPrograms ?? []);
+          const lu = profilsDesComposants(enComposants.composants, programmes);
           if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
           const p = pileComposee(lu.composants);
           choisie = p.adapter;
           composantsDeLaPile = p.composants;
         } else {
-          const lu = parseStackProfile(pileFournie, { allowedPrograms: cfg.allowedPrograms ?? [] });
+          const lu = parseStackProfile(pileFournie, programmes);
           if ("error" in lu) throw new Error(`Pile fournie refusée : ${lu.error}`);
           choisie = createProfileAdapter(lu.profile);
         }
@@ -322,7 +327,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         title: "Stack du projet",
         description: "Affiche la stack employée ; `init` propose un profil à déclarer, `doctor` dit ce qu'il vaut.",
         handler: createStackCommand(
-          stackCommandDeps({ workspace, allowedPrograms: cfg.allowedPrograms ?? [], stack, declaree: declare !== null, confirmer, onPost }),
+          stackCommandDeps({ workspace, programmes, stack, declaree: declare !== null, confirmer, onPost }),
         ),
       });
 
@@ -584,16 +589,16 @@ async function lireSourceDuProfil(root: string): Promise<SourceDuProfil | null> 
  * détection habituelle reprend la main. Le fichier vient du dépôt, donc d'une source que
  * l'agent peut modifier : les programmes qu'il nomme sont soumis à la liste de l'administrateur.
  */
-async function lireProfilDeclare(root: string, allowedPrograms: readonly string[]): Promise<ProfilDeclare> {
+async function lireProfilDeclare(root: string, programmes: ParseOptions): Promise<ProfilDeclare> {
   const src = await lireSourceDuProfil(root);
   if (!src) return null; // pas de profil : la détection s'applique, sans rien dire
   if (src.erreur) return { error: src.erreur };
   if (src.composants) {
-    const lu = profilsDesComposants(src.composants, allowedPrograms);
+    const lu = profilsDesComposants(src.composants, programmes);
     return "error" in lu ? { error: `${src.libelle}, ${lu.error}` } : lu;
   }
   if (src.brut === null) return null;
-  const lu = parseStackProfile(src.brut, { allowedPrograms });
+  const lu = parseStackProfile(src.brut, programmes);
   return "error" in lu ? { error: `${src.libelle} : ${lu.error}` } : lu;
 }
 
@@ -605,13 +610,13 @@ interface PileDuProjet {
 
 async function lireProfilDuProjet(
   root: string,
-  allowedPrograms: readonly string[],
+  programmes: ParseOptions,
   onPost: (extensionId: string, markdown: string) => void,
   logger?: Logger,
 ): Promise<PileDuProjet | null> {
   const src = await lireSourceDuProfil(root);
   for (const a of src?.avertissements ?? []) onPost("agent-studio", a);
-  const lu = await lireProfilDeclare(root, allowedPrograms);
+  const lu = await lireProfilDeclare(root, programmes);
   if (lu === null) return null;
   if ("error" in lu) {
     logger?.warn("profil de stack refusé", { root, error: lu.error });
@@ -623,10 +628,10 @@ async function lireProfilDuProjet(
 }
 
 /** Composants (ADR 0074) : chaque pile validée comme une pile seule, contre la liste de l'administrateur ; une seule refusée suffit. */
-function profilsDesComposants(declares: readonly ComposantDeclare[], allowedPrograms: readonly string[]): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
+function profilsDesComposants(declares: readonly ComposantDeclare[], programmes: ParseOptions): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
   const composants = [];
   for (const c of declares) {
-    const lu = parseStackProfile(c.pile, { allowedPrograms });
+    const lu = parseStackProfile(c.pile, programmes);
     if ("error" in lu) return { error: `composant « ${c.nom} » : ${lu.error}` };
     composants.push({ nom: c.nom, racine: c.racine, profile: lu.profile });
   }
@@ -646,13 +651,13 @@ function pileComposee(profils: readonly { nom: string; racine: string; profile: 
  */
 function stackCommandDeps(args: {
   workspace: Workspace;
-  allowedPrograms: readonly string[];
+  programmes: ParseOptions;
   stack: StackAdapter;
   declaree: boolean;
   confirmer: UserConfirmer;
   onPost: (extensionId: string, markdown: string) => void;
 }): StackCommandDeps {
-  const { workspace, allowedPrograms, stack, declaree, confirmer, onPost } = args;
+  const { workspace, programmes, stack, declaree, confirmer, onPost } = args;
   const fichiers = () => workspace.files.list();
   /** Fichiers sous une racine, chemins relatifs à elle ; `.` : tout le projet. */
   const sous = (tous: readonly string[], racine: string) => tous.flatMap((f) => (racine === "." ? [f] : f.startsWith(`${racine}/`) ? [f.slice(racine.length + 1)] : []));
@@ -673,7 +678,7 @@ function stackCommandDeps(args: {
   return {
     // `/stack init` écrit la section `pile` du fichier de projet (ADR 0071).
     chemin: FICHIER_PROJET,
-    profilDeclare: () => lireProfilDeclare(workspace.root, allowedPrograms),
+    profilDeclare: () => lireProfilDeclare(workspace.root, programmes),
     stackActive: () => ({ id: stack.id, declaree }),
     post: (markdown) => onPost("agent-studio", markdown),
     confirmer: (req) => confirmer.confirm(req),

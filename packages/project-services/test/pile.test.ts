@@ -39,6 +39,7 @@ async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProj
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: [], sources: [] }, infrastructureModules: [], detect: async () => o.detecte ?? false, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
     allowedPrograms: ["pytest"],
+    origineDesProgrammes: "Liste de `allowedPrograms` dans /etc/agent-studio/admin.json.",
     ...(o.sansRepli ? { sansRepli: true } : {}),
     tasksDir: join(root, ".taches"),
     taskStore: new MemoryTaskStore(),
@@ -135,6 +136,18 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
 
   it("pile fournie qui nomme un programme hors de la liste de l'administrateur : refusée, avec le programme", async () => {
     await expect(ouvrir({ fournie: profil("python-client", "curl"), sansRepli: true })).rejects.toThrow(/curl/);
+  });
+
+  it("le refus d'un programme dit d'où vient la liste, pour une pile fournie, une pile du projet et un composant (09/11)", async () => {
+    const origine = /Programmes autorisés : pytest\. Liste de `allowedPrograms` dans \/etc\/agent-studio\/admin\.json\./;
+    await expect(ouvrir({ fournie: profil("python-client", "uv"), sansRepli: true })).rejects.toThrow(origine);
+    const a = await ouvrir({ fichierProjet: `pile:\n${profil("python-projet", "uv").trim().split("\n").map((l) => `  ${l}`).join("\n")}\n`, detecte: true });
+    expect(a.posts.join("\n")).toMatch(origine);
+    await a.services.dispose();
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const b = await ouvrir({ fichierProjet: `composants:\n  - nom: api\n    racine: api\n    pile:\n${indente(profil("python-api", "uv"), 6)}\n`, detecte: true });
+    expect(b.posts.join("\n")).toMatch(origine);
+    await b.services.dispose();
   });
 
   it("sans repli permis et sans aucune pile : refus qui dit quoi fournir", async () => {

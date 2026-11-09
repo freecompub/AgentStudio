@@ -5,6 +5,44 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/11 — Commandes et autorisations du serveur MCP : point 0, le refus d'un programme s'explique
+
+- **Pourquoi** : sur un autre poste (Copilot CLI, projet Python géré par uv), trois blocages. Le projet
+  a été refusé, hors des roots et de `autorises`. `uv` puis `make` ont été refusés comme programmes de
+  pile. Il n'y avait aucun profil de pile.
+- **Ce que le code a montré** (et que j'avais mal dit à l'utilisateur) :
+  - `admin.json` se lit à un emplacement **système** (`/Library/Application Support/agent-studio/`
+    sur macOS, `/etc/agent-studio/` sur Linux) ou à `AGENT_STUDIO_ADMIN_CONFIG`, jamais dans
+    `~/.agent-studio`. Le fichier posé là n'était pas lu ;
+  - `allowedPrograms` remplace la liste : `["uv"]` aurait fait refuser `pytest` ;
+  - le vrai besoin de `uv` vient de ce qu'un profil lance son programme par le PATH, et que `pytest`
+    d'un projet uv est dans `.venv/bin`.
+- **Fait** (branche `feat/autorisations-mcp`) :
+  - `AdminConfig.origineDesProgrammes` : une phrase qui dit d'où vient la liste (fichier lu, clé absente,
+    fichier absent à tel endroit, fichier refusé) ;
+  - `ParseOptions.origine` ; le refus d'un programme cite la liste en vigueur et cette origine ;
+  - les services passent liste et origine ensemble (`programmes: ParseOptions`) ;
+  - README du serveur : les emplacements, la règle de remplacement, la liste par défaut complète.
+- **Le plan qui suit**, révisé après lecture du code :
+  - **Point 1, abandonné : accepter `uv run X` ou `npx X` si X est autorisé.** Chaque lanceur a ses
+    options (`uv run --with`), et `npx` télécharge.
+  - **Point 1, à la place** : le profil déclare où vivent les outils du projet (`outils: [.venv/bin]`).
+    Le programme reste jugé par son nom.
+  - **Point 3** : sans roots du client, le dossier de lancement du serveur devient la borne (refusée si
+    c'est le dossier personnel). Il sert déjà de base (`projet.ts:23`), pas de borne (`:29`).
+  - **Point 4** : `skraft_pile` propose et vérifie un profil, sans l'écrire.
+  - **Point 2** : un accord pour un programme hors liste, seulement par l'elicitation MCP. Un argument
+    d'outil est rempli par le LLM hôte, qui proposerait et accepterait la même pile.
+- **Le SDK Copilot ne change rien aux commandes** : nos agents n'ont aucun shell (`task-agent-guard.ts`),
+  les commandes de la pile sont lancées par notre code (`run_tests`), sans shell. Le serveur n'a aucun
+  canal vers l'humain (`SANS_FENETRE`) : l'accord ne peut venir que du client MCP.
+- **À vérifier par un essai Copilot CLI** (le mode automatique de Claude Code a refusé de le lancer :
+  à faire par l'utilisateur) : Copilot déclare-t-il des roots, dans quel dossier lance-t-il le serveur,
+  gère-t-il l'elicitation ? Et, sur l'autre poste, la connexion du SDK à l'hôte d'entreprise
+  (`hostname`, `GH_HOST`).
+
+---
+
 ## 09/11 — Le serveur MCP tient l'utilisateur au courant : `skraft_attendre` et la ligne de progression
 
 - **Pourquoi** (demande du responsable) : le serveur ne pousse rien, la progression ne se voyait que si

@@ -80,6 +80,7 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     extensions: [],
     stacks: [createTypeScriptAdapter()],
     allowedPrograms: admin.allowedPrograms,
+    origineDesProgrammes: admin.origineDesProgrammes,
     // Sans pile, refus qui dit quoi fournir (point 8) : un repli ferait échouer les portes.
     sansRepli: true,
     tasksDir: join(donnees, "tasks"),

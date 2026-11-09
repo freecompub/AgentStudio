@@ -1163,6 +1163,13 @@
       "verify": "pnpm vitest run --project workflow-skraft test/e2e-s2-workflow.test.ts test/research-gate.test.ts && pnpm vitest run --project ext-skraft test/e2e-s2.test.ts test/research-gate.test.ts",
       "passes": true,
       "notes": "Fait le 2026-10-08 (branche feat/workflow-rejouable), option B choisie par le responsable : une deuxième commande à côté de /skraft, qui reste intacte ; puis, à sa demande, dans une extension totalement indépendante (extensions/skraft-workflow, aucune importation de skraft, vérifiée par test/independance.test.ts ; code pur, agents et tests copiés avec leur provenance). Le critère d’origine (« e2e-s2 passe sans modification ») ne pouvait pas tenir : ce test lance /skraft et lit les champs internes du réducteur ; il continue de tester /skraft, et un test jumeau teste le workflow. Taille : workflow.ts 154 lignes de code contre ≈ 430 estimées dans reducer.ts, effects.ts et model.ts pour le même comportement. Critère d’arrêt (« nettement plus simple ») : à juger par le responsable."
+    },
+    {
+      "id": "refus-de-programme-explique",
+      "title": "Un programme refusé par un profil de pile l'est avec la liste en vigueur et son origine (fichier d'administration lu, ou attendu et absent ; liste qui remplace celle par défaut), pour une pile du projet, d'un composant ou fournie par le client MCP",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts && pnpm vitest run --project project-services test/admin-config.test.ts test/pile.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp), point 0 du plan sur les commandes et les autorisations : sur un autre poste, `uv` était refusé sans explication, l'admin.json avait été posé dans ~/.agent-studio alors que le serveur le lit à un emplacement système. Le passage dans assemblage.ts et le bureau n'a pas de test (assemblerServeur n'en a aucun)."
     }
   ]
 }

@@ -37,6 +37,41 @@ describe("Configuration administrateur (D6, O5)", () => {
     expect(c.allowedPrograms).toEqual(["pytest"]);
   });
 
+  /**
+   * D'où vient la liste des programmes, à citer dans un refus (09/11) : un `admin.json` posé ailleurs
+   * que là où il est lu, ou une liste qui remplace celle par défaut, ne se voient pas autrement.
+   */
+  describe("origine de la liste des programmes", () => {
+    it("sans fichier : la liste par défaut, le fichier attendu et la règle de remplacement", async () => {
+      const chemin = join(dir, "absent.json");
+      expect((await loadAdminConfig(chemin)).origineDesProgrammes).toBe(
+        `Liste par défaut : aucun fichier d'administration à ${chemin}. Pour la changer, y écrire \`allowedPrograms\` (qui remplace la liste par défaut, sans s'y ajouter), ou désigner un autre fichier par la variable AGENT_STUDIO_ADMIN_CONFIG.`,
+      );
+    });
+
+    it("fichier sans `allowedPrograms` : la liste par défaut, et le fichier lu", async () => {
+      const file = join(dir, "admin.json");
+      await writeFile(file, JSON.stringify({ profile: { role: "architecte" } }));
+      expect((await loadAdminConfig(file)).origineDesProgrammes).toBe(
+        `Liste par défaut : ${file} ne contient pas \`allowedPrograms\`. L'y ajouter remplace la liste par défaut, sans s'y ajouter.`,
+      );
+    });
+
+    it("fichier avec `allowedPrograms` : cette liste remplace celle par défaut", async () => {
+      const file = join(dir, "admin.json");
+      await writeFile(file, JSON.stringify({ allowedPrograms: ["uv"] }));
+      expect((await loadAdminConfig(file)).origineDesProgrammes).toBe(
+        `Liste de \`allowedPrograms\` dans ${file} ; elle remplace la liste par défaut, qui ne s'applique donc pas.`,
+      );
+    });
+
+    it("fichier refusé : aucun programme, et pourquoi", async () => {
+      const file = join(dir, "admin.json");
+      await writeFile(file, "{ pas du json");
+      expect((await loadAdminConfig(file)).origineDesProgrammes).toMatch(new RegExp(`^${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} est refusé \\(.+\\) : aucun programme n'est autorisé\\.$`));
+    });
+  });
+
   it("une liste vide interdit tout profil de stack, et c'est un choix valide", async () => {
     const file = join(dir, "admin.json");
     await writeFile(file, JSON.stringify({ allowedPrograms: [] }));
