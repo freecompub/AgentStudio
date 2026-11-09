@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { Connexion } from "./connexion.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet } from "./projet.js";
+import { changements, ligneDeProgression, type Instantane } from "./progression.js";
 
 export interface OptionsServeur {
   projets: Projets;
@@ -119,6 +120,92 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     }, { agents: true }),
   );
 
+  /** Dernier état rendu à l'hôte par `skraft_attendre`, par projet et par run suivi. */
+  const vusParLHote = new Map<string, Instantane>();
+
+  /** Une question en attente, telle que l'hôte doit la montrer et y répondre (`skraft_repondre`). */
+  const questionPourHote = (q: Awaited<ReturnType<ProjetOuvert["services"]["pendingInteractions"]>>[number]) => ({
+    id: q.id,
+    tache: q.taskId,
+    title: q.title,
+    ...(q.detail ? { detail: q.detail } : {}),
+    options: q.options,
+    ...(q.requiredRoles ? { profils: q.requiredRoles } : {}),
+    ...(q.freeText ? { texteLibre: true } : {}),
+  });
+
+  /** L'état du projet en instantané, et la ligne de progression de chaque run (09/11). */
+  async function lireInstantane(p: ProjetOuvert): Promise<{ inst: Instantane; progression: Map<string, string>; questions: ReturnType<typeof questionPourHote>[] }> {
+    const cartes = await p.services.tasks();
+    const attente = await p.services.pendingInteractions();
+    const inst: Instantane = {
+      taches: cartes.map((t) => ({ id: t.id, titre: t.title, status: t.status, phase: t.phase, phaseLabel: t.phaseLabel, ...(t.step ? { etape: { index: t.step.index, total: t.step.total } } : {}), ...(t.feedback ? { dernierRejet: t.feedback } : {}) })),
+      questions: attente.map((q) => ({ id: q.id, tache: q.taskId, title: q.title, ...(q.detail ? { detail: q.detail } : {}) })),
+      messages: p.messages(),
+    };
+    const progression = new Map<string, string>();
+    for (const t of inst.taches) {
+      // Durée et coût lus dans la trace du run : de la première étape à la dernière, ou à maintenant.
+      const etapes = await p.services.etapesDuRun(t.id).catch(() => []);
+      const debut = etapes.length ? Date.parse(etapes[0]!.début) : NaN;
+      const finEtapes = etapes.length ? Date.parse(etapes.at(-1)!.fin) : NaN;
+      const dureeMs = Number.isNaN(debut) ? undefined : (t.status === "finished" && !Number.isNaN(finEtapes) ? finEtapes : Date.now()) - debut;
+      const coutUsd = etapes.reduce((n, e) => n + e.coûtUsd, 0);
+      progression.set(t.id, ligneDeProgression(t, { questions: inst.questions.filter((q) => q.tache === t.id).length, ...(dureeMs !== undefined && dureeMs >= 0 ? { dureeMs } : {}), coutUsd }));
+    }
+    return { inst, progression, questions: attente.map(questionPourHote) };
+  }
+
+  mcp.registerTool(
+    "skraft_attendre",
+    {
+      description:
+        "Attend qu'il se passe quelque chose dans un run (phase, étape, rejet, question à poser, réponse, message, fin), au plus `delai` secondes (60 par défaut, 120 au plus), puis rend ce qui a changé depuis le dernier appel et la ligne de progression, en JSON. " +
+        "Rapporte chaque changement à l'utilisateur, en reprenant la ligne de progression ; montre-lui toute question et réponds avec skraft_repondre selon son choix ; rappelle cet outil tant que `termine` est faux.",
+      inputSchema: {
+        tache: z.string().min(1).optional().describe("Le run à suivre ; par défaut, tous les runs du projet."),
+        delai: z.number().int().min(1).max(120).optional().describe("Attente maximale, en secondes."),
+        projet,
+      },
+    },
+    outil(async (p, a) => {
+      const termine = (i: Instantane) => {
+        const suivis = i.taches.filter((t) => a.tache === undefined || t.id === a.tache);
+        return suivis.length > 0 && suivis.every((t) => t.status === "finished");
+      };
+      const rendre = (l: Awaited<ReturnType<typeof lireInstantane>>, ch: string[]) =>
+        texte(
+          JSON.stringify(
+            {
+              changements: ch,
+              progression: l.inst.taches.filter((t) => a.tache === undefined || t.id === a.tache).map((t) => l.progression.get(t.id)!),
+              questions: l.questions.filter((q) => a.tache === undefined || q.tache === a.tache),
+              termine: termine(l.inst),
+            },
+            null,
+            2,
+          ),
+        );
+      // Comparé au dernier état rendu à l'hôte, pas à celui de l'appel : ce qui s'est passé entre deux
+      // appels (une réponse, la fin du run) n'est pas perdu.
+      const cle = `${p.root}|${a.tache ?? "*"}`;
+      const rendu = (l: Awaited<ReturnType<typeof lireInstantane>>, ch: string[]) => (vusParLHote.set(cle, l.inst), rendre(l, ch));
+      const actuel = await lireInstantane(p);
+      const reference = vusParLHote.get(cle) ?? actuel.inst;
+      const deja = changements(reference, actuel.inst, a.tache);
+      if (deja.length) return rendu(actuel, deja);
+      // Rien ne bougera plus : réponse immédiate, l'hôte n'a pas à attendre le délai.
+      if (termine(actuel.inst)) return rendu(actuel, ["Le run est terminé : skraft_rapport donne son bilan."]);
+      const echeance = Date.now() + (a.delai ?? 60) * 1000;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, Math.min(500, Math.max(0, echeance - Date.now()))));
+        const maintenant = await lireInstantane(p);
+        const ch = changements(reference, maintenant.inst, a.tache);
+        if (ch.length || Date.now() >= echeance) return rendu(maintenant, ch.length ? ch : ["Rien de nouveau."]);
+      }
+    }),
+  );
+
   mcp.registerTool(
     "skraft_etat",
     {
@@ -128,7 +215,10 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     outil(async (p) => {
       const m = p.mode();
       const w = (await p.services.workflows()).find((x) => x.nom === o.workflow);
+      const { progression } = await lireInstantane(p);
       const taches = (await p.services.tasks()).map((t) => ({
+        // La ligne à montrer telle quelle à l'utilisateur (09/11).
+        progression: progression.get(t.id) ?? "",
         id: t.id,
         titre: t.title,
         status: t.status,
@@ -138,15 +228,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         ...(t.feedback ? { dernierRejet: t.feedback } : {}),
         ...(t.usage ? { usage: t.usage.total } : {}),
       }));
-      const questions = (await p.services.pendingInteractions()).map((q) => ({
-        id: q.id,
-        tache: q.taskId,
-        title: q.title,
-        ...(q.detail ? { detail: q.detail } : {}),
-        options: q.options,
-        ...(q.requiredRoles ? { profils: q.requiredRoles } : {}),
-        ...(q.freeText ? { texteLibre: true } : {}),
-      }));
+      const questions = (await p.services.pendingInteractions()).map(questionPourHote);
       return texte(
         JSON.stringify({ projet: p.root, mode: m.pilote ? "pilote" : "consultation", pid, ...(m.pilote ? {} : { detenteur: m.detenteur }), workflow: w ? { nom: w.nom, accordRetenu: w.accordRetenu } : null, pile: p.services.pile(), taches, questions, messages: p.messages() }, null, 2),
       );

@@ -5,6 +5,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/11 — Le serveur MCP tient l'utilisateur au courant : `skraft_attendre` et la ligne de progression
+
+- **Pourquoi** (demande du responsable) : le serveur ne pousse rien, la progression ne se voyait que si
+  l'hôte pensait à rappeler `skraft_etat`, et en JSON à interpréter.
+- **Fait** (`apps/mcp-skraft`, branche `feat/mcp-progression`, partie de `main`) :
+  `progression.ts`, pur : `ligneDeProgression` (titre · phase, étape · statut · durée · coût · dernier
+  rejet · questions ; coût omis s'il vaut 0, Copilot) et `changements(avant, après, tache?)` (run lancé,
+  phase, étape, rejet, fin, question à poser, réponse reçue, message). `skraft_etat` porte `progression`
+  par run (durée et coût lus dans la trace, `etapesDuRun`). Nouvel outil **`skraft_attendre`** (`tache`,
+  `delai` ≤ 120 s) : attend un changement (scrutation toutes les 500 ms), rend les changements, la
+  progression, les questions sous la forme de `skraft_etat` (options comprises) et `termine` ; réponse
+  immédiate si le run est fini ; sa description dit à l'hôte de tout rapporter et de rappeler l'outil.
+- **Piège** (vu par le test de bout en bout) : comparé à l'état **du moment de l'appel**, l'outil perdait ce
+  qui arrive entre deux appels (une réponse, la fin du run). Il compare désormais au **dernier état rendu à
+  l'hôte**, gardé par projet et par run suivi.
+- Notifications poussées par MCP (journal, progression, ressources) : non faites, leur affichage par
+  Claude Code et Copilot CLI n'est pas vérifié.
+- Tests : `test/progression.test.ts` (9), `serveur.test.ts` (1 de bout en bout, plus la liste des outils),
+  `stdio.test.ts` (liste des outils) ; vus rouges. 52 tests verts.
+
 ## 08/11 — État du BDD et suite (ADR 0074, révisé)
 
 - **Principe rappelé par le responsable** : skraft ne connaît aucun langage. Tout ce qui dépend de

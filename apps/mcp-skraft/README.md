@@ -139,7 +139,8 @@ buildErrors:
 |---|---|---|
 | `skraft_connexion` | — | Connexion du runtime. Copilot : rend un code et une adresse à valider dans le navigateur. Claude : vérifie `claude auth status`, sinon dit de lancer `claude auth login`. Rappeler pour vérifier. |
 | `skraft_demarrer` | `story` (chemin relatif au projet), `auto`, `archi`, `pile`, `accord`, `projet` | Démarre un run, en arrière-plan. Au premier lancement, rend le **résumé à faire accepter** (agents, droits d'écriture, questions) sans rien démarrer ; rappeler avec les mêmes arguments et `accord: "une-fois"` ou `"toujours"` (retenu tant que le workflow ne change pas). `auto` : retient la difficulté proposée sans la faire confirmer. `archi` : skill d'architecture par son nom ou son langage (`java`) ; par défaut la clean architecture. |
-| `skraft_etat` | `projet` | JSON : mode du serveur (pilote ou consultation), workflow et accord, pile retenue, runs (phase, étape, dernier rejet, usage), **questions en attente** (identifiant, options, profils, réponse libre), derniers messages. |
+| `skraft_etat` | `projet` | JSON : mode du serveur (pilote ou consultation), workflow et accord, pile retenue, runs (phase, étape, dernier rejet, usage, et **`progression`**, la ligne à montrer telle quelle), **questions en attente** (identifiant, options, profils, réponse libre), derniers messages. |
+| `skraft_attendre` | `tache`, `delai` (secondes, 60 par défaut, 120 au plus), `projet` | **Attend un changement**, puis rend ce qui a changé **depuis le dernier appel** (phase, étape, rejet, question à poser, réponse reçue, message, fin), la ligne de progression de chaque run, les questions en attente et `termine`. Rien ne se perd entre deux appels. Run déjà fini : réponse immédiate. |
 | `skraft_repondre` | `question`, `option`, `texte`, `projet` | Répond à une question en attente, par l'identifiant et l'option lus dans `skraft_etat` ; `texte` : réponse libre ou commentaire. L'hôte pose la question à l'utilisateur, il ne répond jamais à sa place. |
 | `skraft_rapport` | `tache`, `projet` | JSON : statut (`en-cours`, `fini`, `echec`, `annule`), valeur ou motif, messages (dont le bilan final), dernier rejet, arbitrages, et **étapes** (une par phase et par rejeu : début, fin, durée, tours, rejets, unités Copilot `aiu`, coût Claude `coutUsd`, modèles). |
 | `skraft_reprendre` | `projet` | Prend la main si aucun autre serveur ne pilote le projet, et reprend les runs interrompus (rejeu du journal). |
@@ -153,9 +154,12 @@ serveur.
 1. `skraft_connexion` si le runtime n'est pas encore connecté.
 2. `skraft_demarrer { story: "stories/US-2.md" }` : montrer le résumé rendu à l'utilisateur ; s'il
    accepte, rappeler avec `accord`. La réponse donne l'identifiant de la tâche.
-3. `skraft_etat` régulièrement : la phase avance, `dernierRejet` dit pourquoi une phase est refaite.
-4. Une question apparaît dans `questions` : la montrer à l'utilisateur, puis `skraft_repondre` avec son
-   choix. Le run reprend.
+3. `skraft_attendre { tache }` en boucle, tant que `termine` est faux : à chaque retour, dire à
+   l'utilisateur ce qui a changé, avec la ligne de progression, par exemple
+   « US-2 · Conception, étape 2/5 · en cours · 6 min 34 s · 2,94 $ · dernier rejet : … · aucune question
+   en attente ». (`skraft_etat` donne la même ligne à la demande.)
+4. Une question apparaît (« Question à poser à l'utilisateur : … ») : la montrer à l'utilisateur, puis
+   `skraft_repondre` avec son choix. Le run reprend.
 5. Statut `fini` : `skraft_rapport` donne le bilan (phases, ADR, notes hors du changement) et le
    tableau des étapes. La branche `skraft/<slug>` contient le travail, un commit par phase et par
    scénario.
