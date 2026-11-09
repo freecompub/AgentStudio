@@ -26,6 +26,12 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   aussi : un coût sous le centime s'affiche « < 0,01 $ » au lieu de « 0,00 $ » ; la ligne commence par la
   **story** donnée à `skraft_demarrer` (la carte d'une tâche de workflow ne porte que le nom du workflow).
   `scripts/essai-mcp-skraft.ts` gagne `--suivi=attendre`.
+- **Second run suivi** (`docs/runs/2026-11-09-us-2-bdd-claude-suivi/`) : fini, 22m39, 5 rejets, 6,62 $ ;
+  le suivi a tenu, mais **aucun rejet ni essai n'était signalé** : la carte d'une tâche de workflow ne porte
+  ni `feedback` ni `step`. Corrigé : `vueDeTache(carte, étapes de la trace, story)` lit rejets (comptés,
+  pour voir un rejet au texte répété), dernier rejet (« porte : premier motif »), essai de la phase (pas
+  pendant une revue : `REVIEW` est l'étiquette de toutes les revues, son compteur n'est pas un essai),
+  durée et coût. Vérifié en rejouant la trace réelle du run.
 - Notifications poussées par MCP (journal, progression, ressources) : non faites, leur affichage par
   Claude Code et Copilot CLI n'est pas vérifié.
 - Tests : `test/progression.test.ts` (9), `serveur.test.ts` (1 de bout en bout, plus la liste des outils),

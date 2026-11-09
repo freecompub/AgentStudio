@@ -1,0 +1,213 @@
+[    1s] Workflow « skraft-workflow » lancé : tâche 023170a9-3296-46c7-b02b-1d2c1b6393f5. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.
+
+[   13s] Phase : Évaluation de la difficulté (CLASSIFY).
+        ⏵ stories/US-2.md · Évaluation de la difficulté · en cours · 12 s · aucune question en attente
+[   22s] Phase : Difficulté à confirmer (CONFIRM_DIFFICULTY).
+[   22s] Question à poser à l'utilisateur : Difficulté de US-2 : Assez difficile ? — Je confirme medium-hard : la règle de calcul est explicite (critères 1 à 5 avec exemples chiffrés), mais la question ouverte « paliers globaux ou par référence ? » (stories/US-2.md) change la forme de la configuration et du modèle de données, et les critères 3 et 4 imposent de choisir le palier le plus avantageux et de cal
+        ⏵ stories/US-2.md · Difficulté à confirmer · attend une réponse · 20 s · < 0,01 $ · 1 question en attente
+[   22s] ↳ réponse : Confirmer : Assez difficile
+[   22s] Phase : Questions ouvertes (ROUTE).
+[   22s] Question à poser à l'utilisateur : Question ouverte (US-2) — Les paliers sont-ils les mêmes pour toutes les références, ou définis par référence ?
+[   22s] Réponse reçue : le run reprend.
+        ⏵ stories/US-2.md · Questions ouvertes · en cours · 21 s · < 0,01 $ · 1 question en attente
+[   22s] ↳ réponse : Répondre — « Les mêmes paliers s'appliquent à toutes les références. »
+[   22s] Phase : Enquête sur le code existant (RESEARCH).
+[   22s] Réponse reçue : le run reprend.
+        ⏵ stories/US-2.md · Enquête sur le code existant · en cours · 21 s · < 0,01 $ · aucune question en attente
+[   72s] Rien de nouveau.
+        ⏵ stories/US-2.md · Enquête sur le code existant · en cours · 1 min 11 s · < 0,01 $ · aucune question en attente
+[  122s] Rien de nouveau.
+        ⏵ stories/US-2.md · Enquête sur le code existant · en cours · 2 min 01 s · 0,32 $ · aucune question en attente
+[  128s] Phase : Questions ouvertes (ROUTE).
+[  128s] Question à poser à l'utilisateur : Question ouverte (US-2) — **Arrondi** : aucune règle pour une remise qui n'est pas au centime (découverte 7). Non requise par les 5 ACs, mais à trancher avant d'ajouter d'autres cas.
+[  128s] Question à poser à l'utilisateur : Question ouverte (US-2) — **`ATPayer`** : doit-il désormais déduire la remise ? Les ACs ne parlent que de la remise ; aujourd'hui `ATPayer` l'ignore (`CalculDuPanier.cs:12`). Si oui, cela change le total attendu des scénarios US-1 uniquement lorsque des paliers sont configurés.
+[  128s] Question à poser à l'utilisateur : Question ouverte (US-2) — Validation d'une grille : seuils dupliqués, pourcentage hors 0–100 : comportement non spécifié.
+[  128s] Question à poser à l'utilisateur : Question ouverte (US-2) — Cumul avec les codes promotionnels : relève de l'US-3 (`stories/US-3.md:14`).
+        ⏵ stories/US-2.md · Questions ouvertes · attend une réponse · 2 min 07 s · 0,53 $ · 4 questions en attente
+[  128s] ↳ réponse : Répondre — « Pas de précision supplémentaire : retiens l'option la plus simple qui respecte l »
+[  129s] ↳ réponse : Répondre — « Pas de précision supplémentaire : retiens l'option la plus simple qui respecte l »
+[  129s] ↳ réponse : Répondre — « Pas de précision supplémentaire : retiens l'option la plus simple qui respecte l »
+[  129s] ↳ réponse : Répondre — « Pas de précision supplémentaire : retiens l'option la plus simple qui respecte l »
+[  129s] Phase : Conception (DESIGN).
+[  129s] Réponse reçue : le run reprend.
+        ⏵ stories/US-2.md · Conception · en cours · 2 min 08 s · 0,53 $ · aucune question en attente
+[  179s] Rien de nouveau.
+        ⏵ stories/US-2.md · Conception · en cours · 2 min 58 s · 0,53 $ · aucune question en attente
+[  229s] Rien de nouveau.
+        ⏵ stories/US-2.md · Conception · en cours · 3 min 48 s · 0,53 $ · aucune question en attente
+[  280s] Rien de nouveau.
+        ⏵ stories/US-2.md · Conception · en cours · 4 min 38 s · 1,16 $ · aucune question en attente
+[  330s] Rien de nouveau.
+        ⏵ stories/US-2.md · Conception · en cours · 5 min 28 s · 1,16 $ · aucune question en attente
+[  380s] Rien de nouveau.
+        ⏵ stories/US-2.md · Conception · en cours · 6 min 18 s · 1,16 $ · aucune question en attente
+[  382s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 6 min 21 s · 1,92 $ · aucune question en attente
+[  432s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 7 min 11 s · 2,06 $ · aucune question en attente
+[  438s] Phase : ADR à ratifier (RATIFICATION).
+[  438s] Question à poser à l'utilisateur : Ratifier ADR-003 — Décision d'architecture proposée : docs/adr/adr-003-frontiere-agregat-panier-et-grille-de-paliers.md
+        ⏵ stories/US-2.md · ADR à ratifier · attend une réponse · 7 min 16 s · 2,14 $ · 1 question en attente
+[  438s] ↳ réponse : Accepter
+[  438s] Réponse reçue : le run reprend.
+        ⏵ stories/US-2.md · ADR à ratifier · en cours · 7 min 17 s · 2,14 $ · aucune question en attente
+[  439s] Phase : Scénarios d'acceptance (DISTILL).
+        ⏵ stories/US-2.md · Scénarios d'acceptance · en cours · 7 min 18 s · 2,14 $ · aucune question en attente
+[  489s] Rien de nouveau.
+        ⏵ stories/US-2.md · Scénarios d'acceptance · en cours · 8 min 08 s · 2,14 $ · aucune question en attente
+[  539s] Rien de nouveau.
+        ⏵ stories/US-2.md · Scénarios d'acceptance · en cours · 8 min 58 s · 2,43 $ · aucune question en attente
+[  544s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 9 min 03 s · 2,43 $ · aucune question en attente
+[  595s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 9 min 53 s · 2,77 $ · aucune question en attente
+[  645s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 10 min 43 s · 2,78 $ · aucune question en attente
+[  673s] Phase : Scénarios d'acceptance (DISTILL).
+        ⏵ stories/US-2.md · Scénarios d'acceptance · en cours · 11 min 12 s · 3,01 $ · aucune question en attente
+[  700s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 11 min 39 s · 3,37 $ · aucune question en attente
+[  751s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 12 min 29 s · 3,79 $ · aucune question en attente
+[  765s] Phase : Scénarios d'acceptance (DISTILL).
+        ⏵ stories/US-2.md · Scénarios d'acceptance · en cours · 12 min 44 s · 4,10 $ · aucune question en attente
+[  787s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 13 min 05 s · 4,50 $ · aucune question en attente
+[  829s] Phase : Implémentation en TDD (DELIVER).
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 13 min 48 s · 5,01 $ · aucune question en attente
+[  879s] Rien de nouveau.
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 14 min 38 s · 5,11 $ · aucune question en attente
+[  929s] Rien de nouveau.
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 15 min 28 s · 5,22 $ · aucune question en attente
+[  979s] Rien de nouveau.
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 16 min 18 s · 5,22 $ · aucune question en attente
+[ 1016s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 16 min 54 s · 5,22 $ · aucune question en attente
+[ 1066s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 17 min 44 s · 5,62 $ · aucune question en attente
+[ 1116s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 18 min 34 s · 5,86 $ · aucune question en attente
+[ 1122s] Phase : Implémentation en TDD (DELIVER).
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 18 min 41 s · 6,30 $ · aucune question en attente
+[ 1172s] Rien de nouveau.
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 19 min 31 s · 6,47 $ · aucune question en attente
+[ 1222s] Rien de nouveau.
+        ⏵ stories/US-2.md · Implémentation en TDD · en cours · 20 min 21 s · 6,47 $ · aucune question en attente
+[ 1248s] Phase : Revue (REVIEW).
+        ⏵ stories/US-2.md · Revue · en cours · 20 min 46 s · 6,47 $ · aucune question en attente
+[ 1298s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 21 min 36 s · 6,60 $ · aucune question en attente
+[ 1348s] Rien de nouveau.
+        ⏵ stories/US-2.md · Revue · en cours · 22 min 26 s · 6,60 $ · aucune question en attente
+[ 1360s] Message : Pipeline skraft terminé pour **US-2** (branche skraft/us-2).
+Difficulté : medium-hard (confirmée).
+Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.
+ADR : ADR-003 (Accepted).
+Remarques hors du changement de la story :
+- src/Tarification.Application/CalculDuPanier.cs:7 (quality-gates, minor) : La documentation de Facture indique que les remises restent à zéro tant 
+        ⏵ stories/US-2.md · Revue · en cours · 22 min 39 s · 6,62 $ · aucune question en attente
+[ 1360s] Phase : Terminé (DONE).
+        ⏵ stories/US-2.md · Terminé · en cours · 22 min 39 s · 6,62 $ · aucune question en attente
+[ 1361s] Run terminé : stories/US-2.md.
+        ⏵ stories/US-2.md · Terminé · terminé · 22 min 39 s · 6,62 $ · aucune question en attente
+
+Runtime : claude
+
+| Étape | Essai | Début | Fin | Durée | Tours | Rejets | Coût | Modèles |
+|---|---|---|---|---|---|---|---|---|
+| INIT | 1 | 11:09:15 | 11:09:26 | 0m11 | 0 | — | 0.0000 $ |  |
+| CLASSIFY | 1 | 11:09:26 | 11:09:35 | 0m09 | 1 | — | 0.0011 $ | claude-haiku-5-5 |
+| CONFIRM_DIFFICULTY | 1 | 11:09:35 | 11:09:35 | 0m00 | 0 | — | 0.0000 $ |  |
+| ROUTE | 1 | 11:09:35 | 11:09:36 | 0m00 | 0 | — | 0.0000 $ |  |
+| RESEARCH | 1 | 11:09:36 | 11:10:43 | 1m08 | 1 | citations : `Features/panier-chiffrage.feature` : fichier inexistant dans le dépôt. ; `tests/Dosage.Tests` : fichier inexistant dans le dépôt. | 0.1405 $ | claude-sonnet-5-5 |
+| RESEARCH | 2 | 11:10:43 | 11:11:03 | 0m19 | 1 | citations : `tests/Tarification.Tests` : fichier inexistant dans le dépôt. ; `tests/Tarification.UnitTests` : fichier inexistant dans le dépôt. | 0.1761 $ | claude-sonnet-5-5 |
+| RESEARCH | 3 | 11:11:03 | 11:11:21 | 0m18 | 1 | — | 0.2084 $ | claude-sonnet-5-5 |
+| ROUTE | 2 | 11:11:21 | 11:11:23 | 0m02 | 0 | — | 0.0000 $ |  |
+| DESIGN | 1 | 11:11:23 | 11:15:35 | 4m12 | 2 | — | 1.3905 $ | claude-opus-5-5 |
+| REVIEW | 1 | 11:15:35 | 11:16:31 | 0m56 | 3 | — | 0.2203 $ | claude-sonnet-5-5 |
+| RATIFICATION | 1 | 11:16:31 | 11:16:32 | 0m01 | 0 | — | 0.0000 $ |  |
+| DISTILL | 1 | 11:16:32 | 11:18:18 | 1m46 | 1 | — | 0.2977 $ | claude-sonnet-5-5 |
+| REVIEW | 2 | 11:18:18 | 11:20:26 | 2m08 | 5 | revue : [quality-gates#1.1, major, deliverable] Le plan affirme « Mutation M4 : GrillePaliers.RemisePour — M4 negative — saturated by AC ». Aucun outil de mutation n'a été exécuté d'après les faits, donc cette qualité n'est pas mesurée. De plus, la méthode GrillePaliers.RemisePour n'existe pas dans src/Tarification.Domaine/GrillePaliers.cs (la classe ne porte que Paliers, Vide et De). L'affirmation doit être retirée ou reformulée comme non mesurée. (.skraft/us-2/distill/test-plan.md:20) — gravité : Une qualité présentée comme acquise (mutant saturé) sans aucune mesure et sur une cible inexistante trompe le lecteur sur la solidité de la suite. ; [quality-gates#1.2, major, deliverable] Le plan ne documente pas le résultat DISTILL_RED établi par le code : 8 réussis, 2 en échec, sur 10 tests. Il ne dit pas quels scénarios sont en échec (ce devrait être @ac-2 et @ac-3, les seuls non requalifiés) ni pourquoi. Le total de 10 n'est pas réconcilié avec les 5 scénarios de panier-remise-par-palier.feature. La preuve de la porte rouge reste donc absente du livrable. (.skraft/us-2/distill/test-plan.md:1) — gravité : La porte DISTILL repose sur la preuve que les tests échouent pour la bonne raison, et le livrable ne la rapporte pas. ; Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain. | 0.5789 $ | claude-sonnet-5-5, claude-haiku-5-5, claude-opus-5-5 |
+| REVIEW | 3 | 11:20:26 | 11:20:26 | 0m00 | 0 | — | 0.0000 $ |  |
+| DISTILL | 2 | 11:20:26 | 11:20:53 | 0m27 | 1 | — | 0.3562 $ | claude-sonnet-5-5 |
+| REVIEW | 4 | 11:20:53 | 11:21:58 | 1m05 | 5 | revue : [quality-gates#2.1, major, deliverable] La décision sur ATPayer reste non consignée. Le plan ne dit ni si ATPayer doit déduire la remise, ni quelle option « la plus simple » a été retenue. CalculDuPanier.cs:12 définit toujours ATPayer = SommeDesArticles + FraisDePort, sans la remise. Dès @ac-2 vert, Facture.Remise vaudra 1,00 € alors qu'ATPayer restera au plein tarif. Cette incohérence annoncée par l'utilisateur n'est ni tracée ni signalée dans le livrable. (.skraft/us-2/distill/test-plan.md:19) — gravité : Une incohérence concrète entre remise affichée et montant à payer, qui touchera le total dès la phase suivante, n'est pas tracée. ; Rappel des demandes des revues précédentes, déclarées corrigées : ne les défais pas. ;   - [quality-gates#1.1] Le plan affirme « Mutation M4 : GrillePaliers.RemisePour — M4 negative — saturated by AC ». Aucun outil de mutation n'a été exécuté d'après les faits, donc cette qualité n'est pas mesurée. De plus, la méthode GrillePaliers.RemisePour n'existe pas dans src/Tarification.Domaine/GrillePaliers.cs (la classe ne porte que Paliers, Vide et De). L'affirmation doit être retirée ou reformulée comme non mesurée. ;   - [quality-gates#1.2] Le plan ne documente pas le résultat DISTILL_RED établi par le code : 8 réussis, 2 en échec, sur 10 tests. Il ne dit pas quels scénarios sont en échec (ce devrait être @ac-2 et @ac-3, les seuls non requalifiés) ni pourquoi. Le total de 10 n'est pas réconcilié avec les 5 scénarios de panier-remise-par-palier.feature. La preuve de la porte rouge reste donc absente du livrable. ; Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain. | 0.7335 $ | claude-sonnet-5-5, claude-haiku-5-5, claude-opus-5-5 |
+| REVIEW | 5 | 11:21:58 | 11:21:58 | 0m00 | 0 | — | 0.0000 $ |  |
+| DISTILL | 3 | 11:21:58 | 11:22:19 | 0m21 | 1 | — | 0.4003 $ | claude-sonnet-5-5 |
+| REVIEW | 6 | 11:22:19 | 11:23:02 | 0m43 | 4 | — | 0.5058 $ | claude-sonnet-5-5, claude-haiku-5-5 |
+| DELIVER | 1 | 11:23:02 | 11:26:08 | 3m06 | 2 | — | 0.2135 $ | claude-sonnet-5-5 |
+| REVIEW | 7 | 11:26:08 | 11:27:54 | 1m45 | 5 | revue (correction ciblée) : [architecture#1.1, major, code] La somme des remises ligne par ligne est faite dans le cas d'usage (RemiseDe, Aggregate sur panier.Lignes). L'ADR-003 décide de placer `Panier.SommeDesRemises(GrillePaliers)` sur la racine, qui somme `GrillePaliers.RemisePour(ligne)` : c'est ce qui porte l'invariant I1 (remise par ligne) et I2 (grille vide → zéro) dans le domaine. `Panier.cs` n'a pas reçu cette opération ; la règle d'agrégation passe dans la couche Application, contre adr-001 (règle commerciale dans le domaine) et contre la décision ratifiée. Le contrat `contracts.md` (Remise = panier.SommeDesRemises(grille)) n'est pas respecté. (src/Tarification.Application/CalculDuPanier.cs:32) — gravité : Le code s'écarte de la frontière d'agrégat ratifiée par l'ADR-003 et place une règle commerciale dans l'application, contre l'ADR-001. ; Réponds à chaque défaut ci-dessus dans le champ `responses` de report_phase : `fixed` si tu l'as corrigé, `contested` avec ta raison si tu estimes qu'il ne faut pas le corriger, `outOfScope` avec ta raison s'il est juste mais que sa correction n'est pas de ton ressort. Un défaut maintenu après contestation doit être corrigé ; le contester encore soumet le désaccord à l'humain. | 1.0773 $ | claude-sonnet-5-5, claude-haiku-5-5, claude-opus-5-5 |
+| REVIEW | 8 | 11:27:54 | 11:27:55 | 0m01 | 0 | — | 0.0000 $ |  |
+| DELIVER | 2 | 11:27:55 | 11:30:01 | 2m06 | 1 | — | 0.1710 $ | claude-sonnet-5-5 |
+| REVIEW | 9 | 11:30:01 | 11:31:54 | 1m53 | 4 | — | 0.1442 $ | claude-sonnet-5-5, claude-haiku-5-5 |
+| DONE | 1 | 11:31:54 | 11:31:54 | 0m00 | 0 | — | 0.0000 $ |  |
+
+Total : 22m39, 5 rejet(s), 6.6153 $
+
+[ 1361s] Rapport :
+{
+  "statut": "fini",
+  "valeur": {
+    "acceptanceHash": "39bf36d59f6644a11fa7fe2a6092be28df7304332a3f076f2765f06fc7b0718d",
+    "adrs": [
+      {
+        "id": "ADR-003",
+        "path": "docs/adr/adr-003-frontiere-agregat-panier-et-grille-de-paliers.md",
+        "status": "Accepted"
+      }
+    ],
+    "livraison": {
+      "granularity": "turn-per-scenario",
+      "notes": [
+        "Qualité de forme non mesurée : le projet n'a pas de linter configuré pour cette stack.",
+        "Règle de dépendance non vérifiée : la stack du projet ne sait pas analyser les imports.",
+        "Scénario ac-3 : déjà vert avant son premier pas ; le code d'un pas précédent l'a fait passer sans test rouge qui le demande.",
+        "Mutation hors du changement : src/Tarification.Domaine/Montant.cs, 5 mutant(s) survivant(s) sur des lignes que la story ne modifie pas (ligne 14 (String mutation), ligne 21 (Conditional (false) mutation), ligne 21 (Equality mutation), ligne 21 (String mutation (non couvert)), ligne 27 (String mutation (non couvert))) ; non jugés.",
+        "Aucune ligne exécutable modifiée à couvrir : src/Tarification.Domaine/GrillePaliers.cs."
+      ],
+      "scenarios": [
+        [
+          "ac-2",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-3",
+          "driver",
+          "done"
+        ],
+        [
+          "ac-1",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-4",
+          "regression",
+          "done"
+        ],
+        [
+          "ac-5",
+          "regression",
+          "done"
+        ]
+      ]
+    },
+    "niveau": "medium-hard",
+    "phases": [
+      "RESEARCH",
+      "DESIGN",
+      "DISTILL",
+      "DELIVER"
+    ],
+    "regressions": [
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_5AucunPalierConfigureNaccordeAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_1UneLigneSousLePalierNobtientAucuneRemise",
+      "Tarification.UnitTests.Features.RemiseParPalierDeQuantiteFeature.AC_4LaRemiseSeCalculeParLigneJamaisSurLePanierEntier"
+    ],
+    "slug": "us-2"
+  },
+  "messages": [
+    "Pipeline skraft terminé pour **US-2** (branche skraft/us-2).\nDifficulté : medium-hard (confirmée).\nPhases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER ; sautées : aucune.\nADR : ADR-003 (Accepted).\nRemarques hors du changement de la story :\n- src/Tarification.Application/CalculDuPanier.cs:7 (quality-gates, minor) : La documentation de Facture indique que les remises restent à zéro tant que leur story n'est pas livrée. Or US-2 introduit justement Facture.Remise renseignée, et Chiffrer renvoie encore Montant.Zero (ligne 30). Le commentaire sera faux dès l'implémentation de @ac-2.\n- src/Tarification.Application/CalculDuPanier.cs:6 (cold-reader, minor) : Le commentaire de `Facture` dit que les remises restent à zéro tant que les stories ne sont pas livrées, alors que `Remise` est désormais calculée (paliers). Le commentaire est périmé et induit en erreur.\n- src/Tarification.Application/CalculDuPanier.cs:7 (quality-gates, minor) : La documentation de Facture affirme que les remises restent à zéro tant que leur story n'est pas livrée. Or cette phase calcule désormais la remise (ligne 30, RemiseDe). Le commentaire est faux pour le fichier livré.\n- .skraft/us-2/distill/test-plan.md:20 (quality-gates, minor) : Les plans de DISTILL ne correspondent plus au code livré. Ils nomment GrillePaliers.RemisePour (livré : RemiseSur), Montant.Applique (livré : Montant.Prend), Panier.SommeDesRemises et PalierDeRemise.EstAtteintPar (absents du code livré). Le plan de test dit encore que la mutation n'est pas mesurée, alors que les faits de fin de DELIVER donnent 0 mutant survivant sur GrillePaliers.cs. La matrice ne peut donc pas être rattachée aux symboles réellement livrés sans retraduction manuelle.\n- src/Tarification.Application/CalculDuPanier.cs:12 (cold-reader, major) : `ATPayer` est un nom illisible (faute probable pour `APayer
+
+Rapport complet : /tmp/essai-mcp-skraft-x5qMBf/rapport.json
+Clone : /tmp/essai-mcp-skraft-x5qMBf/projet

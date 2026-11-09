@@ -3,7 +3,7 @@
  * et la liste de ce qui a changé entre deux instantanés de l'état. Pur : aucun LLM, aucun disque.
  */
 import { describe, expect, it } from "vitest";
-import { changements, ligneDeProgression, type Instantane } from "../src/progression.js";
+import { changements, ligneDeProgression, vueDeTache, type Instantane } from "../src/progression.js";
 
 const tache = { id: "t1", titre: "US-2 — Remise par palier", status: "running" as const, phase: "DESIGN", phaseLabel: "Conception" };
 const vide: Instantane = { taches: [], questions: [], messages: [] };
@@ -51,7 +51,7 @@ describe("changements", () => {
     expect(changements(avant, apres)).toEqual([
       "Phase : Scénarios d'acceptance (DISTILL).",
       "Étape 1/3.",
-      "Rejet, la phase recommence : gherkin : titre sans AC-1.",
+      "Rejet, Scénarios d'acceptance recommence : gherkin : titre sans AC-1.",
       "Message : Précontrôle : couverture non mesurée.",
     ]);
   });
@@ -72,5 +72,58 @@ describe("changements", () => {
   it("filtré sur un run : les autres runs ne comptent pas", () => {
     const autre = { ...tache, id: "t2", titre: "US-3" };
     expect(changements(avant, { ...avant, taches: [tache, autre] }, "t1")).toEqual([]);
+  });
+});
+
+/**
+ * Une tâche de workflow ne porte ni son dernier rejet ni son étape dans sa carte (run du 09/11 : 5 rejets,
+ * aucun signalé). Ils sont dans la trace du run : on les y lit, comme `skraft_rapport`.
+ */
+describe("vueDeTache : rejets et essais lus dans la trace", () => {
+  const carte = { id: "t1", title: "skraft-workflow", status: "running" as const, phase: "DISTILL", phaseLabel: "Scénarios d'acceptance" };
+  const etape = (phase: string, essai: number, rejets: { porte: string; motifs: string[] }[] = [], coutUsd = 0.1) => ({
+    phase,
+    essai,
+    début: `2026-11-09T11:0${essai}:00.000Z`,
+    fin: `2026-11-09T11:0${essai}:30.000Z`,
+    rejets,
+    coûtUsd: coutUsd,
+  });
+
+  it("le dernier rejet et le nombre de rejets du run, l'essai en cours de la phase", () => {
+    const etapes = [etape("RESEARCH", 1, [{ porte: "citations", motifs: ["`Features/a.feature` : fichier inexistant.", "autre"] }]), etape("DISTILL", 1), etape("DISTILL", 2, [{ porte: "revue", motifs: ["[quality-gates#2.1, major] ATPayer non consigné"] }]), etape("DISTILL", 3)];
+    const { vue } = vueDeTache(carte, etapes, "stories/US-2.md");
+    expect(vue).toMatchObject({ titre: "stories/US-2.md", rejets: 2, dernierRejet: "revue : [quality-gates#2.1, major] ATPayer non consigné", essai: 3 });
+  });
+
+  it("pendant une revue, pas d'essai : les revues de toutes les phases partagent l'étiquette REVIEW (run du 09/11 : « essai 7 »)", () => {
+    const etapes = [etape("DISTILL", 1), etape("REVIEW", 1), etape("DISTILL", 2), etape("REVIEW", 2), etape("DELIVER", 1), etape("REVIEW", 3)];
+    expect(vueDeTache({ ...carte, phase: "REVIEW", phaseLabel: "Revue" }, etapes, undefined).vue.essai).toBeUndefined();
+  });
+
+  it("sans trace, la carte fait foi (tâche d'extension) ; sans story, le titre de la carte", () => {
+    const { vue } = vueDeTache({ ...carte, feedback: "porte : motif" }, [], undefined);
+    expect(vue).toMatchObject({ titre: "skraft-workflow", dernierRejet: "porte : motif" });
+    expect(vue.rejets).toBeUndefined();
+  });
+
+  it("durée et coût du run, depuis la première étape", () => {
+    const { dureeMs, coutUsd } = vueDeTache({ ...carte, status: "finished" }, [etape("RESEARCH", 1, [], 0.2), etape("DESIGN", 2, [], 1.3)], undefined);
+    expect(coutUsd).toBeCloseTo(1.5);
+    expect(dureeMs).toBe(90_000);
+  });
+});
+
+describe("changements et ligne : rejets comptés, essai affiché", () => {
+  const t = { id: "t1", titre: "US-2", status: "running" as const, phase: "DISTILL", phaseLabel: "Scénarios d'acceptance" };
+  it("un nouveau rejet est dit même si son texte est celui du précédent", () => {
+    const avant: Instantane = { taches: [{ ...t, rejets: 1, dernierRejet: "revue : défaut", essai: 2 }], questions: [], messages: [] };
+    const apres: Instantane = { taches: [{ ...t, rejets: 2, dernierRejet: "revue : défaut", essai: 3 }], questions: [], messages: [] };
+    expect(changements(avant, apres)).toEqual(["Rejet, Scénarios d'acceptance recommence (essai 3) : revue : défaut."]);
+  });
+
+  it("la ligne dit l'essai à partir du deuxième", () => {
+    expect(ligneDeProgression({ ...t, essai: 2 }, { questions: 0 })).toBe("US-2 · Scénarios d'acceptance, essai 2 · en cours · aucune question en attente");
+    expect(ligneDeProgression({ ...t, essai: 1 }, { questions: 0 })).toBe("US-2 · Scénarios d'acceptance · en cours · aucune question en attente");
   });
 });

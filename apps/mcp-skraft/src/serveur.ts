@@ -11,7 +11,7 @@ import { z } from "zod";
 import type { Connexion } from "./connexion.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet } from "./projet.js";
-import { changements, ligneDeProgression, type Instantane } from "./progression.js";
+import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
 
 export interface OptionsServeur {
   projets: Projets;
@@ -142,21 +142,20 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
   async function lireInstantane(p: ProjetOuvert): Promise<{ inst: Instantane; progression: Map<string, string>; questions: ReturnType<typeof questionPourHote>[] }> {
     const cartes = await p.services.tasks();
     const attente = await p.services.pendingInteractions();
+    const taches: VueTache[] = [];
+    const progression = new Map<string, string>();
+    for (const carte of cartes) {
+      // Rejets, essai, durée et coût lus dans la trace du run (`etapesDuRun`, comme skraft_rapport).
+      const etapes = await p.services.etapesDuRun(carte.id).catch(() => []);
+      const { vue, dureeMs, coutUsd } = vueDeTache(carte, etapes, storyDe.get(carte.id));
+      taches.push(vue);
+      progression.set(vue.id, ligneDeProgression(vue, { questions: attente.filter((q) => q.taskId === vue.id).length, ...(dureeMs !== undefined ? { dureeMs } : {}), coutUsd }));
+    }
     const inst: Instantane = {
-      taches: cartes.map((t) => ({ id: t.id, titre: storyDe.get(t.id) ?? t.title, status: t.status, phase: t.phase, phaseLabel: t.phaseLabel, ...(t.step ? { etape: { index: t.step.index, total: t.step.total } } : {}), ...(t.feedback ? { dernierRejet: t.feedback } : {}) })),
+      taches,
       questions: attente.map((q) => ({ id: q.id, tache: q.taskId, title: q.title, ...(q.detail ? { detail: q.detail } : {}) })),
       messages: p.messages(),
     };
-    const progression = new Map<string, string>();
-    for (const t of inst.taches) {
-      // Durée et coût lus dans la trace du run : de la première étape à la dernière, ou à maintenant.
-      const etapes = await p.services.etapesDuRun(t.id).catch(() => []);
-      const debut = etapes.length ? Date.parse(etapes[0]!.début) : NaN;
-      const finEtapes = etapes.length ? Date.parse(etapes.at(-1)!.fin) : NaN;
-      const dureeMs = Number.isNaN(debut) ? undefined : (t.status === "finished" && !Number.isNaN(finEtapes) ? finEtapes : Date.now()) - debut;
-      const coutUsd = etapes.reduce((n, e) => n + e.coûtUsd, 0);
-      progression.set(t.id, ligneDeProgression(t, { questions: inst.questions.filter((q) => q.tache === t.id).length, ...(dureeMs !== undefined && dureeMs >= 0 ? { dureeMs } : {}), coutUsd }));
-    }
     return { inst, progression, questions: attente.map(questionPourHote) };
   }
 
