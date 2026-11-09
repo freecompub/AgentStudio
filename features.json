@@ -992,6 +992,13 @@
       "notes": "Lecteur écrit sur un rapport réel de Stryker.NET 5.0.0 (03/10) ; éprouvé de bout en bout sur le code livré d’US-2 : 72 % en 32 s, comme Stryker. dotnet-stryker installé en outil global sur la machine de dev ; le projet d’essai n’a pas encore la commande dans son stack.yaml."
     },
     {
+      "id": "mcp-suivi-de-la-progression",
+      "title": "Le serveur MCP tient l'utilisateur au courant : skraft_attendre rend chaque changement depuis le dernier appel, et l'état porte une ligne de progression lisible",
+      "verify": "pnpm vitest run --project mcp-skraft test/progression.test.ts test/serveur.test.ts",
+      "passes": true,
+      "notes": "09/11, demande du responsable. Changements comparés au dernier état rendu à l'hôte (sinon une réponse ou la fin du run, survenues entre deux appels, étaient perdues). Notifications poussées par MCP non faites : affichage par les clients non vérifié."
+    },
+    {
       "id": "mutation-sur-les-lignes-modifiees",
       "title": "La mutation d'un fichier modifié est jugée sur les seules lignes que la story change ; les survivants anciens sont notés, sans bloquer",
       "verify": "pnpm vitest run --project stack-adapters test/stryker-report.test.ts && pnpm vitest run --project ext-skraft test/deliver-gates.test.ts test/e2e-s5.test.ts && pnpm vitest run --project workflow-skraft test/deliver-gates.test.ts test/e2e-s5-workflow.test.ts",

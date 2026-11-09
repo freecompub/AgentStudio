@@ -168,7 +168,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const { tools } = await s.client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
     await s.fermer();
   }, 30_000);
 
@@ -211,6 +211,47 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(await s.appel("skraft_rapport", { tache: "inconnue" })).toEqual({ erreur: true, texte: expect.stringMatching(/inconnue/) });
     await s.fermer();
   }, 30_000);
+
+  // 09/11 : que l'utilisateur suive la progression sans que l'hôte ait à interpréter l'état.
+  it("skraft_attendre rend chaque changement (question à poser, réponse, fin) ; l'état porte une ligne de progression", async () => {
+    const p = await projet();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
+    const id = /tâche (\S+)\./.exec((await s.appel("skraft_demarrer", { story: "stories/us-2.md", auto: true, accord: "une-fois" })).texte)![1]!;
+    type Attente = { changements: string[]; progression: string[]; questions: { id: string; options: { id: string }[] }[]; termine: boolean };
+    const attendre = async () => JSON.parse((await s.appel("skraft_attendre", { tache: id, delai: 10 })).texte) as Attente;
+    const vus: string[] = [];
+    let r = await attendre();
+    for (let i = 0; i < 10 && !r.questions.length; i++) {
+      vus.push(...r.changements);
+      r = await attendre();
+    }
+    vus.push(...r.changements);
+    expect(vus).toContain("Question à poser à l'utilisateur : Valider le résumé ? — résumé");
+    // La story, donnée au lancement, plutôt que le nom du workflow (run du 09/11).
+    expect(r.progression[0]).toMatch(/^stories\/us-2\.md · /);
+    expect(r.progression[0]).toContain("attend une réponse");
+    expect(r.progression[0]).toContain("1 question en attente");
+    // L'état porte la même ligne.
+    const e = JSON.parse((await s.appel("skraft_etat")).texte) as { taches: { progression: string }[] };
+    expect(e.taches[0]!.progression).toContain("1 question en attente");
+
+    await s.appel("skraft_repondre", { question: r.questions[0]!.id, option: r.questions[0]!.options[0]!.id });
+    const suite: string[] = [];
+    for (let i = 0; i < 10 && !r.termine; i++) {
+      r = await attendre();
+      suite.push(...r.changements);
+    }
+    expect(suite).toContain("Réponse reçue : le run reprend.");
+    expect(suite.some((c) => c.startsWith("Run terminé"))).toBe(true);
+    expect(r.termine).toBe(true);
+    // Le SDK MCP abandonne un appel au bout de 60 s par défaut (run du 09/11) : l'attente reste en deçà.
+    expect((await s.appel("skraft_attendre", { tache: id, delai: 120 })).erreur).toBe(true);
+    // Run déjà terminé : la réponse est immédiate, sans attendre le délai.
+    const t0 = Date.now();
+    expect((await attendre()).changements).toEqual(["Le run est terminé : skraft_rapport donne son bilan."]);
+    expect(Date.now() - t0).toBeLessThan(5_000);
+    await s.fermer();
+  }, 60_000);
 
   it("une réponse refusée (profil, option inconnue) est une erreur de l'outil, avec la raison", async () => {
     const p = await projet();

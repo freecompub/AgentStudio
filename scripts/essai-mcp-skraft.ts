@@ -6,7 +6,7 @@
  * Travaille sur un **clone** du projet, jamais sur le dépôt donné.
  *
  *   pnpm --filter @agent-studio/mcp-skraft build
- *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>]
+ *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>] [--suivi=attendre]
  */
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
@@ -22,6 +22,8 @@ const auto = args.includes("--auto");
 const runtime = args.find((a) => a.startsWith("--runtime="))?.slice("--runtime=".length) ?? "copilot";
 // Commit de départ (par défaut, la branche par défaut du dépôt cloné).
 const baseRun = args.find((a) => a.startsWith("--base="))?.slice("--base=".length);
+// Suivi par `skraft_attendre` (09/11) : affiche ce que l'hôte montrerait à l'utilisateur, changement par changement.
+const parAttente = args.includes("--suivi=attendre");
 // Pile donnée par l'hôte (argument `pile` de skraft_demarrer), pour un projet qui n'en déclare pas.
 const fichierPile = args.find((a) => a.startsWith("--pile="))?.slice("--pile=".length);
 const pile = fichierPile ? await readFile(fichierPile, "utf8") : undefined;
@@ -77,7 +79,21 @@ type Etat = { taches: { id: string; status: string; phase: string; phaseLabel: s
 let derniere = "";
 let messagesVus = 0;
 const repondues = new Set<string>();
-for (;;) {
+type Attente = { changements: string[]; progression: string[]; questions: Etat["questions"]; termine: boolean };
+for (; parAttente; ) {
+  const r = JSON.parse((await appel("skraft_attendre", { tache, delai: 50 })).texte) as Attente;
+  for (const c of r.changements) console.log(`${h()} ${c.slice(0, 400)}`);
+  for (const l of r.progression) console.log(`        ⏵ ${l}`);
+  for (const q of r.questions) {
+    if (repondues.has(q.id)) continue;
+    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options, ...(q.profils ? { requiredRoles: q.profils } : {}) }, reponses, memoire);
+    const rep = await appel("skraft_repondre", { question: q.id, option: c.option, ...(c.commentaire ? { texte: c.commentaire } : {}) });
+    console.log(`${h()} ↳ réponse : ${q.options.find((o) => o.id === c.option)?.label ?? c.option}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${rep.erreur ? `\n        ✖ ${rep.texte}` : ""}`);
+    if (!rep.erreur) repondues.add(q.id);
+  }
+  if (r.termine) break;
+}
+for (; !parAttente; ) {
   const e = JSON.parse((await appel("skraft_etat")).texte) as Etat;
   const t = e.taches.find((x) => x.id === tache);
   const resume = t ? `${t.phase}${t.etape ? ` ${t.etape.index}/${t.etape.total}` : ""} (${t.status})${t.usage ? ` — ${t.usage.requests.toFixed(1)} req.` : ""}` : "?";

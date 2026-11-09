@@ -5,6 +5,43 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 09/11 — Le serveur MCP tient l'utilisateur au courant : `skraft_attendre` et la ligne de progression
+
+- **Pourquoi** (demande du responsable) : le serveur ne pousse rien, la progression ne se voyait que si
+  l'hôte pensait à rappeler `skraft_etat`, et en JSON à interpréter.
+- **Fait** (`apps/mcp-skraft`, branche `feat/mcp-progression`, partie de `main`) :
+  `progression.ts`, pur : `ligneDeProgression` (titre · phase, étape · statut · durée · coût · dernier
+  rejet · questions ; coût omis s'il vaut 0, Copilot) et `changements(avant, après, tache?)` (run lancé,
+  phase, étape, rejet, fin, question à poser, réponse reçue, message). `skraft_etat` porte `progression`
+  par run (durée et coût lus dans la trace, `etapesDuRun`). Nouvel outil **`skraft_attendre`** (`tache`,
+  `delai` ≤ 120 s) : attend un changement (scrutation toutes les 500 ms), rend les changements, la
+  progression, les questions sous la forme de `skraft_etat` (options comprises) et `termine` ; réponse
+  immédiate si le run est fini ; sa description dit à l'hôte de tout rapporter et de rappeler l'outil.
+- **Piège** (vu par le test de bout en bout) : comparé à l'état **du moment de l'appel**, l'outil perdait ce
+  qui arrive entre deux appels (une réponse, la fin du run). Il compare désormais au **dernier état rendu à
+  l'hôte**, gardé par projet et par run suivi.
+- **Vu au premier run réel suivi par l'outil (09/11)** : le client MCP abandonne un appel au bout de 60 s
+  (délai par défaut du SDK) ; avec `delai: 120`, RESEARCH sans changement pendant plus d'une minute a fait
+  tomber le script, et le serveur avec lui. L'attente est bornée à **50 s** (30 par défaut). Corrigés
+  aussi : un coût sous le centime s'affiche « < 0,01 $ » au lieu de « 0,00 $ » ; la ligne commence par la
+  **story** donnée à `skraft_demarrer` (la carte d'une tâche de workflow ne porte que le nom du workflow).
+  `scripts/essai-mcp-skraft.ts` gagne `--suivi=attendre`.
+- **Second run suivi** (`docs/runs/2026-11-09-us-2-bdd-claude-suivi/`) : fini, 22m39, 5 rejets, 6,62 $ ;
+  le suivi a tenu, mais **aucun rejet ni essai n'était signalé** : la carte d'une tâche de workflow ne porte
+  ni `feedback` ni `step`. Corrigé : `vueDeTache(carte, étapes de la trace, story)` lit rejets (comptés,
+  pour voir un rejet au texte répété), dernier rejet (« porte : premier motif »), essai de la phase (pas
+  pendant une revue : `REVIEW` est l'étiquette de toutes les revues, son compteur n'est pas un essai),
+  durée et coût. Vérifié en rejouant la trace réelle du run.
+- **Troisième run suivi** (même dossier) : 21m13, 5 rejets, 6,51 $ ; **5 rejets signalés sur 5**. Corrigés
+  ensuite : motif long coupé au milieu (début et fin, où est la cause) ; pas de double point final.
+  **À analyser** (skraft) : rouge d'acceptance refusé pour un `Assert.True` à message personnalisé
+  (classé au texte) ; escalade sur une revue « changements demandés » sans défaut grave ; conflit entre
+  cold-reader et la recopie mot pour mot des valeurs de la story.
+- Notifications poussées par MCP (journal, progression, ressources) : non faites, leur affichage par
+  Claude Code et Copilot CLI n'est pas vérifié.
+- Tests : `test/progression.test.ts` (9), `serveur.test.ts` (1 de bout en bout, plus la liste des outils),
+  `stdio.test.ts` (liste des outils) ; vus rouges. 52 tests verts.
+
 ## 08/11 — État du BDD et suite (ADR 0074, révisé)
 
 - **Principe rappelé par le responsable** : skraft ne connaît aucun langage. Tout ce qui dépend de
