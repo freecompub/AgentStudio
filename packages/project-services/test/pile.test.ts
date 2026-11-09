@@ -34,7 +34,7 @@ layout:
  * `repondre` : l'utilisateur à qui l'on demande d'accepter un programme (ADR 0075) ; `consentement` :
  * ce que permet l'administrateur (par défaut, oui) ; `root` : rouvrir un projet déjà créé.
  */
-async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProjet?: string; fournie?: string; sansRepli?: boolean; repondre?: (q: ConfirmRequest) => ConfirmAnswer; consentement?: boolean; root?: string; taches?: string }) {
+async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProjet?: string; fournie?: string; sansRepli?: boolean; repondre?: (q: ConfirmRequest) => ConfirmAnswer; consentement?: boolean; root?: string; taches?: string; repliPermis?: boolean }) {
   const root = o.root ?? (await mkdtemp(join(base, "projet-")));
   if (o.profilProjet || o.fichierProjet) await mkdir(join(root, ".agent-studio"), { recursive: true });
   if (o.profilProjet) await writeFile(join(root, ".agent-studio", "stack.yaml"), o.profilProjet);
@@ -61,6 +61,7 @@ async function ouvrir(o: { detecte?: boolean; profilProjet?: string; fichierProj
     onInteractions: () => {},
     onPost: (_e, md) => void posts.push(md),
     ...(o.fournie !== undefined ? { pileFournie: o.fournie } : {}),
+    ...(o.repliPermis ? { repliPermis: true } : {}),
     ...(o.repondre ? { confirmerProgrammes: { confirm: async (q: ConfirmRequest) => o.repondre!(q) } } : {}),
   });
   return { services, posts, root };
@@ -159,6 +160,12 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
 
   it("sans repli permis et sans aucune pile : refus qui dit quoi fournir", async () => {
     await expect(ouvrir({ sansRepli: true })).rejects.toThrow(/stack\.yaml/);
+  });
+
+  it("sans repli permis, mais ouvert pour proposer la pile (`skraft_pile`, ADR 0075) : le repli, sans refus", async () => {
+    const a = await ouvrir({ sansRepli: true, repliPermis: true });
+    expect(a.services.pile()).toEqual({ id: "typescript", source: "repli" });
+    await a.services.dispose();
   });
 
   it("repli permis (application de bureau) : premier adaptateur, source « repli », et l'avertissement habituel", async () => {

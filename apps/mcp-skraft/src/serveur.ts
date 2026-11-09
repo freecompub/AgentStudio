@@ -9,6 +9,7 @@ import { AucunePile } from "@agent-studio/project-services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { confirmerParLeClient } from "./confirmation.js";
+import { consignesPourLeClient } from "./consignes.js";
 import type { Connexion } from "./connexion.js";
 import type { Depots } from "./depots.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
@@ -362,6 +363,53 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       try {
         const r = await o.connexion.connecter();
         return r.ok ? texte(r.texte) : erreur(r.texte);
+      } catch (e) {
+        return erreur(e instanceof Error ? e.message : String(e));
+      }
+    },
+  );
+
+  /**
+   * La pile du projet (ADR 0075) : `/stack init` et `/stack doctor`, tels quels. L'écriture du profil
+   * se fait après la question posée par le client à l'utilisateur ; sans elle, la proposition est
+   * rendue et rien n'est écrit. Le projet est ensuite relu.
+   */
+  mcp.registerTool(
+    "skraft_pile",
+    {
+      description:
+        "Propose la pile du projet (comment lancer ses tests, où vivent ses fichiers, son BDD) et l'écrit dans .agent-studio/projet.yaml après l'accord de l'utilisateur, que le client lui demande ; ou, avec action « diagnostiquer », vérifie la pile déclarée (programmes trouvés, emplacements, canaris qui lancent vraiment les tests). À appeler quand skraft n'a pas de pile. Montre la réponse à l'utilisateur telle quelle.",
+      inputSchema: {
+        action: z.enum(["proposer", "diagnostiquer"]).optional().describe("proposer (par défaut) ou diagnostiquer."),
+        lanceur: sansEspace("Le lanceur BDD").optional().describe("Lanceur BDD, s'il n'a pas été trouvé (reqnroll, cucumber-js, pytest-bdd…)."),
+        features: sansEspace("Le dossier des .feature").optional().describe("Dossier des .feature, s'il n'a pas été trouvé."),
+        etapes: sansEspace("Le dossier des étapes").optional().describe("Dossier des définitions d'étapes, s'il n'a pas été trouvé."),
+        sansBdd: z.boolean().optional().describe("Le projet ne fait pas de BDD."),
+        projet,
+      },
+    },
+    async (a) => {
+      try {
+        const r = await resoudre(a.projet);
+        if (!r.ok) return erreur(r.motif);
+        const diagnostic = a.action === "diagnostiquer";
+        return await o.projets.pourLaPile(r.root, confirmer.peutDemander() ? { confirmerProgrammes: confirmer } : {}, async (p) => {
+          if (!diagnostic) {
+            const refus = enConsultation(p.mode(), "Écris la pile");
+            if (refus) return refus;
+          }
+          const options = [
+            ...(a.lanceur ? ["--lanceur", a.lanceur] : []),
+            ...(a.features ? ["--features", a.features] : []),
+            ...(a.etapes ? ["--etapes", a.etapes] : []),
+            ...(a.sansBdd ? ["--sans-bdd"] : []),
+          ];
+          const avant = p.messages();
+          await p.services.route(diagnostic ? "/stack doctor" : ["/stack init", ...options].join(" "));
+          const dits = p.messages().filter((m) => !avant.includes(m));
+          // Le projet est relu au prochain appel ; les consignes de `/stack` sont dites dans les termes de l'outil.
+          return texte(dits.map(consignesPourLeClient).join("\n\n"));
+        });
       } catch (e) {
         return erreur(e instanceof Error ? e.message : String(e));
       }

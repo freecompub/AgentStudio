@@ -65,9 +65,16 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
    - L'administrateur peut l'interdire : `"programConsent": false` dans `admin.json`. Il n'y a alors
      ni question ni accord retenu. Un `admin.json` refusé l'interdit aussi.
    - Chaque réponse est journalisée (`programme hors liste`, avec la réponse).
-6. **Usages suivants**, chacun dans sa propre brique :
-   - l'écriture du profil de pile proposé (`skraft_pile`) ;
-   - peut-être l'accord sur le workflow, qui passe aujourd'hui par l'argument `accord`.
+6. **Troisième usage : écrire la pile proposée, par l'outil `skraft_pile`.**
+   - L'outil reprend tels quels `/stack init` (`proposer`) et `/stack doctor` (`diagnostiquer`).
+   - Écrire un profil autorise des programmes : la question d'écriture va au même canal que l'accord
+     sur un programme (`confirmerProgrammes`, sinon la fenêtre).
+   - Sans pile, le projet ne s'ouvrirait pas (`sansRepli`). `skraft_pile` l'ouvre donc pour ce seul
+     appel, repli permis, sans reprendre de run (`repliPermis`).
+   - Ensuite, le projet est refermé, sauf pendant un run : il est relu au prochain appel.
+   - Les consignes des réponses (« Rouvrez le projet », « `/stack doctor` ») sont dites dans les
+     termes de l'outil (`consignesPourLeClient`).
+7. **Usage possible** : l'accord sur le workflow, qui passe aujourd'hui par l'argument `accord`.
 
 ## Écarté
 
@@ -91,5 +98,8 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
   - en mode interactif, il affiche la question, son détail et les trois réponses. Essai réel dans
     un dépôt jetable dont la pile lance `uv run pytest`, hors des dossiers permis : deux questions
     (le dépôt, puis `uv`), deux « Oui, cette fois », et `skraft_etat` rend la pile du projet ;
+  - `skraft_pile` dans un dépôt Python jetable sans profil : la question d'écriture nomme `pytest`,
+    le profil est écrit, et `diagnostiquer` trouve que `pytest` est introuvable sur cette machine
+    (pas installé, comme dans un projet uv où il est dans `.venv/bin`) ;
   - il n'abandonne pas l'appel pendant que la question attend : une réponse donnée au bout de 75 s
     a abouti (appel de 1 min 17 s).

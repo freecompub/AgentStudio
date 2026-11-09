@@ -69,7 +69,7 @@ const until = async (check: () => boolean) => {
 };
 
 describe("Services d'un projet (J2)", () => {
-  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
+  async function ouvrir(opts: { profil?: string; projet?: string; allowedPrograms?: string[]; confirmer?: "allow-once" | "deny"; confirmerProgrammes?: "allow-once" | "deny"; fichiers?: string[]; contenus?: Record<string, string> }) {
     const racine = await mkdtemp(join(tmpdir(), "agent-studio-profil-projet-"));
     const cleanup = () => rm(racine, { recursive: true, force: true });
     for (const [rel, contenu] of Object.entries(opts.contenus ?? {})) {
@@ -113,6 +113,7 @@ describe("Services d'un projet (J2)", () => {
       onInteractions: () => {},
       onPost: (_e, md) => posts.push(md),
       ...(opts.confirmer ? { confirmer: { confirm: async () => opts.confirmer! } } : {}),
+      ...(opts.confirmerProgrammes ? { confirmerProgrammes: { confirm: async () => opts.confirmerProgrammes! } } : {}),
     });
     return { services, posts, ecrits, racine, cleanup };
   }
@@ -187,6 +188,20 @@ infrastructureModules: [django]
     expect(ecrits[0]).toMatch(/^\.agent-studio\/projet\.yaml\n/);
     expect(ecrits[0]).toMatch(/pile:\n\s+id: python/);
     await cleanup();
+  });
+
+  // Serveur MCP (ADR 0075) : pas de fenêtre, mais le client sait demander. Écrire un profil autorise
+  // des programmes : la question passe par le même canal que l'accord sur un programme.
+  it("/stack init demande à qui accepte les programmes quand il y en a un, même sans fenêtre", async () => {
+    const { services, ecrits, cleanup } = await ouvrir({ confirmerProgrammes: "allow-once", fichiers: ["pyproject.toml"] });
+    expect(services.commands().map((c) => c.invocation)).toContain("stack");
+    await services.route("/stack init");
+    expect(ecrits).toHaveLength(1);
+    await cleanup();
+    const refuse = await ouvrir({ confirmer: "allow-once", confirmerProgrammes: "deny", fichiers: ["pyproject.toml"] });
+    await refuse.services.route("/stack init");
+    expect(refuse.ecrits).toEqual([]);
+    await refuse.cleanup();
   });
 
   it("/stack init garde la section qualite d'un projet.yaml existant", async () => {

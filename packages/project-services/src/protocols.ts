@@ -94,6 +94,11 @@ export interface WorkspaceServicesArgs {
    */
   confirmerProgrammes?: UserConfirmer;
   /**
+   * Ouvert pour proposer ou diagnostiquer la pile (`skraft_pile`, ADR 0075) : sans pile, le repli
+   * habituel plutôt que le refus de `sansRepli`. Ces services ne doivent servir à aucun run.
+   */
+  repliPermis?: boolean;
+  /**
    * Modèle réel pour une classe de rôle d'un agent de tâche (ADR 0048), relu dans les réglages à
    * chaque appel. Absent : les agents des tâches ne demandent aucun modèle.
    */

@@ -52,8 +52,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     - Coût : environ 8 AIC pour les deux essais.
   - **Point 1** : sans doute moins urgent. `uv run pytest` passe maintenant par un accord, mais
     `outils: [.venv/bin]` éviterait de donner à `uv` tout ce qu'il sait faire.
-  - **Point 4, à faire** : `skraft_pile` propose et vérifie un profil ; l'écrire passera par la même
-    question.
+  - **Point 4, fait (ADR 0075 §6)** : `skraft_pile` reprend `/stack init` (`proposer`) et
+    `/stack doctor` (`diagnostiquer`).
+    - L'écriture se fait après la question du client (`confirmerProgrammes`).
+    - Sans pile, le projet est ouvert pour ce seul appel, repli permis (`repliPermis`,
+      `Projets.pourLaPile`), puis refermé pour être relu.
+    - **Piège** : sans cela, `AucunePile` empêchait d'ouvrir le projet, précisément quand il faut
+      proposer sa pile.
+    - Les consignes « Rouvrez le projet », « `/stack doctor` » sont réécrites pour le client
+      (`consignes.ts`). Un test vérifie qu'aucun `/stack` ne reste.
+    - Essai Copilot : profil écrit ; le diagnostic dit `pytest` introuvable, absent de cette machine.
+      C'est le cas d'un projet uv : d'où le point 1.
 - **Le SDK Copilot ne change rien aux commandes** : nos agents n'ont aucun shell (`task-agent-guard.ts`),
   les commandes de la pile sont lancées par notre code (`run_tests`), sans shell. Le serveur n'a aucun
   canal vers l'humain (`SANS_FENETRE`) : l'accord ne peut venir que du client MCP.

@@ -29,18 +29,32 @@ export interface Projets {
    */
   /** `confirmerProgrammes` : à qui demander d'accepter un programme hors de la liste (ADR 0075). */
   ouvrir(root: string, o?: { pile?: string; confirmerProgrammes?: UserConfirmer }): Promise<ProjetOuvert>;
+  /**
+   * Pour proposer ou diagnostiquer la pile (`skraft_pile`, ADR 0075) : le projet ouvert s'il l'est,
+   * sinon ouvert pour ce seul appel, repli permis (sans pile, il n'ouvrirait pas). Ensuite, le projet
+   * est refermé, sauf pendant un run : la prochaine ouverture lit le profil peut-être écrit.
+   */
+  pourLaPile<T>(root: string, o: { confirmerProgrammes?: UserConfirmer }, fn: (p: ProjetOuvert) => Promise<T>): Promise<T>;
   fermer(): Promise<void>;
 }
 
+/** Comment ouvrir les services d'un projet. */
+export interface OuvertureServices {
+  pileFournie?: string;
+  confirmerProgrammes?: UserConfirmer;
+  repliPermis?: boolean;
+}
+
 export function createProjets(d: {
-  ouvrir(root: string, journal: (markdown: string) => void, pileFournie?: string, confirmerProgrammes?: UserConfirmer): Promise<WorkspaceServices>;
+  ouvrir(root: string, journal: (markdown: string) => void, o: OuvertureServices): Promise<WorkspaceServices>;
   verrou(root: string): Promise<Verrou>;
   piles: Piles;
 }): Projets {
   type Ouvert = ProjetOuvert & { pileFournie: string | undefined; fermer(): Promise<void> };
   const ouverts = new Map<string, Promise<Ouvert>>();
 
-  async function ouvrir(root: string, pile: string | undefined, confirmerProgrammes: UserConfirmer | undefined): Promise<Ouvert> {
+  /** `pourLaPile` : repli permis, et aucun run repris — ces services ne vivent que le temps d'un appel. */
+  async function ouvrir(root: string, pile: string | undefined, confirmerProgrammes: UserConfirmer | undefined, pourLaPile = false): Promise<Ouvert> {
     const messages: string[] = [];
     const journal = (m: string) => {
       messages.push(m);
@@ -51,13 +65,17 @@ export function createProjets(d: {
     const pileFournie = pile ?? (await d.piles.lire(root)) ?? undefined;
     let services: WorkspaceServices;
     try {
-      services = await d.ouvrir(root, journal, pileFournie, confirmerProgrammes);
+      services = await d.ouvrir(root, journal, {
+        ...(pileFournie !== undefined ? { pileFournie } : {}),
+        ...(confirmerProgrammes ? { confirmerProgrammes } : {}),
+        ...(pourLaPile ? { repliPermis: true } : {}),
+      });
     } catch (e) {
       if (verrou.ok) await verrou.liberer();
       throw e;
     }
     if (pile !== undefined && services.pile().source === "client") await d.piles.ecrire(root, pile);
-    if (verrou.ok) await services.demarrer?.();
+    if (verrou.ok && !pourLaPile) await services.demarrer?.();
     const mode = (): Mode => (verrou.ok ? { pilote: true } : { pilote: false, detenteur: verrou.pid });
     return {
       root,
@@ -98,6 +116,23 @@ export function createProjets(d: {
       ouverts.delete(root);
       await x.fermer();
       return garder(root, o.pile, o.confirmerProgrammes);
+    },
+    async pourLaPile(root, o, fn) {
+      const deja = await ouverts.get(root)?.catch(() => null);
+      if (deja) {
+        const r = await fn(deja);
+        if (!(await deja.services.tasks()).some((t) => t.status !== "finished") && ouverts.get(root)) {
+          ouverts.delete(root);
+          await deja.fermer();
+        }
+        return r;
+      }
+      const x = await ouvrir(root, undefined, o.confirmerProgrammes, true);
+      try {
+        return await fn(x);
+      } finally {
+        await x.fermer();
+      }
     },
     async fermer() {
       const tous = [...ouverts.values()];

@@ -188,7 +188,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
   // La liste et son origine voyagent ensemble : un refus doit pouvoir dire d'où vient la liste (09/11).
   const programmes: ParseOptions = { allowedPrograms: cfg.allowedPrograms ?? [], ...(cfg.origineDesProgrammes ? { origine: cfg.origineDesProgrammes } : {}) };
   const acceptes = cfg.programmesAcceptes ?? createProgrammesAcceptesFichier(join(cfg.tasksDir, "programmes-acceptes.json"));
-  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, confirmerProgrammes, modelFor, pileFournie }) => {
+  return async ({ workspace, runtime, onTask, onInteractions, onPost, notify, confirmer, confirmerProgrammes, repliPermis, modelFor, pileFournie }) => {
     const accepter = (bruts: readonly string[]) =>
       accepterLesProgrammes({ root: workspace.root, bruts, programmes, actif: cfg.programConsent === true, acceptes, ...(confirmerProgrammes ? { confirmer: confirmerProgrammes } : {}), onPost, ...(cfg.logger ? { logger: cfg.logger } : {}) });
     // Le profil déclaré par le projet l'emporte : c'est lui qui décrit sa vraie chaîne (J5).
@@ -223,7 +223,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
         onPost("agent-studio", `Stack du projet : **${choisie.id}**, fournie par l'appelant.`);
       }
     }
-    if (!choisie && cfg.sansRepli)
+    if (!choisie && cfg.sansRepli && !repliPermis)
       throw new AucunePile(
         `Aucune pile pour ce projet : ni profil \`${PROFIL_PROJET}\`, ni adaptateur qui le reconnaisse (${cfg.stacks.map((s) => s.id).join(", ") || "aucun"}). Fournis une pile au format de \`${PROFIL_PROJET}\`.`,
       );
@@ -334,15 +334,17 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
     const registry = createRegistry();
 
     // `/stack` appartient au cœur, pas à une extension : elle décrit le projet lui-même, et
-    // doit rester disponible même quand aucune extension n'est installée.
-    if (confirmer)
+    // doit rester disponible même quand aucune extension n'est installée. Écrire un profil autorise
+    // des programmes : la question va d'abord à qui les accepte (ADR 0075, le client MCP).
+    const confirmerPile = confirmerProgrammes ?? confirmer;
+    if (confirmerPile)
       registry.addCommand({
         extensionId: "agent-studio",
         name: "stack",
         title: "Stack du projet",
         description: "Affiche la stack employée ; `init` propose un profil à déclarer, `doctor` dit ce qu'il vaut.",
         handler: createStackCommand(
-          stackCommandDeps({ workspace, programmes: programmesDuProjet, stack, declaree: declare !== null, confirmer, onPost }),
+          stackCommandDeps({ workspace, programmes: programmesDuProjet, stack, declaree: declare !== null, confirmer: confirmerPile, onPost }),
         ),
       });
 

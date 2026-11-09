@@ -1184,6 +1184,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts && pnpm vitest run --project project-services test/admin-config.test.ts test/programmes-acceptes.test.ts test/pile.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts && pnpm vitest run --project desktop test/app-controller.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 en mode interactif (tmux) : questions sur le dépôt puis sur uv affichées, acceptées, pile du projet retenue ; une réponse après 75 s aboutit. Le branchement de programConsent dans assemblage.ts et index.ts n'a pas de test."
+    },
+    {
+      "id": "mcp-skraft-pile",
+      "title": "Serveur MCP : skraft_pile propose la pile du projet (/stack init) et l'écrit après la question du client, ou la diagnostique (/stack doctor), même sans pile ; le projet est relu ensuite, et les consignes sont dites dans les termes de l'outil (ADR 0075)",
+      "verify": "pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts test/stdio.test.ts && pnpm vitest run --project project-services test/workspace-services.test.ts test/pile.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 (tmux) : proposer écrit projet.yaml après la question, diagnostiquer dit pytest introuvable. Le test de relecture du projet a été écrit après le code ; vérifié en cassant la relecture."
     }
   ]
 }
