@@ -32,6 +32,11 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   pour voir un rejet au texte répété), dernier rejet (« porte : premier motif »), essai de la phase (pas
   pendant une revue : `REVIEW` est l'étiquette de toutes les revues, son compteur n'est pas un essai),
   durée et coût. Vérifié en rejouant la trace réelle du run.
+- **Troisième run suivi** (même dossier) : 21m13, 5 rejets, 6,51 $ ; **5 rejets signalés sur 5**. Corrigés
+  ensuite : motif long coupé au milieu (début et fin, où est la cause) ; pas de double point final.
+  **À analyser** (skraft) : rouge d'acceptance refusé pour un `Assert.True` à message personnalisé
+  (classé au texte) ; escalade sur une revue « changements demandés » sans défaut grave ; conflit entre
+  cold-reader et la recopie mot pour mot des valeurs de la story.
 - Notifications poussées par MCP (journal, progression, ressources) : non faites, leur affichage par
   Claude Code et Copilot CLI n'est pas vérifié.
 - Tests : `test/progression.test.ts` (9), `serveur.test.ts` (1 de bout en bout, plus la liste des outils),

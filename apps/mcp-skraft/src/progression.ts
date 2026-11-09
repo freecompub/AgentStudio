@@ -34,7 +34,9 @@ export interface Instantane {
 }
 
 const STATUT: Record<VueTache["status"], string> = { running: "en cours", waiting: "attend une réponse", finished: "terminé" };
-const LONGUEUR_REJET = 160;
+/** Un motif plus long est coupé au milieu : son début dit ce qui est jugé, sa fin la cause (run du 09/11). */
+const DEBUT_REJET = 120;
+const FIN_REJET = 100;
 
 function duree(ms: number): string {
   const s = Math.round(ms / 1000);
@@ -47,11 +49,14 @@ function duree(ms: number): string {
 // Sous le centime, « 0,00 $ » laisserait croire que rien n'a été dépensé (run du 09/11).
 const cout = (usd: number) => (usd < 0.005 ? "< 0,01 $" : `${usd.toFixed(2).replace(".", ",")} $`);
 
-/** Première ligne d'un motif, coupée : la ligne de progression doit se lire d'un coup d'œil. */
+/** Première ligne d'un motif, coupée au milieu s'il est long : la ligne doit se lire d'un coup d'œil. */
 function court(texte: string): string {
   const l = texte.split("\n")[0]!.trim();
-  return l.length > LONGUEUR_REJET ? `${l.slice(0, LONGUEUR_REJET)}…` : l;
+  return l.length > DEBUT_REJET + FIN_REJET ? `${l.slice(0, DEBUT_REJET).trimEnd()} … ${l.slice(-FIN_REJET).trimStart()}` : l;
 }
+
+/** Une phrase finit par un seul point, même si le motif qu'elle cite en porte déjà un. */
+const finDePhrase = (texte: string) => (/[.!?…]$/.test(texte) ? texte : `${texte}.`);
 
 const questions = (n: number) => (n === 0 ? "aucune question en attente" : `${n} question${n > 1 ? "s" : ""} en attente`);
 
@@ -83,7 +88,7 @@ export function changements(avant: Instantane, apres: Instantane, tache?: string
     if (t.etape && (t.etape.index !== a.etape?.index || t.etape.total !== a.etape?.total)) out.push(`Étape ${t.etape.index}/${t.etape.total}.`);
     // Compté dans la trace quand on l'a (workflow), sinon au changement de texte (carte d'une extension).
     const nouveauRejet = t.rejets !== undefined ? t.rejets > (a.rejets ?? 0) : t.dernierRejet !== undefined && t.dernierRejet !== a.dernierRejet;
-    if (nouveauRejet && t.dernierRejet) out.push(`Rejet, ${t.phaseLabel} recommence${t.essai ? ` (essai ${t.essai})` : ""} : ${court(t.dernierRejet)}.`);
+    if (nouveauRejet && t.dernierRejet) out.push(finDePhrase(`Rejet, ${t.phaseLabel} recommence${t.essai ? ` (essai ${t.essai})` : ""} : ${court(t.dernierRejet)}`));
     if (t.status === "finished" && a.status !== "finished") out.push(`Run terminé : ${t.titre}.`);
   }
   const avantQ = avant.questions.filter((q) => garde(q.tache));

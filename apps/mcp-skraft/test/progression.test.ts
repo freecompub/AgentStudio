@@ -23,10 +23,14 @@ describe("ligneDeProgression", () => {
     expect(ligneDeProgression(tache, { questions: 0, coutUsd: 0.0016 })).toContain("· < 0,01 $ ·");
   });
 
-  it("un rejet long est coupé, et seule sa première ligne compte", () => {
-    const l = ligneDeProgression({ ...tache, dernierRejet: `${"x".repeat(300)}\nsuite` }, { questions: 0 });
-    expect(l).toContain(`dernier rejet : ${"x".repeat(160)}…`);
+  it("un rejet long garde son début et sa fin, où se trouve la cause ; seule sa première ligne compte (run du 09/11)", () => {
+    const motif = `RED d'acceptance : Le test d'acceptance « ${"Tarification.UnitTests.Features.".repeat(4)}AC_3UnSeulPalier » échoue pour une mauvaise raison : Remise attendue 12,00 €, obtenue 0,00 €.`;
+    const l = ligneDeProgression({ ...tache, dernierRejet: `${motif}\nsuite` }, { questions: 0 });
+    expect(l).toContain("dernier rejet : RED d'acceptance : Le test d'acceptance « Tarification");
+    expect(l).toContain("Remise attendue 12,00 €, obtenue 0,00 €.");
+    expect(l).toContain(" … ");
     expect(l).not.toContain("suite");
+    expect(l.length).toBeLessThan(motif.length + 120);
   });
 
   it("terminé", () => {
@@ -116,6 +120,12 @@ describe("vueDeTache : rejets et essais lus dans la trace", () => {
 
 describe("changements et ligne : rejets comptés, essai affiché", () => {
   const t = { id: "t1", titre: "US-2", status: "running" as const, phase: "DISTILL", phaseLabel: "Scénarios d'acceptance" };
+  it("un motif qui finit par un point n'en reçoit pas un second (run du 09/11 : « dépôt.. »)", () => {
+    const avant: Instantane = { taches: [{ ...t, rejets: 0 }], questions: [], messages: [] };
+    const apres: Instantane = { taches: [{ ...t, rejets: 1, dernierRejet: "citations : `tests/A` : fichier inexistant dans le dépôt.", essai: 2 }], questions: [], messages: [] };
+    expect(changements(avant, apres)).toEqual(["Rejet, Scénarios d'acceptance recommence (essai 2) : citations : `tests/A` : fichier inexistant dans le dépôt."]);
+  });
+
   it("un nouveau rejet est dit même si son texte est celui du précédent", () => {
     const avant: Instantane = { taches: [{ ...t, rejets: 1, dernierRejet: "revue : défaut", essai: 2 }], questions: [], messages: [] };
     const apres: Instantane = { taches: [{ ...t, rejets: 2, dernierRejet: "revue : défaut", essai: 3 }], questions: [], messages: [] };
