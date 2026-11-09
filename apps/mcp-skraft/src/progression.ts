@@ -40,7 +40,8 @@ function duree(ms: number): string {
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
 }
 
-const cout = (usd: number) => `${usd.toFixed(2).replace(".", ",")} $`;
+// Sous le centime, « 0,00 $ » laisserait croire que rien n'a été dépensé (run du 09/11).
+const cout = (usd: number) => (usd < 0.005 ? "< 0,01 $" : `${usd.toFixed(2).replace(".", ",")} $`);
 
 /** Première ligne d'un motif, coupée : la ligne de progression doit se lire d'un coup d'œil. */
 function court(texte: string): string {

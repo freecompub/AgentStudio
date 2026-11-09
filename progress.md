@@ -20,6 +20,12 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Piège** (vu par le test de bout en bout) : comparé à l'état **du moment de l'appel**, l'outil perdait ce
   qui arrive entre deux appels (une réponse, la fin du run). Il compare désormais au **dernier état rendu à
   l'hôte**, gardé par projet et par run suivi.
+- **Vu au premier run réel suivi par l'outil (09/11)** : le client MCP abandonne un appel au bout de 60 s
+  (délai par défaut du SDK) ; avec `delai: 120`, RESEARCH sans changement pendant plus d'une minute a fait
+  tomber le script, et le serveur avec lui. L'attente est bornée à **50 s** (30 par défaut). Corrigés
+  aussi : un coût sous le centime s'affiche « < 0,01 $ » au lieu de « 0,00 $ » ; la ligne commence par la
+  **story** donnée à `skraft_demarrer` (la carte d'une tâche de workflow ne porte que le nom du workflow).
+  `scripts/essai-mcp-skraft.ts` gagne `--suivi=attendre`.
 - Notifications poussées par MCP (journal, progression, ressources) : non faites, leur affichage par
   Claude Code et Copilot CLI n'est pas vérifié.
 - Tests : `test/progression.test.ts` (9), `serveur.test.ts` (1 de bout en bout, plus la liste des outils),

@@ -19,6 +19,10 @@ describe("ligneDeProgression", () => {
     expect(ligneDeProgression({ ...tache, status: "waiting" }, { questions: 2, coutUsd: 0 })).toBe("US-2 — Remise par palier · Conception · attend une réponse · 2 questions en attente");
   });
 
+  it("un coût faible mais non nul ne s'affiche pas « 0,00 $ » (run du 09/11)", () => {
+    expect(ligneDeProgression(tache, { questions: 0, coutUsd: 0.0016 })).toContain("· < 0,01 $ ·");
+  });
+
   it("un rejet long est coupé, et seule sa première ligne compte", () => {
     const l = ligneDeProgression({ ...tache, dernierRejet: `${"x".repeat(300)}\nsuite` }, { questions: 0 });
     expect(l).toContain(`dernier rejet : ${"x".repeat(160)}…`);

@@ -114,11 +114,15 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       const args = [a.story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
       const r = await p.services.lancerWorkflow(w.nom, args, a.accord ? { accord: a.accord } : {});
       if (!r.ok) return erreur(r.motif);
+      storyDe.set(r.taskId, a.story);
       const pile = p.services.pile();
       const ignoree = a.pile !== undefined && pile.source !== "client" ? ` La pile fournie est ignorée : le projet a la sienne (${pile.id}, ${pile.source === "projet" ? "profil du projet" : "détection"}).` : "";
       return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
     }, { agents: true }),
   );
+
+  /** Story de chaque run lancé par ce serveur : la carte d'une tâche de workflow ne porte que son nom. */
+  const storyDe = new Map<string, string>();
 
   /** Dernier état rendu à l'hôte par `skraft_attendre`, par projet et par run suivi. */
   const vusParLHote = new Map<string, Instantane>();
@@ -139,7 +143,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     const cartes = await p.services.tasks();
     const attente = await p.services.pendingInteractions();
     const inst: Instantane = {
-      taches: cartes.map((t) => ({ id: t.id, titre: t.title, status: t.status, phase: t.phase, phaseLabel: t.phaseLabel, ...(t.step ? { etape: { index: t.step.index, total: t.step.total } } : {}), ...(t.feedback ? { dernierRejet: t.feedback } : {}) })),
+      taches: cartes.map((t) => ({ id: t.id, titre: storyDe.get(t.id) ?? t.title, status: t.status, phase: t.phase, phaseLabel: t.phaseLabel, ...(t.step ? { etape: { index: t.step.index, total: t.step.total } } : {}), ...(t.feedback ? { dernierRejet: t.feedback } : {}) })),
       questions: attente.map((q) => ({ id: q.id, tache: q.taskId, title: q.title, ...(q.detail ? { detail: q.detail } : {}) })),
       messages: p.messages(),
     };
@@ -160,11 +164,12 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     "skraft_attendre",
     {
       description:
-        "Attend qu'il se passe quelque chose dans un run (phase, étape, rejet, question à poser, réponse, message, fin), au plus `delai` secondes (60 par défaut, 120 au plus), puis rend ce qui a changé depuis le dernier appel et la ligne de progression, en JSON. " +
+        "Attend qu'il se passe quelque chose dans un run (phase, étape, rejet, question à poser, réponse, message, fin), au plus `delai` secondes (30 par défaut, 50 au plus), puis rend ce qui a changé depuis le dernier appel et la ligne de progression, en JSON. " +
         "Rapporte chaque changement à l'utilisateur, en reprenant la ligne de progression ; montre-lui toute question et réponds avec skraft_repondre selon son choix ; rappelle cet outil tant que `termine` est faux.",
       inputSchema: {
         tache: z.string().min(1).optional().describe("Le run à suivre ; par défaut, tous les runs du projet."),
-        delai: z.number().int().min(1).max(120).optional().describe("Attente maximale, en secondes."),
+        // Le SDK MCP abandonne un appel au bout de 60 s par défaut (run du 09/11) : l'attente reste en deçà.
+        delai: z.number().int().min(1).max(50).optional().describe("Attente maximale, en secondes (30 par défaut, 50 au plus : un client abandonne souvent un appel au-delà de 60 s)."),
         projet,
       },
     },
@@ -196,7 +201,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       if (deja.length) return rendu(actuel, deja);
       // Rien ne bougera plus : réponse immédiate, l'hôte n'a pas à attendre le délai.
       if (termine(actuel.inst)) return rendu(actuel, ["Le run est terminé : skraft_rapport donne son bilan."]);
-      const echeance = Date.now() + (a.delai ?? 60) * 1000;
+      const echeance = Date.now() + (a.delai ?? 30) * 1000;
       for (;;) {
         await new Promise((r) => setTimeout(r, Math.min(500, Math.max(0, echeance - Date.now()))));
         const maintenant = await lireInstantane(p);

@@ -227,6 +227,8 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     }
     vus.push(...r.changements);
     expect(vus).toContain("Question à poser à l'utilisateur : Valider le résumé ? — résumé");
+    // La story, donnée au lancement, plutôt que le nom du workflow (run du 09/11).
+    expect(r.progression[0]).toMatch(/^stories\/us-2\.md · /);
     expect(r.progression[0]).toContain("attend une réponse");
     expect(r.progression[0]).toContain("1 question en attente");
     // L'état porte la même ligne.
@@ -242,6 +244,8 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(suite).toContain("Réponse reçue : le run reprend.");
     expect(suite.some((c) => c.startsWith("Run terminé"))).toBe(true);
     expect(r.termine).toBe(true);
+    // Le SDK MCP abandonne un appel au bout de 60 s par défaut (run du 09/11) : l'attente reste en deçà.
+    expect((await s.appel("skraft_attendre", { tache: id, delai: 120 })).erreur).toBe(true);
     // Run déjà terminé : la réponse est immédiate, sans attendre le délai.
     const t0 = Date.now();
     expect((await attendre()).changements).toEqual(["Le run est terminé : skraft_rapport donne son bilan."]);
