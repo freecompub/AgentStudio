@@ -160,6 +160,8 @@ export function createAppController(deps: AppControllerDeps): AppController {
       // Même canal que l'arbitre de permissions : écrire un profil de stack élargit ce que
       // l'application a le droit de lancer, et se confirme donc dans la fenêtre (§8.5).
       confirmer,
+      // Accepter un programme que la pile nomme hors de la liste : même fenêtre (ADR 0075).
+      confirmerProgrammes: confirmer,
       // Modèle des agents de tâche (ADR 0048) : classe du rôle, puis modèle du projet (ADR 0020),
       // relus à chaque appel pour qu'un changement de réglage vaille dès le tour suivant.
       // Un modèle que l'abonnement ne propose pas (ou plus) est ignoré ; liste illisible = pas de filtre.

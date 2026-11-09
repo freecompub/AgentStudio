@@ -3,6 +3,7 @@
  * (ADR 0068, point 5) : le serveur qui le tient **pilote** (il reprend les runs interrompus au
  * démarrage, il lance) ; les autres **consultent**.
  */
+import type { UserConfirmer } from "@agent-studio/core";
 import type { WorkspaceServices } from "@agent-studio/project-services";
 import type { Piles } from "./piles.js";
 import type { Verrou } from "./verrou.js";
@@ -26,19 +27,20 @@ export interface Projets {
    * `pile` : profil fourni par le client, retenu si le projet n'en a pas d'autre (point 8), puis
    * gardé pour les ouvertures suivantes. Une autre pile remplace la précédente, sauf pendant un run.
    */
-  ouvrir(root: string, o?: { pile?: string }): Promise<ProjetOuvert>;
+  /** `confirmerProgrammes` : à qui demander d'accepter un programme hors de la liste (ADR 0075). */
+  ouvrir(root: string, o?: { pile?: string; confirmerProgrammes?: UserConfirmer }): Promise<ProjetOuvert>;
   fermer(): Promise<void>;
 }
 
 export function createProjets(d: {
-  ouvrir(root: string, journal: (markdown: string) => void, pileFournie?: string): Promise<WorkspaceServices>;
+  ouvrir(root: string, journal: (markdown: string) => void, pileFournie?: string, confirmerProgrammes?: UserConfirmer): Promise<WorkspaceServices>;
   verrou(root: string): Promise<Verrou>;
   piles: Piles;
 }): Projets {
   type Ouvert = ProjetOuvert & { pileFournie: string | undefined; fermer(): Promise<void> };
   const ouverts = new Map<string, Promise<Ouvert>>();
 
-  async function ouvrir(root: string, pile: string | undefined): Promise<Ouvert> {
+  async function ouvrir(root: string, pile: string | undefined, confirmerProgrammes: UserConfirmer | undefined): Promise<Ouvert> {
     const messages: string[] = [];
     const journal = (m: string) => {
       messages.push(m);
@@ -49,7 +51,7 @@ export function createProjets(d: {
     const pileFournie = pile ?? (await d.piles.lire(root)) ?? undefined;
     let services: WorkspaceServices;
     try {
-      services = await d.ouvrir(root, journal, pileFournie);
+      services = await d.ouvrir(root, journal, pileFournie, confirmerProgrammes);
     } catch (e) {
       if (verrou.ok) await verrou.liberer();
       throw e;
@@ -76,8 +78,8 @@ export function createProjets(d: {
     };
   }
 
-  const garder = (root: string, pile: string | undefined) => {
-    const p = ouvrir(root, pile);
+  const garder = (root: string, pile: string | undefined, confirmerProgrammes: UserConfirmer | undefined) => {
+    const p = ouvrir(root, pile, confirmerProgrammes);
     ouverts.set(root, p);
     // Une ouverture qui échoue n'est pas gardée : l'appel suivant réessaie.
     p.catch(() => ouverts.delete(root));
@@ -87,7 +89,7 @@ export function createProjets(d: {
   return {
     async ouvrir(root, o = {}) {
       const p = ouverts.get(root);
-      if (!p) return garder(root, o.pile);
+      if (!p) return garder(root, o.pile, o.confirmerProgrammes);
       const x = await p;
       if (o.pile === undefined || x.services.pile().source !== "client" || o.pile === x.pileFournie) return x;
       // Une autre pile fournie : les services sont rouverts avec elle, sauf si un run s'en sert.
@@ -95,7 +97,7 @@ export function createProjets(d: {
         throw new Error(`Une autre pile fournie (« ${x.services.pile().id} ») sert à un run en cours : elle ne change pas avant la fin de ce run.`);
       ouverts.delete(root);
       await x.fermer();
-      return garder(root, o.pile);
+      return garder(root, o.pile, o.confirmerProgrammes);
     },
     async fermer() {
       const tous = [...ouverts.values()];

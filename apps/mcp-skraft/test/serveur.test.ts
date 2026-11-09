@@ -113,6 +113,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
     allowedPrograms: ["pytest"],
+    programConsent: true,
     sansRepli: true,
     tasksDir: join(p.root, ".taches"),
     ...p.stockages,
@@ -121,7 +122,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     workflows: { machine, launcher: createNodeLauncher(), runtimeEntry: enfant },
   });
   const projets = createProjets({
-    ouvrir: (root, journal, pileFournie) => ouvrirServicesSansFenetre({ factory, workspace: async () => p.workspace, runtime: async () => p.runtime, journal })(root, pileFournie),
+    ouvrir: (root, journal, pileFournie, confirmerProgrammes) => ouvrirServicesSansFenetre({ factory, workspace: async () => p.workspace, runtime: async () => p.runtime, journal })(root, pileFournie, confirmerProgrammes),
     piles: createPilesFichiers(join(p.root, ".donnees-du-serveur", "piles")),
     verrou: (root) => prendreVerrou(join(root, ".agent-studio", "mcp-skraft.lock"), { pid: o.pid, estVivant: (x) => o.vivants.has(x) }),
   });
@@ -437,14 +438,42 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
       await t.fermer();
     }, 30_000);
 
-    it("« Non » ou question refusée : refusé, et le refus dit que c'est l'utilisateur", async () => {
+    // Copilot CLI en mode non interactif (`-p`) refuse la question de lui-même (essai du 09/11) : le refus
+    // ne doit pas prétendre que l'utilisateur a répondu.
+    it("« Non » ou question refusée : refusé, sans prétendre que l'utilisateur a répondu", async () => {
       const p = await projet();
       const depots = createDepotsFichier(join(p.root, ".donnees-du-serveur", "depots-acceptes.json"));
       for (const repondre of [() => "Non", () => null]) {
         const s = await hors(p, { repondre, depots });
-        expect(await s.appel("skraft_etat", { projet: p.root })).toEqual({ erreur: true, texte: expect.stringMatching(/Projet refusé par l'utilisateur/) });
+        expect(await s.appel("skraft_etat", { projet: p.root })).toEqual({ erreur: true, texte: expect.stringMatching(/^Projet refusé : l'accord demandé pour .+ n'a pas été donné \(refusé, ou personne pour répondre : un client non interactif refuse de lui-même\)\. Rien n'a été ouvert\.$/) });
         await s.fermer();
       }
+    }, 30_000);
+  });
+
+  /** Un programme hors de la liste, accepté par l'utilisateur par la question du client (ADR 0075). */
+  describe("programme hors liste, accepté par l'utilisateur", () => {
+    const avecUv = `pile:\n${PILE.replace("pytest", "uv").trim().split("\n").map((l) => `  ${l}`).join("\n")}\n`;
+
+    it("le client sait demander : la question nomme le programme, et la pile du projet est retenue", async () => {
+      const p = await projet();
+      await poser(p.root, { ".agent-studio/projet.yaml": avecUv });
+      const questions: string[] = [];
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), repondre: (q) => (questions.push(q), "Oui, cette fois") });
+      expect((await s.etat()).pile).toEqual({ id: "python", source: "projet" });
+      expect(questions).toHaveLength(1);
+      expect(questions[0]).toMatch(/^Autoriser « uv » pour ce projet \?\n\n.*tests : uv --junit-xml=\{rapport\}/s);
+      await s.fermer();
+    }, 30_000);
+
+    it("le client ne sait pas demander : la pile du projet est refusée, la détection reprend", async () => {
+      const p = await projet();
+      await poser(p.root, { ".agent-studio/projet.yaml": avecUv });
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
+      const e = await s.etat();
+      expect(e.pile).toEqual({ id: "typescript", source: "detection" });
+      expect(e.messages.join("\n")).toMatch(/« uv » \(tests\) n'est pas un programme autorisé/);
+      await s.fermer();
     }, 30_000);
   });
 

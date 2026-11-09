@@ -87,7 +87,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       })().finally(() => enQuestion.delete(root));
       enQuestion.set(root, question);
     }
-    return (await question) ? { ok: true, root } : { ok: false, motif: `Projet refusé par l'utilisateur : ${root}. Rien n'a été ouvert.` };
+    return (await question) ? { ok: true, root } : { ok: false, motif: `Projet refusé : l'accord demandé pour ${root} n'a pas été donné (refusé, ou personne pour répondre : un client non interactif refuse de lui-même). Rien n'a été ouvert.` };
   }
 
   /**
@@ -103,7 +103,8 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         }
         const r = await resoudre(a.projet);
         if (!r.ok) return erreur(r.motif);
-        return await fn(await o.projets.ouvrir(r.root, a.pile !== undefined ? { pile: a.pile } : {}), a);
+        // Un client qui ne sait pas demander n'a personne à qui poser la question : la liste seule.
+        return await fn(await o.projets.ouvrir(r.root, { ...(a.pile !== undefined ? { pile: a.pile } : {}), ...(confirmer.peutDemander() ? { confirmerProgrammes: confirmer } : {}) }), a);
       } catch (e) {
         if (e instanceof AucunePile) return erreur(`${e.message} Donne-la dans l'argument « pile » de skraft_demarrer (YAML, même format).`);
         return erreur(e instanceof Error ? e.message : String(e));

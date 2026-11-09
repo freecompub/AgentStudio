@@ -89,6 +89,11 @@ export interface WorkspaceServicesArgs {
    */
   confirmer?: UserConfirmer;
   /**
+   * À qui demander d'accepter un programme que la pile nomme hors de la liste de l'administrateur
+   * (ADR 0075). Absent : un tel programme est refusé, comme avant.
+   */
+  confirmerProgrammes?: UserConfirmer;
+  /**
    * Modèle réel pour une classe de rôle d'un agent de tâche (ADR 0048), relu dans les réglages à
    * chaque appel. Absent : les agents des tâches ne demandent aucun modèle.
    */

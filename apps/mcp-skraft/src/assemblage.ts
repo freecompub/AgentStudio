@@ -82,6 +82,7 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     stacks: [createTypeScriptAdapter()],
     allowedPrograms: admin.allowedPrograms,
     origineDesProgrammes: admin.origineDesProgrammes,
+    programConsent: admin.programConsent,
     // Sans pile, refus qui dit quoi fournir (point 8) : un repli ferait échouer les portes.
     sansRepli: true,
     tasksDir: join(donnees, "tasks"),
@@ -94,7 +95,7 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
   });
   const cle = (root: string) => createHash("sha256").update(root).digest("hex").slice(0, 16);
   const projets = createProjets({
-    ouvrir: (root, journal, pileFournie) => ouvrirServicesSansFenetre({ factory, workspace: (r) => openWorkspace(r, { git }), runtime, journal, modelFor })(root, pileFournie),
+    ouvrir: (root, journal, pileFournie, confirmerProgrammes) => ouvrirServicesSansFenetre({ factory, workspace: (r) => openWorkspace(r, { git }), runtime, journal, modelFor })(root, pileFournie, confirmerProgrammes),
     // Hors du dépôt : les checkpoints capturent les fichiers non suivis (ADR 0068, point 5).
     verrou: (root) => prendreVerrou(join(donnees, "verrous", `${cle(root)}.lock`), { pid: process.pid, estVivant: processusVivant }),
     piles: createPilesFichiers(join(donnees, "piles")),

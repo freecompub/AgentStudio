@@ -50,12 +50,24 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
      dépôts** : un agent qui écrit dans un projet ne peut pas s'en ouvrir un autre. Un fichier
      illisible n'accepte rien.
    - Deux appels simultanés sur le même dépôt ne posent qu'une question.
-5. **Usages suivants**, chacun dans sa propre brique :
-   - un programme hors de la liste de l'administrateur ;
+5. **Deuxième usage : un programme hors de la liste de l'administrateur** (`project-services`, donc
+   aussi l'application de bureau, qui pose la question dans sa fenêtre).
+   - À l'ouverture du projet, les programmes que nomme la pile sont lus (`programmesDuProfil`), que la
+     pile vienne du projet, d'un composant ou du client. Ceux qui manquent à la liste sont demandés,
+     un par programme, même s'il sert à plusieurs sections.
+   - La question nomme le programme, les commandes qui le lancent, l'origine de la liste, et ce que
+     l'accord permet : exécution sans shell, dans le projet, aux portes de test, de lint, de format
+     ou de mutation, avec les droits de l'utilisateur, réseau compris.
+   - Le profil est ensuite jugé, comme avant, contre la liste élargie de ces seuls programmes.
+   - Un nom avec un chemin n'est jamais demandé : il échapperait à la liste.
+   - « Oui, toujours » est retenu par projet dans `programmes-acceptes.json`, dans le dossier des
+     tâches, hors du dépôt.
+   - L'administrateur peut l'interdire : `"programConsent": false` dans `admin.json`. Il n'y a alors
+     ni question ni accord retenu. Un `admin.json` refusé l'interdit aussi.
+   - Chaque réponse est journalisée (`programme hors liste`, avec la réponse).
+6. **Usages suivants**, chacun dans sa propre brique :
    - l'écriture du profil de pile proposé (`skraft_pile`) ;
    - peut-être l'accord sur le workflow, qui passe aujourd'hui par l'argument `accord`.
-
-   L'administrateur doit pouvoir interdire ces accords dans `admin.json`. Chaque accord est journalisé.
 
 ## Écarté
 
@@ -71,9 +83,13 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
 
 - Avec un client qui gère l'elicitation, l'utilisateur répond à une question au lieu d'éditer un
   fichier. Avec un client qui ne la gère pas, rien ne change : le refus, et son explication.
-- À vérifier avec Copilot CLI (essai que le mode automatique de Claude Code n'a pas laissé lancer) :
-  - gère-t-il l'elicitation ?
-  - déclare-t-il des roots ?
-  - son délai d'appel d'outil (60 s par défaut dans le SDK client) court-il pendant que la question
-    attend ? Si oui, un utilisateur lent ferait échouer l'appel. Un « toujours » serait tout de même
-    retenu, et le rappel passerait sans question.
+- **Vérifié avec Copilot CLI 1.0.107, le 2026-11-09** :
+  - il annonce `elicitation: { form, url }` et `sampling`, pas `roots` : `listRoots` rend une liste
+    vide. Il lance le serveur dans le dossier où l'utilisateur l'a démarré ;
+  - en mode non interactif (`-p`), il refuse toute question de lui-même (`decline`) : le refus du
+    dépôt ne prétend donc pas que l'utilisateur a répondu ;
+  - en mode interactif, il affiche la question, son détail et les trois réponses. Essai réel dans
+    un dépôt jetable dont la pile lance `uv run pytest`, hors des dossiers permis : deux questions
+    (le dépôt, puis `uv`), deux « Oui, cette fois », et `skraft_etat` rend la pile du projet ;
+  - il n'abandonne pas l'appel pendant que la question attend : une réponse donnée au bout de 75 s
+    a abouti (appel de 1 min 17 s).

@@ -87,8 +87,11 @@ défaut s'applique : `pytest`, `go`, `cargo`, `gradle`, `mvn`, `dotnet`, `vitest
 { "profile": { "role": "architecte" }, "allowedPrograms": ["dotnet", "pytest"] }
 ```
 
-Un programme refusé l'est avec la liste en vigueur et son origine : le fichier lu, ou celui qui
-était attendu et manquait.
+Un programme que la pile nomme hors de la liste n'est pas refusé d'emblée, si le client sait poser
+une question (Copilot CLI en mode interactif, par exemple) : le serveur demande à l'utilisateur de
+l'accepter pour ce projet, une fois ou toujours (ADR 0075). L'administrateur l'interdit par
+`"programConsent": false`. Sans question possible, ou sur un « non », la pile est refusée, avec la
+liste en vigueur et son origine : le fichier lu, ou celui qui était attendu et manquait.
 
 ## La pile du projet
 

@@ -36,15 +36,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     - Sans elicitation annoncée, ou sur un « non », le dépôt reste refusé.
     - L'idée du dossier de lancement comme borne est abandonnée : le code la refusait déjà
       (`projet.test.ts`, « pas accepté d'office »).
-  - **Point 2, à faire** : un programme hors liste, par la même question, jamais par un argument
-    d'outil (le LLM hôte proposerait et accepterait la même pile). L'administrateur pourra
-    l'interdire.
+  - **Point 2, fait (ADR 0075 §5)** : un programme hors liste est demandé à l'utilisateur à
+    l'ouverture du projet (`accepterLesProgrammes`, `workspace-services.ts`). La question passe par le
+    client MCP (elicitation) ou par la fenêtre du bureau, jamais par un argument d'outil.
+    - « Toujours » est retenu par projet dans `programmes-acceptes.json` (dossier des tâches).
+    - L'administrateur l'interdit par `programConsent: false`.
+    - Un nom avec chemin n'est jamais demandé.
+  - **Essai réel avec Copilot CLI 1.0.107 (09/11)** : `-p` ne montre rien, il refuse toute question.
+    Le mode interactif se pilote par **tmux** (`new-session -d`, `send-keys`, `capture-pane`) : un
+    pseudo-terminal nu ne suffit pas, Copilot attend des réponses du terminal avant de s'afficher.
+    - Copilot demande d'abord s'il fait confiance au dossier.
+    - Puis nos deux questions (le dépôt, puis `uv`), acceptées : la pile du projet est retenue.
+    - Une réponse après 75 s aboutit.
+    - `HOME` posé dans le bloc `env` du serveur isole ses données de la vraie configuration.
+    - Coût : environ 8 AIC pour les deux essais.
+  - **Point 1** : sans doute moins urgent. `uv run pytest` passe maintenant par un accord, mais
+    `outils: [.venv/bin]` éviterait de donner à `uv` tout ce qu'il sait faire.
   - **Point 4, à faire** : `skraft_pile` propose et vérifie un profil ; l'écrire passera par la même
     question.
 - **Le SDK Copilot ne change rien aux commandes** : nos agents n'ont aucun shell (`task-agent-guard.ts`),
   les commandes de la pile sont lancées par notre code (`run_tests`), sans shell. Le serveur n'a aucun
   canal vers l'humain (`SANS_FENETRE`) : l'accord ne peut venir que du client MCP.
-- **À vérifier par un essai Copilot CLI** (le mode automatique de Claude Code a refusé de le lancer :
+- **Essai Copilot CLI, d'abord refusé par le mode automatique de Claude Code, fait ensuite à la demande du responsable** (voir point 2) ; questions de départ :
   à faire par l'utilisateur) : Copilot déclare-t-il des roots, dans quel dossier lance-t-il le serveur,
   gère-t-il l'elicitation ? Et, sur l'autre poste, la connexion du SDK à l'hôte d'entreprise
   (`hostname`, `GH_HOST`).

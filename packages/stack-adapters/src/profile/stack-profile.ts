@@ -202,6 +202,35 @@ function refusDuProgramme(programme: string, section: string, opts: ParseOptions
   return [`Profil de stack refusé : « ${programme} » (${section}) n'est pas un programme autorisé.`, permis, ...(opts.origine ? [opts.origine] : [])].join(" ");
 }
 
+/** Un programme nommé par un profil, là où il l'est. */
+export interface ProgrammeNomme {
+  programme: string;
+  section: "tests" | "lint" | "mutation" | "format";
+  commande: string[];
+}
+
+/**
+ * Les programmes qu'un profil nomme, section par section, sans rien valider (ADR 0075) : pour demander
+ * à l'utilisateur d'accepter ceux qui manquent à la liste, avant de juger le profil. Un YAML illisible
+ * ou une commande mal formée n'en nomme aucun ; `parseStackProfile` dira pourquoi.
+ */
+export function programmesDuProfil(raw: string): ProgrammeNomme[] {
+  let brut: unknown;
+  try {
+    brut = parseYaml(raw);
+  } catch {
+    return [];
+  }
+  if (typeof brut !== "object" || brut === null) return [];
+  const out: ProgrammeNomme[] = [];
+  for (const section of ["tests", "lint", "mutation", "format"] as const) {
+    const commande = ((brut as Record<string, unknown>)[section] as { command?: unknown } | undefined)?.command;
+    if (Array.isArray(commande) && commande.length && commande.every((x): x is string => typeof x === "string" && x.length > 0))
+      out.push({ programme: commande[0]!, section, commande });
+  }
+  return out;
+}
+
 export function parseStackProfile(raw: string, opts: ParseOptions): { profile: StackProfile } | { error: string } {
   let brut: unknown;
   try {

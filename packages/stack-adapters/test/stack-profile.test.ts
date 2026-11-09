@@ -7,7 +7,7 @@
  * (D47, O12) — sans quoi un dépôt hostile ferait exécuter n'importe quoi.
  */
 import { describe, expect, it } from "vitest";
-import { parseStackProfile } from "../src/profile/stack-profile.js";
+import { parseStackProfile, programmesDuProfil } from "../src/profile/stack-profile.js";
 
 const MINIMAL = `
 id: python
@@ -98,5 +98,33 @@ lint:
   it("les modules d'infrastructure sont déclarés par le projet, jamais devinés", () => {
     const p = ok(`${MINIMAL}\ninfrastructureModules: [django, sqlalchemy]\n`);
     expect(p.infrastructureModules).toEqual(["django", "sqlalchemy"]);
+  });
+});
+
+/**
+ * Les programmes qu'un profil nomme, section par section (ADR 0075) : pour demander à l'utilisateur
+ * d'accepter ceux qui manquent à la liste, avant de juger le profil. Rien n'est validé ici.
+ */
+describe("programmesDuProfil", () => {
+  it("le premier élément de chaque commande, avec sa section et la commande entière", () => {
+    const yaml = `${MINIMAL.replace('command: [pytest, "--junit-xml={rapport}"]', 'command: [uv, run, pytest, "--junit-xml={rapport}"]')}
+lint:
+  command: [uv, run, ruff, check]
+  report: ruff-json
+format:
+  command: [make, fmt]
+`;
+    expect(programmesDuProfil(yaml)).toEqual([
+      { programme: "uv", section: "tests", commande: ["uv", "run", "pytest", "--junit-xml={rapport}"] },
+      { programme: "uv", section: "lint", commande: ["uv", "run", "ruff", "check"] },
+      { programme: "make", section: "format", commande: ["make", "fmt"] },
+    ]);
+  });
+
+  it("YAML illisible, commande absente ou mal formée : rien", () => {
+    expect(programmesDuProfil(": : :")).toEqual([]);
+    expect(programmesDuProfil("id: x")).toEqual([]);
+    expect(programmesDuProfil("tests:\n  command: uv run")).toEqual([]);
+    expect(programmesDuProfil("tests:\n  command: [3, x]")).toEqual([]);
   });
 });

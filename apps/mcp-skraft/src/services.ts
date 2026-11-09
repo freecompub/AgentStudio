@@ -19,8 +19,8 @@ export function ouvrirServicesSansFenetre(o: {
   runtime(): Promise<AgentRuntime>;
   journal(markdown: string): void;
   modelFor?(cls: ModelClass | undefined): Promise<string | undefined>;
-}): (root: string, pileFournie?: string) => Promise<WorkspaceServices> {
-  return async (root, pileFournie) =>
+}): (root: string, pileFournie?: string, confirmerProgrammes?: UserConfirmer) => Promise<WorkspaceServices> {
+  return async (root, pileFournie, confirmerProgrammes) =>
     o.factory({
       ...(pileFournie !== undefined ? { pileFournie } : {}),
       workspace: await o.workspace(root),
@@ -29,6 +29,8 @@ export function ouvrirServicesSansFenetre(o: {
       onInteractions: () => {},
       onPost: (_extensionId, markdown) => o.journal(markdown),
       confirmer: SANS_FENETRE,
+      // La question passe par le client (ADR 0075), pour ce seul usage : le reste demeure sans fenêtre.
+      ...(confirmerProgrammes ? { confirmerProgrammes } : {}),
       ...(o.modelFor ? { modelFor: o.modelFor } : {}),
     });
 }

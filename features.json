@@ -1177,6 +1177,13 @@
       "verify": "pnpm vitest run --project mcp-skraft test/confirmation.test.ts test/depots.test.ts test/projet.test.ts test/serveur.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Non vérifié avec Copilot CLI : gère-t-il l'elicitation, et son délai d'appel d'outil court-il pendant que la question attend ? Le branchement du stockage dans assemblage.ts n'a pas de test."
+    },
+    {
+      "id": "programme-hors-liste-accepte-par-l-utilisateur",
+      "title": "Un programme que la pile nomme hors de la liste de l'administrateur est demandé à l'utilisateur (serveur MCP par elicitation, bureau par sa fenêtre), une fois ou toujours (par projet, hors du dépôt) ; jamais un nom avec chemin ; l'administrateur l'interdit par programConsent: false (ADR 0075)",
+      "verify": "pnpm vitest run --project stack-adapters test/stack-profile.test.ts && pnpm vitest run --project project-services test/admin-config.test.ts test/programmes-acceptes.test.ts test/pile.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts && pnpm vitest run --project desktop test/app-controller.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09 (branche feat/autorisations-mcp). Essai réel avec Copilot CLI 1.0.107 en mode interactif (tmux) : questions sur le dépôt puis sur uv affichées, acceptées, pile du projet retenue ; une réponse après 75 s aboutit. Le branchement de programConsent dans assemblage.ts et index.ts n'a pas de test."
     }
   ]
 }

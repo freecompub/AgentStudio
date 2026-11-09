@@ -72,6 +72,18 @@ describe("Configuration administrateur (D6, O5)", () => {
     });
   });
 
+  it("accord de l'utilisateur sur un programme hors liste (ADR 0075) : permis par défaut, l'administrateur peut l'interdire", async () => {
+    expect((await loadAdminConfig(join(dir, "absent.json"))).programConsent).toBe(true);
+    const file = join(dir, "admin.json");
+    await writeFile(file, JSON.stringify({ programConsent: false }));
+    expect((await loadAdminConfig(file)).programConsent).toBe(false);
+    await writeFile(file, JSON.stringify({ profile: { role: "po" } }));
+    expect((await loadAdminConfig(file)).programConsent).toBe(true);
+    // Fichier refusé : rien de plus que ce que l'administrateur a pu relire, donc aucun accord.
+    await writeFile(file, "{ pas du json");
+    expect((await loadAdminConfig(file)).programConsent).toBe(false);
+  });
+
   it("une liste vide interdit tout profil de stack, et c'est un choix valide", async () => {
     const file = join(dir, "admin.json");
     await writeFile(file, JSON.stringify({ allowedPrograms: [] }));
