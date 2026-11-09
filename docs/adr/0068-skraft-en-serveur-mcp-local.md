@@ -88,6 +88,8 @@ par rôle, et le serveur ne voit pas les écritures de l'hôte.
    retient l'accord pour cette empreinte, un workflow modifié est redemandé. Écartés : l'accord
    préalable en configuration (l'utilisateur ne voit pas le résumé, l'accord ne suit plus
    l'empreinte) et l'*elicitation* MCP (support par Copilot CLI non vérifié).
+   L'elicitation est reprise le 2026-11-09 par l'ADR 0075, d'abord pour accepter un dépôt hors des
+   dossiers permis, si le client l'annonce ; l'accord sur le workflow reste en deux appels.
 
 ## Conséquences
 

@@ -28,11 +28,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     options (`uv run --with`), et `npx` télécharge.
   - **Point 1, à la place** : le profil déclare où vivent les outils du projet (`outils: [.venv/bin]`).
     Le programme reste jugé par son nom.
-  - **Point 3** : sans roots du client, le dossier de lancement du serveur devient la borne (refusée si
-    c'est le dossier personnel). Il sert déjà de base (`projet.ts:23`), pas de borne (`:29`).
-  - **Point 4** : `skraft_pile` propose et vérifie un profil, sans l'écrire.
-  - **Point 2** : un accord pour un programme hors liste, seulement par l'elicitation MCP. Un argument
-    d'outil est rempli par le LLM hôte, qui proposerait et accepterait la même pile.
+  - **Point 3, fait (ADR 0075)** : un dépôt hors des dossiers permis est accepté par l'utilisateur.
+    - Le serveur pose la question par le client (*elicitation*), si celui-ci l'annonce
+      (`confirmerParLeClient`, `src/confirmation.ts`).
+    - « Oui, cette fois » vaut pour ce serveur. « Oui, toujours » est retenu dans
+      `~/.agent-studio/mcp-skraft/depots-acceptes.json` (`src/depots.ts`).
+    - Sans elicitation annoncée, ou sur un « non », le dépôt reste refusé.
+    - L'idée du dossier de lancement comme borne est abandonnée : le code la refusait déjà
+      (`projet.test.ts`, « pas accepté d'office »).
+  - **Point 2, à faire** : un programme hors liste, par la même question, jamais par un argument
+    d'outil (le LLM hôte proposerait et accepterait la même pile). L'administrateur pourra
+    l'interdire.
+  - **Point 4, à faire** : `skraft_pile` propose et vérifie un profil ; l'écrire passera par la même
+    question.
 - **Le SDK Copilot ne change rien aux commandes** : nos agents n'ont aucun shell (`task-agent-guard.ts`),
   les commandes de la pile sont lancées par notre code (`run_tests`), sans shell. Le serveur n'a aucun
   canal vers l'humain (`SANS_FENETRE`) : l'accord ne peut venir que du client MCP.

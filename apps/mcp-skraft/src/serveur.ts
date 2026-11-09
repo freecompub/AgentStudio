@@ -8,9 +8,11 @@ import type { Role } from "@agent-studio/core";
 import { AucunePile } from "@agent-studio/project-services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { confirmerParLeClient } from "./confirmation.js";
 import type { Connexion } from "./connexion.js";
+import type { Depots } from "./depots.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
-import { resoudreProjet } from "./projet.js";
+import { resoudreProjet, type ProjetResolu } from "./projet.js";
 import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
 
 export interface OptionsServeur {
@@ -26,6 +28,8 @@ export interface OptionsServeur {
   pid?: number;
   /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
   connexion: Pick<Connexion, "verifier" | "connecter">;
+  /** Dépôts acceptés « toujours » par l'utilisateur (ADR 0075) ; sans, « toujours » vaut pour ce serveur. */
+  depots?: Depots;
   version?: string;
 }
 
@@ -52,6 +56,40 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     }
   }
 
+  const confirmer = confirmerParLeClient(mcp.server);
+  /** Dépôts acceptés pour ce serveur ; une question en cours par dépôt, pour ne pas la poser deux fois. */
+  const acceptes = new Set<string>();
+  const enQuestion = new Map<string, Promise<boolean>>();
+
+  /**
+   * Dépôt hors des dossiers permis (ADR 0075) : si le client sait poser une question, on la pose à
+   * l'utilisateur ; c'est lui qui répond, pas le LLM de l'hôte. Sinon, le refus explique quoi faire.
+   */
+  async function resoudre(argument: string | undefined): Promise<ProjetResolu> {
+    const autorises = [...o.autorises, ...acceptes, ...((await o.depots?.liste()) ?? [])];
+    const r = await resoudreProjet({ ...(argument !== undefined ? { argument } : {}), roots: await roots(), cwd: o.cwd, autorises });
+    if (r.ok || !r.horsBornes || !r.root || !confirmer.peutDemander()) return r;
+    const root = r.root;
+    let question = enQuestion.get(root);
+    if (!question) {
+      question = (async () => {
+        const reponse = await confirmer.confirm({
+          title: "Ouvrir ce dépôt avec skraft ?",
+          detail:
+            `${root} n'est ni dans un dossier ouvert par le client, ni dans les dossiers autorisés par la configuration du serveur (« autorises »). ` +
+            "skraft y travaillera sur une branche, avec des checkpoints Git : ses agents y écriront, et les tests du projet y seront lancés. " +
+            "« Oui, toujours » le retient pour les prochaines sessions.",
+        });
+        if (reponse === "deny") return false;
+        if (reponse === "allow-always") await o.depots?.ajouter(root);
+        acceptes.add(root);
+        return true;
+      })().finally(() => enQuestion.delete(root));
+      enQuestion.set(root, question);
+    }
+    return (await question) ? { ok: true, root } : { ok: false, motif: `Projet refusé par l'utilisateur : ${root}. Rien n'a été ouvert.` };
+  }
+
   /**
    * Résout et ouvre le projet, puis exécute ; toute exception devient une erreur de l'outil.
    * `agents` : l'outil peut faire travailler les agents, il exige une connexion utilisable par Copilot.
@@ -63,7 +101,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
           const c = await o.connexion.verifier();
           if (!c.ok) return erreur(c.motif);
         }
-        const r = await resoudreProjet({ ...(a.projet !== undefined ? { argument: a.projet } : {}), roots: await roots(), cwd: o.cwd, autorises: o.autorises });
+        const r = await resoudre(a.projet);
         if (!r.ok) return erreur(r.motif);
         return await fn(await o.projets.ouvrir(r.root, a.pile !== undefined ? { pile: a.pile } : {}), a);
       } catch (e) {

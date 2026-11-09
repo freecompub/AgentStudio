@@ -13,8 +13,9 @@ import { MemoryTaskStore } from "@agent-studio/task-engine";
 import type { Workspace } from "@agent-studio/workspace";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { ElicitRequestSchema, ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createDepotsFichier, type Depots } from "../src/depots.js";
 import { createPilesFichiers } from "../src/piles.js";
 import { createProjets } from "../src/projets.js";
 import { createServeurSkraft } from "../src/serveur.js";
@@ -103,7 +104,11 @@ async function projet(o: { surDisque?: boolean } = {}) {
 type Projet = Awaited<ReturnType<typeof projet>>;
 
 /** Un serveur MCP (un client = un serveur), relié à un client en mémoire. */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean }) {
+/**
+ * `repondre` : le client annonce l'elicitation (ADR 0075) et l'utilisateur répond par cette fonction,
+ * qui reçoit la question ; `null` : il la refuse. `depots` : dépôts acceptés « toujours ».
+ */
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots }) {
   const factory = workspaceServicesFactory({
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
@@ -127,12 +132,20 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     autorises: [],
     cwd: p.root,
     pid: o.pid,
+    ...(o.depots ? { depots: o.depots } : {}),
     connexion: {
       verifier: async () => (o.nonConnecte ? { ok: false as const, motif: "Non connecté à GitHub (github.com) : appelle skraft_connexion." } : { ok: true as const }),
       connecter: async () => ({ ok: true, texte: "Connexion à GitHub lancée. Ouvre https://github.com/login/device et saisis le code ABCD-1234." }),
     },
   });
-  const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { roots: {} } });
+  const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { roots: {}, ...(o.repondre ? { elicitation: {} } : {}) } });
+  if (o.repondre) {
+    const repondre = o.repondre;
+    client.setRequestHandler(ElicitRequestSchema, async (r) => {
+      const reponse = repondre(r.params.message);
+      return reponse === null ? { action: "decline" } : { action: "accept", content: { reponse } };
+    });
+  }
   client.setRequestHandler(ListRootsRequestSchema, async () => ({ roots: (o.roots ?? [p.root]).map((r) => ({ uri: pathToFileURL(r).href })) }));
   const [a, b] = InMemoryTransport.createLinkedPair();
   await mcp.connect(b);
@@ -387,6 +400,53 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(await s.appel("skraft_etat", { projet: p.root })).toEqual({ erreur: true, texte: expect.stringMatching(/Projet refusé/) });
     await s.fermer();
   }, 30_000);
+
+  /**
+   * Dépôt hors des dossiers permis, client qui sait poser une question (ADR 0075) : le serveur demande à
+   * l'utilisateur au lieu de refuser. Copilot CLI ne déclare pas de roots : sans cela, aucun dépôt.
+   */
+  describe("dépôt hors des dossiers permis, accepté par l'utilisateur", () => {
+    const hors = (p: Projet, o: { repondre: (q: string) => string | null; depots: Depots }) => serveur(p, { pid: 1, vivants: new Set([1]), roots: [join(racine, "machine")], ...o });
+
+    it("« Oui, cette fois » : ouvert pour ce serveur seulement, sans redemander ; un autre serveur redemande", async () => {
+      const p = await projet();
+      const depots = createDepotsFichier(join(p.root, ".donnees-du-serveur", "depots-acceptes.json"));
+      const questions: string[] = [];
+      const s = await hors(p, { repondre: (q) => (questions.push(q), "Oui, cette fois"), depots });
+      expect(await s.appel("skraft_etat", { projet: p.root })).toMatchObject({ erreur: false });
+      expect(await s.appel("skraft_etat", { projet: p.root })).toMatchObject({ erreur: false });
+      expect(questions).toHaveLength(1);
+      expect(questions[0]).toContain(p.root);
+      expect(questions[0]).toMatch(/branche.*checkpoints.*tests/s);
+      await s.fermer();
+      expect(await depots.liste()).toEqual([]);
+      const t = await hors(p, { repondre: (q) => (questions.push(q), "Non"), depots });
+      expect(await t.appel("skraft_etat", { projet: p.root })).toMatchObject({ erreur: true });
+      expect(questions).toHaveLength(2);
+      await t.fermer();
+    }, 30_000);
+
+    it("« Oui, toujours » : retenu, un autre serveur ne redemande pas", async () => {
+      const p = await projet();
+      const depots = createDepotsFichier(join(p.root, ".donnees-du-serveur", "depots-acceptes.json"));
+      const s = await hors(p, { repondre: () => "Oui, toujours", depots });
+      expect(await s.appel("skraft_etat", { projet: p.root })).toMatchObject({ erreur: false });
+      await s.fermer();
+      const t = await hors(p, { repondre: () => { throw new Error("ne devait pas redemander"); }, depots });
+      expect(await t.appel("skraft_etat", { projet: p.root })).toMatchObject({ erreur: false });
+      await t.fermer();
+    }, 30_000);
+
+    it("« Non » ou question refusée : refusé, et le refus dit que c'est l'utilisateur", async () => {
+      const p = await projet();
+      const depots = createDepotsFichier(join(p.root, ".donnees-du-serveur", "depots-acceptes.json"));
+      for (const repondre of [() => "Non", () => null]) {
+        const s = await hors(p, { repondre, depots });
+        expect(await s.appel("skraft_etat", { projet: p.root })).toEqual({ erreur: true, texte: expect.stringMatching(/Projet refusé par l'utilisateur/) });
+        await s.fermer();
+      }
+    }, 30_000);
+  });
 
   it("story ou skill avec un espace : refusé, car la commande sépare ses arguments par des espaces", async () => {
     const p = await projet();
