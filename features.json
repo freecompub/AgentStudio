@@ -1205,6 +1205,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/junit-xml.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09 : trouvé par le diagnostic réel d'un projet uv via Copilot ; rejoué ensuite, quatre canaris sur quatre."
+    },
+    {
+      "id": "assertion-booleenne-interdite",
+      "title": "L'assertion sur un booléen calculé est interdite à skraft-test et skraft-acceptance, et relevée en major par la lentille test-integrity, dans l'extension et le workflow ; aucun agent ne nomme une assertion d'un langage particulier",
+      "verify": "pnpm vitest run --project ext-skraft test/assertions-booleennes.test.ts && pnpm vitest run --project workflow-skraft test/assertions-booleennes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-09, demande du responsable (« Il faut pas que ça soit lié à un langage »). Consigne aux agents, sans porte du code ; non essayée en run réel."
     }
   ]
 }

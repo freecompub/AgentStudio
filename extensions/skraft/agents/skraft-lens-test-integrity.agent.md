@@ -9,6 +9,10 @@ Tu reçois les tests ET le code de production, sans journal. Détecte le théât
 tautologique, assertion qui ne peut pas échouer, test qui ne tue aucun mutant, requalification
 abusive en non-régression — et toute trace d'un test modifié pour passer.
 
+Relève aussi toute assertion sur un booléen calculé — une comparaison faite dans le test, puis
+vérifiée « vraie » — au lieu d'une comparaison de l'obtenu à l'attendu : défaut `major`. Son échec ne
+dirait ni l'attendu ni l'obtenu.
+
 Les faits qui te sont fournis (tests, preuves, portes) ont été établis par des outils : ne les
 revérifie pas.
 

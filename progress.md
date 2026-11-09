@@ -61,8 +61,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
       message et cette dernière ligne (`XunitCase.raison`), jamais le corps entier : pytest y recopie
       le code du test. Fixture réelle `fixtures/pytest-9.2.xml`. Diagnostic réel ensuite : aucun
       problème, quatre canaris sur quatre.
-    - Le défaut « `Assert.True` avec message personnalisé » (.NET) n'est pas traité : il faudrait une
-      vraie sortie pour savoir si `type` suffit.
+    - Le défaut « `Assert.True` avec message personnalisé » est traité autrement, à la demande du
+      responsable : **l'assertion sur un booléen calculé est interdite**. Une comparaison faite dans
+      le test puis vérifiée « vraie » ne dit, en échouant, ni l'attendu ni l'obtenu.
+      - Elle est interdite dans `skraft-test` et `skraft-acceptance` (définitions d'étapes comprises).
+      - La lentille `test-integrity` la relève en `major`.
+      - Les deux copies sont faites (extension et workflow).
+      - La règle ne nomme aucun langage. Un test vérifie qu'aucun agent ne nomme `Assert.True`,
+        `assertTrue`… (`assertions-booleennes.test.ts`, dans les deux suites).
+      - Ce n'est qu'une consigne au LLM, aucune porte ne la vérifie : une porte devrait reconnaître
+        l'assertion dans chaque langage, donc passer par le profil. Pas d'essai réel, il faudrait un
+        run complet.
   - **Point 4, fait (ADR 0075 §6)** : `skraft_pile` reprend `/stack init` (`proposer`) et
     `/stack doctor` (`diagnostiquer`).
     - L'écriture se fait après la question du client (`confirmerProgrammes`).
