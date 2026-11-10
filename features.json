@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-10",
-  "branch": "feat/workflow-rejouable",
+  "updated": "2026-11-10",
+  "branch": "main",
   "items": [
     {
       "id": "banc-modeles-par-role",
@@ -1226,6 +1226,27 @@
       "verify": "pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09. Essai réel avec Copilot sur un projet ambigu : question posée, puis réponse donnée, découverte aboutie en 53 s. Limite connue : Copilot abandonne un appel d'outil après 3 minutes."
+    },
+    {
+      "id": "mcp-commandes-skills",
+      "title": "Serveur MCP : une commande Copilot par outil (/skraft-<nom>), en skills (Copilot n'affiche pas les prompts MCP) ; chaque skill dit l'outil à appeler et laisse les questions à l'utilisateur",
+      "verify": "pnpm vitest run --project mcp-skraft test/skills.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Vérifié avec Copilot CLI 1.0.107 : un prompt MCP n'apparaît pas en commande, un skill de projet si. Les neuf /skraft-… listées, /skraft-etat exécutée. copilot skill add <dossier> non lancé ici (il modifie les réglages)."
+    },
+    {
+      "id": "commandes-partagees-copilot-claude",
+      "title": "Les commandes /skraft-… sont partagées entre Copilot CLI et Claude Code par des liens vers une seule source (pnpm --filter @agent-studio/mcp-skraft commandes, --projet, --retirer) ; un skill qui n'est pas à nous n'est jamais remplacé",
+      "verify": "pnpm vitest run --project mcp-skraft test/installer-commandes.test.ts test/skills.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Copilot : lien suivi dans .claude/skills vérifié. Claude Code : d'après sa documentation officielle (skills, liens suivis), pas lancé ici."
+    },
+    {
+      "id": "mcp-deploiement",
+      "title": "Un script déploie le serveur MCP : build, inscription dans Copilot CLI et Claude Code (jamais de remplacement sans --remplacer), commandes ; --npm prépare et compresse le paquet (GPL-3.0-or-later), --publier seul le publie ; --desinstaller retire l'inscription (pointant ailleurs : seulement avec --forcer) et nos commandes, --donnees efface ~/.agent-studio/mcp-skraft et lui seul",
+      "verify": "pnpm vitest run --project mcp-skraft test/deployer.test.ts test/installer-commandes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Essai réel isolé (COPILOT_HOME, CLAUDE_CONFIG_DIR) : inscrit dans les deux clients, relancé sans rien toucher, 18 liens. Paquet npm compressé, installé hors du dépôt, serveur démarré. Non publié : version 0.0.0, nom et compte npm à décider. Désinstallation essayée en réel le 10/11 : inscription retirée des deux clients, 18 liens retirés, un skill étranger gardé."
     }
   ]
 }

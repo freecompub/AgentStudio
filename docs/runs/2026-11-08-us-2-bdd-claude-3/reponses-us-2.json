@@ -1,0 +1,15 @@
+{
+  "$comment": "Réponses humaines du banc de comparaison sur US-2 (docs/10 P4), identiques pour l'extension skraft et le workflow skraft. Reprises des runs du 03/10 (scripts/mesure-skraft.ts).",
+  "difficulte": "medium-hard",
+  "questions": [
+    { "motif": "paliers.*communs|communs.*paliers|par référence|mêmes pour toutes", "reponse": "Les mêmes paliers s'appliquent à toutes les références." },
+    { "motif": "mode d.arrondi|arrondi au plus proche", "reponse": "Arrondi au plus proche, avec les demi-centimes arrondis vers le haut (comme l'exemple US-5)." },
+    { "motif": "arrondir chaque remise|deux règles absentes", "reponse": "Arrondir chaque remise de ligne à deux décimales et soustraire la remise de ATPayer." },
+    { "motif": "plafond|dépasse le sous-total", "reponse": "Taux non négatifs sans plafond ; plafonner la remise au sous-total de ligne." }
+  ],
+  "questionParDefaut": "Pas de précision supplémentaire : retiens l'option la plus simple qui respecte les critères d'acceptation.",
+  "ratification": "accepter",
+  "arbitrage": "lentille",
+  "relancesParEscalade": 2,
+  "blocages": []
+}

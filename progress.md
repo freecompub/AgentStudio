@@ -5,6 +5,80 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Déployer le serveur MCP : un script, et le paquet npm en option
+
+- **Fait** : `pnpm --filter @agent-studio/mcp-skraft deployer` (`scripts/deployer.mjs`).
+  - Il construit le serveur, l'inscrit dans Copilot CLI (`copilot mcp add`) et dans Claude Code
+    (`claude mcp add -s user`), puis pose les commandes.
+  - Une inscription existante différente n'est remplacée qu'avec `--remplacer`.
+  - `--npm <dossier>` prépare le paquet et le compresse ; `--publier` seul le publie.
+- **Pièges vus en préparant** :
+  - les deux clients refusent une seconde inscription du même nom ;
+  - `claude mcp get` lance le serveur pour tester la connexion ;
+  - `COPILOT_HOME` et `CLAUDE_CONFIG_DIR` déplacent la configuration. Le script des commandes les
+    ignorait, il les respecte désormais.
+- **Essais** :
+  - réel, dans des configurations isolées : inscription dans les deux clients, relance sans rien
+    toucher ;
+  - le paquet installé hors du dépôt démarre (`skraft-mcp`).
+- **Quel client** : le script cherche `copilot` et `claude` dans le PATH. Le serveur **et** les
+  commandes ne sont posés que pour les clients trouvés, ou pour celui de `--client`. Jusque-là, les
+  commandes allaient aux deux clients, même absents. La désinstallation sans `--client` retire nos
+  liens chez les deux, pour nettoyer d'anciens liens.
+- **Désinstaller** : `deployer -- --desinstaller`.
+  - Il retire l'inscription si elle pointe vers ce serveur (sinon seulement avec `--forcer`), et
+    nos liens seuls.
+  - Les données sont gardées sauf `--donnees`.
+  - Essai réel : rien ne reste, un skill étranger gardé.
+- **Défaut corrigé** : un échec d'inscription laissait le script sortir en succès. Vu parce que
+  Copilot refuse un `COPILOT_HOME` accessible en écriture au groupe.
+- **Avant de publier** :
+  - une vraie version (`0.0.0` aujourd'hui) ;
+  - un nom disponible (le scope `@agent-studio` demande une organisation npm, sinon `--nom`) ;
+  - un compte npm ;
+  - la licence : GPL-3.0-or-later, parce que le paquet embarque le workflow skraft.
+
+## 10/11 — Les commandes `/skraft-…` dans Copilot CLI
+
+- **Pourquoi** (demande du responsable) : il n'y avait aucune commande, seulement des outils que le
+  LLM appelle quand on le lui demande.
+- **Vérifié avec Copilot CLI 1.0.107**, par un serveur de diagnostic dans tmux, sans requête :
+  - un prompt MCP n'apparaît pas en commande ;
+  - un skill de projet (`.github/skills/`) apparaît en `/<nom>`.
+- **Fait** : `apps/mcp-skraft/skills/`, un skill par outil, et un test qui exige un skill pour chaque
+  outil, ni plus ni moins. Chaque skill nomme son outil, dit comment lire les arguments, et laisse
+  les questions à l'utilisateur.
+- **Essai** : les neuf commandes listées ; `/skraft-etat` appelle l'outil et résume.
+- **Partagées avec Claude Code** : `pnpm --filter @agent-studio/mcp-skraft commandes`.
+  - Le script pose des liens vers `skills/` dans `~/.claude/skills` et `~/.copilot/skills`, ou dans
+    `<projet>/.claude/skills` avec `--projet` : les deux clients lisent ce dossier.
+  - `--retirer` retire nos liens, et eux seuls.
+  - Vérifié : Copilot suit un lien dans `.claude/skills/`.
+  - Pour Claude Code, seulement sa documentation : le lancer dans tmux a été refusé à
+    l'approbation.
+
+## 10/11 — État et prochaine étape
+
+- **Mergé dans `main`** (PR #27, 09/11) :
+  - les questions à l'utilisateur par le client MCP (ADR 0075) : dépôt, programme, écriture du
+    profil ;
+  - `outils` dans le profil ;
+  - la pile découverte par un agent, vérifiée par le code, et la réponse à sa question (ADR 0076) ;
+  - le classement des assertions pytest en junit-xml ;
+  - l'interdiction de l'assertion sur un booléen calculé.
+- **Doc mise à jour le 10/11** :
+  - README racine : serveur MCP, pile, organisation, état ;
+  - `CLAUDE.md` ;
+  - SPEC §6.5, §8.5, §8.6 et O12 ;
+  - README du serveur : inscription dans Copilot CLI, ce que Copilot en fait, `skraft_pile` dans le
+    déroulé.
+- **Prochaine étape**, au choix du responsable :
+  - essayer la PR sur le poste Mac, projet uv, compte d'entreprise (`hostname`) ;
+  - la découverte en arrière-plan, si la limite de 3 minutes de Copilot gêne ;
+  - le lecteur JUnit de `node --test` (`missing_symbol` mal classé), sur une vraie sortie ;
+  - les défauts reportés de skraft : relation `context-map`, escalade sur revue sans défaut
+    majeur, cold-reader et valeurs recopiées, citations de la recherche.
+
 ## 09/11 — La pile découverte par un agent, vérifiée par le code (ADR 0076)
 
 - **Pourquoi** (demande du responsable) : les règles du code ne reconnaissaient que deux modèles.
@@ -188,6 +262,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Ne pas commiter** `docs/Growing Object-Oriented Software, Guided by Tests.pdf` (sous droits).
 - **Branches** : `feat/composants` (briques 1 et 2 des composants), puis `feat/bdd` (ADR, 3a, 3b),
   partie de la précédente. Rien de poussé.
+
+## 08/11 — Troisième run réel US-2 en BDD (`docs/runs/2026-11-08-us-2-bdd-claude-3/`)
+
+- Demandé par le responsable (« On lance le test ») ; serveur reconstruit à `991df12` (PR #25).
+- **Fini : 15m05, 2 rejets, 5,12 $** (second : 16m13, 1 rejet, 5,18 $) ; DESIGN 2,94 $ ; ADR-003 ratifié ;
+  US-1 intacte ; `dotnet test` 10/10.
+- **Vérifié en réel** : aucun refus « nom cité absent du modèle » (liste des noms) ; aucune question
+  bloquante du chercheur (question de la story posée avant RESEARCH) ; note « ac-3 déjà vert » émise.
+- **Nouveau défaut de porte** (**reporté par le responsable le 09/11**, solution décidée mais non faite) :
+  la porte de cohérence lit comme une relation entre contextes une phrase qui dit qu'il n'y en a pas
+  (« aucune flèche `A` → `B` à qualifier ») : patron manquant, contextes `A` et `B` non classés. Coût :
+  le second essai de DESIGN (1,58 $). **Origine** : la consigne de l'architecte du modèle donne l'exemple
+  « `A` → `B` » et « `A` : Core » (`skraft-architect-model.agent.md:28-31`), repris tel quel.
+  **Solution proposée** : (1) `RELATION` (`design.mjs:267`, `design.ts`) ne lit qu'une ligne qui
+  **commence** par la relation (directement, ou après `-`, `*`, `|`), pas la prose ; (2) la consigne
+  écrit `<Contexte>` → `<Autre contexte>` : <patron>, et dit de n'écrire une flèche entre deux noms que
+  pour déclarer une relation. Deux copies, TDD (premier test : la phrase du run ne produit aucun refus).
+- **Cause secondaire** du même rejeu : après un refus de cohérence, l'essai relance les deux architectes,
+  même si un seul fichier est en cause ; le second a passé un tour à ne rien changer (trace, 23:27:20).
+  À examiner.
+- Erreur d'agent : citation à chemin incomplet en RESEARCH (`Steps/ChiffrageDuPanierSteps.cs`) ; la porte a
+  raison. Piste : proposer le chemin complet dans le motif quand un seul fichier y correspond.
 
 ## 08/11 — L'architecte qui décide reçoit les noms du modèle
 

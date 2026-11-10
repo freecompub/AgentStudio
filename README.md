@@ -56,6 +56,27 @@ Deux extensions apportent des méthodes de travail :
 Chaque extension tourne dans **son propre processus**, sous le modèle de permissions de Node, et
 ne voit jamais le SDK : seulement l'API `ctx`.
 
+## Le serveur MCP skraft
+
+skraft tourne aussi **hors de l'application**, depuis un client MCP (Copilot CLI, Claude Code) :
+`apps/mcp-skraft` (ADR 0068, mode d'emploi dans son `README.md`).
+- Le serveur fait travailler ses propres agents, avec les mêmes gardes et les mêmes portes.
+- Le client démarre, suit et relaie les questions.
+- Ce qui élargit les droits est demandé à l'utilisateur par le client (ADR 0075) : un dépôt hors
+  des dossiers permis, un programme hors de la liste, l'écriture du profil de pile.
+- Sans pile, `skraft_pile` la fait découvrir par un agent et la vérifie en l'exécutant (ADR 0076).
+
+## La pile d'un projet
+
+Comment lancer les tests, où sont les fichiers, comment lire les rapports : c'est la section `pile`
+de `.agent-studio/projet.yaml` (`profiles/README.md`). `/stack init` la fait découvrir par un agent,
+à partir de ce que le code a détecté. Le code la vérifie ensuite :
+- programmes autorisés, ou acceptés par l'utilisateur ;
+- schéma et diagnostic ;
+- canaris, des tests à la réponse connue, lancés dans une copie du projet.
+
+La pile n'est écrite qu'après accord. `/stack doctor` la vérifie à nouveau à la demande.
+
 ## Organisation
 
 | Dossier | Rôle |
@@ -64,10 +85,15 @@ ne voit jamais le SDK : seulement l'API `ctx`.
 | `packages/core` | Sessions, registre, routeur, arbitre de permissions, preuves |
 | `packages/task-engine` | Réducteur pur, effets, persistance, reprise après redémarrage |
 | `packages/workspace` | Seul service à toucher le disque et Git |
+| `apps/mcp-skraft` | Serveur MCP local : skraft depuis Copilot CLI ou Claude Code |
 | `packages/runtime-copilot` | Adaptateur du port `AgentRuntime` vers le Copilot SDK |
+| `packages/runtime-claude` | Adaptateur vers Claude, par le CLI `claude -p` (ADR 0070) |
+| `packages/workflow` | Workflows rejouables : script, appels journalisés, reprise par rejeu (ADR 0052, 0055) |
+| `packages/project-services` | Services d'un projet ouvert : pile, `/stack`, tâches, accords, workflows |
 | `packages/stack-adapters` | Lancement des tests par langage (TypeScript/Vitest ; profils déclaratifs pour les autres) |
 | `packages/extension-*` | API, hôte isolé, manifeste, empaquetage signé, installation |
 | `extensions/{tdd,skraft}` | Les deux méthodes de travail |
+| `workflows/skraft` | skraft en workflow, celui qu'embarque le serveur MCP |
 
 ## Documentation
 
@@ -79,6 +105,7 @@ ne voit jamais le SDK : seulement l'API `ctx`.
 
 ## État
 
-Jalons J1 à J6 (socle) et S1 à S6 (skraft) livrés. Ce qui reste ouvert est consigné : les
-profils de stack déclaratifs (J5 partiellement livré), le passage à SQLite (ADR 0019, décidé et
-non implémenté), et la reprise de contenu skraft, soumise à des conditions (ADR 0012).
+Jalons J1 à J6 (socle) et S1 à S6 (skraft) livrés. La reprise du contenu de skraft-plugin a commencé
+le 2026-09-25 (ADR 0012, `docs/licences/autorisation-skraft.md`). Où en est le travail :
+`features.json` (critères vérifiables) et `progress.md` (journal, pièges, prochaine étape). Le
+passage à SQLite (ADR 0019) reste décidé et non implémenté.

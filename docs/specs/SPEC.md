@@ -441,7 +441,8 @@ async function runTurn(session: AgentSession, prompt: string, idleMs = 5 * 60_00
 | `report_phase` | Clôt la phase avec un résumé et la liste des fichiers | Terminal ; **refuse** (erreur) si une skill à la demande requise n'a pas été chargée ou si une précondition manque |
 | `report_blocker` | Signale une question métier bloquante avec des choix | Terminal ; suspend la tâche et crée une demande d'interaction (D31) |
 | `load_skill` | Charge une skill facultative, éventuellement une section | Chaque appel est tracé dans l'état de la tâche (D26) |
-| `submit_plan`, `submit_verdict`, `submit_difficulty` | Sorties structurées spécialisées | Terminales, schéma strict, enums fermés |
+| `submit_plan`, `submit_verdict`, `submit_difficulty` | Sorties structurées spécialisées | Terminales, schéma strict, enums fermés. Le verdict s'appelle `submit_lens_verdict` dans le code |
+| `submit_pile` | Pile proposée par l'agent de découverte : une par racine, en YAML, avec sa justification (ADR 0076) | Terminale ; le code vérifie la pile en l'exécutant avant que rien ne soit écrit |
 
 ### 6.6 Dossier de passation (D17)
 
@@ -590,16 +591,26 @@ Chaque section du profil est une capacité : `tests` (obligatoire), `mutation`, 
 
 Le profil définit des commandes exécutées sur la machine : il sert de **liste blanche** à la permission `shell:test`. Toute création ou modification du profil exige une confirmation de l'utilisateur, comme un élargissement de permissions. Les programmes lancés doivent figurer dans une liste de programmes autorisés (lanceurs de tests, outils de mutation connus), extensible par l'utilisateur.
 
+Mise en œuvre (ADR 0075) :
+- La liste vient d'`admin.json` (`allowedPrograms`, qui remplace la liste par défaut) ; un refus dit
+  la liste en vigueur et d'où elle vient.
+- L'utilisateur l'étend **projet par projet** : un programme hors de la liste lui est demandé, une
+  fois ou toujours, avant toute exécution. L'administrateur l'interdit par `programConsent: false`.
+- La question passe par la fenêtre de l'application, ou par le client MCP (*elicitation*), jamais
+  par un argument d'outil que le LLM remplirait.
+- Un profil peut déclarer les dossiers où le projet installe ses outils (`outils`, un environnement
+  virtuel par exemple). Ils passent en tête du PATH, et le programme reste jugé par son nom.
+
 ### 8.6 Génération assistée : `/stack init` et `/stack doctor`
 
-L'IA propose le profil, le code le vérifie en l'exécutant. Déroulé de `/stack init` :
+L'IA propose le profil, le code le vérifie en l'exécutant. Déroulé de `/stack init`, tel qu'implémenté (ADR 0076) :
 
-1. **Collecte des faits par le code**, sans LLM : fichiers repères, manifestes de dépendances, scripts de test, configuration CI, arborescence. Ces contenus sont des données, jamais des instructions.
-2. **Proposition par un agent** via l'outil terminal `submit_stack_profile`, au schéma du profil. Consigne prioritaire : chercher une option produisant un format standard avant d'envisager un parseur.
-3. **Approbation des commandes** par l'utilisateur, avant toute exécution.
-4. **Vérification par exécution** (`/stack doctor`) dans un `git worktree` temporaire, jamais dans le répertoire du projet.
-5. **Réessai ciblé** avec le motif d'échec, dans la limite d'un budget ; au-delà, escalade.
-6. **Écriture du profil** avec son bloc `verification`, et commit sur confirmation.
+1. **Collecte des faits par le code**, sans LLM : fichiers repères, dépendances, manifestes, arborescence bornée, BDD détecté, modèle reconnu par les règles du code. Ce sont des **indices** pour l'agent, jamais des instructions.
+2. **Proposition par un agent** en lecture seule, sans shell, via l'outil terminal `submit_pile` : une pile par racine, en YAML. S'il lui manque une information, il pose sa question (`report_blocker`), et l'utilisateur répond par `/stack init --reponse <phrase>`.
+3. **Approbation des programmes** hors de la liste par l'utilisateur, avant toute exécution (§8.5).
+4. **Vérification par le code** : racine, schéma, BDD, diagnostic, puis canaris lancés dans une copie isolée du projet, jamais dans son répertoire.
+5. **Réessai ciblé** avec les motifs du refus, dans une session neuve, trois essais au plus ; au-delà, rien n'est écrit et les motifs sont montrés.
+6. **Écriture du profil** dans la section `pile` (ou `composants`) de `.agent-studio/projet.yaml`, sur confirmation. Le bloc `verification` et le commit prévus ici ne sont pas faits.
 
 Contrôles de `/stack doctor`, avec leur oracle :
 
@@ -957,5 +968,5 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | O9 | Licence GPL-3.0-or-later de skraft (D42) | **Tranchée** (ADR 0012) : option C, autorisation de l'auteur. Conditions de reprise à réunir |
 | O10 | Nom définitif de l'application (D39) | `agent-studio` comme nom de code |
 | O11 | Format du profil de stack : YAML ou JSON ? | YAML pour la lisibilité, validé par JSON Schema |
-| O12 | Contenu initial de la liste des programmes autorisés dans un profil (D47) | Lanceurs de tests et outils de mutation courants, extensible par l'utilisateur |
+| O12 | Contenu initial de la liste des programmes autorisés dans un profil (D47) | Lanceurs de tests et outils de mutation courants, extensible par l'utilisateur. Choix provisoire (ADR 0075) : liste par défaut d'`admin.json`, étendue projet par projet par l'accord de l'utilisateur |
 | O13 | Premier profil à livrer en exemple | TypeScript (Vitest) ; Swift retiré (ADR 0061) |
