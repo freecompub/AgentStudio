@@ -1,4 +1,4 @@
-import type { SessionConfigBase } from "@github/copilot-sdk";
+import type { ModelInfo, SessionConfigBase } from "@github/copilot-sdk";
 import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger, ToolCallRequest } from "@agent-studio/core";
 import { mapSessionEvent } from "./events/map-session-event.js";
 import { createPermissionHandler } from "./permissions/permission-handler.js";
@@ -16,6 +16,7 @@ const cible = (r: ToolCallRequest): string | undefined => r.command ?? r.path ??
 /** Adaptateur `AgentRuntime` pour le Copilot SDK (D3, D35). */
 export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
   const { client, logger } = deps;
+  let modelCatalog: Promise<ModelInfo[]> | undefined;
 
   function sessionOptions(cfg: AgentSessionConfig, emettre: (e: AgentEvent) => void): SessionConfigBase {
     return {
@@ -43,7 +44,43 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
           }),
       }),
       ...(cfg.model ? { model: cfg.model } : {}),
+      ...(cfg.reasoningEffort ? { reasoningEffort: cfg.reasoningEffort } : {}),
+      ...(cfg.contextTier ? { contextTier: cfg.contextTier } : {}),
     };
+  }
+
+  /**
+   * L'effort et le contexte long qu'un rôle demande (ADR 0077), gardés seulement si le modèle choisi
+   * les déclare. Sinon ils sont abandonnés avec un avertissement, et la session s'ouvre quand même :
+   * échouer arrêtait DESIGN à chaque run, y compris sans modèle choisi, la configuration par défaut.
+   */
+  async function optionsHonorables(cfg: AgentSessionConfig): Promise<AgentSessionConfig> {
+    if (!cfg.reasoningEffort && cfg.contextTier !== "long_context") return cfg;
+    const { reasoningEffort, contextTier, ...reste } = cfg;
+    const sans = (garder: { effort: boolean; contexte: boolean }, raison: string): AgentSessionConfig => {
+      logger?.warn("options de modèle ignorées", { role: cfg.role, raison });
+      return { ...reste, ...(garder.effort && reasoningEffort ? { reasoningEffort } : {}), ...(garder.contexte && contextTier ? { contextTier } : {}) };
+    };
+    const aucune = { effort: false, contexte: false };
+    if (!cfg.model) return sans(aucune, "aucun modèle explicite : le runtime choisit le sien, sans garantie d'effort ni de contexte");
+    let models: ModelInfo[];
+    try {
+      modelCatalog ??= client.listModels();
+      models = await modelCatalog;
+    } catch (err: unknown) {
+      modelCatalog = undefined;
+      return sans(aucune, `catalogue des modèles illisible (${err instanceof Error ? err.message : String(err)}) : effort et contexte non vérifiables`);
+    }
+    const model = models.find((m) => m.id === cfg.model);
+    if (!model) return sans(aucune, `le modèle « ${cfg.model} » est absent du catalogue Copilot`);
+    const effortOk = !reasoningEffort || (model.supportedReasoningEfforts?.includes(reasoningEffort) ?? false);
+    const contexteOk = contextTier !== "long_context" || (Boolean(model.billing?.tokenPrices?.longContext) && model.capabilities.limits.max_context_window_tokens >= 1_000_000);
+    if (effortOk && contexteOk) return cfg;
+    const raisons = [
+      ...(effortOk ? [] : [`le modèle « ${cfg.model} » ne déclare pas l'effort ${reasoningEffort}`]),
+      ...(contexteOk ? [] : [`le modèle « ${cfg.model} » ne déclare pas de contexte d'au moins 1M tokens`]),
+    ];
+    return sans({ effort: effortOk, contexte: contexteOk }, raisons.join(" ; "));
   }
 
   /** Enveloppe : seule l'interface du port sort de ce paquet (D10). */
@@ -111,13 +148,15 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       const errors = await client.stop();
       for (const e of errors) logger?.warn("erreur à l'arrêt du runtime", { error: e.message });
     },
-    async openSession(cfg) {
+    async openSession(demande) {
+      const cfg = await optionsHonorables(demande);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.createSession(sessionOptions(cfg, broadcast));
       logger?.info("session ouverte", { sessionId: sdk.sessionId, role: cfg.role });
       return wrap(sdk, listeners);
     },
-    async resumeSession(id, cfg) {
+    async resumeSession(id, demande) {
+      const cfg = await optionsHonorables(demande);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.resumeSession(id, sessionOptions(cfg, broadcast));
       logger?.info("session reprise", { sessionId: sdk.sessionId, role: cfg.role });

@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentEvent } from "@agent-studio/core";
 import { describe, expect, it } from "vitest";
-import { argumentsDuTour } from "../src/arguments.js";
+import { argumentsDuTour, contexteLongPossible } from "../src/arguments.js";
 import { createTraducteur } from "../src/evenements.js";
 import { reponsePermission, versDemande } from "../src/permissions.js";
 
@@ -49,6 +49,26 @@ describe("arguments d'un tour", () => {
     expect(a).not.toContain("--session-id");
     expect(a[a.indexOf("--model") + 1]).toBe("claude-sonnet-5");
     expect(a[a.indexOf("--max-budget-usd") + 1]).toBe("2");
+  });
+
+  it("effort élevé et alias Claude 1M sont demandés pour DESIGN", () => {
+    const a = argumentsDuTour({ ...base, reprise: false, modele: "sonnet", reasoningEffort: "high", contextTier: "long_context" });
+    expect(a[a.indexOf("--effort") + 1]).toBe("high");
+    expect(a[a.indexOf("--model") + 1]).toBe("sonnet[1m]");
+  });
+
+  // Un modèle sans variante 1M connue garde son nom, sans `[1m]` : le tour part au lieu d'échouer
+  // (ADR 0077), et le runtime le journalise (`contexteLongPossible`).
+  it("un modèle sans variante 1M connue garde son nom ; le tour part quand même", () => {
+    for (const modele of ["haiku", "claude-opus-5-5"]) {
+      const a = argumentsDuTour({ ...base, reprise: false, modele, contextTier: "long_context" });
+      expect(a[a.indexOf("--model") + 1]).toBe(modele);
+    }
+    expect(argumentsDuTour({ ...base, reprise: false, contextTier: "long_context" })).not.toContain("--model");
+    expect(contexteLongPossible("sonnet")).toBe(true);
+    expect(contexteLongPossible("opus[1m]")).toBe(true);
+    expect(contexteLongPossible("haiku")).toBe(false);
+    expect(contexteLongPossible(undefined)).toBe(false);
   });
 });
 

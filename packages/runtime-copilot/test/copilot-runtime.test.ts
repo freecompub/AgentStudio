@@ -109,6 +109,69 @@ describe("CopilotRuntime", () => {
     expect(typeof created.onPermissionRequest).toBe("function");
   });
 
+  it("transmet l'effort et le palier long-context au SDK", async () => {
+    const client = new FakeClient();
+    client.models = [
+      modele("claude-sonnet-5.5", "Claude Sonnet 5.5", {
+        supportedReasoningEfforts: ["high"],
+        capabilities: { supports: { vision: false, reasoningEffort: true }, limits: { max_context_window_tokens: 1_000_000 } },
+        billing: { tokenPrices: { longContext: { inputPrice: 1 } } },
+      }),
+    ];
+    const rt = createCopilotRuntime({ client });
+    await rt.openSession(cfg({ model: "claude-sonnet-5.5", reasoningEffort: "high", contextTier: "long_context" }));
+
+    expect(client.created[0]).toMatchObject({ model: "claude-sonnet-5.5", reasoningEffort: "high", contextTier: "long_context" });
+  });
+
+  /**
+   * Une option que le modèle ne peut pas honorer est abandonnée, avec un avertissement : la session
+   * s'ouvre quand même (ADR 0077). Échouer arrêtait DESIGN à chaque run, y compris dans la
+   * configuration par défaut, où aucun modèle n'est choisi (revue du 10/11).
+   */
+  describe("options d'effort et de contexte qu'on ne peut pas honorer", () => {
+    const avertissements: { msg: string; data: unknown }[] = [];
+    const logger = { info: () => {}, warn: (msg: string, data?: unknown) => void avertissements.push({ msg, data }), error: () => {}, debug: () => {}, child: () => logger };
+    const ouvrir = async (client: FakeClient, over: Partial<AgentSessionConfig>) => {
+      avertissements.length = 0;
+      await createCopilotRuntime({ client, logger: logger as never }).openSession(cfg({ role: "skraft-architect-model", reasoningEffort: "high", contextTier: "long_context", ...over }));
+      return client.created[0]!;
+    };
+
+    it("sans modèle explicite (configuration par défaut) : la session s'ouvre, sans les options, et c'est journalisé", async () => {
+      const client = new FakeClient();
+      const created = await ouvrir(client, {});
+      expect(created).not.toHaveProperty("reasoningEffort");
+      expect(created).not.toHaveProperty("contextTier");
+      expect(client.listModelsAppels).toBe(0);
+      expect(avertissements).toEqual([{ msg: "options de modèle ignorées", data: { role: "skraft-architect-model", raison: "aucun modèle explicite : le runtime choisit le sien, sans garantie d'effort ni de contexte" } }]);
+    });
+
+    it("effort non déclaré : abandonné seul ; fenêtre sous 1M : contexte long abandonné seul", async () => {
+      const sansEffort = new FakeClient();
+      sansEffort.models = [modele("m", "M", { capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 1_000_000 } }, billing: { tokenPrices: { longContext: { inputPrice: 1 } } } })];
+      const a = await ouvrir(sansEffort, { model: "m" });
+      expect(a).not.toHaveProperty("reasoningEffort");
+      expect(a).toMatchObject({ model: "m", contextTier: "long_context" });
+      const petiteFenetre = new FakeClient();
+      petiteFenetre.models = [modele("m", "M", { supportedReasoningEfforts: ["high"], capabilities: { supports: { vision: false, reasoningEffort: true }, limits: { max_context_window_tokens: 200_000 } } })];
+      const b = await ouvrir(petiteFenetre, { model: "m" });
+      expect(b).toMatchObject({ model: "m", reasoningEffort: "high" });
+      expect(b).not.toHaveProperty("contextTier");
+      expect(avertissements[0]?.data).toMatchObject({ raison: expect.stringMatching(/au moins 1M tokens/) });
+    });
+
+    it("modèle absent du catalogue, ou catalogue illisible : la session s'ouvre sans les options", async () => {
+      const absent = new FakeClient();
+      expect(await ouvrir(absent, { model: "inconnu" })).not.toHaveProperty("contextTier");
+      const enPanne = new FakeClient();
+      enPanne.modelsError = new Error("réseau");
+      const c = await ouvrir(enPanne, { model: "m" });
+      expect(c).not.toHaveProperty("reasoningEffort");
+      expect(avertissements[0]?.data).toMatchObject({ raison: expect.stringMatching(/réseau/) });
+    });
+  });
+
   it("n'expose jamais l'objet du SDK : la session renvoyée n'a que l'interface du port", async () => {
     const rt = createCopilotRuntime({ client: new FakeClient() });
     const s = await rt.openSession(cfg());

@@ -24,11 +24,28 @@ export interface Tour {
   /** Vrai : la session existe déjà, on la reprend. */
   reprise: boolean;
   modele?: string;
+  reasoningEffort?: "low" | "medium" | "high";
+  contextTier?: "default" | "long_context";
   budgetUsd?: number;
+}
+
+/** Les alias Claude dont la variante de contexte 1M est connue (`sonnet[1m]`, `opus[1m]`). */
+export function contexteLongPossible(modele: string | undefined): boolean {
+  return modele === "sonnet" || modele === "opus" || modele === "sonnet[1m]" || modele === "opus[1m]";
+}
+
+/**
+ * Le modèle à demander : sa variante 1M si le contexte long est demandé et connu pour lui. Sinon le
+ * modèle tel quel, et le tour part quand même (ADR 0077) ; le runtime journalise l'abandon.
+ */
+function modelePourContexte(t: Tour): string | undefined {
+  if (t.contextTier !== "long_context" || !contexteLongPossible(t.modele)) return t.modele;
+  return t.modele!.endsWith("[1m]") ? t.modele : `${t.modele}[1m]`;
 }
 
 export function argumentsDuTour(t: Tour): string[] {
   const permission = nomMcp(t.serveur, OUTIL_PERMISSION);
+  const modele = modelePourContexte(t);
   return [
     "-p",
     "--output-format", "stream-json",
@@ -49,7 +66,8 @@ export function argumentsDuTour(t: Tour): string[] {
     "--permission-prompts", "host",
     "--permission-prompt-tool", permission,
     ...(t.reprise ? ["--resume", t.sessionId] : ["--session-id", t.sessionId]),
-    ...(t.modele ? ["--model", t.modele] : []),
+    ...(t.reasoningEffort ? ["--effort", t.reasoningEffort] : []),
+    ...(modele ? ["--model", modele] : []),
     ...(t.budgetUsd !== undefined ? ["--max-budget-usd", String(t.budgetUsd)] : []),
   ];
 }

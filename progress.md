@@ -5,6 +5,41 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Faux rejet des ADR historiques et contexte DESIGN
+
+- **Demande** : corriger ensemble, sur une nouvelle branche, le faux rejet de cohérence ADR et la
+  saturation du contexte de DESIGN.
+- **Fait** (branche `fix/design-context-options`) :
+  - les deux parseurs ADR (extension et workflow indépendant) reconnaissent les titres historiques
+    `# ADR-NNN: titre`. Aucun ADR existant n'est réécrit ; les portes gardent leurs contrôles de
+    statut `Proposed`, doublons, trous créés par la phase et liens de supersession ;
+  - les options facultatives `reasoningEffort` et `contextTier` traversent le workflow, l'extension,
+    le cœur et les deux runtimes ;
+  - les architectes `skraft-architect-model` et `skraft-architect-decide` demandent `high` et
+    `long_context` dans les deux versions de skraft ;
+  - Copilot refuse l'ouverture si le modèle choisi ne déclare pas l'effort demandé et un tier long
+    d'au moins 1M tokens. Claude Code reçoit `--effort high` et `sonnet[1m]` ou `opus[1m]` ; un
+    autre alias est refusé pour ne pas annoncer un contexte non garanti.
+- **Validation** : 242 tests ciblés verts (13 fichiers), `pnpm typecheck` vert, JSON valide et
+  `git diff --check` propre. Aucun run réel Copilot n'a été lancé ; le token limit effectivement
+  rapporté reste à confirmer sur une session réelle.
+- **À retenir** : les erreurs de statut ou de registre relevées pour les nouveaux ADR demeurent de
+  vrais défauts à corriger par l'agent ; seul le faux manque des anciens numéros est éliminé.
+- **Revue du 10/11, corrigé** :
+  - échouer quand le modèle ne peut pas honorer une option arrêtait DESIGN à chaque run Copilot
+    sans modèle explicite. C'est la configuration par défaut du serveur MCP (`modeles: {}`) et de
+    l'application ;
+  - le même échec frappait un modèle `strong` sans contexte long ; côté Claude, tout modèle autre
+    que `sonnet` ou `opus` ;
+  - désormais l'option est abandonnée avec un avertissement (`options de modèle ignorées`,
+    `contexte long ignoré`), et la session s'ouvre. C'est un choix provisoire, consigné par une
+    révision de l'**ADR 0077** (`0077-parametres-de-modele-par-role.md`). La revue l'avait cru
+    absent, à tort : la commande de revue avait coupé la première ligne de la liste des fichiers ;
+  - le cas « trou déjà présent » de la porte de cohérence est rétabli, et un cas pour l'ADR
+    historique `ADR-NNN:` est ajouté dans les deux copies.
+
+---
+
 ## 10/11 — Déployer le serveur MCP : un script, et le paquet npm en option
 
 - **Fait** : `pnpm --filter @agent-studio/mcp-skraft deployer` (`scripts/deployer.mjs`).

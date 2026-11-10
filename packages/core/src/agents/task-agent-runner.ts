@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } from "../protocols/agent-runtime.js";
+import type { AgentContextTier, AgentEvent, AgentReasoningEffort, AgentRuntime, AgentSession, ToolCallGuard, ToolSpec } from "../protocols/agent-runtime.js";
 import type { Logger } from "../protocols/logger.js";
 import type { UsageDelta } from "../protocols/usage.js";
 import type { TraceBody, TraceEntry, TraceStore, TurnEnd } from "../protocols/trace.js";
@@ -19,6 +19,8 @@ export interface TaskAgentSpec<N extends TerminalToolName = TerminalToolName> {
   /** Le rôle peut suspendre sa tâche par `report_blocker` (D31). */
   blocker?: boolean;
   model?: string;
+  reasoningEffort?: AgentReasoningEffort;
+  contextTier?: AgentContextTier;
 }
 
 export interface TaskAgentRunOptions {
@@ -288,6 +290,8 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           ],
           guard: composeGuards([createTaskAgentGuard({ root: deps.root, writable: spec.writable, outils: outilsDuRole }), ...(opts.guards ?? [])]),
           ...(spec.model ? { model: spec.model } : {}),
+          ...(spec.reasoningEffort ? { reasoningEffort: spec.reasoningEffort } : {}),
+          ...(spec.contextTier ? { contextTier: spec.contextTier } : {}),
         };
         const aReprendre = opts.resumeKey ? reprenables.get(opts.resumeKey) : undefined;
         if (opts.resumeKey) reprenables.delete(opts.resumeKey);

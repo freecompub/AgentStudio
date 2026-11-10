@@ -125,6 +125,34 @@ describe("Runtime Claude par le CLI (ADR 0070)", () => {
     await s.close();
   });
 
+  it("transmet l'effort élevé et le modèle 1M au CLI Claude", async () => {
+    const f = fauxClaude(tourOrdinaire);
+    const rt = createClaudeRuntime({ lanceur: f.lanceur });
+    await rt.start();
+    const s = await rt.openSession(config({ model: "sonnet", reasoningEffort: "high", contextTier: "long_context" }));
+
+    await tour(rt, s, "Conçois le modèle.");
+
+    const args = f.lancements[0]!.args;
+    expect(args[args.indexOf("--effort") + 1]).toBe("high");
+    expect(args[args.indexOf("--model") + 1]).toBe("sonnet[1m]");
+    await s.close();
+  });
+
+  it("contexte long demandé pour un modèle qui ne l'a pas : le tour part, et c'est journalisé", async () => {
+    const avertis: { msg: string; data: unknown }[] = [];
+    const logger = { info: () => {}, warn: (msg: string, data?: unknown) => void avertis.push({ msg, data }), error: () => {}, debug: () => {}, child: () => logger };
+    const f = fauxClaude(tourOrdinaire);
+    const rt = createClaudeRuntime({ lanceur: f.lanceur, logger: logger as never });
+    await rt.start();
+    const s = await rt.openSession(config({ model: "haiku", contextTier: "long_context" }));
+    await tour(rt, s, "Conçois le modèle.");
+    const args = f.lancements[0]!.args;
+    expect(args[args.indexOf("--model") + 1]).toBe("haiku");
+    expect(avertis).toContainEqual({ msg: "contexte long ignoré", data: expect.objectContaining({ modele: "haiku" }) });
+    await s.close();
+  });
+
   it("deux tours : le premier crée la session (--session-id), le second la reprend (--resume) ; resumeSession reprend d'emblée", async () => {
     const f = fauxClaude(async ({ ecrire }) => ecrire({ type: "result", subtype: "success" }));
     const rt = createClaudeRuntime({ lanceur: f.lanceur });

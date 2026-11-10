@@ -138,7 +138,7 @@ Facultatif ; `SKRAFT_MCP_CONFIG` en désigne un autre. Une clé inconnue est ref
 | `autorises` | `[]` | Dossiers (absolus, `~` accepté) où un projet est accepté, en plus des roots déclarés par le client. Un projet doit être un dépôt Git situé dans l'un ou l'autre. Ailleurs, si le client sait poser une question (*elicitation*), le serveur demande à l'utilisateur d'accepter le dépôt : une fois, ou toujours (retenu dans `~/.agent-studio/mcp-skraft/depots-acceptes.json`) ; sinon il refuse (ADR 0075). |
 | `hostname` | `github.com` | Hôte GitHub (ou GitHub Enterprise) pour la connexion Copilot. |
 | `runtime` | `copilot` | `copilot` ou `claude` : qui fait travailler les agents. |
-| `modeles` | défaut du runtime | Modèle par classe de rôle : `strong` (les deux architectes, le réfutateur), `standard` (chercheur, acceptance, testeur, développeur, arbitre de mutation, lentilles cold-reader, test-integrity, architecture), `light` (classifieur, lentille quality-gates). Avec Claude : `opus`, `sonnet`, `haiku` par défaut. |
+| `modeles` | défaut du runtime | Les deux architectes demandent un effort élevé et un contexte long (ADR 0077) : ils l'obtiennent si le modèle `strong` le déclare (Copilot), ou s'il s'agit de `sonnet` ou `opus` (Claude, variante `[1m]`) ; sinon l'option est abandonnée et le journal le dit. Modèle par classe de rôle : `strong` (les deux architectes, le réfutateur), `standard` (chercheur, acceptance, testeur, développeur, arbitre de mutation, lentilles cold-reader, test-integrity, architecture), `light` (classifieur, lentille quality-gates). Avec Claude : `opus`, `sonnet`, `haiku` par défaut. |
 
 ### L'utilisateur et les programmes : `admin.json`
 

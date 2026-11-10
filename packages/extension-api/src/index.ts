@@ -69,6 +69,10 @@ export interface ManifestAgent {
    * associe chaque classe à un modèle réel. Absente : le modèle du projet, ou le runtime décide.
    */
   modelClass?: "strong" | "standard" | "light";
+  /** Effort de raisonnement demandé au runtime pour ce rôle. */
+  reasoningEffort?: "low" | "medium" | "high";
+  /** Palier de contexte demandé au runtime ; sa capacité dépend du modèle. */
+  contextTier?: "default" | "long_context";
   /**
    * Mémoire de l'agent (ADR 0053) : `tache` (défaut) garde sa session d'un tour à l'autre dans la
    * même tâche (ADR 0039) ; `tour` repart d'une session neuve à chaque appel — une lentille de

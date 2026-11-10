@@ -9,7 +9,7 @@ import { meta } from "../../../workflows/skraft/workflow.mjs";
 
 const SKILLS_DIR = resolve(import.meta.dirname, "../../../workflows/skraft/skills");
 type Grant = { obligatoires?: string[]; aLaDemande?: string[] };
-const agents = Object.entries((meta as { agents: Record<string, { skills?: Grant }> }).agents);
+const agents = Object.entries((meta as { agents: Record<string, { skills?: Grant; reasoningEffort?: string; contextTier?: string }> }).agents);
 
 describe("Skills des agents du workflow skraft", () => {
   it("aucune skill accordée à un agent n'est absente du dossier", async () => {
@@ -21,5 +21,10 @@ describe("Skills des agents du workflow skraft", () => {
   it("en BDD, l'agent d'acceptance peut charger la skill des définitions d'étapes (ADR 0074 §3)", () => {
     const acceptance = agents.find(([nom]) => nom === "skraft-acceptance")![1];
     expect(acceptance.skills?.aLaDemande).toContain("bdd-step-definitions");
+  });
+
+  it("les deux rôles architectes de DESIGN demandent un effort élevé et le contexte long", () => {
+    for (const name of ["skraft-architect-model", "skraft-architect-decide"])
+      expect(agents.find(([nom]) => nom === name)?.[1]).toMatchObject({ reasoningEffort: "high", contextTier: "long_context" });
   });
 });

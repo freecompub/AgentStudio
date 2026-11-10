@@ -88,10 +88,17 @@ export interface ToolCallGuard {
 
 // ---------- Sessions --------------------------------------------------------------
 
+export type AgentReasoningEffort = "low" | "medium" | "high";
+export type AgentContextTier = "default" | "long_context";
+
 export interface AgentSessionConfig {
   /** "main", "tdd-test", "skraft-architect"… */
   role: string;
   model?: string;
+  /** Effort demandé au runtime, seulement pour les rôles qui le déclarent. */
+  reasoningEffort?: AgentReasoningEffort;
+  /** Palier de contexte demandé au runtime ; sa capacité dépend du modèle. */
+  contextTier?: AgentContextTier;
   workingDirectory: string;
   /** Rôle + skills obligatoires + dossier de passation. */
   systemPrompt: string;

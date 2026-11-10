@@ -142,6 +142,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             output: a.output,
             blocker: a.tools?.includes("report_blocker") ?? false,
             ...(model ? { model } : {}),
+            ...(a.reasoningEffort ? { reasoningEffort: a.reasoningEffort } : {}),
+            ...(a.contextTier ? { contextTier: a.contextTier } : {}),
           },
           prompt,
           {
