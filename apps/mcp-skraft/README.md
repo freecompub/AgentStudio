@@ -185,7 +185,9 @@ liste en vigueur et son origine : le fichier lu, ou celui qui était attendu et 
 4. il écrit `.skraft/github/US-12-contexte.md` (tout ce qui a été lu) et `.skraft/github/US-12.md`,
    la story. Une issue déjà au format, sans commentaire, est reprise telle quelle. Sinon, un agent
    la met en forme, et le code vérifie qu'aucune valeur d'un critère n'est inventée (trois essais
-   au plus). Ce qui reste incertain va dans « Questions ouvertes », posées avant RESEARCH ;
+   au plus). Ce qui reste incertain va dans « Questions ouvertes », posées avant RESEARCH. La story
+   et son contexte sont commités seuls, sur la branche `skraft/<slug>` du run, avant le premier
+   test : la branche commence par la story, et le diff de chaque phase se lit sans elle ;
 5. le run part sur cette story, et ses agents lisent le contexte ;
 6. le run fini, **`skraft_pr`** (`/skraft-pr`) publie le travail. Après l'accord de l'utilisateur,
    demandé par le client à chaque fois, il pousse la branche `skraft/<slug>` et ouvre une PR sur la

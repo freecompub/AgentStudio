@@ -40,7 +40,8 @@ GitHub expose ces liens en REST, ce que vérifie un appel sur github.com le 10/1
 4. **Ce qui est écrit dans le projet** : `.skraft/github/<ID>.md`, la story, et
    `.skraft/github/<ID>-contexte.md`, l'issue brute, ses commentaires et ses dépendances. L'énoncé
    de la story renvoie au contexte, que les agents de RESEARCH et DESIGN lisent. Les dépendances
-   sont du contexte, jamais des critères à livrer.
+   sont du contexte, jamais des critères à livrer. Ces deux fichiers sont commités seuls, sur la
+   branche `skraft/<slug>` du run, avant le premier test (`docs(<slug>): story <ID> depuis …`).
 5. **La mise en forme** : une issue déjà au format de story, sans commentaire, est reprise telle
    quelle. Sinon, un agent la met en forme (`skraft-redacteur-us`, qui n'écrit que ce fichier), et
    le code vérifie qu'aucune valeur n'est inventée : chaque littéral d'un critère doit venir de
