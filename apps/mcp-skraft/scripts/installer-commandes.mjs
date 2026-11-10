@@ -15,11 +15,17 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** @param {{ source: string; home: string; projet?: string; retirer?: boolean }} o */
+/**
+ * `home` et `env` : par défaut ceux du processus. `CLAUDE_CONFIG_DIR` et `COPILOT_HOME` déplacent la
+ * configuration de chaque client, et donc ses skills.
+ * @param {{ source: string; home?: string; env?: Record<string, string | undefined>; projet?: string; retirer?: boolean }} o
+ */
 export async function installerCommandes(o) {
   const source = resolve(o.source);
+  const home = o.home ?? homedir();
+  const env = o.env ?? process.env;
   const noms = (await readdir(source, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name).sort();
-  const cibles = o.projet ? [join(o.projet, ".claude", "skills")] : [join(o.home, ".claude", "skills"), join(o.home, ".copilot", "skills")];
+  const cibles = o.projet ? [join(o.projet, ".claude", "skills")] : [join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "skills"), join(env.COPILOT_HOME || join(home, ".copilot"), "skills")];
   const poses = [];
   const retires = [];
   const refuses = [];
@@ -61,7 +67,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stderr.write("--projet attend un dossier.\n");
     process.exit(2);
   }
-  const r = await installerCommandes({ source: join(dirname(fileURLToPath(import.meta.url)), "..", "skills"), home: homedir(), ...(projet ? { projet: resolve(projet) } : {}), retirer: args.includes("--retirer") });
+  const r = await installerCommandes({ source: join(dirname(fileURLToPath(import.meta.url)), "..", "skills"), ...(projet ? { projet: resolve(projet) } : {}), retirer: args.includes("--retirer") });
   for (const l of r.poses) process.stdout.write(`lien posé : ${l}\n`);
   for (const l of r.retires) process.stdout.write(`lien retiré : ${l}\n`);
   for (const l of r.refuses) process.stderr.write(`${l}\n`);

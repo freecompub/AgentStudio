@@ -1240,6 +1240,13 @@
       "verify": "pnpm vitest run --project mcp-skraft test/installer-commandes.test.ts test/skills.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10. Copilot : lien suivi dans .claude/skills vérifié. Claude Code : d'après sa documentation officielle (skills, liens suivis), pas lancé ici."
+    },
+    {
+      "id": "mcp-deploiement",
+      "title": "Un script déploie le serveur MCP : build, inscription dans Copilot CLI et Claude Code (jamais de remplacement sans --remplacer), commandes ; --npm prépare et compresse le paquet (GPL-3.0-or-later), --publier seul le publie",
+      "verify": "pnpm vitest run --project mcp-skraft test/deployer.test.ts test/installer-commandes.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Essai réel isolé (COPILOT_HOME, CLAUDE_CONFIG_DIR) : inscrit dans les deux clients, relancé sans rien toucher, 18 liens. Paquet npm compressé, installé hors du dépôt, serveur démarré. Non publié : version 0.0.0, nom et compte npm à décider."
     }
   ]
 }

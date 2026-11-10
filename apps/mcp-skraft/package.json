@@ -28,7 +28,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node dist/main.mjs",
-    "commandes": "node scripts/installer-commandes.mjs"
+    "commandes": "node scripts/installer-commandes.mjs",
+    "deployer": "node scripts/deployer.mjs"
   },
   "engines": {
     "node": ">=22.13"

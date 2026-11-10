@@ -19,7 +19,7 @@ afterEach(() => rm(home, { recursive: true, force: true }));
 
 describe("installerCommandes", () => {
   it("personnel : un lien par skill, pour Claude et pour Copilot", async () => {
-    const r = await installerCommandes({ source: SOURCE, home });
+    const r = await installerCommandes({ source: SOURCE, home, env: {} });
     for (const dossier of [join(home, ".claude", "skills"), join(home, ".copilot", "skills")]) {
       expect((await lstat(join(dossier, "skraft-etat"))).isSymbolicLink()).toBe(true);
       expect(await readlink(join(dossier, "skraft-etat"))).toBe(join(SOURCE, "skraft-etat"));
@@ -28,9 +28,16 @@ describe("installerCommandes", () => {
     expect(r.refuses).toEqual([]);
   });
 
+  it("CLAUDE_CONFIG_DIR et COPILOT_HOME déplacent la configuration de chaque client : les liens y vont", async () => {
+    const env = { CLAUDE_CONFIG_DIR: join(home, "conf-claude"), COPILOT_HOME: join(home, "conf-copilot") };
+    await installerCommandes({ source: SOURCE, home, env });
+    expect(await readlink(join(home, "conf-claude", "skills", "skraft-etat"))).toBe(join(SOURCE, "skraft-etat"));
+    expect(await readlink(join(home, "conf-copilot", "skills", "skraft-etat"))).toBe(join(SOURCE, "skraft-etat"));
+  });
+
   it("projet : un lien par skill dans <projet>/.claude/skills, que les deux clients lisent", async () => {
     const projet = join(home, "projet");
-    const r = await installerCommandes({ source: SOURCE, home, projet });
+    const r = await installerCommandes({ source: SOURCE, home, projet, env: {} });
     expect(await readlink(join(projet, ".claude", "skills", "skraft-pile"))).toBe(join(SOURCE, "skraft-pile"));
     expect(r.poses).toHaveLength(9);
   });
@@ -40,8 +47,8 @@ describe("installerCommandes", () => {
     await mkdir(join(dossier, "skraft-etat"), { recursive: true });
     await writeFile(join(dossier, "skraft-etat", "SKILL.md"), "le mien");
     await symlink("/ailleurs/skraft-pile", join(dossier, "skraft-pile"));
-    await installerCommandes({ source: SOURCE, home });
-    const r = await installerCommandes({ source: SOURCE, home });
+    await installerCommandes({ source: SOURCE, home, env: {} });
+    const r = await installerCommandes({ source: SOURCE, home, env: {} });
     expect(r.refuses).toEqual([
       expect.stringMatching(/skraft-etat.*existe déjà et n'est pas un lien/),
       expect.stringMatching(/skraft-pile.*pointe ailleurs/),
@@ -52,9 +59,9 @@ describe("installerCommandes", () => {
   });
 
   it("retirer : seuls nos liens partent", async () => {
-    await installerCommandes({ source: SOURCE, home });
+    await installerCommandes({ source: SOURCE, home, env: {} });
     await writeFile(join(home, ".claude", "skills", "autre"), "x");
-    const r = await installerCommandes({ source: SOURCE, home, retirer: true });
+    const r = await installerCommandes({ source: SOURCE, home, retirer: true, env: {} });
     expect(r.retires).toHaveLength(18);
     await expect(lstat(join(home, ".claude", "skills", "skraft-etat"))).rejects.toThrow();
     expect((await lstat(join(home, ".claude", "skills", "autre"))).isFile()).toBe(true);

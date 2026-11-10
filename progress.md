@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Déployer le serveur MCP : un script, et le paquet npm en option
+
+- **Fait** : `pnpm --filter @agent-studio/mcp-skraft deployer` (`scripts/deployer.mjs`).
+  - Il construit le serveur, l'inscrit dans Copilot CLI (`copilot mcp add`) et dans Claude Code
+    (`claude mcp add -s user`), puis pose les commandes.
+  - Une inscription existante différente n'est remplacée qu'avec `--remplacer`.
+  - `--npm <dossier>` prépare le paquet et le compresse ; `--publier` seul le publie.
+- **Pièges vus en préparant** :
+  - les deux clients refusent une seconde inscription du même nom ;
+  - `claude mcp get` lance le serveur pour tester la connexion ;
+  - `COPILOT_HOME` et `CLAUDE_CONFIG_DIR` déplacent la configuration. Le script des commandes les
+    ignorait, il les respecte désormais.
+- **Essais** :
+  - réel, dans des configurations isolées : inscription dans les deux clients, relance sans rien
+    toucher ;
+  - le paquet installé hors du dépôt démarre (`skraft-mcp`).
+- **Avant de publier** :
+  - une vraie version (`0.0.0` aujourd'hui) ;
+  - un nom disponible (le scope `@agent-studio` demande une organisation npm, sinon `--nom`) ;
+  - un compte npm ;
+  - la licence : GPL-3.0-or-later, parce que le paquet embarque le workflow skraft.
+
 ## 10/11 — Les commandes `/skraft-…` dans Copilot CLI
 
 - **Pourquoi** (demande du responsable) : il n'y avait aucune commande, seulement des outils que le

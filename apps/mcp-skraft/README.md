@@ -28,6 +28,37 @@ reconstruire le serveur.
   de l'administrateur (`admin.json`, voir plus bas), ou acceptés par l'utilisateur quand le serveur
   le lui demande.
 
+## Déployer sur un poste
+
+Une commande construit le serveur, l'inscrit dans les clients présents (Copilot CLI, Claude Code),
+et pose les commandes `/skraft-…` :
+
+```bash
+pnpm install
+pnpm --filter @agent-studio/mcp-skraft deployer
+pnpm --filter @agent-studio/mcp-skraft deployer -- --env AGENT_STUDIO_ADMIN_CONFIG=/chemin/admin.json
+```
+
+| Option | Effet |
+|---|---|
+| `--client copilot` ou `--client claude` | Un seul client. Sans elle, chaque client trouvé dans le PATH. |
+| `--env CLE=valeur` | Variable donnée au serveur (répétable) : `SKRAFT_MCP_CONFIG`, `AGENT_STUDIO_ADMIN_CONFIG`… |
+| `--remplacer` | Remplace une inscription `skraft` différente. Sans elle, une inscription existante n'est jamais touchée : la retirer efface ses variables. |
+| `--sans-build`, `--sans-commandes` | Saute une étape. |
+| `--projet <dossier>` | Les commandes dans `<dossier>/.claude/skills` plutôt que pour l'utilisateur. |
+| `--npm <dossier>` | Prépare le paquet npm (serveur construit, commandes, licence) et le compresse (`npm pack`). |
+| `--npm <dossier> --publier` | … et le publie (`npm publish --access public`). Rien n'est publié sans elle. |
+| `--nom <nom>` | Nom du paquet npm, si `@agent-studio/mcp-skraft` n'est pas disponible. |
+
+Claude Code est inscrit pour l'utilisateur (`-s user`), donc dans tous ses projets. Le script
+respecte `COPILOT_HOME` et `CLAUDE_CONFIG_DIR`. Redémarrer le client ensuite.
+
+Le paquet npm contient `dist/`, `skills/` et le script des commandes. Il n'a que deux dépendances,
+`@github/copilot-sdk` (qui apporte le CLI Copilot) et `esbuild`, et il est sous **GPL-3.0-or-later**
+parce qu'il embarque le workflow skraft. Une fois installé (`npm install -g`), `skraft-mcp` lance le
+serveur, et `skraft-mcp-commandes` pose les commandes. Avant toute publication, donner au paquet une
+vraie version : il est encore en `0.0.0`.
+
 ## Inscrire le serveur dans un client
 
 Le client lance le serveur en processus enfant (transport stdio) :
