@@ -24,11 +24,21 @@ export interface Tour {
   /** Vrai : la session existe déjà, on la reprend. */
   reprise: boolean;
   modele?: string;
+  reasoningEffort?: "low" | "medium" | "high";
+  contextTier?: "default" | "long_context";
   budgetUsd?: number;
+}
+
+function modelePourContexte(t: Tour): string | undefined {
+  if (t.contextTier !== "long_context") return t.modele;
+  if (t.modele === "sonnet" || t.modele === "opus") return `${t.modele}[1m]`;
+  if (t.modele === "sonnet[1m]" || t.modele === "opus[1m]") return t.modele;
+  throw new Error(`Le contexte Claude de 1M exige un modèle sonnet ou opus ; modèle reçu : ${t.modele ?? "non défini"}.`);
 }
 
 export function argumentsDuTour(t: Tour): string[] {
   const permission = nomMcp(t.serveur, OUTIL_PERMISSION);
+  const modele = modelePourContexte(t);
   return [
     "-p",
     "--output-format", "stream-json",
@@ -49,7 +59,8 @@ export function argumentsDuTour(t: Tour): string[] {
     "--permission-prompts", "host",
     "--permission-prompt-tool", permission,
     ...(t.reprise ? ["--resume", t.sessionId] : ["--session-id", t.sessionId]),
-    ...(t.modele ? ["--model", t.modele] : []),
+    ...(t.reasoningEffort ? ["--effort", t.reasoningEffort] : []),
+    ...(modele ? ["--model", modele] : []),
     ...(t.budgetUsd !== undefined ? ["--max-budget-usd", String(t.budgetUsd)] : []),
   ];
 }

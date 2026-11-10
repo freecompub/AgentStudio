@@ -1247,6 +1247,13 @@
       "verify": "pnpm vitest run --project mcp-skraft test/deployer.test.ts test/installer-commandes.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10. Essai réel isolé (COPILOT_HOME, CLAUDE_CONFIG_DIR) : inscrit dans les deux clients, relancé sans rien toucher, 18 liens. Paquet npm compressé, installé hors du dépôt, serveur démarré. Non publié : version 0.0.0, nom et compte npm à décider. Désinstallation essayée en réel le 10/11 : inscription retirée des deux clients, 18 liens retirés, un skill étranger gardé."
+    },
+    {
+      "id": "skraft-design-adr-context-options",
+      "title": "DESIGN lit les ADR historiques à titre séparé par deux-points sans les réécrire ; les architectes demandent effort high et contexte long vérifié pour 1M (ADR 0077)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project core --project runtime-copilot --project runtime-claude --project extension-manifest --project extension-host --project workflow extensions/skraft/test/adr.test.ts extensions/skraft/test/design-gate.test.ts extensions/skraft/test/manifest.test.ts tests/workflow-skraft/test/adr.test.ts tests/workflow-skraft/test/design-gate.test.ts tests/workflow-skraft/test/skills.test.ts packages/core/test/task-agent-runner.test.ts packages/runtime-copilot/test/copilot-runtime.test.ts packages/runtime-claude/test/traduction.test.ts packages/runtime-claude/test/runtime.test.ts packages/extension-manifest/test/validate.test.ts packages/extension-host/test/in-process-host.test.ts packages/workflow/test/activer.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10 (branche fix/design-context-options). Le parseur accepte les titres ADR avec deux-points ; les contrôles de statut, doublon et supersession restent stricts. Les deux rôles architectes de DESIGN demandent high/long_context dans les deux skraft. Copilot refuse un modèle qui n'annonce pas high et le tier long-context d'au moins 1M ; Claude passe --effort high et l'alias [1m]. Vérification : 242 tests ciblés verts, pnpm typecheck vert ; pas de run Copilot réel dans cette tâche."
     }
   ]
 }

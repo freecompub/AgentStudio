@@ -19,6 +19,8 @@ const agent = z
     /** Consignes propres à agent-studio, ajoutées au contenu du fichier d'agent (ADR 0024). */
     consignes: texte(20_000).optional(),
     classe: z.enum(["strong", "standard", "light"]).optional(),
+    reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+    contextTier: z.enum(["default", "long_context"]).optional(),
     ecriture: z.array(texte(200)).optional(),
     outils: z.array(texte(40)).optional(),
     skills: z.object({ obligatoires: z.array(z.string().regex(SKILL)).optional(), aLaDemande: z.array(z.string().regex(SKILL)).optional() }).strict().optional(),

@@ -103,6 +103,8 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
           sessionId: id,
           reprise: tours > 0,
           ...(cfg.model ? { modele: cfg.model } : {}),
+          ...(cfg.reasoningEffort ? { reasoningEffort: cfg.reasoningEffort } : {}),
+          ...(cfg.contextTier ? { contextTier: cfg.contextTier } : {}),
           ...(deps.budgetUsdParTour !== undefined ? { budgetUsd: deps.budgetUsdParTour } : {}),
         });
         tours++;

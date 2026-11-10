@@ -32,6 +32,20 @@ describe("Exécuteur d'agent de tâche", () => {
     expect(runtime.last.sent).toEqual(["Comportement : x"]);
   });
 
+  it("transmet l'effort et le palier de contexte du rôle au runtime", async () => {
+    const { runtime, runner } = setup();
+    runtime.behave("architect", async (t) => {
+      await t.callTool("report_phase", { summary: "conçu", files: [] });
+    });
+
+    await runner.run(
+      { role: "architect", systemPrompt: "Conçois.", writable: [], output: "report_phase", reasoningEffort: "high", contextTier: "long_context" },
+      "Conçois le modèle.",
+    );
+
+    expect(runtime.configs.get("fake-1")).toMatchObject({ reasoningEffort: "high", contextTier: "long_context" });
+  });
+
   it("la session est fermée puis supprimée (éphémère), même en cas d'échec", async () => {
     const { runtime, runner } = setup();
     runtime.behave("tdd-test", async () => {

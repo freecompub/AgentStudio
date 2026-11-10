@@ -109,6 +109,45 @@ describe("CopilotRuntime", () => {
     expect(typeof created.onPermissionRequest).toBe("function");
   });
 
+  it("transmet l'effort et le palier long-context au SDK", async () => {
+    const client = new FakeClient();
+    client.models = [
+      modele("claude-sonnet-5.5", "Claude Sonnet 5.5", {
+        supportedReasoningEfforts: ["high"],
+        capabilities: { supports: { vision: false, reasoningEffort: true }, limits: { max_context_window_tokens: 1_000_000 } },
+        billing: { tokenPrices: { longContext: { inputPrice: 1 } } },
+      }),
+    ];
+    const rt = createCopilotRuntime({ client });
+    await rt.openSession(cfg({ model: "claude-sonnet-5.5", reasoningEffort: "high", contextTier: "long_context" }));
+
+    expect(client.created[0]).toMatchObject({ model: "claude-sonnet-5.5", reasoningEffort: "high", contextTier: "long_context" });
+  });
+
+  it("refuse les options de contexte et d'effort que le modèle ne déclare pas", async () => {
+    const client = new FakeClient();
+    client.models = [modele("gpt-5", "GPT-5")];
+    const rt = createCopilotRuntime({ client });
+
+    await expect(rt.openSession(cfg({ model: "gpt-5", reasoningEffort: "high", contextTier: "long_context" }))).rejects.toThrow(/ne déclare pas l'effort high/);
+    expect(client.created).toEqual([]);
+  });
+
+  it("refuse le tier long-context si la fenêtre déclarée est inférieure à 1M", async () => {
+    const client = new FakeClient();
+    client.models = [
+      modele("claude-sonnet-5.5", "Claude Sonnet 5.5", {
+        supportedReasoningEfforts: ["high"],
+        capabilities: { supports: { vision: false, reasoningEffort: true }, limits: { max_context_window_tokens: 200_000 } },
+        billing: { tokenPrices: { inputPrice: 1 } },
+      }),
+    ];
+    const rt = createCopilotRuntime({ client });
+
+    await expect(rt.openSession(cfg({ model: "claude-sonnet-5.5", reasoningEffort: "high", contextTier: "long_context" }))).rejects.toThrow(/au moins 1M tokens/);
+    expect(client.created).toEqual([]);
+  });
+
   it("n'expose jamais l'objet du SDK : la session renvoyée n'a que l'interface du port", async () => {
     const rt = createCopilotRuntime({ client: new FakeClient() });
     const s = await rt.openSession(cfg());

@@ -56,4 +56,9 @@ describe("classes de modèle des rôles (ADR 0048)", async () => {
     expect(classe("skraft-classifier")).toBe("light");
     expect(classe("skraft-lens-quality-gates")).toBe("light");
   });
+
+  it("les deux rôles de conception demandent un effort élevé et le contexte long", () => {
+    for (const name of ["skraft-architect-model", "skraft-architect-decide"])
+      expect(manifest.contributes.agents?.find((a) => a.name === name)).toMatchObject({ reasoningEffort: "high", contextTier: "long_context" });
+  });
 });

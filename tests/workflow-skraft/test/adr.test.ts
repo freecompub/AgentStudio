@@ -18,6 +18,16 @@ describe("ADR : rendu et lecture (§6.5 render_adr, sans reprise de skraft)", ()
     expect(parseAdr(md)).toEqual({ number: 8, id: "ADR-008", title: "Plafond appliqué dans le domaine", status: "Proposed", supersedes: [], missing: [] });
   });
 
+  it("reconnaît les anciens titres ADR séparés par deux-points", () => {
+    expect(parseAdr("# ADR-052: Décision ancienne\n\n- Statut : Accepted\n\n## Contexte\n\nc\n## Décision\n\nd\n## Conséquences\n\nq\n## Alternatives\n\na\n")).toMatchObject({
+      number: 52,
+      id: "ADR-052",
+      title: "Décision ancienne",
+      status: "Accepted",
+      missing: [],
+    });
+  });
+
   it("remplacements déclarés", () => {
     const md = renderAdr(9, { ...INPUT, supersedes: ["ADR-003"] }, "2026-09-23");
     expect(parseAdr(md).supersedes).toEqual(["ADR-003"]);

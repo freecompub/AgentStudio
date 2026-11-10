@@ -126,4 +126,15 @@ describe("Agents en fichiers Markdown et skills (D12, D26)", () => {
     expect(avec("tour")).toEqual([]);
     expect(avec("toujours")).toEqual([expect.stringMatching(/memoire/)]);
   });
+
+  it("effort et contexte d'un agent : paramètres bornés et transmis au runtime", () => {
+    const agent = (reasoningEffort: unknown, contextTier: unknown) => {
+      const m = base();
+      m.contributes.agents = [{ name: "architecte", title: "Architecte", role: "Conçois.", output: "report_phase", reasoningEffort, contextTier }];
+      return errorsOf(m);
+    };
+    expect(agent("high", "long_context")).toEqual([]);
+    expect(agent("urgent", "long_context")).toEqual([expect.stringMatching(/reasoningEffort/)]);
+    expect(agent("high", "1m")).toEqual([expect.stringMatching(/contextTier/)]);
+  });
 });

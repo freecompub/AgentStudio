@@ -51,7 +51,7 @@ export function renderAdr(n, i, date) {
   ].join("\n");
 }
 export function parseAdr(md) {
-  const h = /^#\s+ADR-(\d+)\s*[—–-]\s*(.+?)\s*$/m.exec(md);
+  const h = /^#\s+ADR-(\d+)\s*[—–:-]\s*(.+?)\s*$/m.exec(md);
   const status = /^-\s*Statut\s*:\s*(\S+)/m.exec(md)?.[1] ?? "";
   const supersedes = (/^-\s*Remplace\s*:\s*(.+)$/m.exec(md)?.[1] ?? "").split(/[,\s]+/).filter((x) => /^ADR-\d+$/.test(x));
   const missing = SECTIONS.filter((s) => !new RegExp(`^##\\s+${s}\\s*$`, "m").test(md));

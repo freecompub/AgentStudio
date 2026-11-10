@@ -135,6 +135,21 @@ describe("Hôte d'extension en processus", () => {
     expect(runs[0]?.spec).toMatchObject({ model: "gpt-5-mini" });
   });
 
+  it("agents.run : transmet l'effort et le palier de contexte déclarés par le rôle", async () => {
+    const manifest = {
+      ...MANIFEST,
+      contributes: {
+        ...MANIFEST.contributes,
+        agents: [{ name: "architecte", title: "Architecte", role: "Conçois.", output: "report_phase", reasoningEffort: "high", contextTier: "long_context" }],
+      },
+    } as ExtensionManifest;
+    const { ctx, runs } = await activateWith(() => {}, manifest);
+
+    await ctx.agents.run("architecte", "Conçois.");
+
+    expect(runs[0]?.spec).toMatchObject({ reasoningEffort: "high", contextTier: "long_context" });
+  });
+
   it("agents.run : modèle non résolu, aucun modèle n'est demandé (le runtime décide)", async () => {
     const { ctx, deps, runs } = await activateWith(() => {});
     deps.modelFor = async () => undefined;
