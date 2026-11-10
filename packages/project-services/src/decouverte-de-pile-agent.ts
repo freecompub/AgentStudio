@@ -26,7 +26,9 @@ le projet dit autre chose.
 - \`detect\` : ce qui la signale, des fichiers présents (\`- un-fichier\`) ou un fichier qui contient
   une sous-chaîne (\`- { fichier: un-manifeste, contient: '"une-dependance"' }\`).
 - \`outils\` (facultatif) : dossiers du projet où sont installés ses programmes (un environnement
-  local), mis en tête du PATH. Préfère-les à un lanceur intermédiaire.
+  local), mis en tête du PATH. Préfère-les à un lanceur intermédiaire. Pour la pile d'un composant,
+  ils sont relatifs à sa racine ; un dossier d'outils partagé à la racine du projet se désigne en
+  remontant (\`../../…\`), sans jamais sortir du projet.
 - \`tests\` : \`command\` (programme puis arguments, une liste, jamais une ligne de shell) et
   \`report\`, l'un des lecteurs de tests qui te sont donnés. La commande écrit son rapport dans \`{rapport}\`
   (un fichier), ou dans \`{rapports}\` (un dossier) si elle en produit plusieurs. \`coverage:

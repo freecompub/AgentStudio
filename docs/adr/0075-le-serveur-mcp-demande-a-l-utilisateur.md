@@ -80,7 +80,9 @@ ses capacités à l'initialisation, comme il annonce les roots (`getClientCapabi
      un `uv` à autoriser, qui fait aussi tout le reste.
    - Les dossiers déclarés passent en tête du PATH de chaque commande du profil (`envDesOutils`), et
      dans la recherche du diagnostic. Le programme reste jugé par son nom contre la liste.
-   - Les chemins sont relatifs, sans `..`.
+   - Les chemins sont relatifs. Depuis le 2026-11-10, un composant peut remonter vers la racine du
+     projet (`../../node_modules/.bin` d'un monorepo), jamais au-delà : la limite est le projet,
+     pas le composant. Vu sur un monorepo, où la découverte avait été refusée trois fois.
    - Les canaris tournent dans un worktree, sans les outils installés (ignorés par Git) : ils
      prennent ceux du projet (`racineDesOutils`). Vu à l'essai : sans cela, « aucun rapport lisible ».
    - `/stack init` propose `outils: [.venv/bin, .venv/Scripts]` quand le projet porte `uv.lock`

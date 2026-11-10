@@ -362,8 +362,8 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
             decouverte: createDecouverteParAgent({
               agents: () => agents,
               programmes: programmesDuProjet,
-              lirePile: async (yaml) => {
-                const lu = parseStackProfile(yaml, await accepter([yaml]));
+              lirePile: async (yaml, racine) => {
+                const lu = parseStackProfile(yaml, { ...(await accepter([yaml])), ...(racine ? { racine } : {}) });
                 return "error" in lu ? { error: lu.error } : { profile: lu.profile };
               },
               ...(modelFor ? { modele: () => modelFor("standard") } : {}),
@@ -734,7 +734,8 @@ async function lireProfilDuProjet(
 function profilsDesComposants(declares: readonly ComposantDeclare[], programmes: ParseOptions): { composants: { nom: string; racine: string; profile: StackProfile }[] } | { error: string } {
   const composants = [];
   for (const c of declares) {
-    const lu = parseStackProfile(c.pile, programmes);
+    // Depuis la racine du composant : ses outils peuvent viser le `node_modules` partagé du monorepo.
+    const lu = parseStackProfile(c.pile, { ...programmes, racine: c.racine });
     if ("error" in lu) return { error: `composant « ${c.nom} » : ${lu.error}` };
     composants.push({ nom: c.nom, racine: c.racine, profile: lu.profile });
   }

@@ -24,8 +24,11 @@ export type ReponseDecouverte = { piles: PileProposee[]; justification: string }
 
 export interface Decouverte {
   decouvrir(d: DemandeDecouverte): Promise<ReponseDecouverte>;
-  /** Accord sur les programmes hors de la liste (ADR 0075), puis schéma : jamais d'exécution avant. */
-  lirePile(yaml: string): Promise<{ profile: StackProfile } | { error: string }>;
+  /**
+   * Accord sur les programmes hors de la liste (ADR 0075), puis schéma : jamais d'exécution avant.
+   * `racine` : celle de la pile, relative au projet ; ses `outils` sont jugés contre le projet.
+   */
+  lirePile(yaml: string, racine?: string): Promise<{ profile: StackProfile } | { error: string }>;
 }
 
 /** Le budget d'essais, appliqué par le code. */
@@ -112,7 +115,7 @@ export async function verifierPiles(
     }
     vues.add(racine);
     const ou = (m: string) => (racine === "." ? m : `Composant \`${racine}\` : ${m}`);
-    const lu = await o.lirePile(p.yaml);
+    const lu = await o.lirePile(p.yaml, racine);
     if ("error" in lu) {
       motifs.push(ou(lu.error));
       continue;

@@ -119,6 +119,18 @@ describe("Pile du projet (ADR 0068, point 8)", () => {
     await a.services.dispose();
   });
 
+  it("composant de monorepo : outils peut viser le node_modules partagé à la racine, pas au-delà du projet", async () => {
+    const indente = (t: string, n: number) => t.trim().split("\n").map((l) => `${" ".repeat(n)}${l}`).join("\n");
+    const avec = (outil: string) => `composants:\n  - nom: web\n    racine: apps/web\n    pile:\n${indente(profil("web").replace("detect: [pyproject.toml]", `detect: [pyproject.toml]\noutils: [${outil}]`), 6)}\n`;
+    const a = await ouvrir({ fichierProjet: avec("../../node_modules/.bin"), detecte: true });
+    expect(a.services.pile().source).toBe("projet");
+    await a.services.dispose();
+    const b = await ouvrir({ fichierProjet: avec("../../../ailleurs"), detecte: true });
+    expect(b.services.pile().source).toBe("detection");
+    expect(b.posts.join("\n")).toMatch(/sort du projet/);
+    await b.services.dispose();
+  });
+
   it("ancien stack.yaml seul : encore lu, avec un avertissement qui dit de le regrouper dans projet.yaml", async () => {
     const a = await ouvrir({ profilProjet: profil("python-ancien"), detecte: true });
     expect(a.services.pile()).toEqual({ id: "python-ancien", source: "projet" });

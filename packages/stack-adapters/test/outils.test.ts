@@ -51,6 +51,18 @@ describe("outils : lecture", () => {
     expect(lire(PROFIL("outils: [../ailleurs/bin]\n"))).toEqual({ error: expect.stringMatching(/outils.*\.\./) });
   });
 
+  // Monorepo (10/11) : depuis `apps/web`, le `node_modules/.bin` partagé est `../../node_modules/.bin`.
+  // La limite est le projet, pas le composant : remonter est permis tant qu'on y reste.
+  it("dans un composant, outils peut remonter vers la racine du projet, jamais au-delà", () => {
+    const yaml = (outil: string) => PROFIL(`outils: [${outil}]\n`);
+    const opts = (racine: string) => ({ allowedPrograms: ["pytest", "eslint", "ruff", "mutmut"], racine });
+    expect(parseStackProfile(yaml("../../node_modules/.bin"), opts("apps/web"))).toMatchObject({ profile: { outils: ["../../node_modules/.bin"] } });
+    expect(parseStackProfile(yaml("../../../ailleurs/bin"), opts("apps/web"))).toEqual({ error: expect.stringMatching(/outils.*« \.\.\/\.\.\/\.\.\/ailleurs\/bin ».*sort du projet/) });
+    expect(parseStackProfile(yaml("../bin"), opts("."))).toEqual({ error: expect.stringMatching(/sort du projet/) });
+    // Sans racine donnée : la racine du projet, comme avant.
+    expect(lire(PROFIL("outils: [../bin]\n"))).toEqual({ error: expect.stringMatching(/sort du projet/) });
+  });
+
   it("le programme reste jugé par son nom : un outil du projet hors de la liste est refusé", () => {
     expect(lire(PROFIL(undefined, "monoutil"))).toEqual({ error: expect.stringMatching(/« monoutil » \(tests\) n'est pas un programme autorisé/) });
   });

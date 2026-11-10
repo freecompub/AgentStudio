@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Outils d'un composant de monorepo
+
+- **Vu sur l'autre poste** : la découverte de la pile d'un monorepo (applications `souscription-dab` et
+  `shell`) a été refusée trois fois. L'agent proposait `outils: [../../node_modules/.bin]` pour
+  atteindre le `node_modules` partagé, et la règle des chemins du profil refusait tout `..`.
+- **Cause** : la règle jugeait les chemins contre la racine du composant, alors que la vraie limite
+  est le projet.
+- **Fait** : `outils` accepte `..`, et `parseStackProfile` (option `racine`) juge le chemin résolu
+  contre la racine du projet. La racine du composant passe aux composants du projet, à une pile
+  fournie et à la découverte (`lirePile(yaml, racine)`). Le prompt de l'agent le dit. Les autres
+  champs gardent la règle sans `..`.
+- **À faire sur l'autre poste** : relancer `/skraft-pile` sur le monorepo.
+
+---
+
 ## 10/11 — Une US donnée par une issue GitHub (ADR 0078)
 
 - **Décidé par le responsable** :
