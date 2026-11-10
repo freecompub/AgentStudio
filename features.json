@@ -1261,6 +1261,13 @@
       "verify": "pnpm vitest run --project github-auth test/issues.test.ts && pnpm vitest run --project mcp-skraft test/us-github.test.ts test/redacteur-us.test.ts test/serveur.test.ts test/pr-github.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10 (branche feat/us-github). Essai réel : cli/cli#14996 lue par gh (3 commentaires, contexte de 50 Ko), mise en forme par un agent Copilot en 19 critères et des questions ouvertes, vérifiée par le code, en 73 s. Pas encore de run skraft complet sur une issue. skraft_pr testé avec git et gh doublés ; aucune vraie PR ouverte (ce serait une publication)."
+    },
+    {
+      "id": "outils-composant-monorepo",
+      "title": "Les outils d'une pile de composant sont jugés contre le projet : remonter vers un dossier partagé (../../node_modules/.bin d'un monorepo) est permis, sortir du projet est refusé ; la racine du composant passe à toute lecture de pile (projet, pile fournie, découverte)",
+      "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/stack-command.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10 (branche fix/outils-monorepo), après une découverte refusée trois fois sur un monorepo (souscription-dab, shell) : l'agent proposait ../../node_modules/.bin, et la règle refusait tout `..`."
     }
   ]
 }

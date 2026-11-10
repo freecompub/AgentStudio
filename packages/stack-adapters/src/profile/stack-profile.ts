@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { compileBuildErrorSpec } from "./build-errors.js";
@@ -182,7 +183,11 @@ const schema = z
      * `pytest` d'un environnement virtuel se lance sans lanceur intermédiaire. Le programme reste jugé
      * par son nom contre la liste.
      */
-    outils: z.array(cheminDuProjet("outils")).min(1).optional(),
+    // Relatifs, jamais absolus ; `..` est permis ici, et jugé contre la racine du projet après lecture.
+    outils: z
+      .array(z.string().min(1).refine((f) => !f.startsWith("/") && !/^[A-Za-z]:/.test(f), "`outils` doit être un chemin relatif à la racine de la pile."))
+      .min(1)
+      .optional(),
     /** Ce que cet écosystème tient pour de l'infrastructure ; un domaine ne l'importe pas. */
     infrastructureModules: z.array(z.string()).default([]),
     /** Facultatif : sans eux, `/stack doctor` ne peut pas vérifier le classement des échecs. */
@@ -195,6 +200,12 @@ export type StackProfile = z.infer<typeof schema>;
 export interface ParseOptions {
   /** Programmes que l'administrateur autorise à lancer (D47, O12). */
   allowedPrograms: readonly string[];
+  /**
+   * Racine de la pile, relative à celle du projet (un composant, ADR 0074) ; par défaut, le projet.
+   * Les `outils` peuvent remonter vers la racine du projet (un `node_modules` partagé de monorepo),
+   * jamais au-delà.
+   */
+  racine?: string;
   /**
    * D'où vient la liste, cité dans un refus (09/11) : un fichier d'administration posé ailleurs que là
    * où il est lu, ou une liste qui remplace celle par défaut, ne se voient pas autrement.
@@ -291,6 +302,13 @@ export function parseStackProfile(raw: string, opts: ParseOptions): { profile: S
       return { error: `Profil de stack refusé : mutation.command — \`${JETON_RAPPORTS}\` n'est lu que pour les tests ; la mutation écrit dans \`${JETON_RAPPORT}\` ou \`{dossier}\`.` };
     if (section === "tests" && c.command.some((a) => a.includes(JETON_RAPPORT)) && c.command.some((a) => a.includes(JETON_RAPPORTS)))
       return { error: `Profil de stack refusé : tests.command — \`${JETON_RAPPORT}\` et \`${JETON_RAPPORTS}\` ensemble : on ne saurait pas lequel lire. Gardez \`${JETON_RAPPORTS}\` si la commande écrit plusieurs rapports.` };
+  }
+
+  // Les outils restent dans le projet : la limite est sa racine, pas celle du composant (10/11).
+  for (const outil of parsed.data.outils ?? []) {
+    const resolu = posix.normalize(posix.join((opts.racine ?? ".").replace(/\\/g, "/"), outil.replace(/\\/g, "/")));
+    if (resolu === ".." || resolu.startsWith("../"))
+      return { error: `Profil de stack refusé : outils — « ${outil} » sort du projet${opts.racine && opts.racine !== "." ? ` (depuis la racine « ${opts.racine} »)` : ""} : un outil doit être un dossier du projet.` };
   }
 
   // Le format lance un programme lui aussi : même liste que les autres sections.

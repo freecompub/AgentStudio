@@ -58,7 +58,9 @@ tests:
 
 Le programme reste jugé par son nom contre la liste de l'administrateur : `pytest` se lance sans
 autoriser un lanceur comme `uv`, qui ferait aussi tout le reste (`uv run --with`, installations).
-Les chemins sont relatifs à la racine (du composant, s'il y en a), sans `..`. Les canaris tournent
+Les chemins sont relatifs à la racine (du composant, s'il y en a). Un composant peut remonter vers
+un dossier d'outils partagé à la racine du projet : depuis `apps/web`, le `node_modules/.bin` d'un
+monorepo est `../../node_modules/.bin`. Un chemin qui sort du projet est refusé. Les canaris tournent
 dans une copie Git du projet, qui n'a pas ces outils (ils sont ignorés par Git) : ils prennent ceux
 du projet. `/stack init` les propose quand le projet porte `uv.lock`.
 

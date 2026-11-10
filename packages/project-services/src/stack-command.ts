@@ -333,7 +333,7 @@ async function initParAgent(deps: StackCommandDeps, deco: Decouverte, options: O
           `\n\nRéponds par \`/stack init --reponse <ta réponse>\`, en une phrase complète (« les tests se lancent avec … ») : l'agent la recevra avec ses indices.`,
       );
     const v = await verifierPiles(r.piles, {
-      lirePile: (y) => deco.lirePile(y),
+      lirePile: (y, racine) => deco.lirePile(y, racine),
       diagnostiquer: (p, racine) => deps.diagnostiquer(p, racine),
       ...(deps.canaris ? { canaris: (p: StackProfile, racine: string) => deps.canaris!(p, racine) } : {}),
       indices,

@@ -426,8 +426,8 @@ describe("/stack init — découverte par un agent, vérifiée par le code", () 
           demandes.push(d);
           return reponses.shift() ?? { erreur: "plus de réponse scriptée" };
         },
-        lirePile: async (yaml) => {
-          const r = parseStackProfile(yaml, { allowedPrograms: AUTORISES });
+        lirePile: async (yaml, racine) => {
+          const r = parseStackProfile(yaml, { allowedPrograms: AUTORISES, ...(racine ? { racine } : {}) });
           return "error" in r ? { error: r.error } : { profile: r.profile };
         },
       },
@@ -527,6 +527,14 @@ describe("/stack init — découverte par un agent, vérifiée par le code", () 
     await h.lancer("init");
     expect(h.demandes[1]!.precedent?.motifs.join("\n")).toMatch(/\.\.\/ailleurs/);
     expect(h.demandes[2]!.precedent?.motifs.join("\n")).toMatch(/api.*deux fois|deux fois.*api/);
+  });
+
+  // Monorepo (10/11) : l'agent proposait `../../node_modules/.bin` pour chaque application, refusé trois fois.
+  it("la pile d'un composant est lue depuis sa racine : ses outils peuvent viser le node_modules partagé", async () => {
+    const yaml = PYTHON.replace("detect: [pyproject.toml]", "detect: [pyproject.toml]\noutils: [../../node_modules/.bin]");
+    const h = avecAgent([{ piles: [{ racine: "apps/web", yaml }, { racine: "apps/shell", yaml }], justification: "monorepo" }], { ecrireComposants: async () => {} });
+    await h.lancer("init");
+    expect(h.demandes).toHaveLength(1);
   });
 
   it("plusieurs piles : la section composants est proposée, confirmée, puis écrite", async () => {
