@@ -54,20 +54,29 @@ l'on a démarré `copilot`. Ce que Copilot CLI fait du serveur, vu à l'essai :
 ## Les commandes `/skraft-…`
 
 Copilot CLI n'affiche pas les prompts MCP comme des commandes, mais il affiche chaque **skill** en
-`/<nom>`. `skills/` en contient un par outil : `/skraft-connexion`, `/skraft-pile`,
+`/<nom>`, comme Claude Code. Les mêmes skills servent donc aux deux clients. `skills/` en contient un par outil : `/skraft-connexion`, `/skraft-pile`,
 `/skraft-demarrer`, `/skraft-attendre`, `/skraft-etat`, `/skraft-repondre`, `/skraft-rapport`,
 `/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
 suit la commande (`/skraft-demarrer stories/US-2.md auto`), et que les questions reviennent à
 l'utilisateur.
 
-Les inscrire une fois (la commande ajoute le dossier aux réglages de Copilot) :
+Les installer, pour Copilot CLI et Claude Code à la fois :
 
 ```bash
-copilot skill add /chemin/vers/apps/mcp-skraft/skills
+pnpm --filter @agent-studio/mcp-skraft commandes                     # ~/.claude/skills et ~/.copilot/skills
+pnpm --filter @agent-studio/mcp-skraft commandes -- --projet <dossier> # <dossier>/.claude/skills, lu par les deux
+pnpm --filter @agent-studio/mcp-skraft commandes -- --retirer          # retire nos liens, et eux seuls
 ```
 
-Ou, pour un seul projet, les copier dans son `.github/skills/`. Claude Code lit aussi les skills
-(`~/.claude/skills/`, `.claude/skills/`), mais cela n'a pas été essayé ici.
+Le script pose des **liens** vers `skills/` (des jonctions sous Windows), pas des copies : corriger
+un skill, ou faire `git pull`, vaut pour les deux clients. Il ne remplace jamais un skill qui n'est
+pas un lien vers les nôtres : il le signale. Redémarrer ensuite le client.
+
+Ce qui a été vérifié :
+- Copilot CLI : il liste les commandes et exécute `/skraft-etat`, et il suit un lien dans
+  `.claude/skills/` ;
+- Claude Code : seulement sa documentation (skills dans `~/.claude/skills/` et `.claude/skills/`,
+  liens suivis). Il n'a pas été lancé ici.
 
 ## Configuration
 

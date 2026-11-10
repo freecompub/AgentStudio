@@ -27,7 +27,8 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "start": "node dist/main.mjs"
+    "start": "node dist/main.mjs",
+    "commandes": "node scripts/installer-commandes.mjs"
   },
   "engines": {
     "node": ">=22.13"

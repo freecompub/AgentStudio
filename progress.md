@@ -16,8 +16,13 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   outil, ni plus ni moins. Chaque skill nomme son outil, dit comment lire les arguments, et laisse
   les questions à l'utilisateur.
 - **Essai** : les neuf commandes listées ; `/skraft-etat` appelle l'outil et résume.
-- **Installation** : `copilot skill add <dépôt>/apps/mcp-skraft/skills`. Pas lancée ici : elle
-  modifie les réglages de Copilot.
+- **Partagées avec Claude Code** : `pnpm --filter @agent-studio/mcp-skraft commandes`.
+  - Le script pose des liens vers `skills/` dans `~/.claude/skills` et `~/.copilot/skills`, ou dans
+    `<projet>/.claude/skills` avec `--projet` : les deux clients lisent ce dossier.
+  - `--retirer` retire nos liens, et eux seuls.
+  - Vérifié : Copilot suit un lien dans `.claude/skills/`.
+  - Pour Claude Code, seulement sa documentation : le lancer dans tmux a été refusé à
+    l'approbation.
 
 ## 10/11 — État et prochaine étape
 

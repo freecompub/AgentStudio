@@ -1233,6 +1233,13 @@
       "verify": "pnpm vitest run --project mcp-skraft test/skills.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10. Vérifié avec Copilot CLI 1.0.107 : un prompt MCP n'apparaît pas en commande, un skill de projet si. Les neuf /skraft-… listées, /skraft-etat exécutée. copilot skill add <dossier> non lancé ici (il modifie les réglages)."
+    },
+    {
+      "id": "commandes-partagees-copilot-claude",
+      "title": "Les commandes /skraft-… sont partagées entre Copilot CLI et Claude Code par des liens vers une seule source (pnpm --filter @agent-studio/mcp-skraft commandes, --projet, --retirer) ; un skill qui n'est pas à nous n'est jamais remplacé",
+      "verify": "pnpm vitest run --project mcp-skraft test/installer-commandes.test.ts test/skills.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Copilot : lien suivi dans .claude/skills vérifié. Claude Code : d'après sa documentation officielle (skills, liens suivis), pas lancé ici."
     }
   ]
 }
