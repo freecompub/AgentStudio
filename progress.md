@@ -25,6 +25,18 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   rapporté reste à confirmer sur une session réelle.
 - **À retenir** : les erreurs de statut ou de registre relevées pour les nouveaux ADR demeurent de
   vrais défauts à corriger par l'agent ; seul le faux manque des anciens numéros est éliminé.
+- **Revue du 10/11, corrigé** :
+  - échouer quand le modèle ne peut pas honorer une option arrêtait DESIGN à chaque run Copilot
+    sans modèle explicite. C'est la configuration par défaut du serveur MCP (`modeles: {}`) et de
+    l'application ;
+  - le même échec frappait un modèle `strong` sans contexte long ; côté Claude, tout modèle autre
+    que `sonnet` ou `opus` ;
+  - désormais l'option est abandonnée avec un avertissement (`options de modèle ignorées`,
+    `contexte long ignoré`), et la session s'ouvre. C'est un choix provisoire, consigné par une
+    révision de l'**ADR 0077** (`0077-parametres-de-modele-par-role.md`). La revue l'avait cru
+    absent, à tort : la commande de revue avait coupé la première ligne de la liste des fichiers ;
+  - le cas « trou déjà présent » de la porte de cohérence est rétabli, et un cas pour l'ADR
+    historique `ADR-NNN:` est ajouté dans les deux copies.
 
 ---
 
