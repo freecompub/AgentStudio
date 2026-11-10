@@ -1226,6 +1226,13 @@
       "verify": "pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09. Essai réel avec Copilot sur un projet ambigu : question posée, puis réponse donnée, découverte aboutie en 53 s. Limite connue : Copilot abandonne un appel d'outil après 3 minutes."
+    },
+    {
+      "id": "mcp-commandes-skills",
+      "title": "Serveur MCP : une commande Copilot par outil (/skraft-<nom>), en skills (Copilot n'affiche pas les prompts MCP) ; chaque skill dit l'outil à appeler et laisse les questions à l'utilisateur",
+      "verify": "pnpm vitest run --project mcp-skraft test/skills.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10. Vérifié avec Copilot CLI 1.0.107 : un prompt MCP n'apparaît pas en commande, un skill de projet si. Les neuf /skraft-… listées, /skraft-etat exécutée. copilot skill add <dossier> non lancé ici (il modifie les réglages)."
     }
   ]
 }

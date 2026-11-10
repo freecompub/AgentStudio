@@ -51,6 +51,24 @@ l'on a démarré `copilot`. Ce que Copilot CLI fait du serveur, vu à l'essai :
 - il **abandonne un appel d'outil au bout de 3 minutes** : `skraft_attendre` attend 50 s au plus, et
   une découverte de pile reste en général bien en dessous.
 
+## Les commandes `/skraft-…`
+
+Copilot CLI n'affiche pas les prompts MCP comme des commandes, mais il affiche chaque **skill** en
+`/<nom>`. `skills/` en contient un par outil : `/skraft-connexion`, `/skraft-pile`,
+`/skraft-demarrer`, `/skraft-attendre`, `/skraft-etat`, `/skraft-repondre`, `/skraft-rapport`,
+`/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
+suit la commande (`/skraft-demarrer stories/US-2.md auto`), et que les questions reviennent à
+l'utilisateur.
+
+Les inscrire une fois (la commande ajoute le dossier aux réglages de Copilot) :
+
+```bash
+copilot skill add /chemin/vers/apps/mcp-skraft/skills
+```
+
+Ou, pour un seul projet, les copier dans son `.github/skills/`. Claude Code lit aussi les skills
+(`~/.claude/skills/`, `.claude/skills/`), mais cela n'a pas été essayé ici.
+
 ## Configuration
 
 ### Le serveur : `~/.agent-studio/mcp-skraft.json`

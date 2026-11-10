@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Les commandes `/skraft-…` dans Copilot CLI
+
+- **Pourquoi** (demande du responsable) : il n'y avait aucune commande, seulement des outils que le
+  LLM appelle quand on le lui demande.
+- **Vérifié avec Copilot CLI 1.0.107**, par un serveur de diagnostic dans tmux, sans requête :
+  - un prompt MCP n'apparaît pas en commande ;
+  - un skill de projet (`.github/skills/`) apparaît en `/<nom>`.
+- **Fait** : `apps/mcp-skraft/skills/`, un skill par outil, et un test qui exige un skill pour chaque
+  outil, ni plus ni moins. Chaque skill nomme son outil, dit comment lire les arguments, et laisse
+  les questions à l'utilisateur.
+- **Essai** : les neuf commandes listées ; `/skraft-etat` appelle l'outil et résume.
+- **Installation** : `copilot skill add <dépôt>/apps/mcp-skraft/skills`. Pas lancée ici : elle
+  modifie les réglages de Copilot.
+
 ## 10/11 — État et prochaine étape
 
 - **Mergé dans `main`** (PR #27, 09/11) :
