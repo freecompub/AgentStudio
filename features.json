@@ -1257,10 +1257,10 @@
     },
     {
       "id": "us-github",
-      "title": "Une US donnée par une issue GitHub (URL ou org/dépôt#n) : gh vérifié, l'issue, ses commentaires et ses dépendances lus par le code, refus si un bloqueur est ouvert, story reprise ou mise en forme par un agent puis vérifiée (aucune valeur inventée), puis le run (ADR 0078)",
-      "verify": "pnpm vitest run --project github-auth test/issues.test.ts && pnpm vitest run --project mcp-skraft test/us-github.test.ts test/redacteur-us.test.ts test/serveur.test.ts",
+      "title": "Une US donnée par une issue GitHub (URL ou org/dépôt#n) : gh vérifié, l'issue, ses commentaires et ses dépendances lus par le code, refus si un bloqueur est ouvert, story reprise ou mise en forme par un agent puis vérifiée (aucune valeur inventée), puis le run (ADR 0078) ; skraft_pr publie le run fini en PR liée à l'issue (Closes #n), après l'accord de l'utilisateur, si origin est le dépôt de l'issue",
+      "verify": "pnpm vitest run --project github-auth test/issues.test.ts && pnpm vitest run --project mcp-skraft test/us-github.test.ts test/redacteur-us.test.ts test/serveur.test.ts test/pr-github.test.ts",
       "passes": true,
-      "notes": "Fait le 2026-11-10 (branche feat/us-github). Essai réel : cli/cli#14996 lue par gh (3 commentaires, contexte de 50 Ko), mise en forme par un agent Copilot en 19 critères et des questions ouvertes, vérifiée par le code, en 73 s. Pas encore de run skraft complet sur une issue. La PR à la fin du run est la brique suivante."
+      "notes": "Fait le 2026-11-10 (branche feat/us-github). Essai réel : cli/cli#14996 lue par gh (3 commentaires, contexte de 50 Ko), mise en forme par un agent Copilot en 19 critères et des questions ouvertes, vérifiée par le code, en 73 s. Pas encore de run skraft complet sur une issue. skraft_pr testé avec git et gh doublés ; aucune vraie PR ouverte (ce serait une publication)."
     }
   ]
 }

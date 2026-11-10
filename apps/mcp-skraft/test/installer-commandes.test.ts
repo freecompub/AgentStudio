@@ -4,13 +4,15 @@
  * clients. Personnel : `~/.claude/skills` (Claude) et `~/.copilot/skills` (Copilot) ; projet :
  * `<projet>/.claude/skills`, que les deux lisent. Rien qui ne vienne de nous n'est remplacé.
  */
-import { lstat, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installerCommandes } from "../scripts/installer-commandes.mjs";
 
 const SOURCE = join(import.meta.dirname, "../skills");
+/** Un skill par outil du serveur : leur nombre suit les outils. */
+const N = (await readdir(SOURCE)).length;
 let home: string;
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "commandes-"));
@@ -24,7 +26,7 @@ describe("installerCommandes", () => {
       expect((await lstat(join(dossier, "skraft-etat"))).isSymbolicLink()).toBe(true);
       expect(await readlink(join(dossier, "skraft-etat"))).toBe(join(SOURCE, "skraft-etat"));
     }
-    expect(r.poses).toHaveLength(18);
+    expect(r.poses).toHaveLength(2 * N);
     expect(r.refuses).toEqual([]);
   });
 
@@ -38,7 +40,7 @@ describe("installerCommandes", () => {
   it("clients : les liens ne vont que chez les clients demandés", async () => {
     const r = await installerCommandes({ source: SOURCE, home, env: {}, clients: ["copilot"] });
     expect(r.poses.every((l) => l.startsWith(join(home, ".copilot")))).toBe(true);
-    expect(r.poses).toHaveLength(9);
+    expect(r.poses).toHaveLength(N);
     await expect(lstat(join(home, ".claude"))).rejects.toThrow();
   });
 
@@ -46,7 +48,7 @@ describe("installerCommandes", () => {
     const projet = join(home, "projet");
     const r = await installerCommandes({ source: SOURCE, home, projet, env: {} });
     expect(await readlink(join(projet, ".claude", "skills", "skraft-pile"))).toBe(join(SOURCE, "skraft-pile"));
-    expect(r.poses).toHaveLength(9);
+    expect(r.poses).toHaveLength(N);
   });
 
   it("relancé : nos liens sont remplacés sans bruit ; un skill qui n'est pas à nous n'est jamais touché", async () => {
@@ -69,7 +71,7 @@ describe("installerCommandes", () => {
     await installerCommandes({ source: SOURCE, home, env: {} });
     await writeFile(join(home, ".claude", "skills", "autre"), "x");
     const r = await installerCommandes({ source: SOURCE, home, retirer: true, env: {} });
-    expect(r.retires).toHaveLength(18);
+    expect(r.retires).toHaveLength(2 * N);
     await expect(lstat(join(home, ".claude", "skills", "skraft-etat"))).rejects.toThrow();
     expect((await lstat(join(home, ".claude", "skills", "autre"))).isFile()).toBe(true);
   });

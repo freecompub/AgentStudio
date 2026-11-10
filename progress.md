@@ -25,8 +25,14 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     absente » ;
   - `extractLiterals` ne garde pas « € » comme unité : le motif dit « 750 ».
 - **Essai réel** : `cli/cli#14996`, 73 s, story de 19 critères vérifiée.
+- **PR à la fin, faite** : `skraft_pr` (`/skraft-pr`, `pr-github.ts`).
+  - Le run doit être fini et sa story une issue.
+  - L'utilisateur accepte par le client, à chaque fois.
+  - `origin` doit être le dépôt de l'issue ; le push passe par l'aide d'identification de `gh` ; une
+    PR déjà ouverte est rendue.
+  - Testé avec `git` et `gh` doublés. Aucune vraie PR ouverte : ce serait une publication, à faire
+    avec le responsable.
 - **Reste** :
-  - la PR à la fin du run (« Closes #n », après accord) ;
   - l'application de bureau ;
   - un run complet sur une issue.
 

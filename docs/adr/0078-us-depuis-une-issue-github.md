@@ -42,11 +42,17 @@ GitHub expose ces liens en REST, ce que vérifie un appel sur github.com le 10/1
    de la story renvoie au contexte, que les agents de RESEARCH et DESIGN lisent. Les dépendances
    sont du contexte, jamais des critères à livrer.
 5. **La mise en forme** : une issue déjà au format de story, sans commentaire, est reprise telle
-   quelle. Sinon, un agent la met en forme (brique suivante), et le code vérifie qu'aucune valeur
-   n'est inventée : chaque littéral de la story doit venir de l'issue, de ses commentaires ou de
-   ses dépendances.
-6. **La PR à la fin** (brique suivante) : la branche `skraft/<slug>` est poussée, et une PR liée à
-   l'issue est ouverte (« Closes #12 »), après l'accord de l'utilisateur, à chaque fois.
+   quelle. Sinon, un agent la met en forme (`skraft-redacteur-us`, qui n'écrit que ce fichier), et
+   le code vérifie qu'aucune valeur n'est inventée : chaque littéral d'un critère doit venir de
+   l'issue, de ses commentaires ou de ses dépendances. Trois essais au plus.
+6. **La PR à la fin**, par l'outil `skraft_pr` :
+   - la branche `skraft/<slug>` est poussée, et une PR liée à l'issue est ouverte (« Closes #12 »),
+     sur la branche par défaut ;
+   - l'utilisateur l'accepte par le client, à chaque fois ; sans question possible, rien n'est
+     publié ;
+   - le remote `origin` doit être le dépôt de l'issue, sinon rien n'est poussé ;
+   - une PR déjà ouverte pour la branche est rendue telle quelle ;
+   - `git push` passe par l'aide d'identification de `gh`.
 
 ## Conséquences
 

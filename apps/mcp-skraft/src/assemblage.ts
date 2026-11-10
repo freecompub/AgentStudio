@@ -23,6 +23,8 @@ import { createDepotsFichier } from "./depots.js";
 import { createPilesFichiers } from "./piles.js";
 import { createMiseEnFormeParAgent } from "./redacteur-us.js";
 import { preparerUsGithub } from "./us-github.js";
+import { publierPr, type Executer } from "./pr-github.js";
+import { execFile } from "node:child_process";
 import { createProjets, type Projets } from "./projets.js";
 import { createServeurSkraft } from "./serveur.js";
 import { ouvrirServicesSansFenetre } from "./services.js";
@@ -119,7 +121,21 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
       }),
     });
   };
-  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, version: o.version });
+  // La PR d'un run fini (ADR 0078) : git pousse avec l'aide d'identification de gh, comme le reste du
+  // serveur ; gh ouvre la PR. Sans shell. La sortie d'erreur sert de motif quand la commande échoue.
+  const executer: Executer = (cmd, args) =>
+    new Promise((r) =>
+      execFile(cmd, args, { timeout: 300_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0" } }, (err, stdout, stderr) =>
+        r(err ? { code: typeof err.code === "number" ? err.code : 1, sortie: `${stderr}${stdout}` } : { code: 0, sortie: stdout }),
+      ),
+    );
+  const publier = async (q: { root: string; ref: import("@agent-studio/github-auth").RefIssue; branche: string; bilan: string }) => {
+    const aide = [`-c`, `credential.https://${q.ref.hostname}.helper=`, `-c`, `credential.https://${q.ref.hostname}.helper=!gh auth git-credential`];
+    const avecAide: Executer = (cmd, args) => executer(cmd, cmd === "git" ? [...aide, ...args] : args);
+    const titre = (await executer("gh", ["api", "--hostname", q.ref.hostname, `repos/${q.ref.owner}/${q.ref.repo}/issues/${q.ref.numero}`, "--jq", ".title"])).sortie.trim();
+    return publierPr({ ...q, titre: `US-${q.ref.numero} — ${titre || "user story"}` }, avecAide);
+  };
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, publierPr: publier, version: o.version });
   logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });
   return { ok: true, mcp, projets };
 }
