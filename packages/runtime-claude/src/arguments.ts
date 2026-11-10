@@ -29,11 +29,18 @@ export interface Tour {
   budgetUsd?: number;
 }
 
+/** Les alias Claude dont la variante de contexte 1M est connue (`sonnet[1m]`, `opus[1m]`). */
+export function contexteLongPossible(modele: string | undefined): boolean {
+  return modele === "sonnet" || modele === "opus" || modele === "sonnet[1m]" || modele === "opus[1m]";
+}
+
+/**
+ * Le modèle à demander : sa variante 1M si le contexte long est demandé et connu pour lui. Sinon le
+ * modèle tel quel, et le tour part quand même (ADR 0077) ; le runtime journalise l'abandon.
+ */
 function modelePourContexte(t: Tour): string | undefined {
-  if (t.contextTier !== "long_context") return t.modele;
-  if (t.modele === "sonnet" || t.modele === "opus") return `${t.modele}[1m]`;
-  if (t.modele === "sonnet[1m]" || t.modele === "opus[1m]") return t.modele;
-  throw new Error(`Le contexte Claude de 1M exige un modèle sonnet ou opus ; modèle reçu : ${t.modele ?? "non défini"}.`);
+  if (t.contextTier !== "long_context" || !contexteLongPossible(t.modele)) return t.modele;
+  return t.modele!.endsWith("[1m]") ? t.modele : `${t.modele}[1m]`;
 }
 
 export function argumentsDuTour(t: Tour): string[] {

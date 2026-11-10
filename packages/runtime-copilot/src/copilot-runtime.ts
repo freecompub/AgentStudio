@@ -49,24 +49,38 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
     };
   }
 
-  async function verifierOptionsModele(cfg: AgentSessionConfig): Promise<void> {
-    if (!cfg.reasoningEffort && cfg.contextTier !== "long_context") return;
-    if (!cfg.model) throw new Error("Un modèle explicite est requis pour vérifier l'effort et le contexte demandés.");
-
-    modelCatalog ??= client.listModels().catch((err: unknown) => {
+  /**
+   * L'effort et le contexte long qu'un rôle demande (ADR 0077), gardés seulement si le modèle choisi
+   * les déclare. Sinon ils sont abandonnés avec un avertissement, et la session s'ouvre quand même :
+   * échouer arrêtait DESIGN à chaque run, y compris sans modèle choisi, la configuration par défaut.
+   */
+  async function optionsHonorables(cfg: AgentSessionConfig): Promise<AgentSessionConfig> {
+    if (!cfg.reasoningEffort && cfg.contextTier !== "long_context") return cfg;
+    const { reasoningEffort, contextTier, ...reste } = cfg;
+    const sans = (garder: { effort: boolean; contexte: boolean }, raison: string): AgentSessionConfig => {
+      logger?.warn("options de modèle ignorées", { role: cfg.role, raison });
+      return { ...reste, ...(garder.effort && reasoningEffort ? { reasoningEffort } : {}), ...(garder.contexte && contextTier ? { contextTier } : {}) };
+    };
+    const aucune = { effort: false, contexte: false };
+    if (!cfg.model) return sans(aucune, "aucun modèle explicite : le runtime choisit le sien, sans garantie d'effort ni de contexte");
+    let models: ModelInfo[];
+    try {
+      modelCatalog ??= client.listModels();
+      models = await modelCatalog;
+    } catch (err: unknown) {
       modelCatalog = undefined;
-      throw err;
-    });
-    const models = await modelCatalog;
+      return sans(aucune, `catalogue des modèles illisible (${err instanceof Error ? err.message : String(err)}) : effort et contexte non vérifiables`);
+    }
     const model = models.find((m) => m.id === cfg.model);
-    if (!model) throw new Error(`Le modèle « ${cfg.model} » est absent de la liste de capacités Copilot.`);
-    if (cfg.reasoningEffort && !model.supportedReasoningEfforts?.includes(cfg.reasoningEffort))
-      throw new Error(`Le modèle « ${cfg.model} » ne déclare pas l'effort ${cfg.reasoningEffort}.`);
-    if (
-      cfg.contextTier === "long_context" &&
-      (!model.billing?.tokenPrices?.longContext || model.capabilities.limits.max_context_window_tokens < 1_000_000)
-    )
-      throw new Error(`Le modèle « ${cfg.model} » ne déclare pas de contexte Copilot d'au moins 1M tokens.`);
+    if (!model) return sans(aucune, `le modèle « ${cfg.model} » est absent du catalogue Copilot`);
+    const effortOk = !reasoningEffort || (model.supportedReasoningEfforts?.includes(reasoningEffort) ?? false);
+    const contexteOk = contextTier !== "long_context" || (Boolean(model.billing?.tokenPrices?.longContext) && model.capabilities.limits.max_context_window_tokens >= 1_000_000);
+    if (effortOk && contexteOk) return cfg;
+    const raisons = [
+      ...(effortOk ? [] : [`le modèle « ${cfg.model} » ne déclare pas l'effort ${reasoningEffort}`]),
+      ...(contexteOk ? [] : [`le modèle « ${cfg.model} » ne déclare pas de contexte d'au moins 1M tokens`]),
+    ];
+    return sans({ effort: effortOk, contexte: contexteOk }, raisons.join(" ; "));
   }
 
   /** Enveloppe : seule l'interface du port sort de ce paquet (D10). */
@@ -134,15 +148,15 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       const errors = await client.stop();
       for (const e of errors) logger?.warn("erreur à l'arrêt du runtime", { error: e.message });
     },
-    async openSession(cfg) {
-      await verifierOptionsModele(cfg);
+    async openSession(demande) {
+      const cfg = await optionsHonorables(demande);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.createSession(sessionOptions(cfg, broadcast));
       logger?.info("session ouverte", { sessionId: sdk.sessionId, role: cfg.role });
       return wrap(sdk, listeners);
     },
-    async resumeSession(id, cfg) {
-      await verifierOptionsModele(cfg);
+    async resumeSession(id, demande) {
+      const cfg = await optionsHonorables(demande);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.resumeSession(id, sessionOptions(cfg, broadcast));
       logger?.info("session reprise", { sessionId: sdk.sessionId, role: cfg.role });

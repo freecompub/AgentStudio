@@ -8,7 +8,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger, ToolCallRequest } from "@agent-studio/core";
-import { argumentsDuTour, nomMcp } from "./arguments.js";
+import { argumentsDuTour, contexteLongPossible, nomMcp } from "./arguments.js";
 import { createTraducteur } from "./evenements.js";
 import type { LanceurClaude, ProcessusClaude } from "./protocols.js";
 import { createRelais } from "./relais.js";
@@ -86,6 +86,9 @@ export function createClaudeRuntime(deps: ClaudeRuntimeDeps): AgentRuntime {
     const noms = cfg.tools.map((t) => `\`${t.name}\` s'appelle \`${nomMcp(SERVEUR, t.name)}\``).join(", ");
     await writeFile(fichierPrompt, `${cfg.systemPrompt}${noms ? `\n\nNoms des outils d'agent-studio dans cette session : ${noms}.` : ""}`, { mode: 0o600 });
     await writeFile(fichierMcp, JSON.stringify(relais.configuration(SERVEUR)), { mode: 0o600 });
+    // Contexte long demandé pour un modèle sans variante 1M connue : le tour part sans (ADR 0077).
+    if (cfg.contextTier === "long_context" && !contexteLongPossible(cfg.model))
+      logger?.warn("contexte long ignoré", { role: cfg.role, modele: cfg.model ?? "(défaut du CLI)", raison: "variante 1M connue seulement pour sonnet et opus" });
     let tours = dejaCreee ? 1 : 0;
     // `total_cost_usd` est le cumul de la session, tours repris compris (run US-2 du 06/11) : on
     // n'émet que l'écart avec ce qui a déjà été compté. Une session reprise après un redémarrage du
