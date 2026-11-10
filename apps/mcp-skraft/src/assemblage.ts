@@ -7,9 +7,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createJsonLogger } from "@agent-studio/core";
+import { createJsonLogger, createLazyRuntime, createTaskAgentRunner } from "@agent-studio/core";
 import { createNodeLauncher } from "@agent-studio/extension-host";
-import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
+import { createGhAuth, createGhIssues, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { defaultAdminConfigPath, loadAdminConfig, workspaceServicesFactory } from "@agent-studio/project-services";
 import { createClaudeRuntime, createLanceurClaude, MODELES_CLAUDE } from "@agent-studio/runtime-claude";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
@@ -21,6 +21,8 @@ import { createConnexion } from "./connexion.js";
 import { createConnexionClaude } from "./connexion-claude.js";
 import { createDepotsFichier } from "./depots.js";
 import { createPilesFichiers } from "./piles.js";
+import { createMiseEnFormeParAgent } from "./redacteur-us.js";
+import { preparerUsGithub } from "./us-github.js";
 import { createProjets, type Projets } from "./projets.js";
 import { createServeurSkraft } from "./serveur.js";
 import { ouvrirServicesSansFenetre } from "./services.js";
@@ -100,7 +102,24 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     verrou: (root) => prendreVerrou(join(donnees, "verrous", `${cle(root)}.lock`), { pid: process.pid, estVivant: processusVivant }),
     piles: createPilesFichiers(join(donnees, "piles")),
   });
-  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, version: o.version });
+  // Une story donnée par une issue GitHub (ADR 0078) : lue par gh, écrite dans le projet par son Workspace,
+  // mise en forme par un agent qui n'écrit que le fichier de la story.
+  const gh = createGhIssues({ runner: createNodeCommandRunner() });
+  const preparerUs = async (texte: string, root: string) => {
+    const ws = await openWorkspace(root, { git });
+    return preparerUsGithub({
+      texte,
+      hote: config.hostname,
+      gh,
+      lire: (rel) => ws.files.read(rel).catch(() => null),
+      ecrire: (rel, contenu) => ws.files.write(rel, contenu),
+      mettreEnForme: createMiseEnFormeParAgent({
+        agents: async () => createTaskAgentRunner({ runtime: createLazyRuntime(runtime), root, logger: logger.child({ component: "redacteur-us" }) }),
+        modele: () => modelFor("standard"),
+      }),
+    });
+  };
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, version: o.version });
   logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });
   return { ok: true, mcp, projets };
 }

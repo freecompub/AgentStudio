@@ -117,7 +117,7 @@ type Projet = Awaited<ReturnType<typeof projet>>;
  * `repondre` : le client annonce l'elicitation (ADR 0075) et l'utilisateur répond par cette fonction,
  * qui reçoit la question ; `null` : il la refuse. `depots` : dépôts acceptés « toujours ».
  */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots }) {
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots; preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }> }) {
   const factory = workspaceServicesFactory({
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
@@ -143,6 +143,7 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     cwd: p.root,
     pid: o.pid,
     ...(o.depots ? { depots: o.depots } : {}),
+    ...(o.preparerUs ? { preparerUs: o.preparerUs } : {}),
     connexion: {
       verifier: async () => (o.nonConnecte ? { ok: false as const, motif: "Non connecté à GitHub (github.com) : appelle skraft_connexion." } : { ok: true as const }),
       connecter: async () => ({ ok: true, texte: "Connexion à GitHub lancée. Ouvre https://github.com/login/device et saisis le code ABCD-1234." }),
@@ -580,6 +581,40 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
       await poser(p.root, { ".agent-studio/projet.yaml": `pile:\n${PILE.trim().split("\n").map((l) => `  ${l}`).join("\n")}\n` });
       const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
       expect((await s.appel("skraft_pile", { action: "diagnostiquer" })).texte).toMatch(/Diagnostic du profil/);
+      await s.fermer();
+    }, 30_000);
+  });
+
+  /** Une US donnée par une issue GitHub (ADR 0078) : préparée après l'accord, puis le workflow part sur le fichier écrit. */
+  describe("story donnée par une issue GitHub", () => {
+    it("après l'accord, l'issue est préparée, et le run part sur la story écrite ; avant, rien n'est lu", async () => {
+      const p = await projet();
+      const appels: string[] = [];
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async (texte) => (appels.push(texte), { ok: true, chemin: ".skraft/github/US-12.md", notes: ["Story US-12 reprise telle quelle de org/app#12."] }) });
+      expect((await s.appel("skraft_demarrer", { story: "org/app#12" })).texte).toMatch(/Accord requis/);
+      expect(appels).toEqual([]);
+      const r = await s.appel("skraft_demarrer", { story: "org/app#12", accord: "une-fois" });
+      expect(r.erreur).toBe(false);
+      expect(r.texte).toMatch(/reprise telle quelle[\s\S]*lancé/);
+      expect(appels).toEqual(["org/app#12"]);
+      await until(async () => p.consignes.some((c) => c.includes(".skraft/github/US-12.md")));
+      await s.fermer();
+    }, 30_000);
+
+    it("une issue bloquée, ou gh absent : le refus de la préparation est rendu, rien ne part", async () => {
+      const p = await projet();
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async () => ({ ok: false, motif: "L'US org/app#12 est bloquée par #10 « Créer le compte » (ouverte)." }) });
+      expect(await s.appel("skraft_demarrer", { story: "https://github.com/org/app/issues/12", accord: "une-fois" })).toEqual({ erreur: true, texte: expect.stringMatching(/bloquée par #10/) });
+      expect((await s.etat()).taches).toEqual([]);
+      await s.fermer();
+    }, 30_000);
+
+    it("un fichier de story ordinaire ne passe pas par la préparation", async () => {
+      const p = await projet();
+      const appels: string[] = [];
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async (t) => (appels.push(t), { ok: false, motif: "x" }) });
+      expect((await s.appel("skraft_demarrer", { story: "stories/US-2.md", accord: "une-fois" })).erreur).toBe(false);
+      expect(appels).toEqual([]);
       await s.fermer();
     }, 30_000);
   });

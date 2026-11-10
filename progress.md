@@ -5,6 +5,33 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Une US donnée par une issue GitHub (ADR 0078)
+
+- **Décidé par le responsable** :
+  - lire l'US et toutes ses dépendances, après avoir vérifié `gh` ;
+  - les commentaires font partie de l'US ;
+  - lire les issues et écrire les PR ;
+  - une US bloquée par une issue ouverte ne démarre pas.
+- **Fait** :
+  - `github-auth/issues.ts` : vérification de `gh`, lecture en lecture seule (issue, commentaires,
+    parente, sous-issues, bloquée par, bloque, citées ; un niveau, dix au plus), `bloqueursOuverts`,
+    `rendreContexte` ;
+  - `mcp-skraft/us-github.ts` : refus si bloquée, écriture du contexte et de la story. La story est
+    reprise telle quelle, ou mise en forme par un agent (`redacteur-us.ts`, qui n'écrit que ce
+    fichier), puis vérifiée par le code avec `parseStory` et `extractLiterals` du workflow ;
+  - `skraft_demarrer` accepte une issue, préparée seulement après l'accord sur le workflow.
+- **Pièges** :
+  - un 404 sur `parent` veut dire « pas de parente », mais un 404 sur une liste veut dire « API
+    absente » ;
+  - `extractLiterals` ne garde pas « € » comme unité : le motif dit « 750 ».
+- **Essai réel** : `cli/cli#14996`, 73 s, story de 19 critères vérifiée.
+- **Reste** :
+  - la PR à la fin du run (« Closes #n », après accord) ;
+  - l'application de bureau ;
+  - un run complet sur une issue.
+
+---
+
 ## 10/11 — Faux rejet des ADR historiques et contexte DESIGN
 
 - **Demande** : corriger ensemble, sur une nouvelle branche, le faux rejet de cohérence ADR et la

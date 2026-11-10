@@ -14,6 +14,7 @@ import type { Connexion } from "./connexion.js";
 import type { Depots } from "./depots.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet, type ProjetResolu } from "./projet.js";
+import { lireRefIssue } from "@agent-studio/github-auth";
 import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
 
 export interface OptionsServeur {
@@ -29,6 +30,11 @@ export interface OptionsServeur {
   pid?: number;
   /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
   connexion: Pick<Connexion, "verifier" | "connecter">;
+  /**
+   * Prépare une story donnée par une issue GitHub (ADR 0078) : la lit avec ses dépendances, refuse si
+   * elle est bloquée, écrit la story et son contexte dans le projet. Absente, une issue est refusée.
+   */
+  preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }>;
   /** Dépôts acceptés « toujours » par l'utilisateur (ADR 0075) ; sans, « toujours » vaut pour ce serveur. */
   depots?: Depots;
   version?: string;
@@ -126,7 +132,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       description:
         "Démarre skraft sur une user story : recherche, conception, scénarios, TDD, revues. Le run tourne en arrière-plan ; suis-le avec skraft_etat. Au premier lancement, rend l'accord à faire valider par l'utilisateur.",
       inputSchema: {
-        story: sansEspace("Le chemin de la story").describe("Fichier de la user story, relatif au projet."),
+        story: sansEspace("Le chemin de la story").describe("Fichier de la user story, relatif au projet ; ou une issue GitHub (URL d'issue, ou org/dépôt#n), lue avec ses commentaires et ses dépendances (ADR 0078)."),
         auto: z.boolean().optional().describe("Retenir la difficulté proposée sans la faire confirmer."),
         archi: sansEspace("Le nom du skill d'architecture").optional().describe("Skill d'architecture (par son nom ou son langage, ex. java) ; par défaut la clean architecture."),
         pile: z
@@ -151,13 +157,23 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
             'Montre ce résumé à l\'utilisateur. S\'il accepte, rappelle skraft_demarrer avec les mêmes arguments et accord: "une-fois" (ce lancement seulement) ou accord: "toujours" (retenu tant que le workflow ne change pas).',
           ].join("\n\n"),
         );
-      const args = [a.story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
+      // Une issue GitHub (ADR 0078) : préparée seulement maintenant, l'accord donné, pour ne pas la lire deux fois.
+      let story = a.story;
+      const notes: string[] = [];
+      if (lireRefIssue(a.story)) {
+        if (!o.preparerUs) return erreur("Une issue GitHub ne peut pas servir de story ici : donne le chemin d'un fichier de story.");
+        const prep = await o.preparerUs(a.story, p.root);
+        if (!prep.ok) return erreur(prep.motif);
+        story = prep.chemin;
+        notes.push(...prep.notes);
+      }
+      const args = [story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
       const r = await p.services.lancerWorkflow(w.nom, args, a.accord ? { accord: a.accord } : {});
       if (!r.ok) return erreur(r.motif);
       storyDe.set(r.taskId, a.story);
       const pile = p.services.pile();
       const ignoree = a.pile !== undefined && pile.source !== "client" ? ` La pile fournie est ignorée : le projet a la sienne (${pile.id}, ${pile.source === "projet" ? "profil du projet" : "détection"}).` : "";
-      return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
+      return texte(`${notes.map((n) => `${n}\n`).join("")}Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
     }, { agents: true }),
   );
 

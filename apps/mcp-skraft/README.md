@@ -173,6 +173,21 @@ l'accepter pour ce projet, une fois ou toujours (ADR 0075). L'administrateur l'i
 `"programConsent": false`. Sans question possible, ou sur un « non », la pile est refusée, avec la
 liste en vigueur et son origine : le fichier lu, ou celui qui était attendu et manquait.
 
+## Une story donnée par une issue GitHub
+
+`skraft_demarrer { story: "https://github.com/org/app/issues/12" }` (ou `org/app#12`), ou
+`/skraft-demarrer org/app#12` (ADR 0078). Une fois le workflow accepté :
+1. le serveur vérifie `gh` : installé, connecté à l'hôte de l'issue, dépôt lisible. Sinon, il dit
+   quoi faire ;
+2. il lit, en lecture seule, l'issue, ses commentaires, sa parente, ses sous-issues, ce qui la
+   bloque, ce qu'elle bloque, et les issues citées (un niveau, dix au plus) ;
+3. **si une issue qui la bloque est encore ouverte, il ne démarre pas** ;
+4. il écrit `.skraft/github/US-12-contexte.md` (tout ce qui a été lu) et `.skraft/github/US-12.md`,
+   la story. Une issue déjà au format, sans commentaire, est reprise telle quelle. Sinon, un agent
+   la met en forme, et le code vérifie qu'aucune valeur d'un critère n'est inventée (trois essais
+   au plus). Ce qui reste incertain va dans « Questions ouvertes », posées avant RESEARCH ;
+5. le run part sur cette story, et ses agents lisent le contexte.
+
 ## La pile du projet
 
 Skraft doit savoir comment lancer les tests, où vivent les fichiers, comment lire une erreur de

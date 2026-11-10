@@ -5,7 +5,9 @@ description: "Démarre skraft sur une user story : recherche, conception, scéna
 
 Appelle l'outil MCP `skraft_demarrer` du serveur `skraft`. Lis le texte qui suit la commande :
 
-- le chemin de la story, relatif au projet : `story` ;
+- la story : `story`, le chemin d'un fichier relatif au projet, ou une issue GitHub (son URL, ou
+  `org/dépôt#n`). Une issue est lue avec ses commentaires et ses dépendances ; si une issue qui la
+  bloque est encore ouverte, skraft refuse de démarrer, et tu le dis à l'utilisateur ;
 - « auto » : `auto: true` (la difficulté proposée est retenue sans confirmation) ;
 - « archi <nom> » : `archi`, le skill d'architecture.
 

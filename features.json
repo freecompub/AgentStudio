@@ -1254,6 +1254,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project core --project runtime-copilot --project runtime-claude --project extension-manifest --project extension-host --project workflow extensions/skraft/test/adr.test.ts extensions/skraft/test/design-gate.test.ts extensions/skraft/test/manifest.test.ts tests/workflow-skraft/test/adr.test.ts tests/workflow-skraft/test/design-gate.test.ts tests/workflow-skraft/test/skills.test.ts packages/core/test/task-agent-runner.test.ts packages/runtime-copilot/test/copilot-runtime.test.ts packages/runtime-claude/test/traduction.test.ts packages/runtime-claude/test/runtime.test.ts packages/extension-manifest/test/validate.test.ts packages/extension-host/test/in-process-host.test.ts packages/workflow/test/activer.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10 (branche fix/design-context-options). Le parseur accepte les titres ADR avec deux-points ; les contrôles de statut, doublon et supersession restent stricts. Les deux rôles architectes de DESIGN demandent high/long_context dans les deux skraft. Copilot refuse un modèle qui n'annonce pas high et le tier long-context d'au moins 1M ; Claude passe --effort high et l'alias [1m]. Vérification : 242 tests ciblés verts, pnpm typecheck vert ; pas de run Copilot réel dans cette tâche. Revue du 10/11 : échouer arrêtait DESIGN sans modèle explicite (configuration par défaut de Copilot) et pour un modèle sans contexte long, Claude échouait pour tout modèle autre que sonnet/opus ; les options sont désormais abandonnées avec un avertissement, la session s'ouvre (choix provisoire, ADR 0077). ADR 0077 révisé (il existait : la revue l'avait cru absent, à tort) ; cas de test historique ajouté plutôt que de modifier le cas existant."
+    },
+    {
+      "id": "us-github",
+      "title": "Une US donnée par une issue GitHub (URL ou org/dépôt#n) : gh vérifié, l'issue, ses commentaires et ses dépendances lus par le code, refus si un bloqueur est ouvert, story reprise ou mise en forme par un agent puis vérifiée (aucune valeur inventée), puis le run (ADR 0078)",
+      "verify": "pnpm vitest run --project github-auth test/issues.test.ts && pnpm vitest run --project mcp-skraft test/us-github.test.ts test/redacteur-us.test.ts test/serveur.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10 (branche feat/us-github). Essai réel : cli/cli#14996 lue par gh (3 commentaires, contexte de 50 Ko), mise en forme par un agent Copilot en 19 critères et des questions ouvertes, vérifiée par le code, en 73 s. Pas encore de run skraft complet sur une issue. La PR à la fin du run est la brique suivante."
     }
   ]
 }
