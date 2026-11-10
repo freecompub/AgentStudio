@@ -94,11 +94,17 @@ describe("Porte cohérence (SPEC-skraft §7.2, fixtures §13.2)", () => {
     expect(checkDesign(input({ adrs: [{ path: "a1", md: adr(1), isNew: false }, { path: "a1b", md: adr(1), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-001 en double."]);
   });
 
+  it("un ADR historique titré « ADR-NNN: … » compte dans la numérotation : son numéro n'est pas reproché comme manquant", () => {
+    // Faux rejet vu en run (10/11) : `# ADR-001: …` n'était pas lu, et ADR-001 « manquait ».
+    const historique = { path: "a1", md: adr(1).replace("# ADR-001 —", "# ADR-001:"), isNew: false };
+    expect(checkDesign(input({ adrs: [historique, { path: "a2", md: adr(2), isNew: true }] }))).toEqual([]);
+  });
+
   it("un trou déjà présent dans le dépôt n'est pas reproché à la phase", () => {
     // ADR-002 a été archivé avant cette story : l'agent ne peut pas le recréer, et le lui
     // reprocher ferait échouer DESIGN jusqu'à épuisement du budget, sur chaque tentative.
     const existants = [
-      { path: "a1", md: adr(1).replace("# ADR-001 —", "# ADR-001:"), isNew: false },
+      { path: "a1", md: adr(1), isNew: false },
       { path: "a3", md: adr(3), isNew: false },
     ];
     expect(checkDesign(input({ adrs: existants }))).toEqual([]);
