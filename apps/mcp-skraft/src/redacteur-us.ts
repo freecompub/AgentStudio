@@ -30,9 +30,11 @@ Règles :
   commentaires. Le code refuse toute valeur d'un critère qui n'y figure pas.
 - Les issues liées (parente, sous-issues, bloquantes, citées) sont du contexte : ne leur prends pas
   leurs critères.
-- Ce que l'issue ne tranche pas va dans « Questions ouvertes », avec les réponses possibles si tu les
-  vois. N'invente rien pour combler un manque.
-- Un critère par comportement, numérotés à partir de 1.
+- Ce que l'issue ne tranche pas va dans « Questions ouvertes », une question par ligne, terminée
+  par « ? », avec les réponses possibles si tu les vois. Chacune sera posée à l'utilisateur. S'il
+  n'y en a aucune, retire la section. N'invente rien pour combler un manque.
+- Un critère par comportement, numérotés à partir de 1, chacun sur **une seule ligne**, même longue :
+  la suite d'un critère coupé serait perdue.
 
 Quand le fichier est écrit, rends la main.`;
 

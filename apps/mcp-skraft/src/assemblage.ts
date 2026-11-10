@@ -133,7 +133,9 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     const aide = [`-c`, `credential.https://${q.ref.hostname}.helper=`, `-c`, `credential.https://${q.ref.hostname}.helper=!gh auth git-credential`];
     const avecAide: Executer = (cmd, args) => executer(cmd, cmd === "git" ? [...aide, ...args] : args);
     const titre = (await executer("gh", ["api", "--hostname", q.ref.hostname, `repos/${q.ref.owner}/${q.ref.repo}/issues/${q.ref.numero}`, "--jq", ".title"])).sortie.trim();
-    return publierPr({ ...q, titre: `US-${q.ref.numero} — ${titre || "user story"}` }, avecAide);
+    // Un titre qui porte déjà son identifiant (« US-7 — … ») est repris tel quel.
+    const complet = /^\s*\[?[A-Za-z]\w*-\d+\]?\s*[—–:-]/.test(titre) ? titre : `US-${q.ref.numero} — ${titre || "user story"}`;
+    return publierPr({ ...q, titre: complet }, avecAide);
   };
   const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, publierPr: publier, version: o.version });
   logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });

@@ -32,6 +32,16 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     PR déjà ouverte est rendue.
   - Testé avec `git` et `gh` doublés. Aucune vraie PR ouverte : ce serait une publication, à faire
     avec le responsable.
+- **Essai sur le dépôt d'exemple** : issue créée à la demande du responsable,
+  `freecompub/exemple-dotnet-tdd#2`, « US-7 — Livraison offerte au-delà d'un seuil », en prose, avec
+  un commentaire du PO qui tranche « après remises ». Trois défauts vus et corrigés :
+  - l'identifiant venait du numéro de l'issue (`US-2`, qui existe déjà dans ce dépôt). Un
+    identifiant en tête du titre l'emporte désormais, pour la story comme pour le titre de la PR ;
+  - l'agent coupait des critères sur deux lignes, et `parseStory` n'en lit que la première. C'est
+    désormais refusé, et le prompt le dit ;
+  - « - Aucune : … » sous « Questions ouvertes » aurait été posée comme une question. Une question
+    ouverte doit finir par « ? », sinon c'est refusé.
+  - Résultat final en 20 s : cinq critères d'une ligne, la décision du commentaire intégrée.
 - **Reste** :
   - l'application de bureau ;
   - un run complet sur une issue.

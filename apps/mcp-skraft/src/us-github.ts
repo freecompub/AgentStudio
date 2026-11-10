@@ -28,13 +28,38 @@ function sources(us: UsGithub): string[] {
 }
 
 /** Ce que rend `parseStory` (module JavaScript du workflow, non typé). */
-type StoryLue = { ok: true; story: { id: string; criteria: { n: number; literals: string[] }[] } } | { ok: false; errors: string[] };
+type StoryLue = { ok: true; story: { id: string; criteria: { n: number; literals: string[] }[]; openQuestions: string[] } } | { ok: false; errors: string[] };
+
+/** Les critères suivis d'une ligne de suite (non vide, ni critère, ni titre, ni liste). */
+function criteresSurPlusieursLignes(md: string): number[] {
+  const lignes = md.split("\n");
+  const debut = lignes.findIndex((l) => /^##\s+crit[èe]res d'acceptation/i.test(l));
+  if (debut === -1) return [];
+  const coupes: number[] = [];
+  let courant: number | null = null;
+  for (const l of lignes.slice(debut + 1)) {
+    if (/^##?\s+/.test(l)) break;
+    const c = /^\s*(\d+)\.\s+/.exec(l);
+    if (c) courant = Number(c[1]);
+    else if (l.trim() === "") courant = null;
+    else if (courant !== null && !coupes.includes(courant)) coupes.push(courant);
+  }
+  return coupes;
+}
 
 /** Ce que le code exige de la story : son format, son identifiant, et aucune valeur inventée dans les critères. */
 function verifierStory(md: string, identifiant: string, us: UsGithub): string[] {
   const lue = parseStory(md) as StoryLue;
   if (!lue.ok) return lue.errors;
   if (lue.story.id !== identifiant) return [`Le titre doit porter l'identifiant ${identifiant} (« # ${identifiant} — <titre> »), pas ${lue.story.id}.`];
+  // `parseStory` ne lit que la première ligne d'un critère : une suite indentée serait perdue.
+  const coupes = criteresSurPlusieursLignes(md);
+  if (coupes.length) return coupes.map((n) => `Critère ${n} : il tient sur plusieurs lignes ; écris chaque critère sur une seule ligne, sinon sa suite est perdue.`);
+  // Chaque question ouverte est posée à l'utilisateur avant RESEARCH : une ligne qui n'en est pas une
+  // (« Aucune : … ») serait posée quand même.
+  const pasDesQuestions = lue.story.openQuestions.filter((q) => !/\?\s*$/.test(q));
+  if (pasDesQuestions.length)
+    return pasDesQuestions.map((q) => `Question ouverte « ${q} » : ce n'est pas une question. Écris-la comme une question (« … ? »), ou retire la section s'il n'y en a pas.`);
   const connues = new Set(sources(us).flatMap((t) => extractLiterals(t)).map(normalizeLiteral));
   return lue.story.criteria.flatMap((c) =>
     c.literals.filter((l) => !connues.has(normalizeLiteral(l))).map((l) => `Critère ${c.n} : « ${l} » ne vient ni de l'issue, ni de ses commentaires, ni de ses dépendances.`),
@@ -75,7 +100,10 @@ export async function preparerUsGithub(o: {
         "skraft ne démarre pas tant qu'elle l'est : livre ou ferme d'abord ce qui la bloque.",
     };
 
-  const identifiant = `US-${ref.numero}`;
+  // Un identifiant en tête du titre (« US-7 — … ») l'emporte : le numéro de l'issue peut en désigner une autre.
+  const enTete = /^\s*\[?([A-Za-z][\w]*-\d+)\]?\s*[—–:-]\s*(.+)$/.exec(us.issue.titre);
+  const identifiant = enTete ? enTete[1]! : `US-${ref.numero}`;
+  const titre = enTete ? enTete[2]!.trim() : us.issue.titre;
   const chemin = `.skraft/github/${identifiant}.md`;
   const cheminContexte = `.skraft/github/${identifiant}-contexte.md`;
   const contexte = rendreContexte(us);
@@ -83,7 +111,7 @@ export async function preparerUsGithub(o: {
   const lien = `Issue : ${us.issue.url}. Ses commentaires et ses dépendances sont dans \`${cheminContexte}\`.`;
 
   // Déjà au format, et rien de décidé dans les commentaires : reprise telle quelle.
-  const telleQuelle = `# ${identifiant} — ${us.issue.titre}\n\n${lien}\n\n${us.issue.corps.trim()}\n`;
+  const telleQuelle = `# ${identifiant} — ${titre}\n\n${lien}\n\n${us.issue.corps.trim()}\n`;
   if (us.commentaires.length === 0 && verifierStory(telleQuelle, identifiant, us).length === 0) {
     await o.ecrire(chemin, telleQuelle);
     return { ok: true, chemin, notes: [`Story ${identifiant} reprise telle quelle de ${nom}.`] };

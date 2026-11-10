@@ -54,6 +54,14 @@ describe("preparerUsGithub", () => {
     expect(m.fichiers.get(".skraft/github/US-12-contexte.md")).toMatch(/^# Contexte GitHub de org\/app#12/);
   });
 
+  // Essai du 10/11 : l'issue n°2 du dépôt d'exemple s'intitule « US-7 — … », et ce dépôt a déjà une US-2.
+  it("un identifiant en tête du titre l'emporte sur le numéro de l'issue, et sort du titre", async () => {
+    const m = monter({ us: us({ issue: issue(2, { titre: "US-7 — Livraison offerte", corps: FORMATEE }), ref: { hostname: "github.com", owner: "org", repo: "app", numero: 2 } }) });
+    expect(await m.preparer("org/app#2")).toEqual({ ok: true, chemin: ".skraft/github/US-7.md", notes: [expect.any(String)] });
+    expect(m.fichiers.get(".skraft/github/US-7.md")).toMatch(/^# US-7 — Livraison offerte\n/);
+    expect(m.fichiers.has(".skraft/github/US-7-contexte.md")).toBe(true);
+  });
+
   it("issue sans le format, ou avec des commentaires : mise en forme par l'agent, puis vérifiée", async () => {
     const entrees: Parameters<MiseEnForme>[0][] = [];
     const m = monter({
@@ -85,6 +93,40 @@ describe("preparerUsGithub", () => {
     expect(motifs).toHaveLength(2);
     expect(motifs[0]).toEqual(["Critère 1 : « 750 » ne vient ni de l'issue, ni de ses commentaires, ni de ses dépendances."]);
     expect(r).toEqual({ ok: false, motif: expect.stringMatching(/refusée 3 fois[\s\S]*750/) });
+  });
+
+  // Essai réel du 10/11 : l'agent coupait un critère sur deux lignes ; parseStory n'en lit que la
+  // première, et l'exemple chiffré de la suite était perdu pour le run.
+  it("un critère sur plusieurs lignes est refusé : sa suite serait perdue", async () => {
+    const vus: string[][] = [];
+    let n = 0;
+    const m = monter({
+      us: us({ issue: issue(12, { titre: "Payer", corps: "Plafond 500 € ; 64,00 € ramené à 57,60 €." }) }),
+      mettreEnForme: async (e) => {
+        if (e.precedent) vus.push(e.precedent.motifs);
+        m.fichiers.set(e.chemin, n++ === 0 ? "# US-12 — Payer\n\nx\n\n## Critères d'acceptation\n\n1. Plafond de 500 € :\n   64,00 € ramené à 57,60 €.\n" : "# US-12 — Payer\n\nx\n\n## Critères d'acceptation\n\n1. Plafond de 500 € : 64,00 € ramené à 57,60 €.\n");
+        return { ok: true };
+      },
+    });
+    expect((await m.preparer()).ok).toBe(true);
+    expect(vus).toEqual([["Critère 1 : il tient sur plusieurs lignes ; écris chaque critère sur une seule ligne, sinon sa suite est perdue."]]);
+  });
+
+  // Essai réel du 10/11 : « - Aucune : … » sous « Questions ouvertes » aurait été posée comme une question.
+  it("une question ouverte qui n'en est pas une est refusée", async () => {
+    const vus: string[][] = [];
+    let n = 0;
+    const m = monter({
+      us: us({ issue: issue(12, { titre: "Payer", corps: "Plafond 500 €." }) }),
+      mettreEnForme: async (e) => {
+        if (e.precedent) vus.push(e.precedent.motifs);
+        const q = n++ === 0 ? "- Aucune : tout est tranché." : "- Le plafond vaut-il par jour ?";
+        m.fichiers.set(e.chemin, `# US-12 — Payer\n\nx\n\n## Critères d'acceptation\n\n1. Plafond de 500 €.\n\n## Questions ouvertes\n\n${q}\n`);
+        return { ok: true };
+      },
+    });
+    expect((await m.preparer()).ok).toBe(true);
+    expect(vus).toEqual([["Question ouverte « Aucune : tout est tranché. » : ce n'est pas une question. Écris-la comme une question (« … ? »), ou retire la section s'il n'y en a pas."]]);
   });
 
   it("une story mal formée ou au mauvais identifiant est refusée", async () => {
