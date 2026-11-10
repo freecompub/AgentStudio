@@ -21,6 +21,13 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   - réel, dans des configurations isolées : inscription dans les deux clients, relance sans rien
     toucher ;
   - le paquet installé hors du dépôt démarre (`skraft-mcp`).
+- **Désinstaller** : `deployer -- --desinstaller`.
+  - Il retire l'inscription si elle pointe vers ce serveur (sinon seulement avec `--forcer`), et
+    nos liens seuls.
+  - Les données sont gardées sauf `--donnees`.
+  - Essai réel : rien ne reste, un skill étranger gardé.
+- **Défaut corrigé** : un échec d'inscription laissait le script sortir en succès. Vu parce que
+  Copilot refuse un `COPILOT_HOME` accessible en écriture au groupe.
 - **Avant de publier** :
   - une vraie version (`0.0.0` aujourd'hui) ;
   - un nom disponible (le scope `@agent-studio` demande une organisation npm, sinon `--nom`) ;

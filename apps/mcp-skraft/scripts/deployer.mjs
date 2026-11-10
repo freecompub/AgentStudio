@@ -10,6 +10,8 @@
  *   node scripts/deployer.mjs --sans-build --sans-commandes
  *   node scripts/deployer.mjs --npm <dossier>          prépare le paquet npm et le compresse
  *   node scripts/deployer.mjs --npm <dossier> --publier  … et le publie (npm publish)
+ *   node scripts/deployer.mjs --desinstaller           retire l'inscription et les commandes
+ *   node scripts/deployer.mjs --desinstaller --donnees … et efface ~/.agent-studio/mcp-skraft
  *
  * Une inscription existante n'est jamais remplacée sans `--remplacer` : la retirer efface les
  * variables d'environnement qu'on y avait mises. Rien n'est publié sans `--publier`.
@@ -17,6 +19,7 @@
 import { execFile } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { installerCommandes } from "./installer-commandes.mjs";
@@ -69,6 +72,41 @@ async function inscrire(client, o, deps, main, lignes) {
   const env = (o.env ?? []).flatMap((e) => (client === "claude" ? ["-e", e] : ["--env", e]));
   const r = await deps.executer(client, ["mcp", "add", ...portee, NOM, ...env, "--", "node", main]);
   lignes.push(r.code === 0 ? `${libelle} : serveur ${NOM} inscrit.` : `${libelle} : l'inscription a échoué — ${r.sortie.trim()}`);
+  return r.code === 0;
+}
+
+/**
+ * Retire l'inscription d'un client si elle pointe vers ce serveur ; une inscription `skraft` qui
+ * pointe ailleurs (un autre dépôt, le paquet npm) n'est retirée qu'avec `--forcer`.
+ */
+async function desinscrire(client, o, deps, main, lignes) {
+  const libelle = LIBELLE[client];
+  if (!deps.trouver(client)) return lignes.push(`${libelle} : absent (commande \`${client}\` introuvable), sauté.`);
+  const existante = commandeInscrite(client, (await deps.executer(client, ["mcp", "get", NOM])).sortie);
+  if (!existante) return lignes.push(`${libelle} : serveur ${NOM} pas inscrit.`);
+  if (existante !== `node ${main}` && !o.forcer)
+    return lignes.push(`${libelle} : le serveur ${NOM} inscrit pointe ailleurs (${existante}) : non retiré. --forcer le retire quand même.`);
+  const r = await deps.executer(client, ["mcp", "remove", ...(client === "claude" ? ["-s", "user"] : []), NOM]);
+  lignes.push(r.code === 0 ? `${libelle} : serveur ${NOM} retiré.` : `${libelle} : le retrait a échoué — ${r.sortie.trim()}`);
+}
+
+/** Défait le déploiement : inscriptions, commandes ; les données du serveur seulement sur demande. */
+async function desinstaller(o, deps) {
+  const lignes = [];
+  const main = join(o.racine, "dist", "main.mjs");
+  for (const client of o.client ? [o.client] : ["copilot", "claude"]) await desinscrire(client, o, deps, main, lignes);
+  if (!o.sansCommandes) {
+    const r = await deps.installerCommandes({ source: join(o.racine, "skills"), retirer: true, ...(o.projet ? { projet: o.projet } : {}) });
+    lignes.push(`Commandes /skraft-… : ${r.retires.length} lien${r.retires.length > 1 ? "s" : ""} retiré${r.retires.length > 1 ? "s" : ""}.`, ...r.refuses);
+  }
+  // Le dossier des données du serveur (assemblage.ts) : runs, journaux, piles fournies, accords.
+  const donnees = join(o.home ?? homedir(), ".agent-studio", "mcp-skraft");
+  if (o.donnees) {
+    await rm(donnees, { recursive: true, force: true });
+    lignes.push(`Données du serveur effacées (${donnees}).`);
+  } else lignes.push(`Données du serveur gardées (${donnees}) : runs, journaux, dépôts et programmes acceptés. --donnees les efface.`);
+  lignes.push("Le profil de pile des projets (.agent-studio/projet.yaml) n'est pas touché : il appartient au projet.");
+  return { lignes, ok: true };
 }
 
 /** Le paquet npm : le serveur construit, les commandes, leur script, la licence du workflow embarqué. */
@@ -107,9 +145,11 @@ async function preparerPaquet(o, deps, lignes) {
 
 /**
  * @param {{ racine: string; client?: "copilot" | "claude"; env?: string[]; remplacer?: boolean; sansBuild?: boolean;
- *   sansCommandes?: boolean; projet?: string; npm?: string; publier?: boolean; nom?: string }} o
+ *   sansCommandes?: boolean; projet?: string; npm?: string; publier?: boolean; nom?: string;
+ *   desinstaller?: boolean; forcer?: boolean; donnees?: boolean; home?: string }} o
  */
 export async function deployer(o, deps = depsReelles) {
+  if (o.desinstaller) return desinstaller(o, deps);
   const lignes = [];
   if (!o.sansBuild) {
     const b = await deps.executer("node", [join(o.racine, "scripts", "build.mjs")]);
@@ -121,12 +161,14 @@ export async function deployer(o, deps = depsReelles) {
     return { lignes, ok: true };
   }
   const main = join(o.racine, "dist", "main.mjs");
-  for (const client of o.client ? [o.client] : ["copilot", "claude"]) await inscrire(client, o, deps, main, lignes);
+  let ok = true;
+  // `inscrire` rend `false` sur un échec du client ; un client absent ou déjà inscrit n'en est pas un.
+  for (const client of o.client ? [o.client] : ["copilot", "claude"]) if ((await inscrire(client, o, deps, main, lignes)) === false) ok = false;
   if (!o.sansCommandes) {
     const r = await deps.installerCommandes({ source: join(o.racine, "skills"), ...(o.projet ? { projet: o.projet } : {}) });
     lignes.push(`Commandes /skraft-… : ${r.poses.length} lien${r.poses.length > 1 ? "s" : ""} posé${r.poses.length > 1 ? "s" : ""}.`, ...r.refuses);
   }
-  return { lignes, ok: true };
+  return { lignes, ok };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -152,8 +194,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     ...(valeur("--npm") ? { npm: valeur("--npm") } : {}),
     ...(valeur("--nom") ? { nom: valeur("--nom") } : {}),
     publier: args.includes("--publier"),
+    desinstaller: args.includes("--desinstaller"),
+    forcer: args.includes("--forcer"),
+    donnees: args.includes("--donnees"),
   });
   for (const l of r.lignes) process.stdout.write(`${l}\n`);
-  if (r.ok && !valeur("--npm")) process.stdout.write("Redémarre Copilot CLI ou Claude Code pour qu'il relance le serveur.\n");
+  if (r.ok && !valeur("--npm") && !args.includes("--desinstaller")) process.stdout.write("Redémarre Copilot CLI ou Claude Code pour qu'il relance le serveur.\n");
   process.exit(r.ok ? 0 : 1);
 }

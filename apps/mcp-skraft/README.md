@@ -49,9 +49,18 @@ pnpm --filter @agent-studio/mcp-skraft deployer -- --env AGENT_STUDIO_ADMIN_CONF
 | `--npm <dossier>` | Prépare le paquet npm (serveur construit, commandes, licence) et le compresse (`npm pack`). |
 | `--npm <dossier> --publier` | … et le publie (`npm publish --access public`). Rien n'est publié sans elle. |
 | `--nom <nom>` | Nom du paquet npm, si `@agent-studio/mcp-skraft` n'est pas disponible. |
+| `--desinstaller` | Retire l'inscription du serveur dans chaque client, et nos commandes `/skraft-…`. |
+| `--desinstaller --forcer` | Retire aussi une inscription `skraft` qui pointe ailleurs (un autre dépôt, le paquet npm). |
+| `--desinstaller --donnees` | Efface aussi `~/.agent-studio/mcp-skraft` (runs, journaux, dépôts et programmes acceptés), et lui seul. |
 
 Claude Code est inscrit pour l'utilisateur (`-s user`), donc dans tous ses projets. Le script
-respecte `COPILOT_HOME` et `CLAUDE_CONFIG_DIR`. Redémarrer le client ensuite.
+respecte `COPILOT_HOME` et `CLAUDE_CONFIG_DIR`. Redémarrer le client ensuite. Un échec d'inscription
+fait sortir le script en erreur, avec la raison du client. Copilot refuse par exemple un
+`COPILOT_HOME` accessible en écriture au groupe.
+
+La désinstallation ne retire que ce que le déploiement a posé : une inscription qui pointe vers ce
+serveur, et des liens vers nos skills. Les autres skills, `admin.json` et le `projet.yaml` des
+projets ne sont jamais touchés.
 
 Le paquet npm contient `dist/`, `skills/` et le script des commandes. Il n'a que deux dépendances,
 `@github/copilot-sdk` (qui apporte le CLI Copilot) et `esbuild`, et il est sous **GPL-3.0-or-later**

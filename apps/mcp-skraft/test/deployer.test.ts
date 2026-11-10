@@ -71,6 +71,14 @@ describe("deployer", () => {
     expect(r.lignes).toEqual(expect.arrayContaining(["Copilot CLI : serveur skraft inscrit.", "Claude Code : serveur skraft inscrit.", "Commandes /skraft-… : 1 lien posé."]));
   });
 
+  it("une inscription qui échoue rend le déploiement en échec, avec la raison du client", async () => {
+    const d = doublure({ clients: ["copilot"] });
+    const executer = d.deps.executer;
+    const r = await deployer({ racine: RACINE, sansBuild: true, sansCommandes: true }, { ...d.deps, executer: async (cmd: string, args: string[]) => (args[1] === "add" ? { code: 1, sortie: "Error: storage directory is writable by group" } : executer(cmd, args)) });
+    expect(r.ok).toBe(false);
+    expect(r.lignes).toContain("Copilot CLI : l'inscription a échoué — Error: storage directory is writable by group");
+  });
+
   it("un client absent est sauté, et c'est dit", async () => {
     const d = doublure({ clients: ["copilot"] });
     const r = await deployer({ racine: RACINE }, d.deps);
@@ -123,5 +131,46 @@ describe("deployer", () => {
     const d = doublure();
     await deployer({ racine: await racineJetable(), sansBuild: true, npm: join(tmp, "paquet"), publier: true }, d.deps);
     expect(d.lances).toContain("npm publish --access public");
+  });
+});
+
+/**
+ * Désinstaller (10/11) : défaire ce que le déploiement a fait, et rien d'autre. Une inscription qui
+ * pointe ailleurs n'est retirée qu'avec `--forcer` ; nos liens seuls partent ; les données du serveur
+ * restent, sauf `--donnees`, qui n'efface que leur dossier.
+ */
+describe("deployer --desinstaller", () => {
+  it("retire l'inscription de chaque client et nos commandes ; rien n'est construit", async () => {
+    const d = doublure({ inscrits: { copilot: `node ${MAIN}`, claude: `node ${MAIN}` } });
+    const retraits: unknown[] = [];
+    const r = await deployer({ racine: RACINE, desinstaller: true, home: tmp }, { ...d.deps, installerCommandes: async (o: unknown) => (retraits.push(o), { poses: [], retires: ["a", "b"], refuses: [] }) });
+    expect(d.lances.filter((l) => !/ mcp get /.test(l))).toEqual(["copilot mcp remove skraft", "claude mcp remove -s user skraft"]);
+    expect(retraits).toEqual([expect.objectContaining({ retirer: true })]);
+    expect(r.lignes).toEqual(expect.arrayContaining(["Copilot CLI : serveur skraft retiré.", "Claude Code : serveur skraft retiré.", "Commandes /skraft-… : 2 liens retirés."]));
+    expect(r.lignes.join("\n")).toMatch(/Données du serveur gardées.*--donnees/);
+  });
+
+  it("pas inscrit, client absent, ou inscription qui pointe ailleurs (sans --forcer) : rien n'est retiré, et c'est dit", async () => {
+    const d = doublure({ clients: ["copilot"], inscrits: { copilot: "node /ailleurs/main.mjs" } });
+    const r = await deployer({ racine: RACINE, desinstaller: true, home: tmp }, d.deps);
+    expect(d.lances.filter((l) => / mcp remove /.test(l))).toEqual([]);
+    expect(r.lignes).toContain("Copilot CLI : le serveur skraft inscrit pointe ailleurs (node /ailleurs/main.mjs) : non retiré. --forcer le retire quand même.");
+    expect(r.lignes).toContain("Claude Code : absent (commande `claude` introuvable), sauté.");
+    const vide = doublure();
+    const r2 = await deployer({ racine: RACINE, desinstaller: true, home: tmp }, vide.deps);
+    expect(r2.lignes).toContain("Copilot CLI : serveur skraft pas inscrit.");
+    const force = doublure({ inscrits: { copilot: "node /ailleurs/main.mjs" }, clients: ["copilot"] });
+    await deployer({ racine: RACINE, desinstaller: true, forcer: true, home: tmp }, force.deps);
+    expect(force.lances).toContain("copilot mcp remove skraft");
+  });
+
+  it("--donnees efface ~/.agent-studio/mcp-skraft, et lui seul", async () => {
+    await mkdir(join(tmp, ".agent-studio", "mcp-skraft", "tasks"), { recursive: true });
+    await writeFile(join(tmp, ".agent-studio", "admin.json"), "{}");
+    const d = doublure();
+    const r = await deployer({ racine: RACINE, desinstaller: true, donnees: true, home: tmp }, d.deps);
+    await expect(stat(join(tmp, ".agent-studio", "mcp-skraft"))).rejects.toThrow();
+    expect((await stat(join(tmp, ".agent-studio", "admin.json"))).isFile()).toBe(true);
+    expect(r.lignes.join("\n")).toMatch(/Données du serveur effacées/);
   });
 });
