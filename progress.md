@@ -5,6 +5,28 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — État et prochaine étape
+
+- **Mergé dans `main`** (PR #27, 09/11) :
+  - les questions à l'utilisateur par le client MCP (ADR 0075) : dépôt, programme, écriture du
+    profil ;
+  - `outils` dans le profil ;
+  - la pile découverte par un agent, vérifiée par le code, et la réponse à sa question (ADR 0076) ;
+  - le classement des assertions pytest en junit-xml ;
+  - l'interdiction de l'assertion sur un booléen calculé.
+- **Doc mise à jour le 10/11** :
+  - README racine : serveur MCP, pile, organisation, état ;
+  - `CLAUDE.md` ;
+  - SPEC §6.5, §8.5, §8.6 et O12 ;
+  - README du serveur : inscription dans Copilot CLI, ce que Copilot en fait, `skraft_pile` dans le
+    déroulé.
+- **Prochaine étape**, au choix du responsable :
+  - essayer la PR sur le poste Mac, projet uv, compte d'entreprise (`hostname`) ;
+  - la découverte en arrière-plan, si la limite de 3 minutes de Copilot gêne ;
+  - le lecteur JUnit de `node --test` (`missing_symbol` mal classé), sur une vraie sortie ;
+  - les défauts reportés de skraft : relation `context-map`, escalade sur revue sans défaut
+    majeur, cold-reader et valeurs recopiées, citations de la recherche.
+
 ## 09/11 — La pile découverte par un agent, vérifiée par le code (ADR 0076)
 
 - **Pourquoi** (demande du responsable) : les règles du code ne reconnaissaient que deux modèles.

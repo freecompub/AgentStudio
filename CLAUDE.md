@@ -60,6 +60,16 @@ Chaque paquet décrit ses capacités dans `src/protocols.ts` (ou `src/protocols/
 sont des fabriques `createX(deps)` injectables. Les doubles de test du cœur sont exportés par
 `@agent-studio/core/testing` (`ScriptedRuntime`, `ScriptedSession`…).
 
+Serveur MCP skraft (`apps/mcp-skraft`, ADR 0068) : il embarque le workflow `workflows/skraft/` (copié
+au build, `pnpm --filter @agent-studio/mcp-skraft build`). Le serveur n'a pas de fenêtre : ce qui
+élargit les droits est demandé à l'utilisateur par le client MCP (*elicitation*, ADR 0075), jamais
+par un argument d'outil que le LLM de l'hôte remplirait. Cela couvre un dépôt hors des dossiers
+permis, un programme hors de la liste et l'écriture du profil. La pile d'un projet est découverte
+par un agent en lecture seule, puis vérifiée par le code jusqu'aux canaris (`/stack init`,
+`skraft_pile`, ADR 0076). Un profil peut déclarer ses `outils` (`.venv/bin`) au lieu d'un lanceur
+intermédiaire. Essais réels avec Copilot CLI : en mode interactif seulement (piloté par tmux) ;
+`copilot -p` refuse toute question, et Copilot abandonne un appel d'outil au bout de 3 minutes.
+
 Les agents d'une extension se déclarent en fichiers Markdown (`agents/<nom>.agent.md`, skills dans
 `skills/<nom>/SKILL.md`) : le **contenu**, partageable avec Copilot CLI et Claude Code, ne nomme
 aucun outil d'agent-studio ; l'orchestration est dans le manifeste, et le cœur ajoute en dernier
@@ -113,7 +123,7 @@ Principe directeur : **le LLM propose, le code décide et vérifie.**
 - **Port `AgentRuntime`** (§4.3) : le cœur ne dépend jamais directement d'un SDK. Deux adaptateurs : Copilot SDK (par défaut) et Claude par le CLI `claude -p` (`packages/runtime-claude`, ADR 0070), au choix dans l'application et le serveur MCP ; Claude Agent SDK et ACP restent des interfaces documentées.
 - **Moteur de tâches** (§6) : `transition(state, event) → { state, effects }` pur ; `runEffect` fait les I/O. État persisté après chaque transition ; checkpoint Git avant chaque effet ; un effet interrompu est rejoué depuis son checkpoint (rollback + `RESUMED`), jamais récupéré. Le réducteur applique le budget de réessais ; `TIMEOUT` = réessai, `ENV_FAILURE` = escalade immédiate.
 - **Tours d'agent** : `send()` non bloquant + watchdog d'inactivité réarmé par chaque événement ; jamais de `sendAndWait` à délai fixe.
-- **Contrat LLM ↔ code** : sorties via outils terminaux à schéma (`report_phase`, `submit_plan`, `submit_verdict`, `submit_difficulty`, `report_blocker`). Les preuves (tests) sont produites par notre handler `run_tests`, jamais par l'agent. Les portes entre états sont exécutées par le code (tests, diff, empreintes des tests gelés, périmètres d'écriture).
+- **Contrat LLM ↔ code** : sorties via outils terminaux à schéma (`report_phase`, `submit_plan`, `submit_lens_verdict`, `submit_difficulty`, `submit_pile`, `report_blocker`). Les preuves (tests) sont produites par notre handler `run_tests`, jamais par l'agent. Les portes entre états sont exécutées par le code (tests, diff, empreintes des tests gelés, périmètres d'écriture).
 - **Une session neuve par phase/rôle** avec un dossier de passation construit par le code ; les transcriptions ne sont jamais réinjectées.
 - **Hooks** : un seul handler par type et par session, composé par le cœur ; exécution en série, premier refus l'emporte, délai par hook, **refus par défaut** si une garde de sécurité plante ou expire. Les gardes du cœur passent avant celles des extensions.
 - **Workspace** est le seul service à toucher le disque et Git.

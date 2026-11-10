@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-10",
-  "branch": "feat/workflow-rejouable",
+  "updated": "2026-11-10",
+  "branch": "main",
   "items": [
     {
       "id": "banc-modeles-par-role",

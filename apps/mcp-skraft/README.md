@@ -24,8 +24,9 @@ reconstruire le serveur.
 - Le **runtime des agents**, au choix (ADR 0070, réglage `runtime`) :
   - **Copilot** (par défaut) : un abonnement Copilot, et `gh` (GitHub CLI) pour la connexion ;
   - **Claude** : Claude Code (`claude`) installé et connecté (`claude auth login`).
-- Les outils que la pile du projet lance (`dotnet`, `pytest`, `vitest`, Stryker…), autorisés par
-  l'administrateur (`admin.json`, voir plus bas).
+- Les outils que la pile du projet lance (`dotnet`, `pytest`, `vitest`, Stryker…) : dans la liste
+  de l'administrateur (`admin.json`, voir plus bas), ou acceptés par l'utilisateur quand le serveur
+  le lui demande.
 
 ## Inscrire le serveur dans un client
 
@@ -35,8 +36,20 @@ Le client lance le serveur en processus enfant (transport stdio) :
 claude mcp add skraft -- node /chemin/vers/apps/mcp-skraft/dist/main.mjs
 ```
 
-Pour Copilot CLI, déclarer la même commande (`node …/dist/main.mjs`) dans sa configuration MCP
-(format à vérifier sur la version installée).
+Pour Copilot CLI (vérifié avec la 1.0.107) :
+
+```bash
+copilot mcp add skraft -- node /chemin/vers/apps/mcp-skraft/dist/main.mjs
+```
+
+La commande écrit `~/.copilot/mcp-config.json`, où un bloc `env` peut donner au serveur ses
+variables (`SKRAFT_MCP_CONFIG`, `AGENT_STUDIO_ADMIN_CONFIG`). Le serveur est lancé dans le dossier où
+l'on a démarré `copilot`. Ce que Copilot CLI fait du serveur, vu à l'essai :
+- il ne déclare **aucun root** : un dépôt hors de `autorises` fait l'objet d'une question ;
+- il sait **poser les questions** du serveur (*elicitation*), en session interactive seulement :
+  `copilot -p` les refuse toutes d'office ;
+- il **abandonne un appel d'outil au bout de 3 minutes** : `skraft_attendre` attend 50 s au plus, et
+  une découverte de pile reste en général bien en dessous.
 
 ## Configuration
 
@@ -107,10 +120,20 @@ compilation. Il prend, dans cet ordre :
 
 Sans aucune des trois, le serveur refuse de démarrer, et dit de fournir `pile`.
 
-Dans un projet, `/stack init` (application de bureau) propose un profil, BDD compris, et
-`/stack doctor` le vérifie en l'exécutant (canaris). Si le BDD n'est détecté qu'à moitié, `/stack init`
-n'écrit rien et demande la suite : `/stack init --lanceur <nom> --features <dossier> --etapes <dossier>`,
-ou `/stack init --sans-bdd`. Exemple de pile .NET, en BDD avec Reqnroll,
+Le plus simple est de laisser **`skraft_pile`** l'écrire (ADR 0076). C'est `/stack init` dans
+l'application de bureau.
+1. Un agent lit le projet et propose sa pile, BDD compris, à partir de ce que le code a détecté.
+2. Le code la vérifie : programmes (un programme hors de la liste est demandé à l'utilisateur
+   avant d'être lancé), schéma, BDD, diagnostic, puis canaris lancés dans une copie du projet.
+3. Une pile refusée repart à l'agent avec les motifs, trois essais au plus.
+4. Vérifiée, elle est écrite dans `.agent-studio/projet.yaml` après l'accord de l'utilisateur.
+
+Si l'agent pose une question, la réponse revient par l'argument `reponse`, en une phrase complète.
+`sansBdd`, `lanceur`, `features`, `etapes` précisent le BDD. `skraft_pile` avec action
+`diagnostiquer` (`/stack doctor`) vérifie à nouveau une pile déclarée.
+
+Un projet qui installe ses outils chez lui les déclare dans `outils` (par exemple
+`[.venv/bin, .venv/Scripts]` pour uv) : `pytest` se lance alors sans `uv` à autoriser. Exemple de pile .NET, en BDD avec Reqnroll,
 mutation Stryker et deux projets de test :
 
 ```yaml
@@ -175,15 +198,17 @@ serveur.
 ## Déroulé d'un run
 
 1. `skraft_connexion` si le runtime n'est pas encore connecté.
-2. `skraft_demarrer { story: "stories/US-2.md" }` : montrer le résumé rendu à l'utilisateur ; s'il
+2. `skraft_pile` si le projet n'a pas de pile : répondre aux questions qu'affiche le client
+   (ouvrir le dépôt, autoriser un programme, écrire le profil).
+3. `skraft_demarrer { story: "stories/US-2.md" }` : montrer le résumé rendu à l'utilisateur ; s'il
    accepte, rappeler avec `accord`. La réponse donne l'identifiant de la tâche.
-3. `skraft_attendre { tache }` en boucle, tant que `termine` est faux : à chaque retour, dire à
+4. `skraft_attendre { tache }` en boucle, tant que `termine` est faux : à chaque retour, dire à
    l'utilisateur ce qui a changé, avec la ligne de progression, par exemple
    « US-2 · Conception, étape 2/5 · en cours · 6 min 34 s · 2,94 $ · dernier rejet : … · aucune question
    en attente ». (`skraft_etat` donne la même ligne à la demande.)
-4. Une question apparaît (« Question à poser à l'utilisateur : … ») : la montrer à l'utilisateur, puis
+5. Une question apparaît (« Question à poser à l'utilisateur : … ») : la montrer à l'utilisateur, puis
    `skraft_repondre` avec son choix. Le run reprend.
-5. Statut `fini` : `skraft_rapport` donne le bilan (phases, ADR, notes hors du changement) et le
+6. Statut `fini` : `skraft_rapport` donne le bilan (phases, ADR, notes hors du changement) et le
    tableau des étapes. La branche `skraft/<slug>` contient le travail, un commit par phase et par
    scénario.
 
