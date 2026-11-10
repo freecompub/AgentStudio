@@ -7,9 +7,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createJsonLogger } from "@agent-studio/core";
+import { createJsonLogger, createLazyRuntime, createTaskAgentRunner } from "@agent-studio/core";
 import { createNodeLauncher } from "@agent-studio/extension-host";
-import { createGhAuth, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
+import { createGhAuth, createGhIssues, createNodeCommandRunner, createNodeProcessSpawner } from "@agent-studio/github-auth";
 import { defaultAdminConfigPath, loadAdminConfig, workspaceServicesFactory } from "@agent-studio/project-services";
 import { createClaudeRuntime, createLanceurClaude, MODELES_CLAUDE } from "@agent-studio/runtime-claude";
 import { createCopilotClient, createCopilotRuntime } from "@agent-studio/runtime-copilot";
@@ -21,6 +21,10 @@ import { createConnexion } from "./connexion.js";
 import { createConnexionClaude } from "./connexion-claude.js";
 import { createDepotsFichier } from "./depots.js";
 import { createPilesFichiers } from "./piles.js";
+import { createMiseEnFormeParAgent } from "./redacteur-us.js";
+import { preparerUsGithub } from "./us-github.js";
+import { publierPr, type Executer } from "./pr-github.js";
+import { execFile } from "node:child_process";
 import { createProjets, type Projets } from "./projets.js";
 import { createServeurSkraft } from "./serveur.js";
 import { ouvrirServicesSansFenetre } from "./services.js";
@@ -100,7 +104,40 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     verrou: (root) => prendreVerrou(join(donnees, "verrous", `${cle(root)}.lock`), { pid: process.pid, estVivant: processusVivant }),
     piles: createPilesFichiers(join(donnees, "piles")),
   });
-  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, version: o.version });
+  // Une story donnée par une issue GitHub (ADR 0078) : lue par gh, écrite dans le projet par son Workspace,
+  // mise en forme par un agent qui n'écrit que le fichier de la story.
+  const gh = createGhIssues({ runner: createNodeCommandRunner() });
+  const preparerUs = async (texte: string, root: string) => {
+    const ws = await openWorkspace(root, { git });
+    return preparerUsGithub({
+      texte,
+      hote: config.hostname,
+      gh,
+      lire: (rel) => ws.files.read(rel).catch(() => null),
+      ecrire: (rel, contenu) => ws.files.write(rel, contenu),
+      mettreEnForme: createMiseEnFormeParAgent({
+        agents: async () => createTaskAgentRunner({ runtime: createLazyRuntime(runtime), root, logger: logger.child({ component: "redacteur-us" }) }),
+        modele: () => modelFor("standard"),
+      }),
+    });
+  };
+  // La PR d'un run fini (ADR 0078) : git pousse avec l'aide d'identification de gh, comme le reste du
+  // serveur ; gh ouvre la PR. Sans shell. La sortie d'erreur sert de motif quand la commande échoue.
+  const executer: Executer = (cmd, args) =>
+    new Promise((r) =>
+      execFile(cmd, args, { timeout: 300_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0" } }, (err, stdout, stderr) =>
+        r(err ? { code: typeof err.code === "number" ? err.code : 1, sortie: `${stderr}${stdout}` } : { code: 0, sortie: stdout }),
+      ),
+    );
+  const publier = async (q: { root: string; ref: import("@agent-studio/github-auth").RefIssue; branche: string; bilan: string }) => {
+    const aide = [`-c`, `credential.https://${q.ref.hostname}.helper=`, `-c`, `credential.https://${q.ref.hostname}.helper=!gh auth git-credential`];
+    const avecAide: Executer = (cmd, args) => executer(cmd, cmd === "git" ? [...aide, ...args] : args);
+    const titre = (await executer("gh", ["api", "--hostname", q.ref.hostname, `repos/${q.ref.owner}/${q.ref.repo}/issues/${q.ref.numero}`, "--jq", ".title"])).sortie.trim();
+    // Un titre qui porte déjà son identifiant (« US-7 — … ») est repris tel quel.
+    const complet = /^\s*\[?[A-Za-z]\w*-\d+\]?\s*[—–:-]/.test(titre) ? titre : `US-${q.ref.numero} — ${titre || "user story"}`;
+    return publierPr({ ...q, titre: complet }, avecAide);
+  };
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, publierPr: publier, version: o.version });
   logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });
   return { ok: true, mcp, projets };
 }

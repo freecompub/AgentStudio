@@ -54,7 +54,7 @@ describe("Serveur MCP construit, en stdio (ADR 0068)", () => {
     const client = await connecter();
     try {
       const { tools } = await client.listTools();
-      expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_pile", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
+      expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_pile", "skraft_pr", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
       const etat = JSON.parse(texte(await client.callTool({ name: "skraft_etat", arguments: {} })));
       expect(etat).toMatchObject({ mode: "pilote", workflow: { nom: "skraft-workflow", accordRetenu: false }, pile: { id: "typescript", source: "detection" }, taches: [], questions: [] });
     } finally {

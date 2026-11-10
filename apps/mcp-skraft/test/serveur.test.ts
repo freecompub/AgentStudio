@@ -117,7 +117,7 @@ type Projet = Awaited<ReturnType<typeof projet>>;
  * `repondre` : le client annonce l'elicitation (ADR 0075) et l'utilisateur répond par cette fonction,
  * qui reçoit la question ; `null` : il la refuse. `depots` : dépôts acceptés « toujours ».
  */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots }) {
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots; preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }>; publierPr?: (o: { root: string; ref: { owner: string; repo: string; numero: number }; branche: string; bilan: string }) => Promise<{ ok: true; url: string; nouvelle: boolean } | { ok: false; motif: string }> }) {
   const factory = workspaceServicesFactory({
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
@@ -143,6 +143,8 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
     cwd: p.root,
     pid: o.pid,
     ...(o.depots ? { depots: o.depots } : {}),
+    ...(o.preparerUs ? { preparerUs: o.preparerUs } : {}),
+    ...(o.publierPr ? { publierPr: o.publierPr } : {}),
     connexion: {
       verifier: async () => (o.nonConnecte ? { ok: false as const, motif: "Non connecté à GitHub (github.com) : appelle skraft_connexion." } : { ok: true as const }),
       connecter: async () => ({ ok: true, texte: "Connexion à GitHub lancée. Ouvre https://github.com/login/device et saisis le code ABCD-1234." }),
@@ -191,7 +193,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const { tools } = await s.client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_pile", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_pile", "skraft_pr", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
     await s.fermer();
   }, 30_000);
 
@@ -580,6 +582,92 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
       await poser(p.root, { ".agent-studio/projet.yaml": `pile:\n${PILE.trim().split("\n").map((l) => `  ${l}`).join("\n")}\n` });
       const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
       expect((await s.appel("skraft_pile", { action: "diagnostiquer" })).texte).toMatch(/Diagnostic du profil/);
+      await s.fermer();
+    }, 30_000);
+  });
+
+  /** Une US donnée par une issue GitHub (ADR 0078) : préparée après l'accord, puis le workflow part sur le fichier écrit. */
+  describe("story donnée par une issue GitHub", () => {
+    it("après l'accord, l'issue est préparée, et le run part sur la story écrite ; avant, rien n'est lu", async () => {
+      const p = await projet();
+      const appels: string[] = [];
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async (texte) => (appels.push(texte), { ok: true, chemin: ".skraft/github/US-12.md", notes: ["Story US-12 reprise telle quelle de org/app#12."] }) });
+      expect((await s.appel("skraft_demarrer", { story: "org/app#12" })).texte).toMatch(/Accord requis/);
+      expect(appels).toEqual([]);
+      const r = await s.appel("skraft_demarrer", { story: "org/app#12", accord: "une-fois" });
+      expect(r.erreur).toBe(false);
+      expect(r.texte).toMatch(/reprise telle quelle[\s\S]*lancé/);
+      expect(appels).toEqual(["org/app#12"]);
+      await until(async () => p.consignes.some((c) => c.includes(".skraft/github/US-12.md")));
+      await s.fermer();
+    }, 30_000);
+
+    it("une issue bloquée, ou gh absent : le refus de la préparation est rendu, rien ne part", async () => {
+      const p = await projet();
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async () => ({ ok: false, motif: "L'US org/app#12 est bloquée par #10 « Créer le compte » (ouverte)." }) });
+      expect(await s.appel("skraft_demarrer", { story: "https://github.com/org/app/issues/12", accord: "une-fois" })).toEqual({ erreur: true, texte: expect.stringMatching(/bloquée par #10/) });
+      expect((await s.etat()).taches).toEqual([]);
+      await s.fermer();
+    }, 30_000);
+
+    /** Mène le run de démonstration jusqu'au bout, à partir de l'issue org/app#12. */
+    async function runFini(o: { repondre?: (q: string) => string | null; publierPr?: Parameters<typeof serveur>[1]["publierPr"]; story?: string } = {}) {
+      const p = await projet();
+      const questions: string[] = [];
+      const s = await serveur(p, {
+        pid: 1,
+        vivants: new Set([1]),
+        preparerUs: async () => ({ ok: true, chemin: ".skraft/github/US-12.md", notes: [] }),
+        ...(o.repondre ? { repondre: (q: string) => (questions.push(q), o.repondre!(q)) } : {}),
+        ...(o.publierPr ? { publierPr: o.publierPr } : {}),
+      });
+      const r = await s.appel("skraft_demarrer", { story: o.story ?? "org/app#12", accord: "une-fois" });
+      const tache = /tâche (\S+)\./.exec(r.texte)![1]!;
+      await until(async () => (await s.etat()).questions.length === 1);
+      const q = (await s.etat()).questions[0]!;
+      await s.appel("skraft_repondre", { question: q.id, option: q.options[0]!.id });
+      await until(async () => (await s.etat()).taches[0]?.status === "finished");
+      return { s, tache, questions };
+    }
+
+    it("skraft_pr : après l'accord de l'utilisateur, la branche du run est publiée en PR liée à l'issue", async () => {
+      const publies: unknown[] = [];
+      const { s, tache, questions } = await runFini({ repondre: () => "Oui, cette fois", publierPr: async (o) => (publies.push(o), { ok: true, url: "https://github.com/org/app/pull/99", nouvelle: true }) });
+      const r = await s.appel("skraft_pr", { tache });
+      expect(r).toEqual({ erreur: false, texte: expect.stringContaining("https://github.com/org/app/pull/99") });
+      expect(questions.at(-1)).toMatch(/^Publier la PR de org\/app#12 \?[\s\S]*skraft\/demo[\s\S]*Closes #12/);
+      expect(publies).toEqual([expect.objectContaining({ ref: expect.objectContaining({ owner: "org", repo: "app", numero: 12 }), branche: "skraft/demo", bilan: "Bilan : terminé." })]);
+      await s.fermer();
+    }, 30_000);
+
+    it("skraft_pr : refusé par l'utilisateur, ou client qui ne sait pas demander : rien n'est publié", async () => {
+      const publies: unknown[] = [];
+      const publierPr = async (o: unknown) => (publies.push(o), { ok: true as const, url: "u", nouvelle: true });
+      const non = await runFini({ repondre: () => "Non", publierPr });
+      expect(await non.s.appel("skraft_pr", { tache: non.tache })).toEqual({ erreur: true, texte: expect.stringMatching(/Rien n'a été publié/) });
+      await non.s.fermer();
+      const muet = await runFini({ publierPr });
+      expect(await muet.s.appel("skraft_pr", { tache: muet.tache })).toEqual({ erreur: true, texte: expect.stringMatching(/accord[\s\S]*gh pr create/) });
+      await muet.s.fermer();
+      expect(publies).toEqual([]);
+    }, 60_000);
+
+    it("skraft_pr : un run qui ne vient pas d'une issue demande l'issue ; un run inconnu est refusé", async () => {
+      const publies: unknown[] = [];
+      const { s, tache } = await runFini({ story: "stories/US-2.md", repondre: () => "Oui, cette fois", publierPr: async (o) => (publies.push(o), { ok: true, url: "u", nouvelle: true }) });
+      expect(await s.appel("skraft_pr", { tache })).toEqual({ erreur: true, texte: expect.stringMatching(/issue/) });
+      expect((await s.appel("skraft_pr", { tache, issue: "org/app#3" })).erreur).toBe(false);
+      expect(publies).toEqual([expect.objectContaining({ ref: expect.objectContaining({ numero: 3 }) })]);
+      expect(await s.appel("skraft_pr", { tache: "inconnue" })).toEqual({ erreur: true, texte: expect.stringMatching(/inconnu/) });
+      await s.fermer();
+    }, 30_000);
+
+    it("un fichier de story ordinaire ne passe pas par la préparation", async () => {
+      const p = await projet();
+      const appels: string[] = [];
+      const s = await serveur(p, { pid: 1, vivants: new Set([1]), preparerUs: async (t) => (appels.push(t), { ok: false, motif: "x" }) });
+      expect((await s.appel("skraft_demarrer", { story: "stories/US-2.md", accord: "une-fois" })).erreur).toBe(false);
+      expect(appels).toEqual([]);
       await s.fermer();
     }, 30_000);
   });

@@ -96,7 +96,7 @@ l'on a démarré `copilot`. Ce que Copilot CLI fait du serveur, vu à l'essai :
 Copilot CLI n'affiche pas les prompts MCP comme des commandes, mais il affiche chaque **skill** en
 `/<nom>`, comme Claude Code. Les mêmes skills servent donc aux deux clients. `skills/` en contient un par outil : `/skraft-connexion`, `/skraft-pile`,
 `/skraft-demarrer`, `/skraft-attendre`, `/skraft-etat`, `/skraft-repondre`, `/skraft-rapport`,
-`/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
+`/skraft-pr`, `/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
 suit la commande (`/skraft-demarrer stories/US-2.md auto`), et que les questions reviennent à
 l'utilisateur.
 
@@ -172,6 +172,26 @@ une question (Copilot CLI en mode interactif, par exemple) : le serveur demande 
 l'accepter pour ce projet, une fois ou toujours (ADR 0075). L'administrateur l'interdit par
 `"programConsent": false`. Sans question possible, ou sur un « non », la pile est refusée, avec la
 liste en vigueur et son origine : le fichier lu, ou celui qui était attendu et manquait.
+
+## Une story donnée par une issue GitHub
+
+`skraft_demarrer { story: "https://github.com/org/app/issues/12" }` (ou `org/app#12`), ou
+`/skraft-demarrer org/app#12` (ADR 0078). Une fois le workflow accepté :
+1. le serveur vérifie `gh` : installé, connecté à l'hôte de l'issue, dépôt lisible. Sinon, il dit
+   quoi faire ;
+2. il lit, en lecture seule, l'issue, ses commentaires, sa parente, ses sous-issues, ce qui la
+   bloque, ce qu'elle bloque, et les issues citées (un niveau, dix au plus) ;
+3. **si une issue qui la bloque est encore ouverte, il ne démarre pas** ;
+4. il écrit `.skraft/github/US-12-contexte.md` (tout ce qui a été lu) et `.skraft/github/US-12.md`,
+   la story. Une issue déjà au format, sans commentaire, est reprise telle quelle. Sinon, un agent
+   la met en forme, et le code vérifie qu'aucune valeur d'un critère n'est inventée (trois essais
+   au plus). Ce qui reste incertain va dans « Questions ouvertes », posées avant RESEARCH ;
+5. le run part sur cette story, et ses agents lisent le contexte ;
+6. le run fini, **`skraft_pr`** (`/skraft-pr`) publie le travail. Après l'accord de l'utilisateur,
+   demandé par le client à chaque fois, il pousse la branche `skraft/<slug>` et ouvre une PR sur la
+   branche par défaut, liée à l'issue (« Closes #12 »). Le remote `origin` doit être le dépôt de
+   l'issue. Une PR déjà ouverte pour la branche est rendue telle quelle. Sans question possible,
+   rien n'est publié, et le message donne les commandes à lancer soi-même.
 
 ## La pile du projet
 
@@ -255,6 +275,7 @@ buildErrors:
 | `skraft_etat` | `projet` | JSON : mode du serveur (pilote ou consultation), workflow et accord, pile retenue, runs (phase, étape, dernier rejet, usage, et **`progression`**, la ligne à montrer telle quelle), **questions en attente** (identifiant, options, profils, réponse libre), derniers messages. |
 | `skraft_attendre` | `tache`, `delai` (secondes, 30 par défaut, 50 au plus : un client MCP abandonne souvent un appel au-delà de 60 s), `projet` | **Attend un changement**, puis rend ce qui a changé **depuis le dernier appel** (phase, étape, rejet avec sa porte et son motif, lus dans la trace du run, question à poser, réponse reçue, message, fin), la ligne de progression de chaque run, les questions en attente et `termine`. Rien ne se perd entre deux appels. Run déjà fini : réponse immédiate. |
 | `skraft_repondre` | `question`, `option`, `texte`, `projet` | Répond à une question en attente, par l'identifiant et l'option lus dans `skraft_etat` ; `texte` : réponse libre ou commentaire. L'hôte pose la question à l'utilisateur, il ne répond jamais à sa place. |
+| `skraft_pr` | `tache`, `issue`, `projet` | Publie un run fini dont la story vient d'une issue : pousse `skraft/<slug>` et ouvre une PR liée à l'issue (« Closes #n »), après l'accord de l'utilisateur. `issue` : l'issue à lier, si la story n'en était pas une. |
 | `skraft_rapport` | `tache`, `projet` | JSON : statut (`en-cours`, `fini`, `echec`, `annule`), valeur ou motif, messages (dont le bilan final), dernier rejet, arbitrages, et **étapes** (une par phase et par rejeu : début, fin, durée, tours, rejets, unités Copilot `aiu`, coût Claude `coutUsd`, modèles). |
 | `skraft_reprendre` | `projet` | Prend la main si aucun autre serveur ne pilote le projet, et reprend les runs interrompus (rejeu du journal). |
 | `skraft_arreter` | `tache`, `projet` | Abandonne un run ; ses questions en attente sont annulées. |

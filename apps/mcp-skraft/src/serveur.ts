@@ -14,6 +14,7 @@ import type { Connexion } from "./connexion.js";
 import type { Depots } from "./depots.js";
 import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet, type ProjetResolu } from "./projet.js";
+import { lireRefIssue, type RefIssue } from "@agent-studio/github-auth";
 import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
 
 export interface OptionsServeur {
@@ -29,6 +30,13 @@ export interface OptionsServeur {
   pid?: number;
   /** Connexion à GitHub, exigée par les outils qui font travailler les agents (point 7). */
   connexion: Pick<Connexion, "verifier" | "connecter">;
+  /**
+   * Prépare une story donnée par une issue GitHub (ADR 0078) : la lit avec ses dépendances, refuse si
+   * elle est bloquée, écrit la story et son contexte dans le projet. Absente, une issue est refusée.
+   */
+  preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }>;
+  /** Pousse la branche d'un run fini et ouvre sa PR liée à l'issue (ADR 0078), l'accord de l'utilisateur obtenu. */
+  publierPr?: (o: { root: string; ref: RefIssue; branche: string; bilan: string }) => Promise<{ ok: true; url: string; nouvelle: boolean } | { ok: false; motif: string }>;
   /** Dépôts acceptés « toujours » par l'utilisateur (ADR 0075) ; sans, « toujours » vaut pour ce serveur. */
   depots?: Depots;
   version?: string;
@@ -126,7 +134,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       description:
         "Démarre skraft sur une user story : recherche, conception, scénarios, TDD, revues. Le run tourne en arrière-plan ; suis-le avec skraft_etat. Au premier lancement, rend l'accord à faire valider par l'utilisateur.",
       inputSchema: {
-        story: sansEspace("Le chemin de la story").describe("Fichier de la user story, relatif au projet."),
+        story: sansEspace("Le chemin de la story").describe("Fichier de la user story, relatif au projet ; ou une issue GitHub (URL d'issue, ou org/dépôt#n), lue avec ses commentaires et ses dépendances (ADR 0078)."),
         auto: z.boolean().optional().describe("Retenir la difficulté proposée sans la faire confirmer."),
         archi: sansEspace("Le nom du skill d'architecture").optional().describe("Skill d'architecture (par son nom ou son langage, ex. java) ; par défaut la clean architecture."),
         pile: z
@@ -151,13 +159,23 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
             'Montre ce résumé à l\'utilisateur. S\'il accepte, rappelle skraft_demarrer avec les mêmes arguments et accord: "une-fois" (ce lancement seulement) ou accord: "toujours" (retenu tant que le workflow ne change pas).',
           ].join("\n\n"),
         );
-      const args = [a.story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
+      // Une issue GitHub (ADR 0078) : préparée seulement maintenant, l'accord donné, pour ne pas la lire deux fois.
+      let story = a.story;
+      const notes: string[] = [];
+      if (lireRefIssue(a.story)) {
+        if (!o.preparerUs) return erreur("Une issue GitHub ne peut pas servir de story ici : donne le chemin d'un fichier de story.");
+        const prep = await o.preparerUs(a.story, p.root);
+        if (!prep.ok) return erreur(prep.motif);
+        story = prep.chemin;
+        notes.push(...prep.notes);
+      }
+      const args = [story, ...(a.auto ? ["--auto"] : []), ...(a.archi ? ["--archi", a.archi] : [])].join(" ");
       const r = await p.services.lancerWorkflow(w.nom, args, a.accord ? { accord: a.accord } : {});
       if (!r.ok) return erreur(r.motif);
       storyDe.set(r.taskId, a.story);
       const pile = p.services.pile();
       const ignoree = a.pile !== undefined && pile.source !== "client" ? ` La pile fournie est ignorée : le projet a la sienne (${pile.id}, ${pile.source === "projet" ? "profil du projet" : "détection"}).` : "";
-      return texte(`Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
+      return texte(`${notes.map((n) => `${n}\n`).join("")}Workflow « ${w.nom} » lancé : tâche ${r.taskId}. Suis-le avec skraft_etat ; ses questions s'y affichent, réponds-y avec skraft_repondre.${ignoree}`);
     }, { agents: true }),
   );
 
@@ -367,6 +385,49 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         return erreur(e instanceof Error ? e.message : String(e));
       }
     },
+  );
+
+  /**
+   * La PR d'un run fini dont la story vient d'une issue (ADR 0078) : la branche du run est poussée et
+   * une PR liée à l'issue est ouverte. C'est une publication : l'utilisateur l'accepte par le client,
+   * à chaque fois ; sans question possible, rien n'est publié.
+   */
+  mcp.registerTool(
+    "skraft_pr",
+    {
+      description:
+        "Publie le travail d'un run fini : pousse sa branche skraft/<slug> et ouvre une PR liée à l'issue de la story (« Closes #n »), après l'accord de l'utilisateur, que le client lui demande. Pour un run dont la story n'était pas une issue, donne l'issue dans `issue`.",
+      inputSchema: {
+        tache: z.string().min(1),
+        issue: sansEspace("L'issue").optional().describe("L'issue à lier (URL ou org/dépôt#n), si la story du run n'en était pas une."),
+        projet,
+      },
+    },
+    outil(async (p, a) => {
+      const rapport = await p.services.rapportWorkflow(a.tache);
+      if (!rapport) return erreur(`Run inconnu dans ce projet : ${a.tache}.`);
+      if (rapport.statut !== "fini") return erreur(`Le run ${a.tache} n'est pas fini (${rapport.statut}) : rien à publier.`);
+      const ref = lireRefIssue(a.issue ?? storyDe.get(a.tache) ?? "");
+      if (!ref) return erreur("La story de ce run n'était pas une issue GitHub : donne l'issue à lier dans `issue` (URL ou org/dépôt#n).");
+      if (!o.publierPr) return erreur("La publication de PR n'est pas disponible sur ce serveur.");
+      const slug = (rapport.valeur as { slug?: unknown } | undefined)?.slug;
+      if (typeof slug !== "string") return erreur("Le run ne dit pas sa branche (pas de slug dans son rapport) : rien n'est publié.");
+      const branche = `skraft/${slug}`;
+      const nom = `${ref.owner}/${ref.repo}#${ref.numero}`;
+      if (!confirmer.peutDemander())
+        return erreur(
+          `Publier la PR demande ton accord, et ce client ne sait pas le demander : rien n'a été publié. Pour la publier toi-même : \`git push -u origin ${branche}\`, puis \`gh pr create --head ${branche}\` avec « Closes #${ref.numero} » dans la description.`,
+        );
+      const reponse = await confirmer.confirm({
+        title: `Publier la PR de ${nom} ?`,
+        detail: `skraft va pousser la branche ${branche} et ouvrir une PR sur ${ref.owner}/${ref.repo}, liée à l'issue (Closes #${ref.numero}). C'est une publication sur GitHub.`,
+      });
+      if (reponse === "deny") return erreur("Rien n'a été publié : l'accord n'a pas été donné.");
+      const bilan = rapport.messages.filter((m) => /bilan/i.test(m)).at(-1) ?? rapport.messages.at(-1) ?? "";
+      const r = await o.publierPr({ root: p.root, ref, branche, bilan });
+      if (!r.ok) return erreur(r.motif);
+      return texte(r.nouvelle ? `PR ouverte : ${r.url}. La branche ${branche} est poussée.` : `Une PR était déjà ouverte pour ${branche} : ${r.url}. La branche est poussée à jour.`);
+    }, { agents: false }),
   );
 
   /**

@@ -5,6 +5,49 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — Une US donnée par une issue GitHub (ADR 0078)
+
+- **Décidé par le responsable** :
+  - lire l'US et toutes ses dépendances, après avoir vérifié `gh` ;
+  - les commentaires font partie de l'US ;
+  - lire les issues et écrire les PR ;
+  - une US bloquée par une issue ouverte ne démarre pas.
+- **Fait** :
+  - `github-auth/issues.ts` : vérification de `gh`, lecture en lecture seule (issue, commentaires,
+    parente, sous-issues, bloquée par, bloque, citées ; un niveau, dix au plus), `bloqueursOuverts`,
+    `rendreContexte` ;
+  - `mcp-skraft/us-github.ts` : refus si bloquée, écriture du contexte et de la story. La story est
+    reprise telle quelle, ou mise en forme par un agent (`redacteur-us.ts`, qui n'écrit que ce
+    fichier), puis vérifiée par le code avec `parseStory` et `extractLiterals` du workflow ;
+  - `skraft_demarrer` accepte une issue, préparée seulement après l'accord sur le workflow.
+- **Pièges** :
+  - un 404 sur `parent` veut dire « pas de parente », mais un 404 sur une liste veut dire « API
+    absente » ;
+  - `extractLiterals` ne garde pas « € » comme unité : le motif dit « 750 ».
+- **Essai réel** : `cli/cli#14996`, 73 s, story de 19 critères vérifiée.
+- **PR à la fin, faite** : `skraft_pr` (`/skraft-pr`, `pr-github.ts`).
+  - Le run doit être fini et sa story une issue.
+  - L'utilisateur accepte par le client, à chaque fois.
+  - `origin` doit être le dépôt de l'issue ; le push passe par l'aide d'identification de `gh` ; une
+    PR déjà ouverte est rendue.
+  - Testé avec `git` et `gh` doublés. Aucune vraie PR ouverte : ce serait une publication, à faire
+    avec le responsable.
+- **Essai sur le dépôt d'exemple** : issue créée à la demande du responsable,
+  `freecompub/exemple-dotnet-tdd#2`, « US-7 — Livraison offerte au-delà d'un seuil », en prose, avec
+  un commentaire du PO qui tranche « après remises ». Trois défauts vus et corrigés :
+  - l'identifiant venait du numéro de l'issue (`US-2`, qui existe déjà dans ce dépôt). Un
+    identifiant en tête du titre l'emporte désormais, pour la story comme pour le titre de la PR ;
+  - l'agent coupait des critères sur deux lignes, et `parseStory` n'en lit que la première. C'est
+    désormais refusé, et le prompt le dit ;
+  - « - Aucune : … » sous « Questions ouvertes » aurait été posée comme une question. Une question
+    ouverte doit finir par « ? », sinon c'est refusé.
+  - Résultat final en 20 s : cinq critères d'une ligne, la décision du commentaire intégrée.
+- **Reste** :
+  - l'application de bureau ;
+  - un run complet sur une issue.
+
+---
+
 ## 10/11 — Faux rejet des ADR historiques et contexte DESIGN
 
 - **Demande** : corriger ensemble, sur une nouvelle branche, le faux rejet de cohérence ADR et la
