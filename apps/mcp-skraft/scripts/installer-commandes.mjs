@@ -18,14 +18,17 @@ import { fileURLToPath } from "node:url";
 /**
  * `home` et `env` : par défaut ceux du processus. `CLAUDE_CONFIG_DIR` et `COPILOT_HOME` déplacent la
  * configuration de chaque client, et donc ses skills.
- * @param {{ source: string; home?: string; env?: Record<string, string | undefined>; projet?: string; retirer?: boolean }} o
+ * `clients` : chez qui poser les liens (par défaut les deux) ; sans effet avec `projet`, dont le
+ * `.claude/skills` est lu par les deux.
+ * @param {{ source: string; home?: string; env?: Record<string, string | undefined>; projet?: string; retirer?: boolean; clients?: ("claude" | "copilot")[] }} o
  */
 export async function installerCommandes(o) {
   const source = resolve(o.source);
   const home = o.home ?? homedir();
   const env = o.env ?? process.env;
   const noms = (await readdir(source, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name).sort();
-  const cibles = o.projet ? [join(o.projet, ".claude", "skills")] : [join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "skills"), join(env.COPILOT_HOME || join(home, ".copilot"), "skills")];
+  const dossierDe = { claude: join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "skills"), copilot: join(env.COPILOT_HOME || join(home, ".copilot"), "skills") };
+  const cibles = o.projet ? [join(o.projet, ".claude", "skills")] : (o.clients ?? ["claude", "copilot"]).map((c) => dossierDe[c]);
   const poses = [];
   const retires = [];
   const refuses = [];

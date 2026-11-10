@@ -105,6 +105,23 @@ describe("deployer", () => {
     ]);
   });
 
+  it("les commandes ne sont posées que pour les clients trouvés, ou celui de --client", async () => {
+    const appels: { clients?: string[] }[] = [];
+    const installer = async (o: { clients?: string[] }) => (appels.push(o), { poses: [], retires: [], refuses: [] });
+    await deployer({ racine: RACINE, sansBuild: true }, { ...doublure({ clients: ["copilot"] }).deps, installerCommandes: installer });
+    await deployer({ racine: RACINE, sansBuild: true, client: "claude" }, { ...doublure().deps, installerCommandes: installer });
+    await deployer({ racine: RACINE, sansBuild: true }, { ...doublure({ clients: [] }).deps, installerCommandes: installer });
+    expect(appels.map((a) => a.clients)).toEqual([["copilot"], ["claude"], []]);
+  });
+
+  it("désinstaller sans --client retire nos liens chez les deux clients, même absents ; avec --client, chez lui seul", async () => {
+    const appels: { clients?: string[] }[] = [];
+    const installer = async (o: { clients?: string[] }) => (appels.push(o), { poses: [], retires: [], refuses: [] });
+    await deployer({ racine: RACINE, desinstaller: true, home: tmp }, { ...doublure({ clients: [] }).deps, installerCommandes: installer });
+    await deployer({ racine: RACINE, desinstaller: true, home: tmp, client: "copilot" }, { ...doublure().deps, installerCommandes: installer });
+    expect(appels.map((a) => a.clients)).toEqual([["copilot", "claude"], ["copilot"]]);
+  });
+
   it("--client limite à un client ; --sans-commandes ne pose rien", async () => {
     const d = doublure();
     let poses = 0;

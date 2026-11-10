@@ -35,6 +35,13 @@ describe("installerCommandes", () => {
     expect(await readlink(join(home, "conf-copilot", "skills", "skraft-etat"))).toBe(join(SOURCE, "skraft-etat"));
   });
 
+  it("clients : les liens ne vont que chez les clients demandés", async () => {
+    const r = await installerCommandes({ source: SOURCE, home, env: {}, clients: ["copilot"] });
+    expect(r.poses.every((l) => l.startsWith(join(home, ".copilot")))).toBe(true);
+    expect(r.poses).toHaveLength(9);
+    await expect(lstat(join(home, ".claude"))).rejects.toThrow();
+  });
+
   it("projet : un lien par skill dans <projet>/.claude/skills, que les deux clients lisent", async () => {
     const projet = join(home, "projet");
     const r = await installerCommandes({ source: SOURCE, home, projet, env: {} });

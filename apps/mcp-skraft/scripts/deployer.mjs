@@ -94,9 +94,11 @@ async function desinscrire(client, o, deps, main, lignes) {
 async function desinstaller(o, deps) {
   const lignes = [];
   const main = join(o.racine, "dist", "main.mjs");
-  for (const client of o.client ? [o.client] : ["copilot", "claude"]) await desinscrire(client, o, deps, main, lignes);
+  const clients = o.client ? [o.client] : ["copilot", "claude"];
+  for (const client of clients) await desinscrire(client, o, deps, main, lignes);
   if (!o.sansCommandes) {
-    const r = await deps.installerCommandes({ source: join(o.racine, "skills"), retirer: true, ...(o.projet ? { projet: o.projet } : {}) });
+    // Chez les deux clients, même absents : seuls nos liens partent, et d'anciens liens sont nettoyés.
+    const r = await deps.installerCommandes({ source: join(o.racine, "skills"), retirer: true, clients, ...(o.projet ? { projet: o.projet } : {}) });
     lignes.push(`Commandes /skraft-… : ${r.retires.length} lien${r.retires.length > 1 ? "s" : ""} retiré${r.retires.length > 1 ? "s" : ""}.`, ...r.refuses);
   }
   // Le dossier des données du serveur (assemblage.ts) : runs, journaux, piles fournies, accords.
@@ -162,10 +164,12 @@ export async function deployer(o, deps = depsReelles) {
   }
   const main = join(o.racine, "dist", "main.mjs");
   let ok = true;
+  const clients = o.client ? [o.client] : ["copilot", "claude"];
   // `inscrire` rend `false` sur un échec du client ; un client absent ou déjà inscrit n'en est pas un.
-  for (const client of o.client ? [o.client] : ["copilot", "claude"]) if ((await inscrire(client, o, deps, main, lignes)) === false) ok = false;
+  for (const client of clients) if ((await inscrire(client, o, deps, main, lignes)) === false) ok = false;
   if (!o.sansCommandes) {
-    const r = await deps.installerCommandes({ source: join(o.racine, "skills"), ...(o.projet ? { projet: o.projet } : {}) });
+    // Les commandes suivent la même règle que le serveur : seulement pour les clients trouvés.
+    const r = await deps.installerCommandes({ source: join(o.racine, "skills"), clients: clients.filter((c) => deps.trouver(c)), ...(o.projet ? { projet: o.projet } : {}) });
     lignes.push(`Commandes /skraft-… : ${r.poses.length} lien${r.poses.length > 1 ? "s" : ""} posé${r.poses.length > 1 ? "s" : ""}.`, ...r.refuses);
   }
   return { lignes, ok };

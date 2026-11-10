@@ -41,7 +41,7 @@ pnpm --filter @agent-studio/mcp-skraft deployer -- --env AGENT_STUDIO_ADMIN_CONF
 
 | Option | Effet |
 |---|---|
-| `--client copilot` ou `--client claude` | Un seul client. Sans elle, chaque client trouvé dans le PATH. |
+| `--client copilot` ou `--client claude` | Un seul client. Sans elle, chaque client trouvé dans le PATH (`copilot`, `claude`). Le serveur et les commandes ne sont posés que pour ces clients-là. |
 | `--env CLE=valeur` | Variable donnée au serveur (répétable) : `SKRAFT_MCP_CONFIG`, `AGENT_STUDIO_ADMIN_CONFIG`… |
 | `--remplacer` | Remplace une inscription `skraft` différente. Sans elle, une inscription existante n'est jamais touchée : la retirer efface ses variables. |
 | `--sans-build`, `--sans-commandes` | Saute une étape. |

@@ -21,6 +21,10 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   - réel, dans des configurations isolées : inscription dans les deux clients, relance sans rien
     toucher ;
   - le paquet installé hors du dépôt démarre (`skraft-mcp`).
+- **Quel client** : le script cherche `copilot` et `claude` dans le PATH. Le serveur **et** les
+  commandes ne sont posés que pour les clients trouvés, ou pour celui de `--client`. Jusque-là, les
+  commandes allaient aux deux clients, même absents. La désinstallation sans `--client` retire nos
+  liens chez les deux, pour nettoyer d'anciens liens.
 - **Désinstaller** : `deployer -- --desinstaller`.
   - Il retire l'inscription si elle pointe vers ce serveur (sinon seulement avec `--forcer`), et
     nos liens seuls.
