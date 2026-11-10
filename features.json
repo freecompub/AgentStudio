@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-10-10",
-  "branch": "feat/workflow-rejouable",
+  "updated": "2026-11-10",
+  "branch": "fix/design-context-options",
   "items": [
     {
       "id": "banc-modeles-par-role",
@@ -1226,6 +1226,13 @@
       "verify": "pnpm vitest run --project project-services test/stack-command.test.ts test/decouverte-de-pile-agent.test.ts test/workspace-services.test.ts && pnpm vitest run --project mcp-skraft test/serveur.test.ts test/consignes.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-09. Essai réel avec Copilot sur un projet ambigu : question posée, puis réponse donnée, découverte aboutie en 53 s. Limite connue : Copilot abandonne un appel d'outil après 3 minutes."
+    },
+    {
+      "id": "skraft-design-adr-context-options",
+      "title": "DESIGN lit les ADR historiques à titre séparé par deux-points sans les réécrire ; les architectes demandent effort high et contexte long vérifié pour 1M (ADR 0077)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft --project core --project runtime-copilot --project runtime-claude --project extension-manifest --project extension-host --project workflow extensions/skraft/test/adr.test.ts extensions/skraft/test/design-gate.test.ts extensions/skraft/test/manifest.test.ts tests/workflow-skraft/test/adr.test.ts tests/workflow-skraft/test/design-gate.test.ts tests/workflow-skraft/test/skills.test.ts packages/core/test/task-agent-runner.test.ts packages/runtime-copilot/test/copilot-runtime.test.ts packages/runtime-claude/test/traduction.test.ts packages/runtime-claude/test/runtime.test.ts packages/extension-manifest/test/validate.test.ts packages/extension-host/test/in-process-host.test.ts packages/workflow/test/activer.test.ts",
+      "passes": true,
+      "notes": "Fait le 2026-11-10 (branche fix/design-context-options). Le parseur accepte les titres ADR avec deux-points ; les contrôles de statut, doublon et supersession restent stricts. Les deux rôles architectes de DESIGN demandent high/long_context dans les deux skraft. Copilot refuse un modèle qui n'annonce pas high et le tier long-context d'au moins 1M ; Claude passe --effort high et l'alias [1m]. Vérification : 242 tests ciblés verts, pnpm typecheck vert ; pas de run Copilot réel dans cette tâche."
     }
   ]
 }

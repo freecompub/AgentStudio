@@ -36,7 +36,7 @@ const META = (corps = "") => `export const meta = {
   phases: { REDACTION: "Rédaction" },
   permissions: { ecriture: [".skraft/**"], tests: false, git: ["commit"] },
   agents: {
-    redacteur: { prompt: "agents/redacteur.agent.md", consignes: "Réponds en une phrase.", ecriture: [".skraft/**"], outils: ["list_files"], sortie: "report_phase", classe: "light" },
+    redacteur: { prompt: "agents/redacteur.agent.md", consignes: "Réponds en une phrase.", ecriture: [".skraft/**"], outils: ["list_files"], sortie: "report_phase", classe: "light", reasoningEffort: "high", contextTier: "long_context" },
   },
 };
 export default async function (w, entree) {
@@ -140,7 +140,7 @@ describe("manifeste interne fabriqué depuis le meta", () => {
     const m = manifesteDuWorkflow(w);
     expect(m.id).toBe("workflow.demo");
     expect(m.permissions).toEqual(["fs:read", "fs:write:.skraft/**", "git:commit", "copilot:sessions"]);
-    expect(m.contributes.agents?.[0]).toMatchObject({ name: "redacteur", prompt: "agents/redacteur.agent.md", role: "Réponds en une phrase.", output: "report_phase", write: [".skraft/**"], tools: ["list_files"], modelClass: "light" });
+    expect(m.contributes.agents?.[0]).toMatchObject({ name: "redacteur", prompt: "agents/redacteur.agent.md", role: "Réponds en une phrase.", output: "report_phase", write: [".skraft/**"], tools: ["list_files"], modelClass: "light", reasoningEffort: "high", contextTier: "long_context" });
     expect(m.contributes.commands?.[0]?.name).toBe("demo");
   });
 });

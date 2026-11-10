@@ -47,6 +47,8 @@ export function manifesteDuWorkflow(w: WorkflowTrouve): ExtensionManifest {
         ...(a.outils ? { tools: [...a.outils] } : {}),
         ...(a.skills ? { skills: { ...(a.skills.obligatoires ? { mandatory: [...a.skills.obligatoires] } : {}), ...(a.skills.aLaDemande ? { onDemand: [...a.skills.aLaDemande] } : {}) } } : {}),
         ...(a.classe ? { modelClass: a.classe } : {}),
+        ...(a.reasoningEffort ? { reasoningEffort: a.reasoningEffort } : {}),
+        ...(a.contextTier ? { contextTier: a.contextTier } : {}),
         ...(a.memoire ? { memoire: a.memoire } : {}),
       })),
       skills: skills.map((name) => ({ name, path: `skills/${name}` })),

@@ -1,4 +1,4 @@
-import type { SessionConfigBase } from "@github/copilot-sdk";
+import type { ModelInfo, SessionConfigBase } from "@github/copilot-sdk";
 import type { AgentEvent, AgentRuntime, AgentSession, AgentSessionConfig, Logger, ToolCallRequest } from "@agent-studio/core";
 import { mapSessionEvent } from "./events/map-session-event.js";
 import { createPermissionHandler } from "./permissions/permission-handler.js";
@@ -16,6 +16,7 @@ const cible = (r: ToolCallRequest): string | undefined => r.command ?? r.path ??
 /** Adaptateur `AgentRuntime` pour le Copilot SDK (D3, D35). */
 export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
   const { client, logger } = deps;
+  let modelCatalog: Promise<ModelInfo[]> | undefined;
 
   function sessionOptions(cfg: AgentSessionConfig, emettre: (e: AgentEvent) => void): SessionConfigBase {
     return {
@@ -43,7 +44,29 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
           }),
       }),
       ...(cfg.model ? { model: cfg.model } : {}),
+      ...(cfg.reasoningEffort ? { reasoningEffort: cfg.reasoningEffort } : {}),
+      ...(cfg.contextTier ? { contextTier: cfg.contextTier } : {}),
     };
+  }
+
+  async function verifierOptionsModele(cfg: AgentSessionConfig): Promise<void> {
+    if (!cfg.reasoningEffort && cfg.contextTier !== "long_context") return;
+    if (!cfg.model) throw new Error("Un modèle explicite est requis pour vérifier l'effort et le contexte demandés.");
+
+    modelCatalog ??= client.listModels().catch((err: unknown) => {
+      modelCatalog = undefined;
+      throw err;
+    });
+    const models = await modelCatalog;
+    const model = models.find((m) => m.id === cfg.model);
+    if (!model) throw new Error(`Le modèle « ${cfg.model} » est absent de la liste de capacités Copilot.`);
+    if (cfg.reasoningEffort && !model.supportedReasoningEfforts?.includes(cfg.reasoningEffort))
+      throw new Error(`Le modèle « ${cfg.model} » ne déclare pas l'effort ${cfg.reasoningEffort}.`);
+    if (
+      cfg.contextTier === "long_context" &&
+      (!model.billing?.tokenPrices?.longContext || model.capabilities.limits.max_context_window_tokens < 1_000_000)
+    )
+      throw new Error(`Le modèle « ${cfg.model} » ne déclare pas de contexte Copilot d'au moins 1M tokens.`);
   }
 
   /** Enveloppe : seule l'interface du port sort de ce paquet (D10). */
@@ -112,12 +135,14 @@ export function createCopilotRuntime(deps: CopilotRuntimeDeps): AgentRuntime {
       for (const e of errors) logger?.warn("erreur à l'arrêt du runtime", { error: e.message });
     },
     async openSession(cfg) {
+      await verifierOptionsModele(cfg);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.createSession(sessionOptions(cfg, broadcast));
       logger?.info("session ouverte", { sessionId: sdk.sessionId, role: cfg.role });
       return wrap(sdk, listeners);
     },
     async resumeSession(id, cfg) {
+      await verifierOptionsModele(cfg);
       const { listeners, broadcast } = listenerSet();
       const sdk = await client.resumeSession(id, sessionOptions(cfg, broadcast));
       logger?.info("session reprise", { sessionId: sdk.sessionId, role: cfg.role });

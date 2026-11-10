@@ -98,7 +98,7 @@ describe("Porte cohérence (SPEC-skraft §7.2, fixtures §13.2)", () => {
     // ADR-002 a été archivé avant cette story : l'agent ne peut pas le recréer, et le lui
     // reprocher ferait échouer DESIGN jusqu'à épuisement du budget, sur chaque tentative.
     const existants = [
-      { path: "a1", md: adr(1), isNew: false },
+      { path: "a1", md: adr(1).replace("# ADR-001 —", "# ADR-001:"), isNew: false },
       { path: "a3", md: adr(3), isNew: false },
     ];
     expect(checkDesign(input({ adrs: existants }))).toEqual([]);

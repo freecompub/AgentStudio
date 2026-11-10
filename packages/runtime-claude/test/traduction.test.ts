@@ -50,6 +50,16 @@ describe("arguments d'un tour", () => {
     expect(a[a.indexOf("--model") + 1]).toBe("claude-sonnet-5");
     expect(a[a.indexOf("--max-budget-usd") + 1]).toBe("2");
   });
+
+  it("effort élevé et alias Claude 1M sont demandés pour DESIGN", () => {
+    const a = argumentsDuTour({ ...base, reprise: false, modele: "sonnet", reasoningEffort: "high", contextTier: "long_context" });
+    expect(a[a.indexOf("--effort") + 1]).toBe("high");
+    expect(a[a.indexOf("--model") + 1]).toBe("sonnet[1m]");
+  });
+
+  it("refuse de prétendre au contexte 1M pour un alias Claude non pris en charge", () => {
+    expect(() => argumentsDuTour({ ...base, reprise: false, modele: "haiku", contextTier: "long_context" })).toThrow(/1M/);
+  });
 });
 
 describe("traduction du flux stream-json", () => {
