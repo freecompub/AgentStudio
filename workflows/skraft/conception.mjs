@@ -108,12 +108,8 @@ async function porteCoherence(w, d, s, cp, essai) {
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
   const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
-  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
-  const disp = await w.disposition();
-  const sources = [];
-  for (const path of (await w.listerFichiers()).filter((p) => matchesAny(disp.sources, p) && !matchesAny([...disp.acceptanceTests, ...disp.unitTests], p)))
-    sources.push({ path, content: (await lire(path)) ?? "" });
-  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs, sources };
+  // La porte ne lit plus les sources du projet : elle juge ce que la story produit (11/11).
+  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `.skraft/${d.slug}/design/consistency-matrix.md`;

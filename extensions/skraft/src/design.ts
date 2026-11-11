@@ -13,8 +13,6 @@ export interface DesignInput {
   supersessions: string;
   /** ADR qui existaient au début de la phase et ont été modifiés ou supprimés. */
   modifiedExistingAdrs: string[];
-  /** Sources de production du projet : engagements structurels déjà en place (docs/15 §4.6). */
-  sources?: { path: string; content: string }[];
 }
 
 /**
@@ -300,33 +298,18 @@ const NE_RATIFIE_PLUS = ["Rejected", "Superseded", "Deprecated"];
 /** Texte des ADR encore valables, hors de leurs alternatives écartées. */
 const adrsValables = (i: DesignInput): string[] => i.adrs.filter((a) => !NE_RATIFIE_PLUS.includes(parseAdr(a.md).status)).map((a) => horsAlternatives(a.md));
 
-/**
- * Engagements déjà présents dans le code (phase 7.0 de solution-architect, mêmes signatures) : le
- * marqueur est le bus, pas un gestionnaire seul, qui peut n'être que la séparation CQS du projet.
- */
-const ENGAGEMENTS: { nom: string; signature: RegExp; ratifie: RegExp }[] = [
-  { nom: "CQRS avec bus", signature: /\bI?(?:Command|Query)Bus\b/, ratifie: /\bCQRS\b|bus de (?:commandes|requêtes)|(?:command|query) bus/i },
-  { nom: "Event Sourcing", signature: /\b(?:IEventStore|EventStream)\b/, ratifie: /event[ -]sourcing|event store/i },
-  { nom: "saga", signature: /Saga|ProcessManager|ICorrelatedBy/, ratifie: /\bsagas?\b|process manager/i },
-];
 const ANTICORRUPTION = /\bACL\b|anti-?corruption/i;
 
 /**
- * Engagements structurels sans ADR qui les ratifie (phases 7.0 et 7 de solution-architect) : ceux
- * que le code du projet porte déjà, et la couche anticorruption de la carte des contextes. Les
- * autres déclencheurs obligatoires d'ADR sont jugés par la lentille architecture : écrits en prose,
- * « pas de CQRS » tromperait une simple recherche.
+ * Engagements structurels que la conception de la story introduit sans ADR qui les ratifie : la
+ * couche anticorruption de sa carte des contextes. La porte juge ce que la story produit, pas
+ * l'existant (décision du responsable, 11/11) : la phase 7.0 du plugin, qui exigeait un ADR de
+ * rattrapage pour un engagement déjà dans le code, est retirée. Les autres déclencheurs d'ADR sont
+ * jugés par la lentille architecture : écrits en prose, « pas de CQRS » tromperait une recherche.
  */
 export function engagementsSansAdr(i: DesignInput): string[] {
   const reasons: string[] = [];
   const valables = adrsValables(i);
-  for (const e of ENGAGEMENTS) {
-    const fichiers = (i.sources ?? []).filter((s) => e.signature.test(s.content)).map((s) => s.path);
-    if (fichiers.length && !valables.some((t) => e.ratifie.test(t)))
-      reasons.push(
-        `Le code du projet contient un engagement structurel sans ADR : ${e.nom} (${fichiers.slice(0, 3).join(", ")}${fichiers.length > 3 ? ", …" : ""}). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.`,
-      );
-  }
   for (const l of (i.docs["context-map.md"] ?? "").split("\n")) {
     const m = RELATION.exec(l);
     if (m && ANTICORRUPTION.test(l) && !valables.some((t) => ANTICORRUPTION.test(t)))

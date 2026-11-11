@@ -560,13 +560,8 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   } catch {
     supersessions = "";
   }
-  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
-  const sources = await Promise.all(
-    fichiers
-      .filter((p) => matchesAny(ctx.stack.layout.sources, p) && !ctx.stack.isTestFile(p))
-      .map(async (path) => ({ path, content: await ctx.workspace.readFile(path).catch(() => "") })),
-  );
-  const input = { docs, adrs, supersessions, modifiedExistingAdrs, sources };
+  // La porte ne lit plus les sources du projet : elle juge ce que la story produit (11/11).
+  const input = { docs, adrs, supersessions, modifiedExistingAdrs };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `${dir}/consistency-matrix.md`;

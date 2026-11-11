@@ -1268,6 +1268,13 @@
       "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/stack-command.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10 (branche fix/outils-monorepo), après une découverte refusée trois fois sur un monorepo (souscription-dab, shell) : l'agent proposait ../../node_modules/.bin, et la règle refusait tout `..`."
+    },
+    {
+      "id": "design-adr-produits-seulement",
+      "title": "La porte de DESIGN juge les ADR que la story produit, pas l'existant : un engagement déjà présent dans le code (bus CQRS, event store, saga) n'exige plus d'ADR de rattrapage, et la porte ne lit plus les sources ; la couche anticorruption de la carte de la story reste à ratifier (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, après un run réel de LEC-1 (freecompub/AgentStudio#32) bloqué 40 min en DESIGN (21,27 $) : la phase 7.0 du plugin prenait les skills qui décrivent CQRS pour du code, et ne reconnaissait pas les ADR « ADR 0001 »."
     }
   ]
 }

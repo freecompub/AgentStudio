@@ -292,21 +292,20 @@ describe("Méthode de DESIGN vérifiée par le code (docs/15 §4.6)", () => {
     expect(checkDesign(input({ docs, adrs }))).toEqual([]);
   });
 
-  it("un engagement déjà dans le code (bus de commandes) sans ADR : rejet ; un ADR existant suffit (phase 7.0)", () => {
-    const sources = [{ path: "src/app/bus.ts", content: "export class CommandBus {}\n" }];
-    expect(checkDesign(input({ sources }))).toEqual([
-      "Le code du projet contient un engagement structurel sans ADR : CQRS avec bus (src/app/bus.ts). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.",
-    ]);
-    const adrs = [{ path: "docs/adr/adr-001-decision-1.md", md: adr(1, { status: "Accepted", decision: "CQRS avec bus de commandes." }), isNew: false }, input().adrs[1]!];
-    expect(checkDesign(input({ sources, adrs }))).toEqual([]);
+  // Décision du responsable (11/11) : la porte juge les ADR que la story produit, pas l'existant. La
+  // phase 7.0 du plugin (ADR de rattrapage pour un engagement déjà dans le code) est retirée : sur
+  // AgentStudio, elle a bloqué DESIGN en boucle sur des skills qui décrivent CQRS.
+  it("un engagement déjà présent dans le code n'est pas reproché : aucun ADR de rattrapage n'est exigé", () => {
+    const sources = [{ path: "src/app/bus.ts", content: "export class CommandBus {}\ninterface IEventStore {}\nclass PaiementSaga {}\n" }];
+    expect(checkDesign(input({ sources }))).toEqual([]);
   });
 
-  it("un ADR rejeté, ou une mention dans les alternatives, ne ratifie pas l'engagement", () => {
-    const sources = [{ path: "src/app/store.ts", content: "interface IEventStore {}\n" }];
-    const rejete = [{ path: "docs/adr/adr-001-decision-1.md", md: adr(1, { status: "Rejected", decision: "Event Sourcing." }), isNew: false }, input().adrs[1]!];
-    expect(checkDesign(input({ sources, adrs: rejete }))).toHaveLength(1);
-    const ecarte = [input().adrs[0]!, { path: "docs/adr/adr-002-decision-2.md", md: adr(2, { alternatives: "Event Sourcing : écarté." }), isNew: true }];
-    expect(checkDesign(input({ sources, adrs: ecarte }))).toHaveLength(1);
+  it("un ADR rejeté, ou une mention dans les alternatives, ne ratifie pas la couche anticorruption de la story", () => {
+    const docs = { ...input().docs, "context-map.md": carte("`Bolus` → `Patient` : ACL") };
+    const rejete = [{ path: "docs/adr/adr-001-decision-1.md", md: adr(1, { status: "Rejected", decision: "Couche anticorruption." }), isNew: false }, input().adrs[1]!];
+    expect(checkDesign(input({ docs, adrs: rejete }))).toHaveLength(1);
+    const ecarte = [input().adrs[0]!, { path: "docs/adr/adr-002-decision-2.md", md: adr(2, { alternatives: "Couche anticorruption : écartée." }), isNew: true }];
+    expect(checkDesign(input({ docs, adrs: ecarte }))).toHaveLength(1);
   });
 
   it("une commande ou un événement du modèle sans section dans contracts.md : rejet (phase 8)", () => {

@@ -43,8 +43,9 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
-  // Phase 7.0 de solution-architect (docs/15 §4.6) : la porte lit les sources du projet.
-  it("un bus de commandes déjà dans le code, sans ADR : DESIGN refusée, puis acceptée avec l'ADR de rattrapage", async () => {
+  // Phase 7.0 du plugin retirée le 11/11 (décision du responsable) : la porte juge ce que la story produit,
+  // pas l'existant. Un engagement déjà dans le code n'exige plus d'ADR de rattrapage.
+  it("un bus de commandes déjà dans le code, sans ADR : DESIGN n'est pas refusée, la ratification arrive au premier essai", async () => {
     await put(root, "src/app/command-bus.ts", "export class CommandBus {}\n");
     git(root, "add", "-A");
     git(root, "commit", "-qm", "bus");
@@ -56,7 +57,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
       await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
-      const args = decidePrompts.length === 1 ? ADR_ARGS : { ...ADR_ARGS, decision: `${ADR_ARGS.decision} Le bus de commandes existant (CQRS) est conservé.` };
+      const args = ADR_ARGS;
       await put(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md", renderAdr(1, args, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
@@ -69,8 +70,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
-    expect(decidePrompts).toHaveLength(2);
-    expect(decidePrompts[1]).toContain("Le code du projet contient un engagement structurel sans ADR : CQRS avec bus (src/app/command-bus.ts). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.");
+    expect(decidePrompts).toHaveLength(1);
   }, 120_000);
 
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {

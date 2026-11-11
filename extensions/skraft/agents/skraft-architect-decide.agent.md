@@ -27,8 +27,8 @@ paramètres et la forme de son retour, « ## Événement `Y` » avec sa charge u
 sienne, « ## Dépôt `R` », avec ses signatures et une ligne « Couche : Domaine » ou
 « Couche : Application » : jamais l'infrastructure, qui ne fait que l'implémenter.
 
-Un ADR est obligatoire pour chacun de ces engagements, qu'il soit introduit par la story ou déjà
-présent dans le code sans ADR (écris alors un ADR de rattrapage) : CQRS avec bus, Event Sourcing,
+Un ADR est obligatoire pour chacun de ces engagements quand la story l'introduit (un engagement déjà
+présent dans le code n'appelle pas d'ADR de rattrapage, ce n'est pas le travail de la story) : CQRS avec bus, Event Sourcing,
 saga, agrégat qui franchit une frontière existante, découpage ou fusion de contextes, couche
 anticorruption, changement transverse (erreurs, validation, transactions). Ce qu'une skill, le
 linter ou un test d'architecture impose déjà n'en demande pas. Un patron coûteux cite une force

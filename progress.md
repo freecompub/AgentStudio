@@ -5,6 +5,34 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/11 — Essai réel de LEC-1 sur AgentStudio, et la porte de DESIGN ne juge plus l'existant
+
+- **Essais sur les vraies issues d'AgentStudio** :
+  - #33 (LEC-2), bloquée par #32 : refusée. Le message nomme le bloqueur.
+  - #32 (LEC-1), au format et sans commentaire : reprise telle quelle et commitée sur
+    `skraft/lec-1`, sans agent.
+- **Run complet de LEC-1** (Claude, `scripts/essai-mcp-skraft.ts --installer`, pile cadrée dans un
+  clone : la commande de test ne lance que `acceptance/`, `lecons*` et les canaris, car les deux
+  projets entiers prennent 5 min 44 la passe) :
+  - RESEARCH en 4 min, avec cinq questions ouvertes pertinentes, auxquelles le répondeur a donné
+    « l'option la plus simple ». **À trancher par le responsable** avant le prochain run : run
+    annulé, escalade en attente, défaut accepté par l'humain, run rembobiné, second run sur une même
+    story ;
+  - DESIGN bloquée 36 min, en cinq essais, pour **21,27 $**, puis arrêtée : la porte réclamait un ADR
+    de rattrapage pour « CQRS avec bus », trouvé dans les skills de skraft, et ne reconnaissait pas
+    les ADR d'AgentStudio (`# ADR 0001 —`).
+- **Décision du responsable** : la porte juge les ADR que la story produit, pas l'existant.
+  - La phase 7.0 du plugin (`engagementsSansAdr` sur les sources) est retirée des deux copies.
+  - La porte ne lit plus les sources.
+  - La consigne « ADR de rattrapage » est retirée du prompt de l'architecte qui décide.
+  - La couche anticorruption de la carte de la story reste à ratifier.
+  - `docs/15` §4.6 le note.
+- **Reste ouvert** : les ADR produits par skraft suivent leur gabarit (`docs/adr/adr-NNN-…`,
+  `# ADR-NNN —`). Sur un projet qui a sa propre convention (AgentStudio : `0078-….md`,
+  `# ADR 0078 —`), ils n'y collent pas, et leur numéro repart de 001.
+
+---
+
 ## 10/11 — La story d'une issue commitée avant le run
 
 - **Demande du responsable** : commiter la story avant le premier test, pour lire le diff.
