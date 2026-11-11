@@ -6,7 +6,7 @@
  * Travaille sur un **clone** du projet, jamais sur le dépôt donné.
  *
  *   pnpm --filter @agent-studio/mcp-skraft build
- *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>] [--suivi=attendre]
+ *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>] [--suivi=attendre] [--installer]
  */
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
@@ -26,6 +26,8 @@ const baseRun = args.find((a) => a.startsWith("--base="))?.slice("--base=".lengt
 const parAttente = args.includes("--suivi=attendre");
 // Pile donnée par l'hôte (argument `pile` de skraft_demarrer), pour un projet qui n'en déclare pas.
 const fichierPile = args.find((a) => a.startsWith("--pile="))?.slice("--pile=".length);
+// Installer les dépendances du clone avant de démarrer (11/11) : un projet Node n'a pas son node_modules.
+const installer = args.includes("--installer");
 const pile = fichierPile ? await readFile(fichierPile, "utf8") : undefined;
 const [source, story, fichierReponses] = args.filter((a) => !a.startsWith("--"));
 if (!source || !story || !fichierReponses) throw new Error("Utilisation : essai-mcp-skraft.ts <projet> <story> <reponses.json> [--auto]");
@@ -34,6 +36,7 @@ const base = await realpath(await mkdtemp(join(tmpdir(), "essai-mcp-skraft-")));
 const projet = join(base, "projet");
 execFileSync("git", ["clone", "-q", "--no-hardlinks", /^[a-z]+:\/\//.test(source) ? source : resolve(source), projet]);
 if (baseRun) execFileSync("git", ["checkout", "-q", "-b", `base-${baseRun.slice(0, 7)}`, baseRun], { cwd: projet });
+if (installer) execFileSync("pnpm", ["install", "--frozen-lockfile"], { cwd: projet, stdio: "inherit" });
 // Configuration propre à l'essai : seul le clone est autorisé ; profil architecte (ratification
 // d'ADR), programmes par défaut.
 await writeFile(join(base, "mcp-skraft.json"), JSON.stringify({ autorises: [base], runtime }));
