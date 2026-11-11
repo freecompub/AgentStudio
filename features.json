@@ -1282,6 +1282,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
       "passes": true,
       "notes": "Fait le 2026-11-11, après le run 2 de LEC-1 (20,54 $) : la porte ne lisait que les `adr-NNN-*.md`, réclamait ADR-001 à ADR-078, et l'architecte ne pouvait pas supprimer le fichier qu'on lui demandait de renommer."
+    },
+    {
+      "id": "design-adr-numero-par-le-code",
+      "title": "Le numéro d'un ADR est calculé par le code, après tous les ADR de docs/adr/ quel que soit leur format (ADR 0079) : `render_adr` le prend ; dans le workflow, le dossier de passation le donne à l'architecte et les numéros pris sont en lecture seule pendant son tour. Un doublon nomme le fichier qui tient le numéro et le prochain numéro libre ; un doublon entre ADR du projet n'est pas reproché",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate adr.test render-adr e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 3 de LEC-1 arrêté en DESIGN (12,44 $) : l'architecte numérotait depuis 001 à côté des 0001-….md d'AgentStudio, la porte répondait « ADR-001 en double », et il ne pouvait pas supprimer son fichier pour renuméroter."
     }
   ]
 }

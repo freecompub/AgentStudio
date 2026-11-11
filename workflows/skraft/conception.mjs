@@ -5,7 +5,7 @@
 * pas tranchés ici.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { avecStory, conventionAdr, numeroAdr, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
+import { avecStory, conventionAdr, ligneNumerotation, motifsNumerosPris, numeroAdr, numerotationAdrs, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
 import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
@@ -71,7 +71,10 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
         docs[doc] = md;
     }
     const noms = ligneNomsDuModele(d.slug, docs);
-    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, noms ? `\n${noms}` : "");
+    // Le code donne le numéro et interdit ceux qui sont pris : un ADR mal numéroté ne pourrait plus
+    // être renommé, l'architecte ne supprimant pas de fichier (run 3 de LEC-1, 11/11).
+    const numerotation = numerotationAdrs([...avant].map(([path, md]) => ({ path, md })), d.slug);
+    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, `${noms ? `\n${noms}` : ""}\n${ligneNumerotation(numerotation)}`, motifsNumerosPris(numerotation.pris));
     const horsStory = await controlerAdrs(w, d, avant);
     if (horsStory.length)
       return { motifs: horsStory, porte: "adr" };

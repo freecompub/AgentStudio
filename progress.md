@@ -42,6 +42,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     n'existe jamais. Le titre est contrôlé à la fin de son tour (`controlerAdrs`), avant la porte.
     Les ADR existants hors convention sont désormais protégés eux aussi (restaurés s'ils sont touchés).
   - Extension : `render_adr` nomme déjà les fichiers ; seule la lecture de la porte change.
+- **Run 3 de LEC-1**, arrêté à la main en DESIGN, essai 4 (28 min, 12,44 $). Les ADR d'AgentStudio
+  étaient reconnus, mais l'architecte numérotait depuis 001 (`adr-001-couche-anticorruption-….md`).
+  La porte répondait « ADR-001 en double », sans dire avec quoi, et il ne pouvait pas supprimer
+  son fichier pour renuméroter.
+- **Fait (ADR 0079)** :
+  - le code calcule le numéro (`numerotationAdrs`) : `render_adr` le prend, le workflow le donne
+    dans le dossier de passation (`ligneNumerotation`) ;
+  - les numéros pris sont en lecture seule pendant le tour de l'architecte (`motifsNumerosPris`,
+    paramètre `lectureSeule` de `specialiste`) ;
+  - un doublon nomme le fichier qui tient le numéro et le prochain numéro libre ; un doublon entre
+    ADR du projet n'est pas reproché ;
+  - le message de `readOnlyGuard` devient générique (tests gelés, ou fichier interdit par le
+    dossier de passation).
+- **Piège** : le moteur de workflow n'a pas de suppression de fichier. Toute erreur de nom ou de
+  numéro doit être empêchée à l'écriture, pas réparée après coup.
+- **Pas fait** : les PDF de `docs/pdf/skraft-fonctionnement-*` ne sont pas régénérés (Typst absent
+  de la machine) ; seule leur source `skraft.typ` est à jour.
+- **Prochaine étape** : relancer le run de LEC-1.
 - **Reste ouvert** : les ADR produits gardent la convention skraft, pas celle du projet (option B,
   une section `adr` dans `projet.yaml`, non tranchée).
 

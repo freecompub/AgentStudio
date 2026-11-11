@@ -474,7 +474,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
   ("Qui", "Ce qu'il fait"),
   ([#AGENT `skraft-architect-model`], [Premier tour : modèle d'événements, modèle du domaine, carte des contextes. Les noms sont en PascalCase entre accents graves.]),
   ([#AGENT `skraft-architect-decide`], [Second tour, avec le même motif : contrats et diagrammes, en ne citant que des noms définis par le modélisateur, chacun avec la même catégorie partout. Écrit les ADR *uniquement* par l'outil `render_adr` ; il n'a pas d'accès direct à `docs/adr/`.]),
-  ([#CODE `render_adr`], [Valide l'ADR (champs non vides, statut `Proposed`), le numérote (plus grand numéro + 1), l'écrit avec le gabarit (Contexte, Décision, Conséquences, Alternatives). Un même titre encore proposé est réécrit, pas dupliqué. Refuse d'amender un ADR déjà décidé.]),
+  ([#CODE `render_adr`], [Valide l'ADR (champs non vides, statut `Proposed`), le numérote (plus grand numéro de `docs/adr/` + 1, ADR du projet compris quel que soit leur format, ADR 0079), l'écrit avec le gabarit (Contexte, Décision, Conséquences, Alternatives). Un même titre encore proposé est réécrit, pas dupliqué. Refuse d'amender un ADR déjà décidé.]),
   ([#CODE porte « cohérence »], [Voir ci-dessous.]),
   ([#AGENT lentilles], [Revue par `cold-reader`, `test-integrity` et `architecture` (pas `quality-gates`).]),
   ([#HUMAIN architecte], [Ratifie chaque ADR proposé.]),
@@ -487,7 +487,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
 - Un ADR existant ne se modifie pas : on en rédige un nouveau qui le remplace (append-only).
 - Chaque nouvel ADR : un titre, toutes les sections, le statut `Proposed`, pas de verdict dans le nom
   de fichier, pas de titre de bonne pratique (« ne pas », « toujours »…).
-- Numérotation sans doublon ni trou ; registre des remplacements (`supersessions.md`) cohérent dans
+- Numérotation sans doublon ni trou creusé par la story ; les ADR du projet comptent sans être jugés, et chaque motif nomme le fichier en cause et le numéro à prendre ; registre des remplacements (`supersessions.md`) cohérent dans
   les deux sens.
 - Chaque commande de `event-model.md` (« Commande `X` ») a au moins un événement : « `X` → événement
   `Y` », ou une ligne de tableau qui les associe. Une requête en est exemptée.

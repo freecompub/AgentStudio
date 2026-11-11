@@ -346,7 +346,7 @@ describe("Hôte d'extension en processus", () => {
     await ctx.agents.run("writer", "x", { readOnly: ["@stack:acceptanceTests"] });
     expect(seen).toHaveLength(1);
     const deny = await seen[0]!.check({ kind: "write", toolName: "edit", path: "tests/acceptance/cap.test.ts" });
-    expect(deny).toMatchObject({ decision: "deny", reason: expect.stringContaining("tests/acceptance/cap.test.ts est gelé") });
+    expect(deny).toMatchObject({ decision: "deny", reason: expect.stringContaining("tests/acceptance/cap.test.ts est en lecture seule pour ce tour") });
     expect(await seen[0]!.check({ kind: "write", toolName: "edit", path: "/projets/demo/tests/unit/cap.test.ts" })).toEqual({ decision: "allow" });
     expect(await seen[0]!.check({ kind: "read", toolName: "view", path: "tests/acceptance/cap.test.ts" })).toEqual({ decision: "allow" });
   });

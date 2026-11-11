@@ -25,7 +25,7 @@ export function oublierLeRun(s) {
 * Tour d'un spécialiste ; ses réponses aux défauts mettent les fils à jour. Une question bloquante
 * passe à l'humain, puis il repart avec la réponse et le même motif (D9 de docs/12).
 */
-export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
+export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "", lectureSeule = []) {
   for (;;) {
     await w.etape(phase);
     // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
@@ -40,7 +40,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
         pile += `\n${ligneBdd(disp.bdd)}`;
     }
     await ecrirePassation(w, d);
-    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides] });
+    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides, ...lectureSeule] });
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);

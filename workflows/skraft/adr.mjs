@@ -76,6 +76,23 @@ export function suitLaConvention(path, adr) {
 }
 /** Ce que la convention attend pour le numéro n, à dire à l'architecte. */
 export const conventionAdr = (n) => `fichier attendu docs/adr/adr-${pad(n)}-<titre>.md, titre attendu « # ${adrId(n)} — <Titre> »`;
+/**
+ * Numérotation des ADR, calculée par le code (11/11) : le prochain numéro suit tous les ADR de
+ * `docs/adr/`, quel que soit leur format ; les numéros « pris » sont ceux des ADR qui ne sont pas
+ * de cette story, que l'architecte ne doit pas réécrire.
+ */
+export function numerotationAdrs(adrs, slug) {
+  const avecNumero = adrs.map((a) => ({ ...a, n: numeroAdr(a.path, a.md) })).filter((a) => Number.isFinite(a.n));
+  const pris = [...new Set(avecNumero.filter((a) => storyDe(a.md) !== slug).map((a) => a.n))].sort((x, y) => x - y);
+  return { prochain: nextAdrNumber(avecNumero.map((a) => a.n)), pris };
+}
+/** La ligne du dossier de passation de l'architecte qui décide. */
+export function ligneNumerotation({ prochain, pris }) {
+  const ligne = `Numérotation des ADR, calculée par le code : ton prochain ADR est ${adrId(prochain)} (docs/adr/adr-${pad(prochain)}-<titre>.md), puis ${adrId(prochain + 1)}, et ainsi de suite.`;
+  return pris.length ? `${ligne} Les numéros des autres ADR du projet (${pris.length}, jusqu'à ${adrId(pris.at(-1))}) sont pris : tu ne peux pas les écrire.` : ligne;
+}
+/** Les numéros pris, en motifs interdits en écriture pendant le tour de l'architecte. */
+export const motifsNumerosPris = (pris) => pris.map((n) => `docs/adr/adr-${pad(n)}-*.md`);
 export function nextAdrNumber(existing) {
   return existing.length ? Math.max(...existing) + 1 : 1;
 }

@@ -1,5 +1,5 @@
 import type { ExtensionContext, ExtensionTool } from "@agent-studio/extension-api";
-import { adrId, adrPath, nextAdrNumber, parseAdr, renderAdr, slugify, supersessionLine, validateAdrInput, type AdrInput } from "./adr.js";
+import { adrId, adrPath, nextAdrNumber, numeroAdr, parseAdr, renderAdr, slugify, supersessionLine, validateAdrInput, type AdrInput } from "./adr.js";
 
 const ADR_FILE = /^docs\/adr\/adr-(\d{3,})-([^/]+)\.md$/;
 export const SUPERSESSIONS = "docs/adr/supersessions.md";
@@ -32,12 +32,17 @@ export function renderAdrTool(ctx: ExtensionContext, today: () => string = () =>
       const errors = validateAdrInput(input);
       if (errors.length) throw new Error(`ADR refusé : ${errors.join(" ; ")}`);
 
-      const existing = (await ctx.workspace.listFiles())
+      const fichiers = await ctx.workspace.listFiles();
+      const existing = fichiers
         .map((p) => ({ p, m: ADR_FILE.exec(p) }))
         .filter((x): x is { p: string; m: RegExpExecArray } => !!x.m)
         .map((x) => ({ path: x.p, number: Number(x.m[1]), slug: x.m[2]! }))
         .sort((a, b) => a.number - b.number);
-      let number = nextAdrNumber(existing.map((e) => e.number));
+      // Le numéro suit tous les ADR du projet, même hors convention (`0078-x.md`, « # ADR 0078 — ») :
+      // sinon le premier ADR de skraft prend 001, déjà pris (11/11).
+      const duProjet = fichiers.filter((p) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS && !ADR_FILE.test(p));
+      const numerosDuProjet = await Promise.all(duProjet.map(async (p) => numeroAdr(p, await ctx.workspace.readFile(p))));
+      let number = nextAdrNumber([...existing.map((e) => e.number), ...numerosDuProjet.filter((n) => Number.isFinite(n))]);
       let path = adrPath(number, input.title);
       // Même titre, statut encore Proposed : on réécrit ce brouillon plutôt que d'en ouvrir un
       // second (ADR 0040). Depuis qu'un rejet de porte n'efface plus les fichiers, l'architecte

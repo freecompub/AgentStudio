@@ -124,7 +124,7 @@ export function readOnlyGuard(root: string, globs: string[]): ToolCallGuard {
       // Insensible à la casse (ADR 0035) : c'est un REFUS, et un gel qui ne reconnaîtrait pas
       // `.skraft/QUALITY.JSON` laisserait réécrire la barre de qualité sur Windows et macOS.
       return matchesAnyIgnoringCase(globs, path)
-        ? { decision: "deny", reason: `Écriture refusée : ${path} est gelé pour ce rôle (tests existants). Modifie uniquement les fichiers de ton périmètre.` }
+        ? { decision: "deny", reason: `Écriture refusée : ${path} est en lecture seule pour ce tour (tests gelés, ou fichier que ton dossier de passation t'interdit). Modifie uniquement les fichiers de ton périmètre.` }
         : { decision: "allow" };
     },
   };

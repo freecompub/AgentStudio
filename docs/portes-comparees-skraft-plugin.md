@@ -75,7 +75,9 @@ Et ce que **nous** contrôlons et qu'ils n'ont pas :
 
 - **ADR en ajout seul.** Modifier un ADR existant est refusé : *« les ADR sont append-only ; en
   rédiger un nouveau qui le remplace »*. Chez eux, rien n'empêche de réécrire l'histoire.
-- **Numérotation sans trou ni doublon.**
+- **Numérotation sans trou ni doublon**, calculée par le code (ADR 0079). Les ADR du projet comptent
+  quel que soit leur format, sans être jugés ; un motif dit quel fichier tient le numéro, et lequel
+  prendre.
 - **Identifiants croisés.** Un nom cité dans `contracts.md` ou `diagrams.md` doit exister dans
   `event-model.md` ou `domain-model.md`. C'est leur G7/G8 pris par l'autre bout : au lieu de
   demander qu'un événement existe pour chaque commande, nous refusons qu'un document cite un nom

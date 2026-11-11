@@ -43,5 +43,7 @@ lisible dans l'historique Git), lui-même repris de
 
 Différences avec l'extension skraft-workflow : plus d'outil `render_adr` — l'architecte écrit les
 ADR au gabarit, le code y inscrit `Story : <slug>` et refuse toute modification d'un ADR d'une
-autre story ou déjà décidé ; entrées `story` et `auto` au lieu de `storyPath` et
+autre story ou déjà décidé. Le code lui donne le numéro de son prochain ADR ; il n'écrit que
+`docs/adr/adr-???-*.md` et `supersessions.md`, jamais un numéro déjà pris, et un titre hors
+convention est refusé dès la fin de son tour (ADR 0079) ; entrées `story` et `auto` au lieu de `storyPath` et
 `confirmDifficulty`.

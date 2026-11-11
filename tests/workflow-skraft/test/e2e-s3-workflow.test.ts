@@ -109,6 +109,41 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(decidePrompts).toHaveLength(2);
     expect(decidePrompts[1]).toContain(`${ADR1} ne suit pas la convention skraft : fichier attendu docs/adr/adr-001-<titre>.md, titre attendu « # ADR-001 — <Titre> ».`);
   }, 120_000);
+
+  // Run 3 de LEC-1 (11/11) : l'architecte numérotait depuis 001 à côté des `0001-….md` du projet, la
+  // porte répondait « ADR-001 en double », et il ne pouvait pas supprimer son fichier pour renuméroter.
+  it("le code donne le numéro à l'architecte, et lui interdit d'écrire un numéro déjà pris", async () => {
+    await put(root, "docs/adr/0001-monorepo.md", "# ADR 0001 — Monorepo\n\n- Statut : Accepté\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "adr du projet");
+    const decidePrompts: string[] = [];
+    const probes: Record<string, unknown> = {};
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      for (const path of ["docs/adr/adr-001-plafond-applique-dans-le-domaine.md", "docs/adr/adr-002-plafond-applique-dans-le-domaine.md"])
+        probes[path] = await t.config.guard.check({ kind: "write", toolName: "edit", path });
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md", renderAdr(2, ADR_ARGS, "2026-10-10"));
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-002"), 60_000);
+    expect(decidePrompts).toHaveLength(1);
+    expect(decidePrompts[0]).toContain("ton prochain ADR est ADR-002 (docs/adr/adr-002-<titre>.md)");
+    expect(probes["docs/adr/adr-001-plafond-applique-dans-le-domaine.md"]).toEqual(expect.objectContaining({ decision: "deny" }));
+    expect(probes["docs/adr/adr-002-plafond-applique-dans-le-domaine.md"]).not.toEqual(expect.objectContaining({ decision: "deny" }));
+  }, 120_000);
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {

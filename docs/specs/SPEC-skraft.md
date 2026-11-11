@@ -369,7 +369,7 @@ Deux sessions successives, dans la même phase.
 | Contrôle | Rejet si |
 | --- | --- |
 | En-tête de chaque nouvel ADR | Champ obligatoire absent, statut différent de `Proposed` |
-| Numérotation | Trou ou doublon |
+| Numérotation | Trou ou doublon creusé par la story ; un ADR de la story hors convention (`docs/adr/adr-NNN-titre.md`, `# ADR-NNN — Titre`). Les ADR existants comptent par leur numéro, quel que soit leur format, et ne sont pas jugés ; chaque motif nomme le fichier et le numéro attendu (ADR 0079) |
 | Événements cités dans `contracts.md` et `diagrams.md` | Absent de `event-model.md` |
 | Agrégats cités | Absent du modèle |
 | Remplacements | Un ADR remplacé n'apparaît pas à la fois dans le nouvel ADR et dans `supersessions.md` |
@@ -378,6 +378,8 @@ Deux sessions successives, dans la même phase.
 L'extraction des noms repose sur une convention imposée dans les prompts : identifiants en `PascalCase` entre backticks dans les documents de conception.
 
 **Revue** : lentilles `cold-reader` et `architecture` (section 9).
+
+**Numéro d'un ADR** : calculé par le code, après tous les ADR de `docs/adr/` (ADR 0079) ; `render_adr` le prend lui-même. Dans le workflow, où l'architecte écrit ses fichiers, le dossier de passation le lui donne, et la garde refuse un nom hors convention ou un numéro déjà pris.
 
 **Ratification** : une demande d'interaction par ADR, réservée au profil architecte ; options `accept`, `reject`, `amend` (avec texte). Tant qu'un ADR est `Proposed`, DISTILL est inatteignable (invariant 7).
 

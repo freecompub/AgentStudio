@@ -75,11 +75,23 @@ export function checkDesign(i: DesignInput): string[] {
   const conforme = (a: (typeof parsed)[number]) => suitLaConvention(a.path, a.adr);
   const horsConvention = parsed.filter((a) => a.isNew && Number.isFinite(a.numero) && !conforme(a));
   const numbers = parsed.filter((a) => !a.isNew || conforme(a)).map((a) => a.numero).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
-  const seen = new Set<number>();
-  for (const n of numbers) {
-    if (seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} en double.`);
-    seen.add(n);
+  // Un doublon dit qui tient déjà le numéro, et lequel prendre ; un doublon entre ADR du projet
+  // n'est pas reproché à la story, qui ne peut pas le réparer.
+  const libre = Math.max(0, ...numbers, ...horsConvention.map((a) => a.numero)) + 1;
+  const parNumero = new Map<number, typeof parsed>();
+  for (const a of parsed.filter((x) => (!x.isNew || conforme(x)) && Number.isFinite(x.numero)))
+    parNumero.set(a.numero, [...(parNumero.get(a.numero) ?? []), a]);
+  for (const [n, tenants] of [...parNumero].sort((x, y) => x[0] - y[0])) {
+    const nouveaux = tenants.filter((a) => a.isNew).map((a) => a.path);
+    if (tenants.length < 2 || !nouveaux.length) continue;
+    const existant = tenants.find((a) => !a.isNew);
+    reasons.push(
+      existant
+        ? `Numérotation des ADR : ${adrId(n)} est déjà pris par ${existant.path} : ${nouveaux.join(", ")} doit prendre le prochain numéro libre, ${adrId(libre)}.`
+        : `Numérotation des ADR : ${adrId(n)} en double : ${nouveaux.join(" et ")}. Le prochain numéro libre est ${adrId(libre)}.`,
+    );
   }
+  const seen = new Set(parNumero.keys());
   for (const a of horsConvention)
     reasons.push(`Numérotation des ADR : ${adrId(a.numero)} existe (${a.path}) mais ne suit pas la convention skraft : ${conventionAdr(a.numero)}.`);
   // Seuls les trous que cette phase creuse sont reprochés : un ADR archivé avant la story

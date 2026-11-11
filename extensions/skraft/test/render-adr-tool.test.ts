@@ -73,4 +73,11 @@ describe("render_adr : un essai relancé amende son brouillon, il n'en ouvre pas
     await outil.handler({ ...INPUT, title: "Journalisation des doses refusées" });
     expect(Object.keys(fichiers)).toHaveLength(2);
   });
+
+  it("les ADR du projet hors convention comptent : le numéro suit le plus grand, quel que soit le format", async () => {
+    // Run de LEC-1 sur AgentStudio (11/11) : `0078-x.md` n'était pas vu, et le premier ADR prenait 001.
+    const { fichiers, outil } = atelier({ "docs/adr/0078-x.md": "# ADR 0078 — x\n\n- Statut : Accepté\n" });
+    expect(await outil.handler(INPUT)).toBe("ADR-079 rédigé : docs/adr/adr-079-plafond-applique-dans-le-domaine.md");
+    expect(Object.keys(fichiers)).toHaveLength(2);
+  });
 });

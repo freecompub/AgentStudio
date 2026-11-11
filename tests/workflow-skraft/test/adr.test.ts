@@ -1,6 +1,6 @@
 // Repris de extensions/skraft-workflow/test/adr.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 import { describe, expect, it } from "vitest";
-import { adrPath, nextAdrNumber, parseAdr, renderAdr, setAdrStatus, validateAdrInput } from "../../../workflows/skraft/adr.mjs";
+import { adrPath, avecStory, ligneNumerotation, motifsNumerosPris, nextAdrNumber, numerotationAdrs, parseAdr, renderAdr, setAdrStatus, validateAdrInput } from "../../../workflows/skraft/adr.mjs";
 
 const INPUT = {
   title: "Plafond appliqué dans le domaine",
@@ -56,5 +56,26 @@ describe("ADR : rendu et lecture (§6.5 render_adr, sans reprise de skraft)", ()
 
   it("champs d'en-tête manquants détectés", () => {
     expect(parseAdr("# ADR-004 — X\n\n- Statut : Proposed\n\n## Contexte\n\nc\n").missing).toEqual(["Décision", "Conséquences", "Alternatives"]);
+  });
+});
+
+describe("Numérotation des ADR calculée par le code, donnée à l'architecte (11/11)", () => {
+  const projet = [
+    { path: "docs/adr/0001-monorepo.md", md: "# ADR 0001 — Monorepo\n" },
+    { path: "docs/adr/0002-renderer.md", md: "# ADR 0002 — Renderer\n" },
+  ];
+  it("le prochain numéro suit tous les ADR, quel que soit leur format ; ceux de la story ne sont pas « pris »", () => {
+    const sien = { path: "docs/adr/adr-003-x.md", md: avecStory(renderAdr(3, INPUT, "2026-11-11"), "us-12") };
+    expect(numerotationAdrs([...projet, sien], "us-12")).toEqual({ prochain: 4, pris: [1, 2] });
+    expect(numerotationAdrs([], "us-12")).toEqual({ prochain: 1, pris: [] });
+  });
+  it("la ligne du dossier de passation dit le numéro à prendre, et que les numéros pris sont interdits", () => {
+    expect(ligneNumerotation({ prochain: 79, pris: [1, 78] })).toBe(
+      "Numérotation des ADR, calculée par le code : ton prochain ADR est ADR-079 (docs/adr/adr-079-<titre>.md), puis ADR-080, et ainsi de suite. Les numéros des autres ADR du projet (2, jusqu'à ADR-078) sont pris : tu ne peux pas les écrire.",
+    );
+    expect(ligneNumerotation({ prochain: 1, pris: [] })).toBe("Numérotation des ADR, calculée par le code : ton prochain ADR est ADR-001 (docs/adr/adr-001-<titre>.md), puis ADR-002, et ainsi de suite.");
+  });
+  it("les numéros pris deviennent des motifs en lecture seule pour le tour de l'architecte", () => {
+    expect(motifsNumerosPris([1, 78])).toEqual(["docs/adr/adr-001-*.md", "docs/adr/adr-078-*.md"]);
   });
 });
