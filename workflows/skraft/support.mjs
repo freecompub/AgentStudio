@@ -33,9 +33,10 @@ export function repositoryShape(files) {
 }
 /**
 * Fichiers qu'aucun agent n'écrit, quel que soit son périmètre : la barre de qualité sur laquelle
-* le travail est jugé (ADR 0049). Un agent ne doit pas pouvoir abaisser son propre critère.
+* le travail est jugé (ADR 0049), et le registre des erreurs commises (LEC-1). Un agent ne doit pas
+* pouvoir abaisser son propre critère, ni effacer la trace de ses erreurs.
 */
-export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml", ".agent-studio/projet.yaml"];
+export const GELÉS = [".skraft/quality.json", ".agent-studio/quality.yaml", ".agent-studio/projet.yaml", ".agent-studio/lecons/**"];
 /** Dossiers où les agents et le code déposent les livrables d'une story (ADR 0037). */
 export const dossiersDeLaStory = (slug) => [
   `.skraft/${slug}/research`,

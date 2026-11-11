@@ -6,6 +6,7 @@
 import { correspond as matchesAny, essayer } from "@agent-studio/workflow";
 import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.mjs";
 import { checkGherkin, checkTitresBdd, dossiersDesFeatures, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.mjs";
+import { ecrireLeRegistre, releverLesDefauts } from "./registre.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
@@ -18,13 +19,17 @@ export async function distiller(w, d, lentilles, max) {
     d.gherkinAvant = await gherkinDuDisque(w, d.slug, (await w.disposition()).bdd);
     // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
     await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
+    releverLesDefauts(d.registre, suivi, "DISTILL");
     await ecrireRapports(w, d.slug, "DISTILL", suivi);
     return true;
   }, {
     commit: commitMessage("DISTILL", d.slug),
     // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
     commitManque: () => void d.nonCommitees.push("DISTILL"),
-    apresRembobinage: () => {
+    apresRembobinage: async () => {
+      // Les défauts retenus du run effacé sont des erreurs commises : relevés avant d'être oubliés (LEC-1).
+      releverLesDefauts(d.registre, suivi, "DISTILL");
+      await ecrireLeRegistre(w, d.registre, { apresRembobinage: true });
       d.acceptanceHash = null;
       d.regressions = [];
       d.testsDeLaStory = null;

@@ -3,7 +3,7 @@
  * même porte, même ensemble de motifs, à l'ordre et aux espaces près.
  */
 import { describe, expect, it } from "vitest";
-import { memeRefus } from "../src/retries/meme-refus.js";
+import { memeRefus, normaliserMotifs } from "../src/retries/meme-refus.js";
 
 describe("memeRefus (ADR 0073)", () => {
   const a = { porte: "documents", motifs: ["Section « Découvertes » absente.", "Citation invalide : src/a.ts:3"] };
@@ -32,5 +32,12 @@ describe("memeRefus (ADR 0073)", () => {
     const { disjoncte } = await import("../src/retries/meme-refus.js");
     expect(disjoncte(["a", "b"])).toEqual(["Même refus deux fois de suite : a", "b"]);
     expect(disjoncte(disjoncte(["a"]))).toEqual(["Même refus deux fois de suite : a"]);
+  });
+});
+
+// LEC-1 : le registre des erreurs normalise les motifs comme le disjoncteur, avec la même fonction.
+describe("normaliserMotifs", () => {
+  it("espaces de bord retirés, doublons ôtés, ordre trié", () => {
+    expect(normaliserMotifs(["  b ", "a", "b"])).toEqual(["a", "b"]);
   });
 });

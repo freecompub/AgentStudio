@@ -11,11 +11,18 @@ export interface Refus {
 /** Début du motif d'une escalade déclenchée par le disjoncteur. */
 export const MEME_REFUS = "Même refus deux fois de suite : ";
 
+/**
+ * Motifs normalisés : espaces de début et de fin retirés, doublons ôtés, ordre trié. Le disjoncteur
+ * compare ainsi deux refus ; le registre des erreurs (LEC-1) en tire leur signature.
+ */
+export function normaliserMotifs(motifs: readonly string[]): string[] {
+  return [...new Set(motifs.map((x) => x.trim()))].sort();
+}
+
 /** Même porte, et même ensemble de motifs (espaces de début et de fin ignorés, ordre indifférent). */
 export function memeRefus(avant: Refus | null | undefined, apres: Refus): boolean {
   if (!avant || avant.porte !== apres.porte || !apres.motifs.length) return false;
-  const ensemble = (m: readonly string[]) => [...new Set(m.map((x) => x.trim()))].sort();
-  const [a, b] = [ensemble(avant.motifs), ensemble(apres.motifs)];
+  const [a, b] = [normaliserMotifs(avant.motifs), normaliserMotifs(apres.motifs)];
   return a.length === b.length && a.every((x, i) => x === b[i]);
 }
 

@@ -3,7 +3,7 @@ export type * from "./protocols/conversation.js";
 export type * from "./protocols/interaction.js";
 export type * from "./protocols/logger.js";
 export { listFilesTool, LIMITE_CHEMINS, type ProjectFiles } from "./agents/list-files-tool.js";
-export { disjoncte, MEME_REFUS, memeRefus, type Refus } from "./retries/meme-refus.js";
+export { disjoncte, MEME_REFUS, memeRefus, normaliserMotifs, type Refus } from "./retries/meme-refus.js";
 export { createJsonlTraceStore, tronquer, LIMITE_TEXTE } from "./trace/jsonl-trace-store.js";
 export { resumerTrace, type ResumeEtape, type ResumeRun } from "./trace/run-summary.js";
 export type { TraceEntry, TraceBody, TraceStore, TurnEnd } from "./protocols/trace.js";

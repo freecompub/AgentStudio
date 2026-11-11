@@ -44,7 +44,7 @@ export const meta = {
   },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
   permissions: {
-    ecriture: [".skraft/**", "docs/adr/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
+    ecriture: [".skraft/**", "docs/adr/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md", ".agent-studio/lecons/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
     tests: true,
     git: ["branche", "commit", "revert"],
   },
@@ -194,12 +194,18 @@ export const outils = {
 import { livrer, barreDeQualite } from "./livraison.mjs";
 import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
+import { ecrireLeRegistre, ligneDuRegistre, nouveauRegistre, ouvrirLeRegistre, suivreLesRefus } from "./registre.mjs";
 const RELANCER_OU_ABANDONNER = [
   { id: "relancer", label: "Relancer" },
   { id: "abandonner", label: "Abandonner" },
 ];
-export default async function skraft(w, entree) {
+export default async function skraft(w0, entree) {
+  // Registre des erreurs commises (LEC-1) : les refus de porte comptés sont relevés au moment où le
+  // code les trace ; le reste du script ne voit aucune différence.
+  const registre = nouveauRegistre();
+  const w = suivreLesRefus(w0, registre);
   const { story, slug, indicateurs } = await preparer(w, entree.story);
+  await ouvrirLeRegistre(w, registre, slug);
   const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
   // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
   const racinesMuettes = (await w.disposition()).bddNonDecide ?? [];
@@ -223,13 +229,14 @@ export default async function skraft(w, entree) {
   const architecture = skillDArchitecture(entree.archi);
   if (architecture.avertissement)
     await w.informer(architecture.avertissement);
-  const niveau = await evaluerDifficulte(w, story, indicateurs, !entree.auto);
+  const niveau = await evaluerDifficulte(w, story, indicateurs, !entree.auto, registre);
   const effets = levelEffects(niveau);
   // Ce que le dossier de passation raconte, tenu à jour au fil du script.
   const vue = {
     story,
     slug,
     niveau,
+    registre,
     phasesFaites: [],
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
     architecture: architecture.skill,
@@ -291,6 +298,10 @@ export default async function skraft(w, entree) {
     vue.phasesFaites = [...vue.phasesFaites, { phase: "DELIVER", fichiers: [] }];
   else
     vue.phasesSautees = [...vue.phasesSautees, "DELIVER"];
+  // Le registre de la story est écrit, puis commité seul : sa trace reste dans l'historique (LEC-1).
+  await ecrireLeRegistre(w, registre);
+  if (registre.erreurs.length)
+    await w.commiter(`docs(skraft): registre des erreurs de ${slug}`, [registre.chemin]);
   await w.etape("DONE");
   await w.informer(bilan(vue, !entree.auto));
   return {
@@ -330,6 +341,7 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...[ligneDuRegistre(d.registre)].filter((l) => l !== null),
     ...[ligneValeursRetirees(d.questions)].filter((l) => l !== null),
     ...(d.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${d.verifications.map((v) => `${v.phase} ${v.agent} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(d.derogationsCouverture?.length
@@ -355,7 +367,7 @@ async function trancher(w, vue, storyId) {
   if (!ouvertes.length)
     return;
   await w.etape("ROUTE");
-  const reponses = await poserLesQuestions(w, ouvertes, storyId);
+  const reponses = await poserLesQuestions(w, ouvertes, storyId, vue.registre);
   const reponseDe = new Map(ouvertes.map((q, i) => [q.id, reponses[i]]));
   vue.questions = vue.questions.map((q) => {
     const d = reponseDe.get(q.id);
@@ -376,7 +388,7 @@ async function trancher(w, vue, storyId) {
 * demande (D17 de docs/12) escalade : « Relancer » repose les seules questions en échec ; il n'y a
 * pas de phase à sauter.
 */
-async function poserLesQuestions(w, questions, storyId) {
+async function poserLesQuestions(w, questions, storyId, registre) {
   const reponses = new Array(questions.length);
   let restantes = questions.map((_, i) => i);
   for (;;) {
@@ -397,8 +409,10 @@ async function poserLesQuestions(w, questions, storyId) {
       { id: "relancer", label: "Relancer : reposer les questions" },
       { id: "abandonner", label: "Abandonner" },
     ], { detail: `Panne pendant les questions ouvertes : ${pannes.map((p) => p.motif).join(" ; ")}` });
-    if (d.decision === "abandonner")
+    if (d.decision === "abandonner") {
+      await ecrireLeRegistre(w, registre);
       w.echec(`Abandon pendant les questions ouvertes : ${pannes[0].motif}`);
+    }
     await w.etape("ROUTE");
     restantes = pannes.map((p) => p.i);
   }
@@ -435,7 +449,7 @@ async function preparer(w, chemin) {
   }
 }
 /** Classifieur, budget compté par le code (D24), puis confirmation humaine si demandée. */
-async function evaluerDifficulte(w, story, indicateurs, confirmer) {
+async function evaluerDifficulte(w, story, indicateurs, confirmer, registre) {
   await w.etape("CLASSIFY");
   const grille = gradeDifficulty(indicateurs, DEFAULT_THRESHOLDS);
   const consigne = [`Story : ${story.id} — ${story.title}`, `Indicateurs : ${JSON.stringify(indicateurs)}`, `Niveau proposé par la grille : ${grille}`].join("\n");
@@ -456,7 +470,7 @@ async function evaluerDifficulte(w, story, indicateurs, confirmer) {
     catch (e) {
       if (!(e instanceof Escalade || e instanceof PanneEnvironnement))
         throw e;
-      await relancerOuAbandonner(w, e.message);
+      await relancerOuAbandonner(w, e.message, registre);
     }
   }
   if (!confirmer)
@@ -519,9 +533,13 @@ async function porteCitations(w, vue) {
   vue.recherche = extraireInventaire(md);
   return [];
 }
-async function relancerOuAbandonner(w, motif) {
+async function relancerOuAbandonner(w, motif, registre) {
   await w.etape("ESCALATED");
   const d = await w.humain("escalade", "Pipeline skraft bloqué", RELANCER_OU_ABANDONNER, { detail: motif });
-  if (d.decision !== "relancer")
+  if (d.decision !== "relancer") {
+    // Le run s'arrête : le registre de la story est écrit avant (LEC-1).
+    if (registre)
+      await ecrireLeRegistre(w, registre);
     w.echec(`Abandon : ${motif}`);
+  }
 }

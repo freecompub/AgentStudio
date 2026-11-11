@@ -1324,6 +1324,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate reducer.test e2e-s3",
       "passes": true,
       "notes": "Fait le 2026-11-11, demande du responsable : le modélisateur recevait les refus sur les ADR, qu'il ne peut pas corriger, et coûtait une session par essai."
+    },
+    {
+      "id": "lec-1-registre-des-erreurs",
+      "title": "LEC-1 (freecompub/AgentStudio#32, ADR 0083) : le workflow enregistre les défauts de revue retenus et les refus de porte qui consomment un essai dans .agent-studio/lecons/brut/<slug>.jsonl, avec une signature (phase, source, motif normalisé comme le disjoncteur) ; écrit à l'escalade, avant un abandon et à la fin du run, commité seul ; gelé pour les agents, une modification hors du code est détectée",
+      "verify": "pnpm vitest run --project core meme-refus && pnpm vitest run --project workflow-skraft registre.test e2e-registre",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, demande du responsable. Choix provisoires : tâche annulée sans écriture, relance en ajout, champs en français. Les critères 3 et 5 (défaut réfuté, défaut hors du changement) tiennent par construction : le registre lit les fils de revue, que la réfutation et le rangement hors changement ont déjà filtrés ; pas de test dédié."
     }
   ]
 }
