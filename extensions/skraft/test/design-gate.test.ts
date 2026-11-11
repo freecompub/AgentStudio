@@ -90,36 +90,58 @@ describe("Porte cohérence (SPEC-skraft §7.2, fixtures §13.2)", () => {
   });
 
   it("numérotation : trou ou doublon", () => {
-    expect(checkDesign(input({ adrs: [{ path: "a1", md: adr(1), isNew: false }, { path: "a3", md: adr(3), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-002 manque."]);
-    expect(checkDesign(input({ adrs: [{ path: "a1", md: adr(1), isNew: false }, { path: "a1b", md: adr(1), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-001 en double."]);
+    expect(checkDesign(input({ adrs: [{ path: "docs/adr/adr-001-x.md", md: adr(1), isNew: false }, { path: "docs/adr/adr-003-x.md", md: adr(3), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-002 manque : aucun fichier de docs/adr/ ne porte ce numéro."]);
+    expect(checkDesign(input({ adrs: [{ path: "docs/adr/adr-001-x.md", md: adr(1), isNew: false }, { path: "docs/adr/adr-001-bis.md", md: adr(1), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-001 en double."]);
   });
 
   it("un ADR historique titré « ADR-NNN: … » compte dans la numérotation : son numéro n'est pas reproché comme manquant", () => {
     // Faux rejet vu en run (10/11) : `# ADR-001: …` n'était pas lu, et ADR-001 « manquait ».
-    const historique = { path: "a1", md: adr(1).replace("# ADR-001 —", "# ADR-001:"), isNew: false };
-    expect(checkDesign(input({ adrs: [historique, { path: "a2", md: adr(2), isNew: true }] }))).toEqual([]);
+    const historique = { path: "docs/adr/adr-001-x.md", md: adr(1).replace("# ADR-001 —", "# ADR-001:"), isNew: false };
+    expect(checkDesign(input({ adrs: [historique, { path: "docs/adr/adr-002-x.md", md: adr(2), isNew: true }] }))).toEqual([]);
   });
 
+
+  it("un ADR existant hors convention compte dans la numérotation : la story continue après lui", () => {
+    // Run de LEC-1 sur AgentStudio (11/11) : `docs/adr/0078-x.md` titré « # ADR 0078 — x » était
+    // invisible, et la porte réclamait ADR-001 à ADR-078, que l'architecte ne peut pas écrire.
+    const existant = { path: "docs/adr/0078-x.md", md: "# ADR 0078 — x\n\n- Statut : Accepté\n", isNew: false };
+    expect(checkDesign(input({ adrs: [existant, { path: "docs/adr/adr-079-y.md", md: adr(79), isNew: true }] }))).toEqual([]);
+    expect(checkDesign(input({ adrs: [existant, { path: "docs/adr/adr-078-y.md", md: adr(78), isNew: true }] }))).toEqual(["Numérotation des ADR : ADR-078 en double."]);
+  });
+
+  it("un ADR de la story hors convention : le motif nomme le fichier et la convention attendue", () => {
+    const premier = { path: "docs/adr/adr-001-x.md", md: adr(1), isNew: false };
+    const attendu = (chemin: string) =>
+      `Numérotation des ADR : ADR-002 existe (${chemin}) mais ne suit pas la convention skraft : fichier attendu docs/adr/adr-002-<titre>.md, titre attendu « # ADR-002 — <Titre> ».`;
+    // Titre hors convention.
+    const titre = { path: "docs/adr/0002-y.md", md: adr(2).replace("# ADR-002 —", "# ADR 0002 —"), isNew: true };
+    expect(checkDesign(input({ adrs: [premier, titre] }))).toEqual([attendu("docs/adr/0002-y.md")]);
+    // Nom de fichier hors convention, titre conforme.
+    const nom = { path: "docs/adr/0002-y.md", md: adr(2), isNew: true };
+    expect(checkDesign(input({ adrs: [premier, nom] }))).toEqual([attendu("docs/adr/0002-y.md")]);
+    // Le numéro suivant reste reconnu : seul le fichier hors convention est reproché.
+    expect(checkDesign(input({ adrs: [premier, titre, { path: "docs/adr/adr-003-z.md", md: adr(3), isNew: true }] }))).toEqual([attendu("docs/adr/0002-y.md")]);
+  });
   it("un trou déjà présent dans le dépôt n'est pas reproché à la phase", () => {
     // ADR-002 a été archivé avant cette story : l'agent ne peut pas le recréer, et le lui
     // reprocher ferait échouer DESIGN jusqu'à épuisement du budget, sur chaque tentative.
     const existants = [
-      { path: "a1", md: adr(1), isNew: false },
-      { path: "a3", md: adr(3), isNew: false },
+      { path: "docs/adr/adr-001-x.md", md: adr(1), isNew: false },
+      { path: "docs/adr/adr-003-x.md", md: adr(3), isNew: false },
     ];
     expect(checkDesign(input({ adrs: existants }))).toEqual([]);
     // En revanche, le nouvel ADR doit bien prendre le numéro suivant.
-    expect(checkDesign(input({ adrs: [...existants, { path: "a4", md: adr(4), isNew: true }] }))).toEqual([]);
-    expect(checkDesign(input({ adrs: [...existants, { path: "a6", md: adr(6), isNew: true }] }))).toEqual([
-      "Numérotation des ADR : ADR-004 manque.",
-      "Numérotation des ADR : ADR-005 manque.",
+    expect(checkDesign(input({ adrs: [...existants, { path: "docs/adr/adr-004-x.md", md: adr(4), isNew: true }] }))).toEqual([]);
+    expect(checkDesign(input({ adrs: [...existants, { path: "docs/adr/adr-006-x.md", md: adr(6), isNew: true }] }))).toEqual([
+      "Numérotation des ADR : ADR-004 manque : aucun fichier de docs/adr/ ne porte ce numéro.",
+      "Numérotation des ADR : ADR-005 manque : aucun fichier de docs/adr/ ne porte ce numéro.",
     ]);
   });
 
   it("remplacement : présent dans le nouvel ADR ET dans supersessions.md", () => {
     const adrs = [
-      { path: "a1", md: adr(1), isNew: false },
-      { path: "a2", md: adr(2, { supersedes: ["ADR-001"] }), isNew: true },
+      { path: "docs/adr/adr-001-x.md", md: adr(1), isNew: false },
+      { path: "docs/adr/adr-002-x.md", md: adr(2, { supersedes: ["ADR-001"] }), isNew: true },
     ];
     expect(checkDesign(input({ adrs }))).toEqual(["ADR-002 remplace ADR-001 mais le registre supersessions.md ne le mentionne pas."]);
     expect(checkDesign(input({ adrs, supersessions: supersessionLine("ADR-002", "ADR-001") }))).toEqual([]);

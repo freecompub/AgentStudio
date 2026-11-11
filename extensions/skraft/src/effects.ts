@@ -529,6 +529,8 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
 }
 
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+/** Tout fichier de `docs/adr/`, y compris hors convention : la porte doit voir les ADR du projet. */
+const estFichierAdr = (p: string) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS;
 /** Les rapports de revue sont écrits par le code à chaque revue : ce ne sont pas des livrables (D6 de docs/12). */
 const pasUnRapport = (f: { path: string }) => !f.path.includes("/reviews/");
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
@@ -548,9 +550,9 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   }
   const changed = await ctx.workspace.changedFiles(cp);
   const added = new Set(changed.filter((f) => f.status === "added").map((f) => f.path));
-  const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && ADR_FILE.test(f.path)).map((f) => f.path);
+  const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && estFichierAdr(f.path)).map((f) => f.path);
   const fichiers = await ctx.workspace.listFiles();
-  const adrPaths = fichiers.filter((p) => ADR_FILE.test(p));
+  const adrPaths = fichiers.filter(estFichierAdr);
   // Un ADR déjà décidé n'est plus « nouveau » : son statut n'est plus Proposed (D3 de docs/12).
   const decides = new Set(state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
   const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) && !decides.has(path) })));

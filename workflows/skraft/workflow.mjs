@@ -43,7 +43,7 @@ export const meta = {
   },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
   permissions: {
-    ecriture: [".skraft/**", "docs/adr/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
+    ecriture: [".skraft/**", "docs/adr/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
     tests: true,
     git: ["branche", "commit", "revert"],
   },
@@ -80,7 +80,9 @@ export const meta = {
       reasoningEffort: "high",
       contextTier: "long_context",
       sortie: "report_phase",
-      ecriture: [".skraft/**", "docs/adr/**"],
+      // Le nom d'un ADR est vérifié dès l'écriture : un fichier mal nommé, que l'architecte ne
+      // pourrait pas supprimer, n'existe jamais (11/11).
+      ecriture: [".skraft/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md"],
       outils: ["list_files", "report_blocker"],
       skills: { obligatoires: ["architecture-decisions", "adr-eligibility-gate"], aLaDemande: ["architecture-patterns", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },

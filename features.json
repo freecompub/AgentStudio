@@ -1275,6 +1275,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
       "passes": true,
       "notes": "Fait le 2026-11-11, décision du responsable, après un run réel de LEC-1 (freecompub/AgentStudio#32) bloqué 40 min en DESIGN (21,27 $) : la phase 7.0 du plugin prenait les skills qui décrivent CQRS pour du code, et ne reconnaissait pas les ADR « ADR 0001 »."
+    },
+    {
+      "id": "design-adr-hors-convention",
+      "title": "Un ADR hors convention skraft est signalé avec la bonne raison : un ADR existant du projet (`0078-x.md`, `# ADR 0078 —`) compte par son numéro et la story continue après lui ; un numéro absent est dit « aucun fichier ne porte ce numéro » ; un ADR de la story hors convention est nommé, avec le fichier et le titre attendus. Dans le workflow, le nom est refusé dès l'écriture (périmètre `docs/adr/adr-???-*.md`), le titre dès la sortie de l'architecte",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 2 de LEC-1 (20,54 $) : la porte ne lisait que les `adr-NNN-*.md`, réclamait ADR-001 à ADR-078, et l'architecte ne pouvait pas supprimer le fichier qu'on lui demandait de renommer."
     }
   ]
 }

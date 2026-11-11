@@ -27,9 +27,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   - La consigne « ADR de rattrapage » est retirée du prompt de l'architecte qui décide.
   - La couche anticorruption de la carte de la story reste à ratifier.
   - `docs/15` §4.6 le note.
-- **Reste ouvert** : les ADR produits par skraft suivent leur gabarit (`docs/adr/adr-NNN-…`,
-  `# ADR-NNN —`). Sur un projet qui a sa propre convention (AgentStudio : `0078-….md`,
-  `# ADR 0078 —`), ils n'y collent pas, et leur numéro repart de 001.
+- **Run 2 de LEC-1**, arrêté en DESIGN (20,54 $) : « ADR-001 manque … ADR-078 manque ». La porte
+  ne lisait que les `docs/adr/adr-NNN-*.md`, et les ADR d'AgentStudio (`0078-….md`,
+  `# ADR 0078 —`) lui étaient invisibles. Le répondeur a choisi de renuméroter, mais l'architecte ne
+  peut pas supprimer de fichier : un ADR mal nommé restait, refusé à chaque essai.
+- **Demande du responsable** : dire à l'architecte la bonne raison, et dès sa sortie.
+  - La porte lit tout `docs/adr/` (sauf `supersessions.md`). Un ADR existant compte par son
+    numéro, même hors convention (`numeroAdr`), et la story numérote après lui.
+  - Deux motifs distincts : « ADR-005 manque : aucun fichier de docs/adr/ ne porte ce numéro », ou
+    « ADR-079 existe (chemin) mais ne suit pas la convention skraft : fichier attendu …, titre
+    attendu … » (`suitLaConvention`, `conventionAdr`).
+  - Workflow : le périmètre de l'architecte qui décide passe à `docs/adr/adr-???-*.md` et
+    `docs/adr/supersessions.md`. Un nom hors convention est refusé par la garde à l'écriture, donc
+    n'existe jamais. Le titre est contrôlé à la fin de son tour (`controlerAdrs`), avant la porte.
+    Les ADR existants hors convention sont désormais protégés eux aussi (restaurés s'ils sont touchés).
+  - Extension : `render_adr` nomme déjà les fichiers ; seule la lecture de la porte change.
+- **Reste ouvert** : les ADR produits gardent la convention skraft, pas celle du projet (option B,
+  une section `adr` dans `projet.yaml`, non tranchée).
 
 ---
 

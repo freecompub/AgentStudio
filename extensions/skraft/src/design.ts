@@ -1,4 +1,4 @@
-import { adrId, parseAdr, parseSupersessions } from "./adr.js";
+import { adrId, conventionAdr, numeroAdr, parseAdr, parseSupersessions, suitLaConvention } from "./adr.js";
 import { extractCodeIdentifiers, extractPascalIdentifiers } from "./text-analysis.js";
 
 /** Documents de conception attendus (§6.2) et sources des noms du modèle. */
@@ -45,9 +45,9 @@ export function checkDesign(i: DesignInput): string[] {
   for (const p of i.modifiedExistingAdrs)
     reasons.push(`ADR existant modifié : ${p} (les ADR sont append-only ; en rédiger un nouveau qui le remplace).`);
 
-  const parsed = i.adrs.map((a) => ({ ...a, adr: parseAdr(a.md) }));
+  const parsed = i.adrs.map((a) => ({ ...a, adr: parseAdr(a.md), numero: numeroAdr(a.path, a.md) }));
   for (const a of parsed.filter((x) => x.isNew)) {
-    if (!a.adr.id) reasons.push(`${a.path} : titre « # ADR-NNN — titre » absent.`);
+    if (!a.adr.id && !Number.isFinite(a.numero)) reasons.push(`${a.path} : titre « # ADR-NNN — titre » absent.`);
     for (const m of a.adr.missing) reasons.push(`${a.path} : section manquante « ${m} ».`);
     if (a.adr.status && a.adr.status !== "Proposed") reasons.push(`${a.path} : statut ${a.adr.status}, Proposed attendu.`);
 
@@ -70,19 +70,27 @@ export function checkDesign(i: DesignInput): string[] {
       );
   }
 
-  const numbers = parsed.map((a) => a.adr.number).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+  // Un ADR existant compte par son numéro, même hors convention (les ADR du projet) ; un ADR de la
+  // story ne compte que s'il suit la convention, et sinon le motif dit lequel, et ce qui est attendu.
+  const conforme = (a: (typeof parsed)[number]) => suitLaConvention(a.path, a.adr);
+  const horsConvention = parsed.filter((a) => a.isNew && Number.isFinite(a.numero) && !conforme(a));
+  const numbers = parsed.filter((a) => !a.isNew || conforme(a)).map((a) => a.numero).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
   const seen = new Set<number>();
   for (const n of numbers) {
     if (seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} en double.`);
     seen.add(n);
   }
+  for (const a of horsConvention)
+    reasons.push(`Numérotation des ADR : ${adrId(a.numero)} existe (${a.path}) mais ne suit pas la convention skraft : ${conventionAdr(a.numero)}.`);
   // Seuls les trous que cette phase creuse sont reprochés : un ADR archivé avant la story
   // laisse un trou que l'agent ne peut pas combler, et le lui reprocher ferait échouer DESIGN
   // à chaque tentative, jusqu'à épuisement du budget.
-  const dejaLa = parsed.filter((a) => !a.isNew).map((a) => a.adr.number).filter((n) => Number.isFinite(n));
+  const dejaLa = parsed.filter((a) => !a.isNew).map((a) => a.numero).filter((n) => Number.isFinite(n));
   const depuis = (dejaLa.length ? Math.max(...dejaLa) : 0) + 1;
-  const max = numbers.at(-1) ?? 0;
-  for (let n = depuis; n <= max; n++) if (!seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} manque.`);
+  const max = Math.max(numbers.at(-1) ?? 0, ...horsConvention.map((a) => a.numero));
+  for (let n = depuis; n <= max; n++)
+    if (!seen.has(n) && !horsConvention.some((a) => a.numero === n))
+      reasons.push(`Numérotation des ADR : ${adrId(n)} manque : aucun fichier de docs/adr/ ne porte ce numéro.`);
 
   const registry = parseSupersessions(i.supersessions);
   for (const a of parsed.filter((x) => x.isNew))

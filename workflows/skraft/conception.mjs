@@ -5,7 +5,7 @@
 * pas tranchés ici.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { avecStory, parseAdr, setAdrStatus, storyDe } from "./adr.mjs";
+import { avecStory, conventionAdr, numeroAdr, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
 import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
@@ -13,6 +13,8 @@ import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+/** Tout fichier de `docs/adr/`, y compris hors convention : la porte doit voir les ADR du projet. */
+const estFichierAdr = (p) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS;
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
 export async function concevoir(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
@@ -99,7 +101,7 @@ async function porteCoherence(w, d, s, cp, essai) {
   const ajoutes = new Set(changes.filter((f) => f.status === "added").map((f) => f.path));
   const adrs = [];
   const decides = new Set(d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
-  for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p))) {
+  for (const path of (await w.listerFichiers()).filter(estFichierAdr)) {
     const md = await w.lireFichier(path);
     // Un ADR de cette story est « nouveau » pour la porte même s'il existait avant la phase :
     // il a pu être proposé avant un arrêt, puis amendé après la reprise.
@@ -107,7 +109,7 @@ async function porteCoherence(w, d, s, cp, essai) {
     adrs.push({ path, md, isNew: !decides.has(path) && (ajoutes.has(path) || storyDe(md) === d.slug) });
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
-  const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
+  const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && estFichierAdr(f.path) && !siens.has(f.path)).map((f) => f.path);
   // La porte ne lit plus les sources du projet : elle juge ce que la story produit (11/11).
   const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
@@ -125,7 +127,7 @@ async function porteCoherence(w, d, s, cp, essai) {
 /** Contenu de chaque ADR du dépôt, relevé avant le tour de l'architecte. */
 async function instantaneAdrs(w) {
   const m = new Map();
-  for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p)))
+  for (const path of (await w.listerFichiers()).filter(estFichierAdr))
     m.set(path, await w.lireFichier(path));
   return m;
 }
@@ -146,6 +148,10 @@ async function controlerAdrs(w, d, avant) {
       const marque = avecStory((await w.lireFichier(path)), d.slug);
       if (marque !== (await w.lireFichier(path)))
         await w.ecrireFichier(path, marque);
+      // Dès la sortie de l'architecte, pas à la porte : il réécrit le fichier au format attendu.
+      const n = numeroAdr(path, md);
+      if (!suitLaConvention(path, parseAdr(md)))
+        motifs.push(`${path} ne suit pas la convention skraft : ${Number.isFinite(n) ? conventionAdr(n) : "titre attendu « # ADR-NNN — <Titre> »"}.`);
       continue;
     }
     const ancien = avant.get(path);
