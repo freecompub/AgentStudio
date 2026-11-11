@@ -72,9 +72,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   le garde (première option, ce que prend un répondeur) ou le retire de son seul critère. Réponse
   dans la passation, ligne au bilan (`ligneValeursRetirees`). Remplacer la porte par une lentille a
   été écarté : c'est un contrôle mécanique.
+- **Run 5 de LEC-1** (47 min, 26,43 $), arrêté à la main en DISTILL, essai 3 : aucune porte du code
+  n'a refusé, ni en DESIGN ni en DISTILL ; trois refus de revue sur des défauts majeurs fondés.
+  Anomalie à vérifier : l'état affichait « essai 3 » en DESIGN avant tout refus, juste après deux
+  questions bloquantes.
+- **Fait (ADR 0081)** : hors DELIVER, une revue sans défaut bloquant ni majeur à corriger est
+  approuvée (mineurs au rapport), ou escaladée sans essai si une lentille est REJECTED ou une
+  question sans lentille (`revueSansDefautCorrigible`).
+- **Piège** : changer `synthesize` aurait été plus simple, mais l'ADR 0062 règle déjà DELIVER
+  autrement (mineurs corrigés de façon ciblée). Sept tests de DELIVER l'ont rappelé.
 - **Prochaine étape** :
-  - une revue sans défaut bloquant ni majeur doit passer (`revue.mjs:162`, et l'équivalent de
-    l'extension) : c'est la gravité qui décide, pas le verdict de la lentille ;
+  - outils de vérification pour les agents, niveaux 1 et 2 décidés le 11/11 : `verifier_scenarios`
+    (DISTILL), puis `verifier_conception` (DESIGN) ; chaque appel tracé comme une preuve, et un
+    seul rappel si `report_phase` arrive sans vérification depuis la dernière écriture ;
   - refuser une question ouverte qui renvoie à un élément absent (« voir décision 2 ») ;
   - un critère coupé sur plusieurs lignes, dans une story donnée par fichier, n'est lu que sur sa
     première ligne : le refuser, comme pour une issue ;

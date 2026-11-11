@@ -5,7 +5,7 @@ import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, leve
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import type { MutantSurvivant } from "./deliver.js";
 import { questionDeValeur, sansValeur, valeursDouteuses, type Story } from "./story.js";
-import { synthesize, type LensVerdict } from "./review.js";
+import { revueSansDefautCorrigible, synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { disjoncte, memeRefus } from "@agent-studio/extension-api";
 import { bumpRetries, deciderSelonLaCause, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
@@ -405,11 +405,12 @@ function mutationThreads(mutants: MutantSurvivant[], round: number): DefectThrea
 function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: boolean): Out {
   const p = ns.phase!;
   const verdict = synthesize(lenses);
-  if (verdict === "APPROVED") {
+  const approuver = (): Out => {
     const proposed = ns.adrs.filter((a) => a.status === "Proposed");
     if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
     return commit(ns);
-  }
+  };
+  if (verdict === "APPROVED") return approuver();
   if (verdict === "REJECTED") {
     // Tracé comme tout rejet (D11 de docs/12) : sinon la cause n'existe que dans le texte de l'escalade.
     const motifs = lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
@@ -427,6 +428,9 @@ function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: b
     if (!mineurs.length) return escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
     if (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || ns.reviews[p].length === 1 || decidedByHuman) return startReviewFix(ns, [...threads, ...mineurs]);
   }
+  // Hors DELIVER, rien à corriger (ADR 0081) : rejouer la phase consommerait un essai pour rien.
+  if (p !== "DELIVER" && !active.length)
+    return revueSansDefautCorrigible(lenses) === "approuver" ? approuver() : escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
   // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
   // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
   // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade

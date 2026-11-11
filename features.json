@@ -1296,6 +1296,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft story.test reducer.test e2e-valeurs-douteuses",
       "passes": true,
       "notes": "Fait le 2026-11-11, décision du responsable, après le run 4 de LEC-1 : « (ADR 0069) » dans le critère 3 faisait exiger « 0069 » dans le scénario. Remplacer la porte par une lentille a été écarté."
+    },
+    {
+      "id": "revue-sans-defaut-hors-deliver",
+      "title": "Hors DELIVER, une revue « changements demandés » sans défaut bloquant ni majeur à corriger ne fait plus rejouer la phase (ADR 0081) : approuvée, mineurs au rapport ; escaladée sans essai si une lentille est REJECTED ou une question sans lentille. DELIVER garde l'ADR 0062 (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft review-synthesis reducer.test e2e-revue-sans-defaut",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 4 de LEC-1 : deux revues de DISTILL sans défaut à corriger ont épuisé le budget et provoqué la seconde escalade. Changer synthesize a été écarté : cela aurait contredit l'ADR 0062 en DELIVER (sept tests le rappelaient)."
     }
   ]
 }

@@ -595,6 +595,24 @@ describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
     expect(play(approuve).state.deliver?.acceptanceHash).toBe("apres");
   });
 
+  // ADR 0081 : hors DELIVER, rien à corriger ne fait plus rejouer la phase.
+  it.each([
+    ["mineurs seulement", lens("CHANGES_REQUESTED", ["minor"])],
+    ["changements demandés sans défaut", lens("CHANGES_REQUESTED")],
+  ])("revue de DISTILL sans défaut à corriger (%s) : approuvée, commitée sans consommer d'essai", (_nom, verdict) => {
+    const avant = play(toReview()).state;
+    const { state, effects } = play([...toReview(), LENSES(verdict)]);
+    expect(state).toMatchObject({ stage: "COMMIT", phase: "DISTILL", attempts: avant.attempts });
+    expect(kinds(effects)).toEqual(["commitPhase"]);
+  });
+
+  it("revue de DISTILL : une lentille REJECTED sans défaut à corriger escalade, sans consommer d'essai", () => {
+    const avant = play(toReview()).state;
+    const { state } = play([...toReview(), LENSES(lens("REJECTED", ["minor"]))]);
+    expect(state).toMatchObject({ stage: "ESCALATED", attempts: avant.attempts });
+    expect(state.escalation?.reason).toContain("Revue sans défaut à corriger");
+  });
+
   it.each([
     ["délai de revue", TIMEOUT("silence")],
     ["panne de revue", { type: "ENV_FAILURE", reason: "runtime indisponible" } as Ev],

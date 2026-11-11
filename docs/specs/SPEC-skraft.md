@@ -534,6 +534,8 @@ La table de pondération de la skill `adversarial-review-lenses` est transcrite 
 - toutes `APPROVED` sans défaut `major` → `APPROVED` ;
 - sinon `CHANGES_REQUESTED`.
 
+Hors DELIVER, un `CHANGES_REQUESTED` qui ne laisse aucun défaut bloquant ni majeur à corriger ne fait pas rejouer la phase : la revue est approuvée, ses mineurs restent au rapport ; si une lentille a rendu `REJECTED` ou qu'une question reste sans lentille, l'humain décide, sans qu'un essai soit consommé (ADR 0081). DELIVER suit l'ADR 0062.
+
 Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depuis les JSON. Lors d'un réessai, seuls les défauts `blocker` et `major` sont transmis au spécialiste, avec fichier et ligne.
 
 **US-12** : `cold-reader` signale « `MaxBolus` accepte une valeur négative » (`major`) → `CHANGES_REQUESTED` → rollback au dernier commit vert du scénario concerné, relance de `skraft-dev` avec ce seul défaut.

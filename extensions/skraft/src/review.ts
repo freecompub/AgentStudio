@@ -200,3 +200,13 @@ export function replayReview(phase: string, attempt: number, json: string): { ve
   const lenses: LensVerdict[] = lensesSchema.parse(JSON.parse(json));
   return { verdict: synthesize(lenses), markdown: reviewReport(phase, attempt, lenses) };
 }
+
+/**
+ * Revue « changements demandés » sans défaut bloquant ni majeur, hors DELIVER (ADR 0081) : le
+ * producteur n'a rien à corriger. Mineurs seuls, ou aucun défaut : la revue est approuvée, ses
+ * mineurs restent au rapport. Une lentille REJECTED, ou une question sans lentille : personne ne
+ * peut y répondre, l'humain décide. DELIVER garde sa règle (ADR 0062).
+ */
+export function revueSansDefautCorrigible(lenses: LensVerdict[]): "approuver" | "escalader" {
+  return lenses.some((l) => l.verdict === "REJECTED") || uncoveredQuestions(lenses).length > 0 ? "escalader" : "approuver";
+}

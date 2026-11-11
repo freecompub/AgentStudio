@@ -7,7 +7,7 @@
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
-import { reviewReport, synthesize } from "./review.mjs";
+import { reviewReport, revueSansDefautCorrigible, synthesize } from "./review.mjs";
 import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, rangerHorsChangement, verifierOccurrences, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
 /**
@@ -157,6 +157,15 @@ async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
     const motifs = motifsDeRejet(lenses);
     await w.rejet("revue", motifs);
     throw new Escalade([`Revue : verdict REJECTED (${motifs.join(" ; ")})`]);
+  }
+  // Hors DELIVER, rien à corriger (ADR 0081) : rejouer la phase consommerait un essai pour rien.
+  // DELIVER garde sa règle : ses mineurs sont corrigés de façon ciblée (ADR 0062).
+  if (phase !== "DELIVER" && !s.fils.some(isActive)) {
+    if (revueSansDefautCorrigible(lenses) === "approuver")
+      return undefined;
+    const motif = sansDefautCorrigible(lenses);
+    await w.rejet("revue", [motif]);
+    throw new Escalade([`Revue sans défaut à corriger : ${motif}`]);
   }
   return {
     motifs: s.fils.some(isActive) ? agentFeedback(s.fils, () => true) : [sansDefautCorrigible(lenses)],
