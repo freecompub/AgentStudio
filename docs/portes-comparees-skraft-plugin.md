@@ -205,6 +205,8 @@ arrondisse le palier à « 5 % » en « 5,0 % ».
 - **Chez nous** : la porte `valeurs` extrait les littéraux du critère — `10`, `5 %`, `10`, `2,00 €`,
   `1,00 €` — et exige chacun **dans le scénario** et **dans le test**. Le refus nomme la valeur :
   *« La valeur « 1,00 € » du critère 2 n'apparaît pas dans le test d'acceptance du critère 2. »*
+  Le `10` seul, sans unité, est une valeur douteuse : il est d'abord soumis à l'humain, avant
+  RESEARCH, qui le garde ou le retire de la porte (ADR 0080).
 
 Puis la porte lance les tests et exige que le test d'acceptance soit **rouge pour la bonne raison**.
 Sur .NET, `RemiseParPalier` n'existant pas encore, la compilation échoue : notre profil lit l'erreur

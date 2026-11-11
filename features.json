@@ -1289,6 +1289,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate adr.test render-adr e2e-s3",
       "passes": true,
       "notes": "Fait le 2026-11-11, après le run 3 de LEC-1 arrêté en DESIGN (12,44 $) : l'architecte numérotait depuis 001 à côté des 0001-….md d'AgentStudio, la porte répondait « ADR-001 en double », et il ne pouvait pas supprimer son fichier pour renuméroter."
+    },
+    {
+      "id": "valeurs-douteuses-a-l-humain",
+      "title": "Porte des valeurs (ADR 0080) : une référence (« ADR 0069 », « #32 ») n'est pas une valeur ; un nombre seul est soumis à l'humain en ROUTE, avant RESEARCH (« Valeur à tester », la garder d'abord), qui le retire valeur par valeur ; la réponse va dans le dossier de passation et le bilan nomme les valeurs retirées (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft story.test reducer.test e2e-valeurs-douteuses",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, après le run 4 de LEC-1 : « (ADR 0069) » dans le critère 3 faisait exiger « 0069 » dans le scénario. Remplacer la porte par une lentille a été écarté."
     }
   ]
 }

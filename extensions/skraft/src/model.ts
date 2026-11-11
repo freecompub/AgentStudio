@@ -8,7 +8,7 @@ import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSu
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
-import type { Story } from "./story.js";
+import type { Story, ValeurDouteuse } from "./story.js";
 
 export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
 
@@ -191,7 +191,8 @@ export interface SkraftState {
   attempts: number;
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
-  openQuestions: { id: string; text: string; answer?: string }[];
+  /** `valeur` : une valeur douteuse de la porte des valeurs, que l'humain garde ou retire (ADR 0080). */
+  openQuestions: { id: string; text: string; answer?: string; valeur?: ValeurDouteuse; retiree?: boolean }[];
   /** Matrice du plan de test gardée depuis DISTILL (ADR 0067). */
   planDeTest?: Record<string, LigneDuPlan>;
   /** Écarts au plan de test déclarés et validés en DELIVER, commités dans `ecarts-au-plan.md` (ADR 0067). */
@@ -353,7 +354,7 @@ export type SkraftEffect =
   | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
   /** `lens` : question d'une lentille de revue (D4 de docs/12). */
   | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
-  | { kind: "askQuestion"; id: string; text: string }
+  | { kind: "askQuestion"; id: string; text: string; valeur?: ValeurDouteuse }
   | { kind: "askEscalation"; reason: string; options: ("obsolete" | "exempt" | "retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "arbitrateMutants"; threads: DefectThread[] }
@@ -434,7 +435,7 @@ const stateSchema = z.object({
   attempts: z.number().int().min(0),
   budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
-  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
+  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional(), valeur: z.object({ critere: z.number().int(), valeur: z.string() }).optional(), retiree: z.boolean().optional() })),
   recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
   architecture: z.string().optional(),
   planDeTest: z.record(z.string(), z.object({ couche: z.string(), doublure: z.string() })).optional(),

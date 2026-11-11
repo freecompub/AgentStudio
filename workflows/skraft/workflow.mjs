@@ -33,6 +33,7 @@ export const meta = {
   humains: {
     "confirmer-difficulte": [],
     "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
+    "valeur-a-tester": ["po", "developpeur", "architecte", "administrateur"],
     blocage: ["po", "developpeur", "architecte", "administrateur"],
     "question-de-revue": ["po", "developpeur", "architecte", "administrateur"],
     escalade: ["developpeur", "architecte", "administrateur"],
@@ -174,7 +175,7 @@ import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, l
 import { preselectFiles } from "./preselect.mjs";
 import { checkResearch, extraireInventaire } from "./research.mjs";
 import { skillDArchitecture } from "./architecture.mjs";
-import { parseStory, slugOf } from "./story.mjs";
+import { ligneValeursRetirees, parseStory, questionDeValeur, sansValeur, slugOf, valeursDouteuses } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
 import { distiller } from "./distillation.mjs";
 import { livrer, barreDeQualite } from "./livraison.mjs";
@@ -219,7 +220,11 @@ export default async function skraft(w, entree) {
     phasesFaites: [],
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
     architecture: architecture.skill,
-    questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+    // Une valeur douteuse de la porte des valeurs est posée avec les questions de la story (ADR 0080).
+    questions: [
+      ...story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+      ...valeursDouteuses(story.criteria).map((valeur, i) => ({ id: `v${i + 1}`, text: questionDeValeur(valeur, story.criteria.find((c) => c.n === valeur.critere)?.text ?? ""), valeur })),
+    ],
     reponses: [],
     adrs: [],
     regressions: [],
@@ -312,6 +317,7 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...[ligneValeursRetirees(d.questions)].filter((l) => l !== null),
     ...(d.derogationsCouverture?.length
       ? [`Lignes exemptées de la couverture du diff : ${d.derogationsCouverture.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`]
       : []),
@@ -339,7 +345,16 @@ async function trancher(w, vue, storyId) {
   const reponseDe = new Map(ouvertes.map((q, i) => [q.id, reponses[i]]));
   vue.questions = vue.questions.map((q) => {
     const d = reponseDe.get(q.id);
-    return d ? { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" } : q;
+    if (!d)
+      return q;
+    // Valeur douteuse (ADR 0080) : retirée, elle sort de son critère, et la porte ne l'exige plus.
+    if (q.valeur) {
+      const retiree = d.decision === "drop";
+      if (retiree)
+        vue.story = { ...vue.story, criteria: sansValeur(vue.story.criteria, q.valeur) };
+      return { ...q, ...(retiree ? { retiree: true } : {}), answer: retiree ? `Non : « ${q.valeur.valeur} » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.` : `Oui : « ${q.valeur.valeur} » est une valeur à tester ; la porte des valeurs l'exige.` };
+    }
+    return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
   });
 }
 /**
@@ -351,7 +366,7 @@ async function poserLesQuestions(w, questions, storyId) {
   const reponses = new Array(questions.length);
   let restantes = questions.map((_, i) => i);
   for (;;) {
-    const issues = await Promise.allSettled(restantes.map((i) => w.humain("question-ouverte", `Question ouverte (${storyId})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: questions[i].text, texteLibre: true })));
+    const issues = await Promise.allSettled(restantes.map((i) => poser(w, questions[i], storyId)));
     const pannes = [];
     issues.forEach((r, j) => {
       if (r.status === "fulfilled")
@@ -373,6 +388,15 @@ async function poserLesQuestions(w, questions, storyId) {
     await w.etape("ROUTE");
     restantes = pannes.map((p) => p.i);
   }
+}
+/** Une question : ouverte, à réponse libre ; ou valeur douteuse, à garder d'abord, ce que retient un répondeur qui ne lit pas (ADR 0080). */
+function poser(w, q, storyId) {
+  if (q.valeur)
+    return w.humain("valeur-a-tester", `Valeur à tester (${storyId}, critère ${q.valeur.critere})`, [
+      { id: "keep", label: "Oui : la garder dans la porte des valeurs" },
+      { id: "drop", label: "Non : la retirer de la porte des valeurs" },
+    ], { detail: q.text });
+  return w.humain("question-ouverte", `Question ouverte (${storyId})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true });
 }
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */
 async function preparer(w, chemin) {
@@ -474,7 +498,7 @@ async function porteCitations(w, vue) {
     return reasons;
   const connues = new Set(vue.questions.map((q) => q.text));
   const nouvelles = openQuestions.filter((q) => !connues.has(q));
-  vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.length + i + 1}`, text }))];
+  vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.filter((q) => !q.valeur).length + i + 1}`, text }))];
   // Transmise à DESIGN et DISTILL par le dossier de passation (skraft-plugin v1.15.1).
   vue.recherche = extraireInventaire(md);
   return [];

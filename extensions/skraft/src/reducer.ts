@@ -4,6 +4,7 @@ import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import type { MutantSurvivant } from "./deliver.js";
+import { questionDeValeur, sansValeur, valeursDouteuses, type Story } from "./story.js";
 import { synthesize, type LensVerdict } from "./review.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { disjoncte, memeRefus } from "@agent-studio/extension-api";
@@ -84,7 +85,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "INIT":
       if (e.type === "INITIALIZED") {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
-        const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
+        const openQuestions = [...e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })), ...questionsDeValeur(e.story)];
         return {
           state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}), ...(e.testsAvant ? { testsAvant: e.testsAvant } : {}) },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
@@ -169,7 +170,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
           ...s,
           artifacts: { ...s.artifacts, [p]: [...s.artifacts[p], ...e.artifacts] },
           adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
-          openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
+          openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.filter((q) => !q.valeur).length + i + 1}`, text }))],
           ...(p === "RESEARCH" && e.recherche ? { recherche: e.recherche } : {}),
           ...(p === "DISTILL" && e.planDeTest ? { planDeTest: e.planDeTest } : {}),
           lastRejection: null,
@@ -482,11 +483,25 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
 }
 
 /** Invariant 2 : prochaine phase de `phaseOrder` hors phases faites et sautées ; invariant 7 : pas de DISTILL avec un ADR proposé. */
+/** Une question par valeur douteuse des critères (ADR 0080), posée avec celles de la story. */
+function questionsDeValeur(story: Story): SkraftState["openQuestions"] {
+  return valeursDouteuses(story.criteria).map((valeur, i) => ({ id: `v${i + 1}`, text: questionDeValeur(valeur, story.criteria.find((c) => c.n === valeur.critere)?.text ?? ""), valeur }));
+}
+
 /** Réponse (ou report) à une question ouverte ; `null` si la décision ne la concerne pas. */
 function repondre(s: SkraftState, decision: string, comment: string | undefined): SkraftState | null {
   const [action, id] = decision.split(":");
   const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
-  if (!q || (action !== "answer" && action !== "defer")) return null;
+  if (!q) return null;
+  // Valeur douteuse (ADR 0080) : gardée, la porte l'exige ; retirée, elle sort de son critère.
+  if (q.valeur) {
+    if (action !== "keep" && action !== "drop") return null;
+    const v = q.valeur;
+    const answer = action === "keep" ? `Oui : « ${v.valeur} » est une valeur à tester ; la porte des valeurs l'exige.` : `Non : « ${v.valeur} » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.`;
+    const story = action === "drop" && s.story ? { ...s.story, criteria: sansValeur(s.story.criteria, v) } : s.story;
+    return { ...s, story, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer, ...(action === "drop" ? { retiree: true } : {}) } : x)) };
+  }
+  if (action !== "answer" && action !== "defer") return null;
   const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (comment ?? "").trim() || "(réponse vide)";
   return { ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) };
 }
@@ -503,7 +518,7 @@ function route(s: SkraftState): Out {
     const toAsk = unanswered.filter((q) => !s.questionsAsked.includes(q.id));
     return {
       state: { ...s, stage: "ROUTE", phase: null, questionsAsked: [...s.questionsAsked, ...toAsk.map((q) => q.id)] },
-      effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text })),
+      effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text, ...(q.valeur ? { valeur: q.valeur } : {}) })),
     };
   }
   return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };

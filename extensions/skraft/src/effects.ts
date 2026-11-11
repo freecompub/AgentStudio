@@ -17,7 +17,7 @@ import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
-import { parseStory, slugOf } from "./story.js";
+import { ligneValeursRetirees, parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees, sansTestsObsoletes } from "./deliver.js";
 import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects, rangerHorsChangement, verifierOccurrences } from "./review-thread.js";
@@ -298,13 +298,25 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     case "askQuestion":
       await ctx.interactions.request({
         taskId,
-        title: `Question ouverte (${state.story?.id ?? "skraft"})`,
-        detail: effect.text,
-        options: [
-          { id: `answer:${effect.id}`, label: "Répondre" },
-          { id: `defer:${effect.id}`, label: "Reporter" },
-        ],
-        freeText: true,
+        // Valeur douteuse (ADR 0080) : la garder d'abord, c'est ce que retient un répondeur qui ne lit pas.
+        ...(effect.valeur
+          ? {
+              title: `Valeur à tester (${state.story?.id ?? "skraft"}, critère ${effect.valeur.critere})`,
+              detail: effect.text,
+              options: [
+                { id: `keep:${effect.id}`, label: "Oui : la garder dans la porte des valeurs" },
+                { id: `drop:${effect.id}`, label: "Non : la retirer de la porte des valeurs" },
+              ],
+            }
+          : {
+              title: `Question ouverte (${state.story?.id ?? "skraft"})`,
+              detail: effect.text,
+              options: [
+                { id: `answer:${effect.id}`, label: "Répondre" },
+                { id: `defer:${effect.id}`, label: "Reporter" },
+              ],
+              freeText: true,
+            }),
         requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
       });
       // Demande créée : une panne sur une question suivante ne la fera pas reposer (D17 de docs/12).
@@ -811,6 +823,7 @@ function finalReport(s: SkraftState): string {
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
+    ...[ligneValeursRetirees(s.openQuestions)].filter((l): l is string => l !== null),
     ...(s.nonCommitees?.length ? [`Phases non commitées : ${s.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(s.derogationsCouverture?.length
       ? [`Lignes exemptées de la couverture du diff : ${s.derogationsCouverture.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`]

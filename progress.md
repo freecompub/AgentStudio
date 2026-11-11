@@ -59,7 +59,26 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   numéro doit être empêchée à l'écriture, pas réparée après coup.
 - **Pas fait** : les PDF de `docs/pdf/skraft-fonctionnement-*` ne sont pas régénérés (Typst absent
   de la machine) ; seule leur source `skraft.typ` est à jour.
-- **Prochaine étape** : relancer le run de LEC-1.
+- **Run 4 de LEC-1** (1 h 23, 30,12 $), arrêté à la main en DISTILL, essai 7. RESEARCH du premier
+  coup ; DESIGN terminée, ADR-079 à 081 numérotés à la suite et ratifiés : le correctif des ADR tient.
+  DISTILL a bouclé :
+  - la porte des valeurs exigeait « 0069 », tiré de « (ADR 0069) » dans le critère 3 ;
+  - « Q2 : voir décision 2 », question de RESEARCH qui renvoie à une décision absente : l'agent a
+    inventé un thème, la revue l'a refusé ;
+  - deux refus de revue « changements demandés » sans défaut bloquant ni majeur (`revue.mjs:162`),
+    donc rien à corriger : deux escalades, relancées par le répondeur.
+- **Fait (ADR 0080, décision du responsable)** : une référence d'ADR ou d'issue n'est plus une
+  valeur ; un nombre seul est soumis à l'humain en ROUTE (« Valeur à tester », questions `v1`…), qui
+  le garde (première option, ce que prend un répondeur) ou le retire de son seul critère. Réponse
+  dans la passation, ligne au bilan (`ligneValeursRetirees`). Remplacer la porte par une lentille a
+  été écarté : c'est un contrôle mécanique.
+- **Prochaine étape** :
+  - une revue sans défaut bloquant ni majeur doit passer (`revue.mjs:162`, et l'équivalent de
+    l'extension) : c'est la gravité qui décide, pas le verdict de la lentille ;
+  - refuser une question ouverte qui renvoie à un élément absent (« voir décision 2 ») ;
+  - un critère coupé sur plusieurs lignes, dans une story donnée par fichier, n'est lu que sur sa
+    première ligne : le refuser, comme pour une issue ;
+  - faire trancher par le responsable les questions de RESEARCH de LEC-1 (issue #32), puis relancer.
 - **Reste ouvert** : les ADR produits gardent la convention skraft, pas celle du projet (option B,
   une section `adr` dans `projet.yaml`, non tranchée).
 

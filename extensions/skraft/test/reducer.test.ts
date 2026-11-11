@@ -373,6 +373,49 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     expect(kinds(effects)).toEqual(["askQuestion"]);
   });
 
+  // ADR 0080 : un nombre seul d'un critère est peut-être un compte, une date, un numéro. L'humain dit
+  // s'il faut le tester, avant tout travail ; sans réponse, la porte le garde.
+  describe("valeurs douteuses de la porte des valeurs", () => {
+    const avecDouteuse = (() => {
+      const r = parseStory(US12.replace("3. Aucun plafond configuré", "3. Après 3 refus, aucun plafond configuré"));
+      if (!r.ok) throw new Error();
+      return r.story;
+    })();
+    const INIT_DOUTE: Ev = { ...INITIALIZED, story: avecDouteuse } as Ev;
+    const texte = "Le critère 3 cite « 3 » : « Après 3 refus, aucun plafond configuré : dose proposée égale au calcul, pas d'alerte. ». Est-ce une valeur que les scénarios et les tests d'acceptance doivent contenir ? Si c'est un compte, une date ou un numéro sans portée métier, retire-la : la porte des valeurs ne l'exigera pas.";
+
+    it("posée avec les questions de la story, avant RESEARCH, avec la valeur et son critère", () => {
+      const { state, effects } = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard")]);
+      expect(state.stage).toBe("ROUTE");
+      expect(effects).toEqual([
+        { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
+        { kind: "askQuestion", id: "v1", text: texte, valeur: { critere: 3, valeur: "3" } },
+      ]);
+    });
+
+    it("retirée : la porte ne l'exige plus, et la réponse est gardée ; gardée : rien ne change", () => {
+      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER];
+      const retiree = play([...base, DECIDE("drop:v1")]).state;
+      expect(retiree.story!.criteria[2]!.literals).toEqual([]);
+      expect(retiree.openQuestions[1]).toMatchObject({ id: "v1", answer: "Non : « 3 » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas." });
+      expect(retiree).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
+      const gardee = play([...base, DECIDE("keep:v1")]).state;
+      expect(gardee.story!.criteria[2]!.literals).toEqual(["3"]);
+      expect(gardee.openQuestions[1]).toMatchObject({ id: "v1", answer: "Oui : « 3 » est une valeur à tester ; la porte des valeurs l'exige." });
+    });
+
+    it("une question de la recherche garde sa numérotation en q", () => {
+      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER, DECIDE("keep:v1"), CP("RESEARCH"), REPORTED];
+      const { effects } = play([...base, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED]);
+      expect(effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
+    });
+
+    it("« Répondre » ou « Reporter » ne tranchent pas une valeur", () => {
+      const base = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER]);
+      expect(transition(base.state, DECIDE("answer:v1", "x"))).toEqual({ state: base.state, effects: [] });
+    });
+  });
+
   it("réponse à une question inconnue ou déjà tranchée : ignorée", () => {
     const base = play([...toFirstPhase("simple")]);
     expect(transition(base.state, DECIDE("answer:q9", "x"))).toEqual({ state: base.state, effects: [] });

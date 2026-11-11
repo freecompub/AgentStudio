@@ -352,7 +352,7 @@ Lire et valider la story, vérifier que les tests existants sont sains, ouvrir l
   ("", "Contenu"),
   ([Entrée], [Le chemin de la story (par exemple `stories/us-12.md`), donné à la commande `/skraft`. Options : `--auto` (difficulté retenue sans confirmation) et `--archi <skill>` (skill d'architecture du projet, par son nom ou son langage : `dotnet`, `java`, `python`, `react`) ; sans `--archi`, ou si la skill est inconnue (avec un avertissement), la clean architecture par défaut.]),
   ([Format exigé], [Un titre `# US-12 — Titre` ; une section « Critères d'acceptation » avec des lignes `1. …` (au moins une) ; une section « Questions ouvertes » facultative, en puces.]),
-  ([Sorties], [La story analysée (critères, valeurs littérales de chaque critère, questions numérotées `q1`, `q2`…) ; la branche `skraft/<slug>` ; les dossiers `.skraft/<slug>/research`, `/design`, `/distill/features`, `/reviews` ; un checkpoint « qualité initiale » qui sert de base à la couverture du diff de toute la tâche.]),
+  ([Sorties], [La story analysée (critères, valeurs littérales de chaque critère, questions numérotées `q1`, `q2`… ; un nombre seul d'un critère devient une question `v1`, `v2`… : l'humain le garde ou le retire de la porte des valeurs, ADR 0080 ; une référence comme « ADR 0069 » n'est pas une valeur) ; la branche `skraft/<slug>` ; les dossiers `.skraft/<slug>/research`, `/design`, `/distill/features`, `/reviews` ; un checkpoint « qualité initiale » qui sert de base à la couverture du diff de toute la tâche.]),
 )
 
 === Qui exécute quoi

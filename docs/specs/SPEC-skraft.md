@@ -253,7 +253,7 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 - Le plafond s'applique-t-il par prise ou par jour ?
 ```
 
-Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3).
+Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3). Une référence (« ADR 0069 », « #32 ») n'en est pas un. Un nombre seul, sans unité, est une valeur douteuse : il est soumis à l'humain en ROUTE, avant RESEARCH, qui le garde ou le retire de la porte (ADR 0080).
 
 **Précontrôle avant tout appel LLM (ADR 0060)** : le code exécute les tests existants
 (`INIT_BASELINE`). Échec, test ignoré, délai dépassé ou sortie non nulle bloquent le
@@ -389,7 +389,7 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements déclarés dans le profil de stack ; les valeurs sont copiées mot pour mot des critères.
 
-**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables.
+**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables. Une valeur douteuse retirée par l'humain (6.1, ADR 0080) n'est pas exigée ; le bilan du run la nomme.
 
 **Porte RED d'acceptance (code)** : exécution des tests d'acceptance selon le profil de stack, classification des échecs par le moteur générique.
 
