@@ -1310,6 +1310,13 @@
       "verify": "pnpm vitest run --project core task-agent-runner && pnpm vitest run --project extension-host in-process-host && pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-scenarios",
       "passes": true,
       "notes": "Fait le 2026-11-11, décision du responsable, qui révise le point 3 de l'ADR 0055. Niveaux 1 (mesurer) et 2 (un rappel) ; le niveau 3 (exiger) a été écarté. verifier_conception (DESIGN) reste à faire."
+    },
+    {
+      "id": "chercheur-se-verifie",
+      "title": "Le chercheur se vérifie avec verifier_recherche (ADR 0082) : même calcul que la porte des citations (motifsDeLaRecherche), le document lu par l'hôte, les fichiers cités lus à la demande ; un outil de workflow lit par lire(chemin), servi par l'hôte, limité à la liste du dépôt (extension et workflow)",
+      "verify": "pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-recherche",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, demande du responsable, après le run 6 de LEC-1 : le gabarit `docs/adr/00NN-titre.md`, cité comme un fichier, avait coûté un essai de RESEARCH."
     }
   ]
 }

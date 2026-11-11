@@ -89,6 +89,14 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     (`rejoueur.outil`) ; `w.agent(…, { verification })` journalisé.
   - skraft : `verifier_scenarios` pour l'agent d'acceptance (`motifsDesScenarios`, même calcul que
     la porte, dans les deux copies) ; bilan « Vérifications par les agents ».
+- **Run 6 de LEC-1**, arrêté à la main en DESIGN (7 min, 2,41 $) : RESEARCH refusée une fois sur
+  `docs/adr/00NN-titre.md`, un gabarit cité comme un fichier ; le chercheur n'avait pas d'outil pour
+  le voir avant de rendre.
+- **Fait** : `verifier_recherche` pour le chercheur (même calcul que la porte, `motifsDeLaRecherche`).
+  La porte ne sait qu'après lecture quels fichiers lire : un outil de workflow reçoit `lire(chemin)`,
+  servi par l'hôte, qui ne rend que les fichiers de la liste du dépôt (ceux que voit la porte), sinon
+  `null`. Dans l'extension, l'outil lit par `ctx.workspace`.
+- **Piège** : le RPC rend `undefined` pour un `null` ; `lire` le normalise côté enfant.
 - **Piège** : le rappel refuse le premier `report_phase` de tout agent qui ne vérifie pas. Les
   agents simulés des bancs (`ignoreLeRappel`) le rappellent, comme un agent réel qui ignore le
   rappel ; `rappelsVus` permet aux essais de le constater.
@@ -96,6 +104,8 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   autrement (mineurs corrigés de façon ciblée). Sept tests de DELIVER l'ont rappelé.
 - **Prochaine étape** :
   - `verifier_conception` (DESIGN), sur le modèle de `verifier_scenarios` ;
+  - faux positif de la porte des citations : un gabarit (`docs/adr/00NN-titre.md`, `<…>`, `{…}`, `*`)
+    n'est pas une citation ;
   - refuser une question ouverte qui renvoie à un élément absent (« voir décision 2 ») ;
   - un critère coupé sur plusieurs lignes, dans une story donnée par fichier, n'est lu que sur sa
     première ligne : le refuser, comme pour une issue ;

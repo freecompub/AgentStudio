@@ -136,10 +136,16 @@ export interface EntreeOutil {
   /** Fichiers désignés par la vérification du tour, lus par l'hôte : chemin → contenu. */
   fichiers: Record<string, string>;
   donnees?: Json;
+  /**
+   * Lecture à la demande, servie par l'hôte : le contenu d'un fichier de la liste du dépôt, celle que
+   * voit le script (`w.listerFichiers`), ou `null`. Pour une porte qui ne sait qu'après lecture ce
+   * qu'elle doit lire (les fichiers cités par une recherche).
+   */
+  lire(chemin: string): Promise<string | null>;
 }
 
-/** Les outils qu'un workflow apporte à ses agents : fonctions pures, exportées par le script (`outils`). */
-export type OutilsWorkflow = Record<string, (entree: EntreeOutil) => string>;
+/** Les outils qu'un workflow apporte à ses agents : fonctions sans effet, exportées par le script (`outils`). */
+export type OutilsWorkflow = Record<string, (entree: EntreeOutil) => string | Promise<string>>;
 
 export interface OptionHumaine {
   id: string;

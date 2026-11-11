@@ -341,6 +341,8 @@ Toujours exécutée, quelle que soit la difficulté, comme dans skraft 1.6.0.
 
 **Agent** `skraft-researcher` : enquête sur le code et les sources externes, produit `research/research.md` selon le gabarit : périmètre et critères de succès, fichiers analysés, recherches effectuées, conventions du projet, découvertes clés (chaque affirmation sourcée), approches évaluées, recommandation unique, passage de relais à DESIGN (décisions à valider, questions ouvertes).
 
+**Vérification par le chercheur (ADR 0082)** : le chercheur dispose de l'outil `verifier_recherche`, qui rend ce que la porte des citations dirait de son document ; c'est le même calcul que la porte, rejouée par le code après son tour. Sans vérification depuis sa dernière modification, sa sortie est refusée une fois.
+
 **Porte citations (code), pas de reviewer LLM** :
 
 | Contrôle | Rejet si |

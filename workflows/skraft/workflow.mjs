@@ -50,6 +50,7 @@ export const meta = {
   },
   // Outils apportés aux agents (ADR 0082) : la porte que le code rejoue, consultable pendant le tour.
   outils: {
+    verifier_recherche: { description: "Vérifie ta recherche avec la porte des citations du code : sections, fichiers cités et plages de lignes, existant réutilisable. Sans argument : le code lit lui-même ton document." },
     verifier_scenarios: { description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (gherkin, valeurs, plan de test). Sans argument : le code lit lui-même tes fichiers." },
   },
   agents: {
@@ -61,11 +62,11 @@ export const meta = {
     },
     "skraft-researcher": {
       prompt: "agents/skraft-researcher.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nAvant de rendre ton travail, appelle `verifier_recherche` : il rend ce que la porte des citations dirait de ton document, avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: [".skraft/**"],
-      outils: ["list_files", "report_blocker"],
+      outils: ["list_files", "verifier_recherche", "report_blocker"],
     },
     "skraft-architect-model": {
       prompt: "agents/skraft-architect-model.agent.md",
@@ -177,7 +178,7 @@ import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsEx
 import { buildBrief, ecrirePassation } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
-import { checkResearch, extraireInventaire } from "./research.mjs";
+import { citesDansLaRecherche, extraireInventaire, motifsDeLaRecherche, verifierRecherche } from "./research.mjs";
 import { skillDArchitecture } from "./architecture.mjs";
 import { ligneValeursRetirees, parseStory, questionDeValeur, sansValeur, slugOf, valeursDouteuses } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
@@ -187,6 +188,7 @@ import { distiller, motifsDesScenarios, texteDeVerification } from "./distillati
 * porte appelle le même calcul après le tour : l'agent est jugé comme il s'est vérifié.
 */
 export const outils = {
+  verifier_recherche: verifierRecherche,
   verifier_scenarios: ({ fichiers, donnees }) => texteDeVerification(motifsDesScenarios({ fichiers, ...donnees })),
 };
 import { livrer, barreDeQualite } from "./livraison.mjs";
@@ -474,7 +476,11 @@ function rechercher(w, vue, max, relance) {
       const utiles = preselectFiles(vue.story, fichiers);
       await ecrirePassation(w, vue);
       const consigne = buildBrief(vue, "RESEARCH", motifs) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
-      const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
+      // Le chercheur vérifie son document avec la porte que le code rejouera (ADR 0082).
+      const document = `.skraft/${vue.slug}/research/research.md`;
+      const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS, verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } });
+      if (r.verification)
+        vue.verifications = [...(vue.verifications ?? []), { phase: "RESEARCH", agent: "skraft-researcher", appels: r.verification.appels }];
       if (r.sortie)
         break;
       // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier, et le même motif (D9 de docs/12).
@@ -499,13 +505,11 @@ async function porteCitations(w, vue) {
   }
   const existants = new Set(await w.listerFichiers());
   const contenus = new Map();
-  for (const cite of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0])))
+  for (const cite of citesDansLaRecherche(md))
     if (existants.has(cite))
       contenus.set(cite, await w.lireFichier(cite));
-  const { reasons, openQuestions } = checkResearch(md, {
-    lineCount: (p) => (contenus.has(p) ? contenus.get(p).replace(/\n$/, "").split("\n").length : null),
-    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
-  });
+  // Le même calcul que l'outil `verifier_recherche` du chercheur (ADR 0082).
+  const { reasons, openQuestions } = motifsDeLaRecherche(md, contenus);
   if (reasons.length)
     return reasons;
   const connues = new Set(vue.questions.map((q) => q.text));

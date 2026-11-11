@@ -37,7 +37,9 @@ export const ROLES = {
   classifier: `${PASSATION}
 Rends le niveau et sa justification avec l'outil submit_difficulty.`,
 
-  researcher: PASSATION,
+  researcher: `${PASSATION}
+Avant de rendre ton travail, appelle \`verifier_recherche\` : il rend ce que la porte des citations dirait de ton document,
+avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.`,
 
   architectModel: PASSATION,
 

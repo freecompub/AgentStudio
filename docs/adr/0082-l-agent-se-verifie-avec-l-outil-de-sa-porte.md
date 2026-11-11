@@ -45,8 +45,13 @@ de la plateforme (`list_files`, `run_tests`, `run_lint`, `report_blocker`).
    - leur code est une fonction exportée par le script (`export const outils = { nom: ({ args, fichiers, donnees }) => texte }`) ;
    - le processus isolé du workflow l'exécute à la demande de l'hôte. Elle ne lit ni n'écrit rien :
      le journal et le rejeu ne changent pas.
-6. **Dans skraft**, le premier outil est `verifier_scenarios`, pour l'agent d'acceptance : portes
-   gherkin, valeurs et plan de test. Le RED d'acceptance reste prouvé par les tests, après le tour.
+6. **Lecture à la demande.** Une porte qui ne sait qu'après lecture ce qu'elle doit lire (les fichiers
+   cités par une recherche) reçoit `lire(chemin)`. L'hôte le sert, et ne rend que les fichiers de la
+   liste du dépôt, ceux que la porte elle-même voit ; sinon `null`.
+7. **Dans skraft** :
+   - `verifier_recherche`, pour le chercheur : la porte des citations ;
+   - `verifier_scenarios`, pour l'agent d'acceptance : portes gherkin, valeurs et plan de test. Le RED
+     d'acceptance reste prouvé par les tests, après le tour.
 
 ## Conséquences
 

@@ -11,7 +11,7 @@ import { evaluerScript } from "./bac-a-sable.js";
 export function lancerEnfantWorkflow(canal: MessageChannelLike): RpcEndpoint {
   let script: ScriptWorkflow<never> | null = null;
   let outils: OutilsWorkflow = {};
-  return createRpcEndpoint(canal, {
+  const rpc: RpcEndpoint = createRpcEndpoint(canal, {
     async charger([code]) {
       ({ script, outils } = evaluerScript(String(code)));
       return null;
@@ -20,7 +20,9 @@ export function lancerEnfantWorkflow(canal: MessageChannelLike): RpcEndpoint {
     async outil([nom, entree]) {
       const f = outils[String(nom)];
       if (!f) throw new Error(`outil ${String(nom)} non exporté par le script (export const outils)`);
-      return String(f(entree as EntreeOutil));
+      // La lecture à la demande est servie par le principal : l'enfant n'a aucun accès au disque.
+      const lire = async (chemin: string) => ((await rpc.call("lire", [chemin], { timeoutMs: 30_000 })) as string | undefined) ?? null;
+      return String(await f({ ...(entree as Omit<EntreeOutil, "lire">), lire }));
     },
     async rejouer([etat, opts]) {
       if (!script) throw new Error("aucun script chargé");
@@ -30,4 +32,5 @@ export function lancerEnfantWorkflow(canal: MessageChannelLike): RpcEndpoint {
       return { etat: e, nouveaux };
     },
   });
+  return rpc;
 }

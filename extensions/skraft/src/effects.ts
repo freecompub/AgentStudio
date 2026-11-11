@@ -7,7 +7,7 @@ import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.j
 import type { DefectThread } from "./review-thread.js";
 import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
-import { checkResearch, extraireInventaire } from "./research.js";
+import { contenusCites, extraireInventaire, motifsDeLaRecherche } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.js";
 import { checkAcceptanceRed, planDeTest, testsDeLaStory } from "./distill.js";
@@ -198,11 +198,14 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (effect.phase === "DISTILL" && ctx.stack.bdd?.length) brief += `\n${ligneBdd(ctx.stack.bdd)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
       const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
-      // L'agent d'acceptance vérifie son travail avec la porte que le code rejouera (ADR 0082).
+      // Le chercheur et l'agent d'acceptance vérifient leur travail avec la porte que le code rejouera (ADR 0082).
+      const document = `.skraft/${state.slug}/research/research.md`;
       const verification =
         effect.role === "skraft-acceptance"
           ? { verification: { outil: "verifier_scenarios", fichiers: fichiersDesScenarios(state.slug, ctx.stack.bdd, ctx.stack.layout.acceptanceTests), donnees: donneesDesScenarios(ctx, state) } }
-          : {};
+          : effect.role === "skraft-researcher"
+            ? { verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } }
+            : {};
       const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase), ...verification });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return {
@@ -528,15 +531,8 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
   } catch {
     return { type: "GATE_FAIL", gate: "citations", reasons: [`Document de recherche absent : ${path}`] };
   }
-  const files = new Set(await ctx.workspace.listFiles());
-  const contenus = new Map<string, string>();
-  for (const cited of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))) {
-    if (files.has(cited)) contenus.set(cited, await ctx.workspace.readFile(cited));
-  }
-  const { reasons, openQuestions } = checkResearch(md, {
-    lineCount: (p) => (contenus.has(p) ? contenus.get(p)!.replace(/\n$/, "").split("\n").length : null),
-    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
-  });
+  // Le même calcul que l'outil `verifier_recherche` du chercheur (ADR 0082).
+  const { reasons, openQuestions } = motifsDeLaRecherche(md, await contenusCites(ctx, md));
   if (reasons.length) return { type: "GATE_FAIL", gate: "citations", reasons };
   const known = new Set(state.openQuestions.map((q) => q.text));
   return {

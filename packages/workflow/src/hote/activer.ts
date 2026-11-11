@@ -129,6 +129,8 @@ export async function activerWorkflow(w: WorkflowTrouve, deps: HostDeps, o: Opti
     humains: m.humains,
     agents: Object.keys(m.agents),
     ...(o.delaiMs ? { delaiMs: o.delaiMs } : {}),
+    // Un outil ne lit que ce que le script lui-même pourrait lire : la liste du dépôt (ADR 0082).
+    lire: async (chemin) => ((await deps.workspace.files.list()).includes(chemin) ? deps.workspace.files.read(chemin).catch(() => null) : null),
   });
   const tache = createWorkflowTaskDepuis({ nom: m.name, empreinte: w.empreinte, humains: m.humains, rejoueur, refusEnTermesDuMeta: true });
 

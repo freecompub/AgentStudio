@@ -201,13 +201,15 @@ describe("outils apportés par un workflow (ADR 0082)", () => {
   entrees: { story: { type: "fichier", obligatoire: true, aide: "La story." } },
   phases: { REDACTION: "Rédaction" },
   permissions: { ecriture: [".skraft/**"], tests: false, git: [] },
-  outils: { verifier_resume: { description: "Vérifie le résumé." } },
+  outils: { verifier_resume: { description: "Vérifie le résumé." }, lire_source: { description: "Lit une source." } },
   agents: {
-    redacteur: { prompt: "agents/redacteur.agent.md", ecriture: [".skraft/**"], outils: ["verifier_resume"], sortie: "report_phase" },
+    redacteur: { prompt: "agents/redacteur.agent.md", ecriture: [".skraft/**"], outils: ["verifier_resume", "lire_source"], sortie: "report_phase" },
   },
 };
 export const outils = {
   verifier_resume: ({ fichiers, donnees }) => "vu " + Object.keys(fichiers).join(",") + " pour " + donnees.story,
+  // Lecture à la demande : ce que la porte verrait, servi par l'hôte ; rien hors de la liste du dépôt.
+  lire_source: async ({ lire }) => [await lire("src/a.ts"), await lire("node_modules/x.js")].map(String).join(" | "),
 };
 export default async function (w, entree) {
   let a;
@@ -242,6 +244,33 @@ export default async function (w, entree) {
     const s = await derniere(h.engine);
     expect(reponses).toEqual(["vu .skraft/resume.md pour stories/us-2.md"]);
     expect(s?.fin).toEqual({ statut: "fini", valeur: { clair: { appels: 1, dernier: "vu .skraft/resume.md pour stories/us-2.md" } } });
+    await r.handle.deactivate();
+  }, 30_000);
+
+  it("un outil lit à la demande ce que la porte verrait : un fichier de la liste du dépôt, et rien d'autre", async () => {
+    const p = await mkdtemp(join(racine, "projet-"));
+    const d = join(p, ".agent-studio/workflows/demo");
+    const script = AVEC_OUTIL.replace('verification: { outil: "verifier_resume"', 'verification: { outil: "lire_source"');
+    for (const [rel, c] of Object.entries({ "workflow.mjs": script, "agents/redacteur.agent.md": "Tu résumes des stories." })) {
+      await mkdir(dirname(join(d, rel)), { recursive: true });
+      await writeFile(join(d, rel), c);
+    }
+    const trouves = await trouverWorkflows({ projet: join(p, ".agent-studio/workflows") });
+    const reponses: unknown[] = [];
+    const runtime = new ScriptedRuntime();
+    runtime.behave("workflow.demo/redacteur", async (t) => {
+      reponses.push(await t.callTool("lire_source", {}));
+      await t.callTool("report_phase", { summary: "résumé", files: [] });
+    });
+    const h = hote(runtime);
+    const files = h.deps.workspace.files as { list: () => Promise<string[]>; read: (p: string) => Promise<string> };
+    files.list = async () => ["src/a.ts"];
+    files.read = async (chemin) => (chemin === "src/a.ts" ? "export const a = 1;" : "secret");
+    const r = await activerWorkflow(trouves.workflows[0]!, h.deps, { isolation: { launcher: createNodeLauncher(), runtimeEntry: enfant }, accords: createJsonAccordStore(join(p, "accords.json")), confirmer: confirmeur("allow-once") });
+    if (!r.ok) throw new Error(r.motifs.join(" ; "));
+    await h.deps.registry.command("demo")!.handler("stories/us-2.md");
+    await derniere(h.engine);
+    expect(reponses).toEqual(["export const a = 1; | null"]);
     await r.handle.deactivate();
   }, 30_000);
 });

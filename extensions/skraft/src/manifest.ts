@@ -53,7 +53,7 @@ export const manifest: ExtensionManifest = {
         output: "report_phase",
         modelClass: ROLE_MODEL_CLASS.researcher,
         write: [SKRAFT_DIR],
-        tools: ["list_files", "report_blocker"],
+        tools: ["list_files", "verifier_recherche", "report_blocker"],
       },
       {
         name: "skraft-architect-model",
@@ -134,6 +134,7 @@ export const manifest: ExtensionManifest = {
     skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
     tools: [
       { name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." },
+      { name: "verifier_recherche", description: "Vérifie ta recherche avec la porte des citations du code (ADR 0082)." },
       { name: "verifier_scenarios", description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (ADR 0082)." },
     ],
     tasks: [

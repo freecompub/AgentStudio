@@ -199,7 +199,11 @@ export function simulatedAgents(
     },
     "skraft-researcher": async (t) => {
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
-      await writer(`.skraft/${slug}/research/research.md`, researchDoc())(t);
+      const rel = `.skraft/${slug}/research/research.md`;
+      await put(root, rel, researchDoc());
+      // Comme on l'attend d'un agent réel : il vérifie avec la porte avant de rendre (ADR 0082).
+      await t.callTool("verifier_recherche", {});
+      await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
     },
     "skraft-architect-model": async (t) => {
       const slug = /Dossier de travail : \.skraft\/([^/]+)\//.exec(t.prompt)?.[1] ?? "x";
