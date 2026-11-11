@@ -1303,6 +1303,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft review-synthesis reducer.test e2e-revue-sans-defaut",
       "passes": true,
       "notes": "Fait le 2026-11-11, après le run 4 de LEC-1 : deux revues de DISTILL sans défaut à corriger ont épuisé le budget et provoqué la seconde escalade. Changer synthesize a été écarté : cela aurait contredit l'ADR 0062 en DELIVER (sept tests le rappelaient)."
+    },
+    {
+      "id": "agent-se-verifie-avec-sa-porte",
+      "title": "L'agent se vérifie avec l'outil de sa porte (ADR 0082) : un workflow apporte ses outils (meta.outils, export const outils, exécutés dans son processus isolé) ; l'hôte lit les fichiers désignés, compte les appels et refuse une fois la sortie sans vérification depuis la dernière modification ; verifier_scenarios en DISTILL, même calcul que la porte (extension et workflow)",
+      "verify": "pnpm vitest run --project core task-agent-runner && pnpm vitest run --project extension-host in-process-host && pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-scenarios",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, qui révise le point 3 de l'ADR 0055. Niveaux 1 (mesurer) et 2 (un rappel) ; le niveau 3 (exiger) a été écarté. verifier_conception (DESIGN) reste à faire."
     }
   ]
 }

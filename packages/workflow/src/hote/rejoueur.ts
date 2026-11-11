@@ -4,12 +4,14 @@
  */
 import { dirname } from "node:path";
 import { createRpcEndpoint, type ChildHandle, type ProcessLauncher, type RpcEndpoint } from "@agent-studio/extension-host";
-import type { DeclarationWorkflow, EntreeJournal, EtatWorkflow, Profil } from "../protocols.js";
+import type { DeclarationWorkflow, EntreeJournal, EntreeOutil, EtatWorkflow, Profil } from "../protocols.js";
 import { rejouer } from "../rejeu.js";
 
 export interface Rejoueur {
   /** Relance le script contre le journal de `etat` ; rend l'état complété et les entrées nouvelles. */
   rejouer(etat: EtatWorkflow): Promise<{ etat: EtatWorkflow; nouveaux: EntreeJournal[] }>;
+  /** Exécute un outil apporté par le workflow (ADR 0082) ; rend le texte destiné à l'agent. */
+  outil(nom: string, entree: EntreeOutil): Promise<string>;
   arreter(): void;
 }
 
@@ -18,6 +20,11 @@ export function createRejoueurLocal(decl: DeclarationWorkflow<never>): Rejoueur 
     async rejouer(etat) {
       const nouveaux = await rejouer(decl, etat);
       return { etat, nouveaux };
+    },
+    async outil(nom, entree) {
+      const f = decl.outils?.[nom];
+      if (!f) throw new Error(`outil ${nom} non exporté par le script (export const outils)`);
+      return f(entree);
     },
     arreter() {},
   };
@@ -84,6 +91,11 @@ export function createRejoueurIsole(o: OptionsRejoueurIsole): Rejoueur {
               : `Le processus du workflow a échoué : ${message}`;
         return { etat: { ...etat, fin: { statut: "echec", motif } }, nouveaux: [] };
       }
+    },
+    async outil(nom, entree) {
+      // Pas de réessai : une erreur de l'outil est rendue à l'agent, qui peut continuer son tour.
+      const e = enfant ?? (await demarrer());
+      return String(await e.rpc.call("outil", [nom, entree], { timeoutMs: delai }));
     },
     arreter,
   };

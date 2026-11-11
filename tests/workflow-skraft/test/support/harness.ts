@@ -155,8 +155,33 @@ export function acceptanceWriter(root: string): ScriptedBehavior {
     await put(root, `.skraft/${slug}/distill/impl-plan.md`, implPlanDe(criteria.map((c) => c.n), "tests/acceptance/story.acceptance.test.ts"));
     const rel = "tests/acceptance/story.acceptance.test.ts";
     await put(root, rel, `import { expect, it } from "vitest";\n\n${tests}\n`);
+    // Comme on l'attend d'un agent réel : il vérifie avec la porte avant de rendre (ADR 0082).
+    await t.callTool("verifier_scenarios", {});
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
   };
+}
+
+/**
+ * Un agent simulé qui reçoit le rappel de vérification (ADR 0082) rend quand même son travail, comme
+ * un agent réel qui l'ignore : les essais écrits avant l'outil gardent leur déroulé.
+ */
+export const rappelsVus: string[] = [];
+function ignoreLeRappel(b: ScriptedBehavior): ScriptedBehavior {
+  return (t) =>
+    b({
+      ...t,
+      callTool: async (n, a) => {
+        try {
+          return await t.callTool(n, a);
+        } catch (e) {
+          if (n === "report_phase" && e instanceof Error && e.message.startsWith("Avant de rendre ton travail, vérifie-le")) {
+            rappelsVus.push(e.message);
+            return t.callTool(n, a);
+          }
+          throw e;
+        }
+      },
+    });
 }
 
 /** Agents simulés : chacun écrit son livrable dans son périmètre puis rend la main. */
@@ -203,8 +228,9 @@ export function simulatedAgents(
       await t.callTool("submit_lens_verdict", { lens: "finding-refuter", verdict: "APPROVED", defects: [], rulings: ids.map((defect) => ({ defect, decision: "maintained", reason: "défaut établi" })) });
     },
   };
-  for (const [name, behavior] of Object.entries({ ...behaviors, ...over })) {
-    if (!behavior) continue;
+  for (const [name, comportement] of Object.entries({ ...behaviors, ...over })) {
+    if (!comportement) continue;
+    const behavior = ignoreLeRappel(comportement);
     // Usage simulé (D37) : une requête par tour, tokens proportionnels au dossier de passation.
     const measured: ScriptedBehavior = opts.usage
       ? async (t) => {

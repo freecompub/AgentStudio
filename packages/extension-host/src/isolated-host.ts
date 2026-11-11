@@ -118,7 +118,7 @@ export async function activateIsolated(ext: IsolatedExtension, deps: HostDeps, o
             }
             if (method === "tools.register") {
               const t = (args as [{ name: string; description: string; parameters: Record<string, unknown> }])[0];
-              ctx.tools.register({ ...t, handler: async (a) => String(await endpoint.call("tool.invoke", [t.name, a], { timeoutMs: 60_000 })) });
+              ctx.tools.register({ ...t, handler: async (a, v) => String(await endpoint.call("tool.invoke", v ? [t.name, a, v] : [t.name, a], { timeoutMs: 60_000 })) });
               return null;
             }
             if (method === "hooks.onPreToolUse") {

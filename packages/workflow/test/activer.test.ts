@@ -190,3 +190,58 @@ describe("activer un workflow", () => {
     await h.handle.deactivate();
   }, 30_000);
 });
+
+// ADR 0082 : un workflow apporte ses outils (révise le point 3 de l'ADR 0055). La fonction est exportée
+// par le script et exécutée dans le processus isolé ; l'hôte lui passe les fichiers qu'il a lus.
+describe("outils apportés par un workflow (ADR 0082)", () => {
+  const AVEC_OUTIL = `export const meta = {
+  name: "demo",
+  description: "Démo.",
+  commande: "demo",
+  entrees: { story: { type: "fichier", obligatoire: true, aide: "La story." } },
+  phases: { REDACTION: "Rédaction" },
+  permissions: { ecriture: [".skraft/**"], tests: false, git: [] },
+  outils: { verifier_resume: { description: "Vérifie le résumé." } },
+  agents: {
+    redacteur: { prompt: "agents/redacteur.agent.md", ecriture: [".skraft/**"], outils: ["verifier_resume"], sortie: "report_phase" },
+  },
+};
+export const outils = {
+  verifier_resume: ({ fichiers, donnees }) => "vu " + Object.keys(fichiers).join(",") + " pour " + donnees.story,
+};
+export default async function (w, entree) {
+  let a;
+  await w.phase("REDACTION", async () => {
+    a = await w.agent("redacteur", "Résume " + entree.story, { verification: { outil: "verifier_resume", fichiers: [".skraft/**"], donnees: { story: entree.story } } });
+    return true;
+  });
+  return a.verification;
+}
+`;
+
+  it("l'agent appelle l'outil : la fonction du script reçoit les fichiers lus par l'hôte et les données ; l'appel est compté", async () => {
+    const p = await mkdtemp(join(racine, "projet-"));
+    const d = join(p, ".agent-studio/workflows/demo");
+    for (const [rel, c] of Object.entries({ "workflow.mjs": AVEC_OUTIL, "agents/redacteur.agent.md": "Tu résumes des stories." })) {
+      await mkdir(dirname(join(d, rel)), { recursive: true });
+      await writeFile(join(d, rel), c);
+    }
+    const trouves = await trouverWorkflows({ projet: join(p, ".agent-studio/workflows") });
+    expect(trouves.erreurs).toEqual([]);
+    const reponses: unknown[] = [];
+    const runtime = new ScriptedRuntime();
+    runtime.behave("workflow.demo/redacteur", async (t) => {
+      reponses.push(await t.callTool("verifier_resume", {}));
+      await t.callTool("report_phase", { summary: "résumé", files: [] });
+    });
+    const h = hote(runtime);
+    (h.deps.workspace.files as { list: () => Promise<string[]> }).list = async () => [".skraft/resume.md", "src/a.ts"];
+    const r = await activerWorkflow(trouves.workflows[0]!, h.deps, { isolation: { launcher: createNodeLauncher(), runtimeEntry: enfant }, accords: createJsonAccordStore(join(p, "accords.json")), confirmer: confirmeur("allow-once") });
+    if (!r.ok) throw new Error(r.motifs.join(" ; "));
+    await h.deps.registry.command("demo")!.handler("stories/us-2.md");
+    const s = await derniere(h.engine);
+    expect(reponses).toEqual(["vu .skraft/resume.md pour stories/us-2.md"]);
+    expect(s?.fin).toEqual({ statut: "fini", valeur: { clair: { appels: 1, dernier: "vu .skraft/resume.md pour stories/us-2.md" } } });
+    await r.handle.deactivate();
+  }, 30_000);
+});

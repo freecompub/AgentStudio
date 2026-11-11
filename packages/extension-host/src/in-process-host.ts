@@ -130,6 +130,42 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
         if (!a) throw new Error(`Agent non déclaré dans le manifeste : ${name}`);
         let frozen = false;
         const skillsLoaded: string[] = [];
+        const verif = opts?.verification;
+        if (verif && !a.tools?.includes(verif.outil)) throw new Error(`Vérification par ${verif.outil} : ce n'est pas un outil de l'agent ${name}`);
+        // Vérification du tour (ADR 0082) : fichiers lus par l'hôte, appels comptés, empreinte de ce qui a été vérifié.
+        const suivi = { appels: 0, dernier: undefined as string | undefined, empreinte: null as string | null, rappele: false };
+        const designes = (p: string) => (verif ? matchesAny(resolveGlobs(verif.fichiers), p) : false);
+        const lireDesignes = async () => {
+          const chemins = (await deps.workspace.files.list()).filter(designes).sort();
+          return Object.fromEntries(await Promise.all(chemins.map(async (p) => [p, await deps.workspace.files.read(p)] as const)));
+        };
+        const empreinte = () => fingerprintFiles(deps.workspace.files, designes);
+        const outilsDeLAgent = (): import("@agent-studio/core").ToolSpec[] =>
+          ownTools(a.tools ?? []).map((t) => {
+            if (!verif || t.name !== verif.outil) return t;
+            const outil = extensionTools.get(t.name)!;
+            return {
+              ...t,
+              handler: async (args: unknown) => {
+                const fichiers = await lireDesignes();
+                const texte = await outil.handler(args, { fichiers, ...(verif.donnees !== undefined ? { donnees: verif.donnees } : {}) });
+                suivi.appels++;
+                suivi.dernier = texte;
+                suivi.empreinte = await empreinte();
+                return texte;
+              },
+            };
+          });
+        // Un seul rappel : l'agent qui ne vérifie pas après l'avoir lu rend quand même son travail, que la porte jugera.
+        const avantSortie = verif
+          ? async () => {
+              if (suivi.rappele) return null;
+              const raison = suivi.appels === 0 ? "tu ne l'as pas appelé pendant ce tour" : (await empreinte()) !== suivi.empreinte ? "les fichiers qu'il vérifie ont changé depuis ton dernier appel" : null;
+              if (!raison) return null;
+              suivi.rappele = true;
+              return `Avant de rendre ton travail, vérifie-le avec l'outil \`${verif.outil}\` : ${raison}. Le code rejouera la même vérification après ton tour.`;
+            }
+          : undefined;
         const composed = promptOf(name);
         const taskId = opts?.evidence?.taskId;
         const phase = taskId ? ((await deps.engine.phaseOf(taskId)) ?? opts?.evidence?.phase ?? "?") : null;
@@ -156,8 +192,9 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
             // Trace d'exécution (ADR 0032) : tout ce que ce tour échange, et pourquoi il s'arrête.
             ...(taskId ? { trace: { taskId, ...(phase ? { phase } : {}) } } : {}),
             ...(deps.usage && taskId && phase ? { onUsage: (u: import("@agent-studio/core").UsageDelta) => void deps.usage!.add(taskId, phase, u).catch(() => undefined) } : {}),
+            ...(avantSortie ? { avantSortie } : {}),
             tools: (beat: () => void) => [
-              ...ownTools(a.tools ?? []),
+              ...outilsDeLAgent(),
               ...(a.tools?.includes("run_tests")
                 ? [
                     runTestsTool(testRuns, {
@@ -202,7 +239,8 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
           },
         );
         const loaded = skillsLoaded.length ? { skillsLoaded: [...new Set(skillsLoaded)] } : {};
-        return (r.blocker ? { blocker: structuredClone(r.blocker), ...loaded } : { output: structuredClone(r.output), ...loaded }) as never;
+        const verifiees = verif ? { verification: { appels: suivi.appels, ...(suivi.dernier !== undefined ? { dernier: suivi.dernier } : {}) } } : {};
+        return (r.blocker ? { blocker: structuredClone(r.blocker), ...loaded, ...verifiees } : { output: structuredClone(r.output), ...loaded, ...verifiees }) as never;
       },
     },
 

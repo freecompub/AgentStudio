@@ -76,10 +76,11 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       const e = ec as { taskId: string; state: unknown };
       return (await task(name).runEffect(effect, ctx!, { taskId: e.taskId, state: e.state, signal })) ?? null;
     },
-    "tool.invoke": async ([name, args]) => {
+    "tool.invoke": async ([name, args, verification]) => {
       const t = tools.get(String(name));
       if (!t) throw new Error(`Outil inconnu dans l'hôte : ${String(name)}`);
-      return t.handler(args);
+      // Contexte de vérification du tour (ADR 0082), quand l'outil en est un.
+      return verification ? t.handler(args, verification as import("@agent-studio/extension-api").ContexteDeVerification) : t.handler(args);
     },
     "hook.preToolUse": async ([id, call]) => {
       const h = hooks.get(Number(id));

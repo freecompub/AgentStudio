@@ -4,16 +4,23 @@
  * rendus au principal comme effets à exécuter (`docs/09` §6).
  */
 import { createRpcEndpoint, type MessageChannelLike, type RpcEndpoint } from "@agent-studio/extension-host";
-import type { EtatWorkflow, ScriptWorkflow } from "../protocols.js";
+import type { EntreeOutil, EtatWorkflow, OutilsWorkflow, ScriptWorkflow } from "../protocols.js";
 import { rejouer } from "../rejeu.js";
 import { evaluerScript } from "./bac-a-sable.js";
 
 export function lancerEnfantWorkflow(canal: MessageChannelLike): RpcEndpoint {
   let script: ScriptWorkflow<never> | null = null;
+  let outils: OutilsWorkflow = {};
   return createRpcEndpoint(canal, {
     async charger([code]) {
-      script = evaluerScript(String(code)).script;
+      ({ script, outils } = evaluerScript(String(code)));
       return null;
+    },
+    // Un outil apporté par le workflow (ADR 0082) : fonction pure, sur les fichiers lus par l'hôte.
+    async outil([nom, entree]) {
+      const f = outils[String(nom)];
+      if (!f) throw new Error(`outil ${String(nom)} non exporté par le script (export const outils)`);
+      return String(f(entree as EntreeOutil));
     },
     async rejouer([etat, opts]) {
       if (!script) throw new Error("aucun script chargé");

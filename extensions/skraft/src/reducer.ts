@@ -71,8 +71,11 @@ export const phaseOf = (s: SkraftState): string =>
 export function transition(s0: SkraftState, e: Ev): Out {
   if (isTerminal(s0)) return { state: s0, effects: [] };
   // Chaque chargement de skill facultative est tracé dans l'état, quelle que soit la suite (D26).
-  const s: SkraftState =
+  const s1: SkraftState =
     e.type === "AGENT_REPORTED" && e.skills?.length ? { ...s0, skillsLoaded: [...(s0.skillsLoaded ?? []), { phase: s0.phase, role: e.role, skills: [...e.skills] }] } : s0;
+  // Les vérifications de l'agent aussi, pour le bilan (ADR 0082).
+  const s: SkraftState =
+    e.type === "AGENT_REPORTED" && e.verifications !== undefined ? { ...s1, verifications: [...(s1.verifications ?? []), { phase: s1.phase, role: e.role, appels: e.verifications }] } : s1;
   const same: Out = { state: s, effects: [] };
   if (e.type === "ABORT") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (e.type === "RESUMED") return same;

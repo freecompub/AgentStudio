@@ -389,6 +389,8 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements déclarés dans le profil de stack ; les valeurs sont copiées mot pour mot des critères.
 
+**Vérification par l'agent (ADR 0082)** : l'agent d'acceptance dispose de l'outil `verifier_scenarios`, qui rend ce que les portes gherkin, valeurs et plan de test diraient de ses fichiers ; c'est le même calcul que la porte, rejouée par le code après son tour. Sans vérification depuis sa dernière modification, sa sortie est refusée une fois.
+
 **Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables. Une valeur douteuse retirée par l'humain (6.1, ADR 0080) n'est pas exigée ; le bilan du run la nomme.
 
 **Porte RED d'acceptance (code)** : exécution des tests d'acceptance selon le profil de stack, classification des échecs par le moteur générique.

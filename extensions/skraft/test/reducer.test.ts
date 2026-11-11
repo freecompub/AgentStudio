@@ -613,6 +613,13 @@ describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
     expect(state.escalation?.reason).toContain("Revue sans défaut à corriger");
   });
 
+  // ADR 0082 : les vérifications faites par l'agent sont gardées pour le bilan, quelle que soit la suite.
+  it("les vérifications de l'agent d'acceptance sont gardées dans l'état, avec sa phase", () => {
+    const base = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL")];
+    const { state } = play([...base, { type: "AGENT_REPORTED", role: "skraft-acceptance", summary: "fait", files: [], verifications: 2 } as Ev]);
+    expect(state.verifications).toEqual([{ phase: "DISTILL", role: "skraft-acceptance", appels: 2 }]);
+  });
+
   it.each([
     ["délai de revue", TIMEOUT("silence")],
     ["panne de revue", { type: "ENV_FAILURE", reason: "runtime indisponible" } as Ev],

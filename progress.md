@@ -79,12 +79,23 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Fait (ADR 0081)** : hors DELIVER, une revue sans défaut bloquant ni majeur à corriger est
   approuvée (mineurs au rapport), ou escaladée sans essai si une lentille est REJECTED ou une
   question sans lentille (`revueSansDefautCorrigible`).
+- **Fait (ADR 0082, décision du responsable, révise le point 3 de l'ADR 0055)** : l'agent se vérifie
+  avec l'outil de sa porte.
+  - Cœur : `avantSortie`, contrôle facultatif de l'outil terminal (un motif refuse, l'agent continue).
+  - Hôte : `verification: { outil, fichiers, donnees }` dans `ctx.agents.run` ; l'hôte lit les
+    fichiers, compte les appels, garde l'empreinte, refuse une fois la sortie ; le résultat rapporte
+    `verification: { appels, dernier }`. Le contexte traverse le RPC d'une extension isolée.
+  - Moteur de workflow : `meta.outils`, `export const outils`, exécutés par le processus enfant
+    (`rejoueur.outil`) ; `w.agent(…, { verification })` journalisé.
+  - skraft : `verifier_scenarios` pour l'agent d'acceptance (`motifsDesScenarios`, même calcul que
+    la porte, dans les deux copies) ; bilan « Vérifications par les agents ».
+- **Piège** : le rappel refuse le premier `report_phase` de tout agent qui ne vérifie pas. Les
+  agents simulés des bancs (`ignoreLeRappel`) le rappellent, comme un agent réel qui ignore le
+  rappel ; `rappelsVus` permet aux essais de le constater.
 - **Piège** : changer `synthesize` aurait été plus simple, mais l'ADR 0062 règle déjà DELIVER
   autrement (mineurs corrigés de façon ciblée). Sept tests de DELIVER l'ont rappelé.
 - **Prochaine étape** :
-  - outils de vérification pour les agents, niveaux 1 et 2 décidés le 11/11 : `verifier_scenarios`
-    (DISTILL), puis `verifier_conception` (DESIGN) ; chaque appel tracé comme une preuve, et un
-    seul rappel si `report_phase` arrive sans vérification depuis la dernière écriture ;
+  - `verifier_conception` (DESIGN), sur le modèle de `verifier_scenarios` ;
   - refuser une question ouverte qui renvoie à un élément absent (« voir décision 2 ») ;
   - un critère coupé sur plusieurs lignes, dans une story donnée par fichier, n'est lu que sur sa
     première ligne : le refuser, comme pour une issue ;

@@ -104,9 +104,13 @@ export type EvenementWorkflow =
   | { type: "ERREUR"; n: number; nature: NatureErreur; message: string };
 
 /** Sortie d'un tour d'agent : la sortie validée de son outil terminal, ou sa question bloquante. */
-export type ResultatAgent<S = Record<string, unknown>> =
+export type ResultatAgent<S = Record<string, unknown>> = (
   | { sortie: S; blocage?: undefined }
-  | { sortie?: undefined; blocage: { question: string; choix: string[] } };
+  | { sortie?: undefined; blocage: { question: string; choix: string[] } }
+) & {
+  /** Vérifications faites par l'agent pendant son tour (ADR 0082) : nombre d'appels, dernière réponse. */
+  verification?: { appels: number; dernier?: string };
+};
 
 export interface OptionsAgent {
   /** Motifs du rejet précédent, ajoutés à la consigne sous « Rejet précédent : » (SPEC §6.6). */
@@ -117,7 +121,25 @@ export interface OptionsAgent {
   gelApresRouge?: boolean;
   /** Rattachement des preuves de l'agent (`run_tests`) : étape (scénario), phase si elle diffère. */
   preuve?: { phase?: string; etape?: string };
+  /**
+   * L'outil du workflow avec lequel l'agent vérifie son travail, celui que la porte rejoue (ADR 0082) :
+   * il reçoit les fichiers désignés, lus par l'hôte, et `donnees`. Sans vérification depuis sa
+   * dernière modification de ces fichiers, la sortie de l'agent est refusée une fois.
+   */
+  verification?: { outil: string; fichiers: readonly string[]; donnees?: Json };
 }
+
+/** Ce que reçoit un outil apporté par un workflow (ADR 0082). */
+export interface EntreeOutil {
+  /** Arguments passés par l'agent. */
+  args: unknown;
+  /** Fichiers désignés par la vérification du tour, lus par l'hôte : chemin → contenu. */
+  fichiers: Record<string, string>;
+  donnees?: Json;
+}
+
+/** Les outils qu'un workflow apporte à ses agents : fonctions pures, exportées par le script (`outils`). */
+export type OutilsWorkflow = Record<string, (entree: EntreeOutil) => string>;
 
 export interface OptionHumaine {
   id: string;
@@ -214,4 +236,6 @@ export interface DeclarationWorkflow<E = Json> {
   humains?: Record<string, readonly Profil[]>;
   /** Agents déclarés (meta du workflow) : un agent absent est refusé à l'appel. Absent : pas de contrôle. */
   agents?: readonly string[];
+  /** Outils apportés par le workflow (ADR 0082), exécutés à la demande de l'hôte. */
+  outils?: OutilsWorkflow;
 }

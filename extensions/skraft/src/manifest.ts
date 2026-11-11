@@ -90,7 +90,7 @@ export const manifest: ExtensionManifest = {
         output: "report_phase",
         modelClass: ROLE_MODEL_CLASS.acceptance,
         write: [SKRAFT_DIR, ACCEPTANCE, SOURCES],
-        tools: ["list_files", "run_tests", "report_blocker"],
+        tools: ["list_files", "run_tests", "verifier_scenarios", "report_blocker"],
         skills: skillsOf(ROLE_SKILLS.acceptance),
       },
       {
@@ -132,7 +132,10 @@ export const manifest: ExtensionManifest = {
       { name: "skraft-finding-refuter", title: "Réfutateur de revue", prompt: agentFile("skraft-finding-refuter"), role: ROLES.findingRefuter, output: "submit_lens_verdict", modelClass: ROLE_MODEL_CLASS.findingRefuter },
     ],
     skills: SKILLS.map((name) => ({ name, path: `skills/${name}` })),
-    tools: [{ name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." }],
+    tools: [
+      { name: "render_adr", description: "Rédige un ADR au statut Proposed dans docs/adr, depuis le gabarit du projet." },
+      { name: "verifier_scenarios", description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (ADR 0082)." },
+    ],
     tasks: [
       {
         name: "skraft-pipeline",

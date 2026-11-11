@@ -2,6 +2,7 @@ import type { ExtensionContext, ExtensionModule, TaskDefinition } from "@agent-s
 import { skillDArchitecture } from "./architecture.js";
 import { runSkraftEffect } from "./effects.js";
 import { renderAdrTool } from "./render-adr-tool.js";
+import { verifierScenariosTool } from "./verifier-scenarios.js";
 import type { SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import { initialEffects, initialState, isTerminal, phaseOf, transition } from "./reducer.js";
 
@@ -41,6 +42,7 @@ export const skraftExtension: ExtensionModule = {
   activate(ctx) {
     ctx.tasks.register(skraftTask);
     ctx.tools.register(renderAdrTool(ctx));
+    ctx.tools.register(verifierScenariosTool());
     ctx.chat.registerCommand("skraft", async (args) => {
       const input = parseSkraftArgs(args);
       if (!input) return ctx.chat.post(USAGE);

@@ -20,7 +20,7 @@ machine ou dans le projet, et qu'on lance par une commande ou que l'agent princi
 |---|---|
 | 1 | Les workflows sont **écrits par nous** (développeurs), jamais par l'agent. L'agent principal les **utilise**. |
 | 2 | Deux façons de lancer : **une commande** (`/skraft stories/US-2.md`), ou **l'agent principal propose** et l'utilisateur confirme avant le démarrage. |
-| 3 | Un workflow **n'est pas une extension** : pas de hooks, pas d'outils propres, pas d'API `ctx`. Le script n'a que les appels `w.*`. |
+| 3 | Un workflow **n'est pas une extension** : pas de hooks, pas d'API `ctx`. Le script n'a que les appels `w.*`. *Révisé le 11/11 (ADR 0082) : il peut apporter ses outils à ses agents, déclarés dans `meta.outils` et exportés par le script (`export const outils`).* |
 | 4, 10 | Deux emplacements : **machine** (`~/.agent-studio/workflows/<nom>/`) et **projet** (`.agent-studio/workflows/<nom>/`, versionné avec le code). La commande `/workflow ajouter <nom>` copie un modèle ; **une copie à la main est prise en compte** de la même façon. Même nom aux deux endroits : **le projet l'emporte**. |
 | 5 | Les **agents** (`agents/*.agent.md`) et les **skills** (`skills/<nom>/SKILL.md`) sont dans le dossier. |
 | 6 | Le **code des contrôles** (portes) et de la **revue** (lentilles, fils de défauts) est dans le dossier ; le script l'importe. |

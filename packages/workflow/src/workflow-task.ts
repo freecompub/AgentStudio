@@ -178,6 +178,7 @@ interface Args {
   etiquette?: string;
   etape?: string;
   preuve?: { phase?: string; etape?: string };
+  verification?: { outil: string; fichiers: string[]; donnees?: unknown };
   regles: { module: string; forbidden: string[] }[];
 }
 
@@ -217,8 +218,10 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
         evidence: { ...evidence, ...(a.preuve?.phase ? { phase: a.preuve.phase } : {}), ...(a.preuve?.etape ? { stepId: a.preuve.etape } : {}) },
         ...(a.lectureSeule ? { readOnly: a.lectureSeule } : {}),
         ...(a.gelApresRouge ? { freezeTestsAfterRed: true } : {}),
+        ...(a.verification ? { verification: a.verification } : {}),
       });
-      return r.blocker ? { blocage: { question: r.blocker.question, choix: r.blocker.choices } } : { sortie: r.output };
+      const verifiees = r.verification ? { verification: r.verification } : {};
+      return r.blocker ? { blocage: { question: r.blocker.question, choix: r.blocker.choices }, ...verifiees } : { sortie: r.output, ...verifiees };
     }
     case "humain": {
       const roles = x.humains?.[a.id];

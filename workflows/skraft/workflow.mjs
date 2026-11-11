@@ -48,6 +48,10 @@ export const meta = {
     tests: true,
     git: ["branche", "commit", "revert"],
   },
+  // Outils apportés aux agents (ADR 0082) : la porte que le code rejoue, consultable pendant le tour.
+  outils: {
+    verifier_scenarios: { description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (gherkin, valeurs, plan de test). Sans argument : le code lit lui-même tes fichiers." },
+  },
   agents: {
     "skraft-classifier": {
       prompt: "agents/skraft-classifier.agent.md",
@@ -89,11 +93,11 @@ export const meta = {
     },
     "skraft-acceptance": {
       prompt: "agents/skraft-acceptance.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nL'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur\nrecopiée et la raison de chaque rouge : un écart est rejeté avec son motif.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nL'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur\nrecopiée et la raison de chaque rouge : un écart est rejeté avec son motif.\nAvant de rendre ton travail, appelle `verifier_scenarios` : il rend ce que les portes gherkin, valeurs et plan de test diraient de tes fichiers, avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: [".skraft/**", "@stack:acceptanceTests", "@stack:sources"],
-      outils: ["list_files", "run_tests", "report_blocker"],
+      outils: ["list_files", "run_tests", "verifier_scenarios", "report_blocker"],
       skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing", "bdd-step-definitions"] },
     },
     "skraft-test": {
@@ -177,7 +181,14 @@ import { checkResearch, extraireInventaire } from "./research.mjs";
 import { skillDArchitecture } from "./architecture.mjs";
 import { ligneValeursRetirees, parseStory, questionDeValeur, sansValeur, slugOf, valeursDouteuses } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
-import { distiller } from "./distillation.mjs";
+import { distiller, motifsDesScenarios, texteDeVerification } from "./distillation.mjs";
+/**
+* Outils apportés aux agents (ADR 0082) : fonctions pures, sur les fichiers que l'hôte a lus. La
+* porte appelle le même calcul après le tour : l'agent est jugé comme il s'est vérifié.
+*/
+export const outils = {
+  verifier_scenarios: ({ fichiers, donnees }) => texteDeVerification(motifsDesScenarios({ fichiers, ...donnees })),
+};
 import { livrer, barreDeQualite } from "./livraison.mjs";
 import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
@@ -318,6 +329,7 @@ function bilan(d, confirmee) {
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
     ...[ligneValeursRetirees(d.questions)].filter((l) => l !== null),
+    ...(d.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${d.verifications.map((v) => `${v.phase} ${v.agent} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(d.derogationsCouverture?.length
       ? [`Lignes exemptées de la couverture du diff : ${d.derogationsCouverture.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`]
       : []),
