@@ -102,6 +102,40 @@ describe("skraft — critères de sortie de S3 (DESIGN)", () => {
     expect(decidePrompts).toHaveLength(1);
   }, 120_000);
 
+
+  // L'architecte qui décide signale un défaut du modèle au lieu de le corriger : le code relance le
+  // modélisateur avec la remarque, une seule fois par essai, puis l'architecte qui décide (11/11).
+  it("un défaut du modèle signalé par l'architecte qui décide relance le modélisateur, une fois ; il ne peut pas écrire le modèle", async () => {
+    const REMARQUE = "`MaxBolus` est cité par la story mais manque au modèle de domaine.";
+    const modelPrompts: string[] = [];
+    const decidePrompts: string[] = [];
+    const probes: unknown[] = [];
+    const model: ScriptedBehavior = async (t) => {
+      modelPrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ".skraft/us-12/design/event-model.md" }));
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await t.callTool("render_adr", ADR_ARGS);
+      await t.callTool("report_phase", { summary: "décisions", files: [], modelDefects: [REMARQUE] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    const id = (await app.engine.list())[0]!.id;
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    await app.interactions.respond((await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!.id, "medium");
+    await until(async () => stateOf(await app.engine.status(id))?.stage === "RATIFICATION", 60_000);
+    expect(modelPrompts).toHaveLength(2);
+    expect(modelPrompts[1]).toContain(`Remarque de l'architecte qui décide sur le modèle : ${REMARQUE}`);
+    expect(decidePrompts).toHaveLength(2);
+    expect(probes[0]).toEqual(expect.objectContaining({ decision: "deny" }));
+  }, 120_000);
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     let acceptanceRan = false;

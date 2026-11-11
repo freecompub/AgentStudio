@@ -102,6 +102,15 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   vient des critères de LEC-1, eux-mêmes techniques.
 - **Fait** : un refus de DESIGN est routé vers son auteur (`routerMotifsDeDesign`) ; après le premier
   essai, le modélisateur n'est relancé que si un motif le concerne.
+- **Fait (11/11, branche `feat/design-retour-au-modele`)** : l'architecte qui décide signale les défauts
+  du modèle (`modelDefects`) ; le modèle lui est en lecture seule ; le code relance le modélisateur
+  avec ses remarques, une seule fois par essai, sans en consommer un. Sa consigne ne l'autorise plus
+  à « ajouter d'abord au modèle ».
+  - Workflow : `specialiste` rend la sortie de l'agent ; l'aller-retour vient après `controlerAdrs`,
+    pour que les ADR écrits avant soient marqués de leur story.
+  - Extension : drapeau `retourAuModele`, remis à faux à chaque essai et à chaque phase ; les
+    remarques arrivent au modélisateur sous « Rejet précédent », préfixées « Remarque de
+    l'architecte qui décide sur le modèle ».
 - **Instable** : « l'architecte qui décide reçoit les noms du modèle écrit juste avant lui » a échoué
   une fois sous charge (3,9 s), puis passé seul et en suite complète.
 - **Proposé, non tranché** : préciser la consigne de l'agent d'acceptance pour un critère technique

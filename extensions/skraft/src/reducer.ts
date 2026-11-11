@@ -136,6 +136,10 @@ export function transition(s0: SkraftState, e: Ev): Out {
       if (e.type === "AGENT_REPORTED") {
         // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
         const s1: SkraftState = e.responses?.length && s.reviewThreads ? { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, () => true) } : s;
+        // Défauts du modèle signalés par l'architecte qui décide : le modélisateur est relancé avec ces
+        // remarques, une seule fois par essai, sans en consommer un (11/11).
+        if (p === "DESIGN" && s1.designStep === "decide" && e.modelDefects?.length && !s1.retourAuModele)
+          return lancer({ ...s1, designStep: "model", retourAuModele: true }, e.modelDefects.map((r) => `Remarque de l'architecte qui décide sur le modèle : ${r}`));
         if (p === "DESIGN" && s1.designStep === "model") {
           // L'architecte qui décide reçoit les motifs du dernier rejet qui le concernent (11/11).
           const ns: SkraftState = { ...s1, designStep: "decide" };
@@ -529,7 +533,7 @@ function route(s: SkraftState): Out {
       effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text, ...(q.valeur ? { valeur: q.valeur } : {}) })),
     };
   }
-  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };
+  return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", retourAuModele: false, escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };
 }
 
 function commit(s: SkraftState): Out {
@@ -633,7 +637,7 @@ function failure(etat: SkraftState, gate: string, motifs: string[], essaiGaranti
       effects: [...rollback, { kind: "askEscalation", reason: `${gate} : ${reasons.join(" ; ")}`, options: ["retry", "skip", "abort"] }],
     };
   }
-  const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model" };
+  const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model", retourAuModele: false };
   return relancerLaPhase(ns, reasons, rollback);
 }
 

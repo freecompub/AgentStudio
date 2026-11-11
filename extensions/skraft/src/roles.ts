@@ -45,7 +45,10 @@ avec les mêmes règles que le code appliquera après ton tour. Corrige chaque m
 
   architectDecide: `${PASSATION}
 Rédige chaque ADR uniquement avec l'outil render_adr, qui applique le gabarit du projet et refuse un champ manquant ;
-pour amender un ADR encore proposé, rappelle render_adr avec son numéro. Tu n'as aucun accès direct en écriture à docs/adr.`,
+pour amender un ADR encore proposé, rappelle render_adr avec son numéro. Tu n'as aucun accès direct en écriture à docs/adr.
+Le modèle (event-model.md, domain-model.md, context-map.md) est écrit par le modélisateur : tu ne peux pas l'écrire. S'il lui
+manque un nom ou s'il a un défaut, décris-le dans le champ \`modelDefects\` de report_phase, une remarque par défaut :
+l'orchestrateur relance le modélisateur avec tes remarques, puis te relance sur le modèle corrigé.`,
 
   acceptance: `${PASSATION}
 ${SKILLS_ARBITRATION}
