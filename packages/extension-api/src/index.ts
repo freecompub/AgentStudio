@@ -146,12 +146,30 @@ export interface AgentRunOptions {
   freezeTestsAfterRed?: boolean;
   /** Motifs (dont `@stack:*`) interdits en écriture pendant ce tour, en plus du périmètre du rôle (tests gelés). */
   readOnly?: string[];
+  /**
+   * L'outil avec lequel l'agent vérifie son travail, celui que la porte rejouera (ADR 0082) : un
+   * outil de l'agent. L'hôte lui passe les fichiers désignés (motifs, dont `@stack:*`) et `donnees`,
+   * compte ses appels, et refuse une fois la sortie si l'agent n'a pas vérifié depuis sa dernière
+   * modification de ces fichiers.
+   */
+  verification?: { outil: string; fichiers: string[]; donnees?: unknown };
+}
+
+/** Ce que l'hôte passe à l'outil de vérification d'un tour (ADR 0082). */
+export interface ContexteDeVerification {
+  /** Les fichiers désignés, lus par l'hôte : chemin → contenu. */
+  fichiers: Record<string, string>;
+  donnees?: unknown;
 }
 
 /** Sortie structurée du rôle, ou question bloquante (`report_blocker`, si le rôle le déclare). */
-export type AgentRunResult<N extends TerminalToolName> =
+export type AgentRunResult<N extends TerminalToolName> = (
   | { output: TerminalOutput<N>; blocker?: undefined; skillsLoaded?: string[] }
-  | { output?: undefined; blocker: { question: string; choices: string[] }; skillsLoaded?: string[] };
+  | { output?: undefined; blocker: { question: string; choices: string[] }; skillsLoaded?: string[] }
+) & {
+  /** Vérifications faites pendant le tour (ADR 0082) : nombre d'appels, et la dernière réponse. */
+  verification?: { appels: number; dernier?: string };
+};
 
 export interface AgentsApi {
   /** Lance un agent déclaré par l'extension ; ne renvoie qu'un résultat sérialisé. */
@@ -269,8 +287,11 @@ export interface ExtensionTool {
   description: string;
   /** JSON Schema des arguments. */
   parameters: Record<string, unknown>;
-  /** Renvoie le texte transmis à l'agent ; une exception refuse l'appel (l'agent peut corriger). */
-  handler(args: unknown): Promise<string>;
+  /**
+   * Renvoie le texte transmis à l'agent ; une exception refuse l'appel (l'agent peut corriger).
+   * `verification` : présent quand l'outil est celui de la vérification du tour (ADR 0082).
+   */
+  handler(args: unknown, verification?: ContexteDeVerification): Promise<string>;
 }
 
 export interface ToolsApi {

@@ -1,3 +1,4 @@
+import type { ContexteDeVerification, ExtensionContext, ExtensionTool } from "@agent-studio/extension-api";
 import { parseCitations } from "./text-analysis.js";
 
 /** Gabarit du document de recherche (SPEC-skraft §7.1). */
@@ -123,4 +124,50 @@ export function sousSection(section: string, titre: string): string | null {
 export function extraireInventaire(md: string): { conventions: string; existant: string } {
   const secs = sections(md);
   return { conventions: secs.get(norm("Conventions du projet")) ?? "", existant: sousSection(secs.get(norm("Passage de relais")) ?? "", "Existant réutilisable") ?? "" };
+}
+
+/** Les chemins que cite une recherche, tels que la porte des citations les cherche. */
+export function citesDansLaRecherche(md: string): string[] {
+  return [...new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))];
+}
+
+/**
+ * La porte des citations sur des contenus déjà lus (`contenus` : chemin → contenu des fichiers cités
+ * qui existent). La porte et l'outil `verifier_recherche` du chercheur appellent ce même calcul (ADR 0082).
+ */
+export function motifsDeLaRecherche(md: string, contenus: ReadonlyMap<string, string>): { reasons: string[]; openQuestions: string[] } {
+  return checkResearch(md, {
+    lineCount: (p) => (contenus.has(p) ? contenus.get(p)!.replace(/\n$/, "").split("\n").length : null),
+    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
+  });
+}
+
+/** Les fichiers cités qui existent dans le dépôt, lus : ce que la porte examine. */
+export async function contenusCites(ctx: ExtensionContext, md: string): Promise<Map<string, string>> {
+  const fichiers = new Set(await ctx.workspace.listFiles());
+  const contenus = new Map<string, string>();
+  for (const cite of citesDansLaRecherche(md)) if (fichiers.has(cite)) contenus.set(cite, await ctx.workspace.readFile(cite));
+  return contenus;
+}
+
+/** Réponse de l'outil au chercheur : ce que la porte des citations dirait de son document. */
+export function texteDeVerificationRecherche(reasons: string[]): string {
+  if (!reasons.length) return "Aucun motif : la porte des citations accepterait ce document en l'état.";
+  return ["La porte « citations » refuserait ce document :", ...reasons.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau."].join("\n");
+}
+
+/** L'outil `verifier_recherche` : le document lu par l'hôte pendant le tour du chercheur, les fichiers cités lus ici. */
+export function verifierRechercheTool(ctx: ExtensionContext): ExtensionTool {
+  return {
+    name: "verifier_recherche",
+    description: "Vérifie ta recherche avec la porte des citations du code : sections, fichiers cités et plages de lignes, existant réutilisable. Sans argument : le code lit lui-même ton document.",
+    parameters: { type: "object", properties: {} },
+    async handler(_args: unknown, v?: ContexteDeVerification) {
+      if (!v) throw new Error("L'outil verifier_recherche n'est pas la vérification de ce tour : il n'a rien à examiner.");
+      const chemin = (v.donnees as { chemin: string }).chemin;
+      const md = v.fichiers[chemin];
+      if (md === undefined) return texteDeVerificationRecherche([`Document de recherche absent : ${chemin}`]);
+      return texteDeVerificationRecherche(motifsDeLaRecherche(md, await contenusCites(ctx, md)).reasons);
+    },
+  };
 }

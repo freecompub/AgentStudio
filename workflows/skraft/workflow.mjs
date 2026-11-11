@@ -33,6 +33,7 @@ export const meta = {
   humains: {
     "confirmer-difficulte": [],
     "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
+    "valeur-a-tester": ["po", "developpeur", "architecte", "administrateur"],
     blocage: ["po", "developpeur", "architecte", "administrateur"],
     "question-de-revue": ["po", "developpeur", "architecte", "administrateur"],
     escalade: ["developpeur", "architecte", "administrateur"],
@@ -43,9 +44,14 @@ export const meta = {
   },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
   permissions: {
-    ecriture: [".skraft/**", "docs/adr/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
+    ecriture: [".skraft/**", "docs/adr/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
     tests: true,
     git: ["branche", "commit", "revert"],
+  },
+  // Outils apportés aux agents (ADR 0082) : la porte que le code rejoue, consultable pendant le tour.
+  outils: {
+    verifier_recherche: { description: "Vérifie ta recherche avec la porte des citations du code : sections, fichiers cités et plages de lignes, existant réutilisable. Sans argument : le code lit lui-même ton document." },
+    verifier_scenarios: { description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (gherkin, valeurs, plan de test). Sans argument : le code lit lui-même tes fichiers." },
   },
   agents: {
     "skraft-classifier": {
@@ -56,11 +62,11 @@ export const meta = {
     },
     "skraft-researcher": {
       prompt: "agents/skraft-researcher.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nAvant de rendre ton travail, appelle `verifier_recherche` : il rend ce que la porte des citations dirait de ton document, avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: [".skraft/**"],
-      outils: ["list_files", "report_blocker"],
+      outils: ["list_files", "verifier_recherche", "report_blocker"],
     },
     "skraft-architect-model": {
       prompt: "agents/skraft-architect-model.agent.md",
@@ -75,22 +81,24 @@ export const meta = {
     },
     "skraft-architect-decide": {
       prompt: "agents/skraft-architect-decide.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nRédige chaque ADR dans docs/adr/, un fichier par décision, nommé adr-NNN-titre.md (NNN : numéro suivant, sur trois chiffres ; titre en minuscules, mots séparés par des tirets), avec ce gabarit :\n# ADR-NNN — Titre\n\n- Statut : Proposed\n- Date : AAAA-MM-JJ\n\n## Contexte\n\n…\n\n## Décision\n\n…\n\n## Conséquences\n\n…\n\n## Alternatives\n\n…\nS'il en remplace un autre, ajoute « - Remplace : ADR-NNN » sous la date, et la ligne « - ADR-XXX remplace ADR-NNN » dans docs/adr/supersessions.md.\nPour amender un ADR que tu as proposé pour cette story, modifie son fichier. Ne modifie jamais un ADR décidé ni celui d'une autre story, et ne touche pas à la ligne « Story », que l'orchestrateur ajoute lui-même.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nRédige chaque ADR dans docs/adr/, un fichier par décision, nommé adr-NNN-titre.md (NNN : le numéro que te donne le dossier de passation, sur trois chiffres ; titre en minuscules, mots séparés par des tirets), avec ce gabarit :\n# ADR-NNN — Titre\n\n- Statut : Proposed\n- Date : AAAA-MM-JJ\n\n## Contexte\n\n…\n\n## Décision\n\n…\n\n## Conséquences\n\n…\n\n## Alternatives\n\n…\nS'il en remplace un autre, ajoute « - Remplace : ADR-NNN » sous la date, et la ligne « - ADR-XXX remplace ADR-NNN » dans docs/adr/supersessions.md.\nPour amender un ADR que tu as proposé pour cette story, modifie son fichier. Ne modifie jamais un ADR décidé ni celui d'une autre story, et ne touche pas à la ligne « Story », que l'orchestrateur ajoute lui-même.",
       classe: "strong",
       reasoningEffort: "high",
       contextTier: "long_context",
       sortie: "report_phase",
-      ecriture: [".skraft/**", "docs/adr/**"],
+      // Le nom d'un ADR est vérifié dès l'écriture : un fichier mal nommé, que l'architecte ne
+      // pourrait pas supprimer, n'existe jamais (11/11).
+      ecriture: [".skraft/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md"],
       outils: ["list_files", "report_blocker"],
       skills: { obligatoires: ["architecture-decisions", "adr-eligibility-gate"], aLaDemande: ["architecture-patterns", "clean-architecture-dotnet", "clean-architecture-java", "clean-architecture-python", "clean-architecture-react"] },
     },
     "skraft-acceptance": {
       prompt: "agents/skraft-acceptance.agent.md",
-      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nL'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur\nrecopiée et la raison de chaque rouge : un écart est rejeté avec son motif.",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nLes skills décrivent aussi des étapes que l'orchestrateur exécute lui-même (commits, portes, mutation) : ne les fais pas.\nPour la forme du code, le linter du projet fait foi : en cas d'écart avec les seuils d'une skill (Object Calisthenics), suis le linter.\nL'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur\nrecopiée et la raison de chaque rouge : un écart est rejeté avec son motif.\nAvant de rendre ton travail, appelle `verifier_scenarios` : il rend ce que les portes gherkin, valeurs et plan de test diraient de tes fichiers, avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.",
       classe: "standard",
       sortie: "report_phase",
       ecriture: [".skraft/**", "@stack:acceptanceTests", "@stack:sources"],
-      outils: ["list_files", "run_tests", "report_blocker"],
+      outils: ["list_files", "run_tests", "verifier_scenarios", "report_blocker"],
       skills: { obligatoires: ["bdd-methodology", "test-design-mandates"], aLaDemande: ["outside-in-tdd", "craft-discipline", "clean-architecture-testing", "bdd-step-definitions"] },
     },
     "skraft-test": {
@@ -170,11 +178,19 @@ import { essayer, PanneEnvironnement, Escalade, TourInterrompu, problemesTestsEx
 import { buildBrief, ecrirePassation } from "./brief.mjs";
 import { computeIndicators, DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, levelEffects, shift } from "./difficulty.mjs";
 import { preselectFiles } from "./preselect.mjs";
-import { checkResearch, extraireInventaire } from "./research.mjs";
+import { citesDansLaRecherche, extraireInventaire, motifsDeLaRecherche, verifierRecherche } from "./research.mjs";
 import { skillDArchitecture } from "./architecture.mjs";
-import { parseStory, slugOf } from "./story.mjs";
+import { ligneValeursRetirees, parseStory, questionDeValeur, sansValeur, slugOf, valeursDouteuses } from "./story.mjs";
 import { concevoir } from "./conception.mjs";
-import { distiller } from "./distillation.mjs";
+import { distiller, motifsDesScenarios, texteDeVerification } from "./distillation.mjs";
+/**
+* Outils apportés aux agents (ADR 0082) : fonctions pures, sur les fichiers que l'hôte a lus. La
+* porte appelle le même calcul après le tour : l'agent est jugé comme il s'est vérifié.
+*/
+export const outils = {
+  verifier_recherche: verifierRecherche,
+  verifier_scenarios: ({ fichiers, donnees }) => texteDeVerification(motifsDesScenarios({ fichiers, ...donnees })),
+};
 import { livrer, barreDeQualite } from "./livraison.mjs";
 import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
@@ -217,7 +233,11 @@ export default async function skraft(w, entree) {
     phasesFaites: [],
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
     architecture: architecture.skill,
-    questions: story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+    // Une valeur douteuse de la porte des valeurs est posée avec les questions de la story (ADR 0080).
+    questions: [
+      ...story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })),
+      ...valeursDouteuses(story.criteria).map((valeur, i) => ({ id: `v${i + 1}`, text: questionDeValeur(valeur, story.criteria.find((c) => c.n === valeur.critere)?.text ?? ""), valeur })),
+    ],
     reponses: [],
     adrs: [],
     regressions: [],
@@ -310,6 +330,8 @@ function bilan(d, confirmee) {
     `Difficulté : ${d.niveau} (${confirmee ? "confirmée" : "automatique"}).`,
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
+    ...[ligneValeursRetirees(d.questions)].filter((l) => l !== null),
+    ...(d.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${d.verifications.map((v) => `${v.phase} ${v.agent} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(d.derogationsCouverture?.length
       ? [`Lignes exemptées de la couverture du diff : ${d.derogationsCouverture.length} (détail dans .skraft/${d.slug}/deliver/derogations.md).`]
       : []),
@@ -337,7 +359,16 @@ async function trancher(w, vue, storyId) {
   const reponseDe = new Map(ouvertes.map((q, i) => [q.id, reponses[i]]));
   vue.questions = vue.questions.map((q) => {
     const d = reponseDe.get(q.id);
-    return d ? { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" } : q;
+    if (!d)
+      return q;
+    // Valeur douteuse (ADR 0080) : retirée, elle sort de son critère, et la porte ne l'exige plus.
+    if (q.valeur) {
+      const retiree = d.decision === "drop";
+      if (retiree)
+        vue.story = { ...vue.story, criteria: sansValeur(vue.story.criteria, q.valeur) };
+      return { ...q, ...(retiree ? { retiree: true } : {}), answer: retiree ? `Non : « ${q.valeur.valeur} » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.` : `Oui : « ${q.valeur.valeur} » est une valeur à tester ; la porte des valeurs l'exige.` };
+    }
+    return { ...q, answer: d.decision === "defer" ? "(question reportée par l'utilisateur)" : d.commentaire?.trim() || "(réponse vide)" };
   });
 }
 /**
@@ -349,7 +380,7 @@ async function poserLesQuestions(w, questions, storyId) {
   const reponses = new Array(questions.length);
   let restantes = questions.map((_, i) => i);
   for (;;) {
-    const issues = await Promise.allSettled(restantes.map((i) => w.humain("question-ouverte", `Question ouverte (${storyId})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: questions[i].text, texteLibre: true })));
+    const issues = await Promise.allSettled(restantes.map((i) => poser(w, questions[i], storyId)));
     const pannes = [];
     issues.forEach((r, j) => {
       if (r.status === "fulfilled")
@@ -371,6 +402,15 @@ async function poserLesQuestions(w, questions, storyId) {
     await w.etape("ROUTE");
     restantes = pannes.map((p) => p.i);
   }
+}
+/** Une question : ouverte, à réponse libre ; ou valeur douteuse, à garder d'abord, ce que retient un répondeur qui ne lit pas (ADR 0080). */
+function poser(w, q, storyId) {
+  if (q.valeur)
+    return w.humain("valeur-a-tester", `Valeur à tester (${storyId}, critère ${q.valeur.critere})`, [
+      { id: "keep", label: "Oui : la garder dans la porte des valeurs" },
+      { id: "drop", label: "Non : la retirer de la porte des valeurs" },
+    ], { detail: q.text });
+  return w.humain("question-ouverte", `Question ouverte (${storyId})`, [{ id: "answer", label: "Répondre" }, { id: "defer", label: "Reporter" }], { detail: q.text, texteLibre: true });
 }
 /** Lecture de la story, branche et arborescence (effet `init` du réducteur). */
 async function preparer(w, chemin) {
@@ -436,7 +476,11 @@ function rechercher(w, vue, max, relance) {
       const utiles = preselectFiles(vue.story, fichiers);
       await ecrirePassation(w, vue);
       const consigne = buildBrief(vue, "RESEARCH", motifs) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
-      const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS });
+      // Le chercheur vérifie son document avec la porte que le code rejouera (ADR 0082).
+      const document = `.skraft/${vue.slug}/research/research.md`;
+      const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS, verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } });
+      if (r.verification)
+        vue.verifications = [...(vue.verifications ?? []), { phase: "RESEARCH", agent: "skraft-researcher", appels: r.verification.appels }];
       if (r.sortie)
         break;
       // Question bloquante (D31) : l'humain répond, l'agent repart avec la réponse dans son dossier, et le même motif (D9 de docs/12).
@@ -461,18 +505,16 @@ async function porteCitations(w, vue) {
   }
   const existants = new Set(await w.listerFichiers());
   const contenus = new Map();
-  for (const cite of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0])))
+  for (const cite of citesDansLaRecherche(md))
     if (existants.has(cite))
       contenus.set(cite, await w.lireFichier(cite));
-  const { reasons, openQuestions } = checkResearch(md, {
-    lineCount: (p) => (contenus.has(p) ? contenus.get(p).replace(/\n$/, "").split("\n").length : null),
-    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
-  });
+  // Le même calcul que l'outil `verifier_recherche` du chercheur (ADR 0082).
+  const { reasons, openQuestions } = motifsDeLaRecherche(md, contenus);
   if (reasons.length)
     return reasons;
   const connues = new Set(vue.questions.map((q) => q.text));
   const nouvelles = openQuestions.filter((q) => !connues.has(q));
-  vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.length + i + 1}`, text }))];
+  vue.questions = [...vue.questions, ...nouvelles.map((text, i) => ({ id: `q${vue.questions.filter((q) => !q.valeur).length + i + 1}`, text }))];
   // Transmise à DESIGN et DISTILL par le dossier de passation (skraft-plugin v1.15.1).
   vue.recherche = extraireInventaire(md);
   return [];

@@ -4,7 +4,9 @@ import { commitMessage, phaseRoles, PHASE_ORDER, REVIEWED_PHASES, specialistRole
 import { DEFAULT_THRESHOLDS, gradeDifficulty, isDifficulty, lensesForPhase, levelEffects, shift, type Difficulty, type LensName } from "./difficulty.js";
 import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftState } from "./model.js";
 import type { MutantSurvivant } from "./deliver.js";
-import { synthesize, type LensVerdict } from "./review.js";
+import { questionDeValeur, sansValeur, valeursDouteuses, type Story } from "./story.js";
+import { revueSansDefautCorrigible, synthesize, type LensVerdict } from "./review.js";
+import { routerMotifsDeDesign } from "./design.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { disjoncte, memeRefus } from "@agent-studio/extension-api";
 import { bumpRetries, deciderSelonLaCause, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
@@ -70,8 +72,11 @@ export const phaseOf = (s: SkraftState): string =>
 export function transition(s0: SkraftState, e: Ev): Out {
   if (isTerminal(s0)) return { state: s0, effects: [] };
   // Chaque chargement de skill facultative est tracé dans l'état, quelle que soit la suite (D26).
-  const s: SkraftState =
+  const s1: SkraftState =
     e.type === "AGENT_REPORTED" && e.skills?.length ? { ...s0, skillsLoaded: [...(s0.skillsLoaded ?? []), { phase: s0.phase, role: e.role, skills: [...e.skills] }] } : s0;
+  // Les vérifications de l'agent aussi, pour le bilan (ADR 0082).
+  const s: SkraftState =
+    e.type === "AGENT_REPORTED" && e.verifications !== undefined ? { ...s1, verifications: [...(s1.verifications ?? []), { phase: s1.phase, role: e.role, appels: e.verifications }] } : s1;
   const same: Out = { state: s, effects: [] };
   if (e.type === "ABORT") return { state: { ...s, stage: "ABORTED" }, effects: [] };
   if (e.type === "RESUMED") return same;
@@ -84,7 +89,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
     case "INIT":
       if (e.type === "INITIALIZED") {
         const proposed = gradeDifficulty(e.indicators, DEFAULT_THRESHOLDS);
-        const openQuestions = e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text }));
+        const openQuestions = [...e.story.openQuestions.map((text, i) => ({ id: `q${i + 1}`, text })), ...questionsDeValeur(e.story)];
         return {
           state: { ...s, stage: "CLASSIFY", slug: e.slug, story: e.story, baseSha: e.baseSha, branch: e.branch, indicators: e.indicators, openQuestions, ...(e.qualityCheckpoint ? { qualityCheckpoint: e.qualityCheckpoint } : {}), ...(e.testsAvant ? { testsAvant: e.testsAvant } : {}) },
           effects: [{ kind: "classify", indicators: e.indicators, proposed }],
@@ -132,9 +137,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
         // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
         const s1: SkraftState = e.responses?.length && s.reviewThreads ? { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, () => true) } : s;
         if (p === "DESIGN" && s1.designStep === "model") {
-          // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
+          // L'architecte qui décide reçoit les motifs du dernier rejet qui le concernent (11/11).
           const ns: SkraftState = { ...s1, designStep: "decide" };
-          return lancer(ns, s1.lastRejection?.reasons ?? []);
+          return lancer(ns, routerMotifsDeDesign(s1.lastRejection?.reasons ?? []).decisions);
         }
         return { state: { ...s1, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s1.attempts + 1 }] };
       }
@@ -169,7 +174,7 @@ export function transition(s0: SkraftState, e: Ev): Out {
           ...s,
           artifacts: { ...s.artifacts, [p]: [...s.artifacts[p], ...e.artifacts] },
           adrs: p === "DESIGN" ? [...gardes, ...(e.adrs ?? []).filter((a) => !known.has(a.id))] : s.adrs,
-          openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.length + i + 1}`, text }))],
+          openQuestions: [...s.openQuestions, ...(e.openQuestions ?? []).map((text, i) => ({ id: `q${s.openQuestions.filter((q) => !q.valeur).length + i + 1}`, text }))],
           ...(p === "RESEARCH" && e.recherche ? { recherche: e.recherche } : {}),
           ...(p === "DISTILL" && e.planDeTest ? { planDeTest: e.planDeTest } : {}),
           lastRejection: null,
@@ -321,7 +326,7 @@ function afterReviewQuestion(s: SkraftState, lens: LensName, question: string, a
   };
   if (p === "DELIVER") return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
   const replay: SkraftState = { ...ns, stage: "SPECIALIST", designStep: "model" };
-  return lancer(replay, [motif]);
+  return relancerLaPhase(replay, [motif]);
 }
 
 /**
@@ -404,11 +409,12 @@ function mutationThreads(mutants: MutantSurvivant[], round: number): DefectThrea
 function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: boolean): Out {
   const p = ns.phase!;
   const verdict = synthesize(lenses);
-  if (verdict === "APPROVED") {
+  const approuver = (): Out => {
     const proposed = ns.adrs.filter((a) => a.status === "Proposed");
     if (p === "DESIGN" && proposed.length) return { state: { ...ns, stage: "RATIFICATION" }, effects: proposed.map((adr) => ({ kind: "askRatification", adr })) };
     return commit(ns);
-  }
+  };
+  if (verdict === "APPROVED") return approuver();
   if (verdict === "REJECTED") {
     // Tracé comme tout rejet (D11 de docs/12) : sinon la cause n'existe que dans le texte de l'escalade.
     const motifs = lenses.filter((l) => l.verdict === "REJECTED").map((l) => `${l.lens} : REJECTED${l.defects.length ? ` — ${l.defects.map((d) => d.description).join(" ; ")}` : ""}`);
@@ -426,6 +432,9 @@ function resolveReview(ns: SkraftState, lenses: LensVerdict[], decidedByHuman: b
     if (!mineurs.length) return escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
     if (ns.attempts + 1 < ns.budget.maxAttemptsPerPhase || ns.reviews[p].length === 1 || decidedByHuman) return startReviewFix(ns, [...threads, ...mineurs]);
   }
+  // Hors DELIVER, rien à corriger (ADR 0081) : rejouer la phase consommerait un essai pour rien.
+  if (p !== "DELIVER" && !active.length)
+    return revueSansDefautCorrigible(lenses) === "approuver" ? approuver() : escalate(ns, `Revue sans défaut à corriger : ${unactionableReview(lenses)}`);
   // Sans défaut blocker ni major, rien à corriger de façon ciblée : réessai de la phase avec les verdicts.
   // La PREMIÈRE revue d'une phase a droit à un essai même si les portes de forme ont tout
   // consommé (ADR 0042) : sans cela ses défauts, précis et corrigeables, tombent en escalade
@@ -482,11 +491,25 @@ function applyDifficulty(s: SkraftState, level: Difficulty, confirmedBy: "user" 
 }
 
 /** Invariant 2 : prochaine phase de `phaseOrder` hors phases faites et sautées ; invariant 7 : pas de DISTILL avec un ADR proposé. */
+/** Une question par valeur douteuse des critères (ADR 0080), posée avec celles de la story. */
+function questionsDeValeur(story: Story): SkraftState["openQuestions"] {
+  return valeursDouteuses(story.criteria).map((valeur, i) => ({ id: `v${i + 1}`, text: questionDeValeur(valeur, story.criteria.find((c) => c.n === valeur.critere)?.text ?? ""), valeur }));
+}
+
 /** Réponse (ou report) à une question ouverte ; `null` si la décision ne la concerne pas. */
 function repondre(s: SkraftState, decision: string, comment: string | undefined): SkraftState | null {
   const [action, id] = decision.split(":");
   const q = s.openQuestions.find((x) => x.id === id && x.answer === undefined);
-  if (!q || (action !== "answer" && action !== "defer")) return null;
+  if (!q) return null;
+  // Valeur douteuse (ADR 0080) : gardée, la porte l'exige ; retirée, elle sort de son critère.
+  if (q.valeur) {
+    if (action !== "keep" && action !== "drop") return null;
+    const v = q.valeur;
+    const answer = action === "keep" ? `Oui : « ${v.valeur} » est une valeur à tester ; la porte des valeurs l'exige.` : `Non : « ${v.valeur} » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.`;
+    const story = action === "drop" && s.story ? { ...s.story, criteria: sansValeur(s.story.criteria, v) } : s.story;
+    return { ...s, story, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer, ...(action === "drop" ? { retiree: true } : {}) } : x)) };
+  }
+  if (action !== "answer" && action !== "defer") return null;
   const answer = action === "defer" ? "(question reportée par l'utilisateur)" : (comment ?? "").trim() || "(réponse vide)";
   return { ...s, openQuestions: s.openQuestions.map((x) => (x.id === q.id ? { ...x, answer } : x)) };
 }
@@ -503,7 +526,7 @@ function route(s: SkraftState): Out {
     const toAsk = unanswered.filter((q) => !s.questionsAsked.includes(q.id));
     return {
       state: { ...s, stage: "ROUTE", phase: null, questionsAsked: [...s.questionsAsked, ...toAsk.map((q) => q.id)] },
-      effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text })),
+      effects: toAsk.map((q) => ({ kind: "askQuestion", id: q.id, text: q.text, ...(q.valeur ? { valeur: q.valeur } : {}) })),
     };
   }
   return { state: { ...s, stage: "SPECIALIST", phase: next, attempts: 0, designStep: "model", escalation: null, reviewQuestions: 0, adrsAvantPhase: s.adrs }, effects: [{ kind: "checkpointPhase", phase: next }] };
@@ -611,7 +634,18 @@ function failure(etat: SkraftState, gate: string, motifs: string[], essaiGaranti
     };
   }
   const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model" };
-  return lancer(ns, reasons, rollback);
+  return relancerLaPhase(ns, reasons, rollback);
+}
+
+/**
+ * Relance d'une phase refusée. En DESIGN, chaque motif va à l'agent qui a produit le fichier en cause
+ * (11/11) : sans motif pour lui, le modélisateur n'est pas relancé et l'architecte qui décide repart
+ * sur le modèle déjà écrit, qu'un refus sans escalade n'efface pas.
+ */
+function relancerLaPhase(ns: SkraftState, reasons: string[], avant: SkraftEffect[] = []): Out {
+  if (ns.phase !== "DESIGN") return lancer(ns, reasons, avant);
+  const { modele, decisions } = routerMotifsDeDesign(reasons);
+  return modele.length ? lancer({ ...ns, designStep: "model" }, modele, avant) : lancer({ ...ns, designStep: "decide" }, decisions, avant);
 }
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */

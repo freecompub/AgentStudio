@@ -203,7 +203,7 @@ La skill `adr-eligibility-gate` n'en couvre qu'une partie.
 | 4. Command/Query, tranches verticales | commande → événement ; commande et requête cohérentes (matrice) | modélisateur | test-integrity |
 | 5. Sous-domaines, relations | chaque contexte classé Core, Supporting ou Generic (`contextesNonClasses`) ; patron par relation | modélisateur | — |
 | 6. Couche des dépôts | « Couche : Domaine / Application » exigée, infrastructure refusée (`contratsIncomplets`) | modélisateur et décideur | architecture (consigne corrigée : domaine **ou** application) |
-| 7.0 Engagements déjà dans le code | sources du projet : bus CQRS, event store, saga, mêmes signatures que le plugin, sans ADR valable → refus (`engagementsSansAdr`) | décideur : ADR de rattrapage | — |
+| 7.0 Engagements déjà dans le code | **retiré le 2026-11-11** (décision du responsable : la porte juge les ADR que la story produit, pas l'existant). La recherche dans les sources prenait des skills qui décrivent CQRS pour du code, et bloquait DESIGN en boucle sur AgentStudio. | — | — |
 | 7. Déclencheurs obligatoires d'ADR | couche anticorruption de la carte sans ADR → refus | décideur : liste et exclusions | architecture : liste complète |
 | 7. Justification des patrons | — | décideur | architecture |
 | 8. Format des contrats | chaque commande, requête et événement du modèle a sa section « ## Commande `X` »… (`contratsIncomplets`) | décideur | — |

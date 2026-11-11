@@ -52,6 +52,8 @@ export function manifesteDuWorkflow(w: WorkflowTrouve): ExtensionManifest {
         ...(a.memoire ? { memoire: a.memoire } : {}),
       })),
       skills: skills.map((name) => ({ name, path: `skills/${name}` })),
+      // Outils apportés par le workflow (ADR 0082), servis par son processus isolé.
+      ...(Object.keys(m.outils).length ? { tools: Object.entries(m.outils).map(([name, o]) => ({ name, description: o.description })) } : {}),
       // Le titre de la carte est court (80 caractères) : le nom, pas la description.
       tasks: [{ name: m.name, title: m.name, states: { ...m.phases } }],
     },
@@ -127,12 +129,26 @@ export async function activerWorkflow(w: WorkflowTrouve, deps: HostDeps, o: Opti
     humains: m.humains,
     agents: Object.keys(m.agents),
     ...(o.delaiMs ? { delaiMs: o.delaiMs } : {}),
+    // Un outil ne lit que ce que le script lui-même pourrait lire : la liste du dépôt (ADR 0082).
+    lire: async (chemin) => ((await deps.workspace.files.list()).includes(chemin) ? deps.workspace.files.read(chemin).catch(() => null) : null),
   });
   const tache = createWorkflowTaskDepuis({ nom: m.name, empreinte: w.empreinte, humains: m.humains, rejoueur, refusEnTermesDuMeta: true });
 
   const module: ExtensionModule = {
     activate(ctx) {
       ctx.tasks.register(tache);
+      // Un outil du workflow ne lit que ce que l'hôte lui passe : hors de la vérification d'un tour,
+      // il n'a rien à examiner (ADR 0082).
+      for (const [nom, o] of Object.entries(m.outils))
+        ctx.tools.register({
+          name: nom,
+          description: o.description,
+          parameters: { type: "object", properties: {} },
+          handler: async (args, v) => {
+            if (!v) throw new Error(`L'outil ${nom} n'est pas la vérification de ce tour : il n'a rien à examiner.`);
+            return rejoueur.outil(nom, { args, fichiers: v.fichiers, ...(v.donnees !== undefined ? { donnees: v.donnees as never } : {}) });
+          },
+        });
       ctx.chat.registerCommand(m.commande, async (args) => {
         const lu = lireEntrees(m.entrees, args, m.commande);
         if (!lu.ok) return ctx.chat.post(lu.usage);

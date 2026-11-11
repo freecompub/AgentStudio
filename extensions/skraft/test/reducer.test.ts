@@ -373,6 +373,49 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     expect(kinds(effects)).toEqual(["askQuestion"]);
   });
 
+  // ADR 0080 : un nombre seul d'un critère est peut-être un compte, une date, un numéro. L'humain dit
+  // s'il faut le tester, avant tout travail ; sans réponse, la porte le garde.
+  describe("valeurs douteuses de la porte des valeurs", () => {
+    const avecDouteuse = (() => {
+      const r = parseStory(US12.replace("3. Aucun plafond configuré", "3. Après 3 refus, aucun plafond configuré"));
+      if (!r.ok) throw new Error();
+      return r.story;
+    })();
+    const INIT_DOUTE: Ev = { ...INITIALIZED, story: avecDouteuse } as Ev;
+    const texte = "Le critère 3 cite « 3 » : « Après 3 refus, aucun plafond configuré : dose proposée égale au calcul, pas d'alerte. ». Est-ce une valeur que les scénarios et les tests d'acceptance doivent contenir ? Si c'est un compte, une date ou un numéro sans portée métier, retire-la : la porte des valeurs ne l'exigera pas.";
+
+    it("posée avec les questions de la story, avant RESEARCH, avec la valeur et son critère", () => {
+      const { state, effects } = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard")]);
+      expect(state.stage).toBe("ROUTE");
+      expect(effects).toEqual([
+        { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
+        { kind: "askQuestion", id: "v1", text: texte, valeur: { critere: 3, valeur: "3" } },
+      ]);
+    });
+
+    it("retirée : la porte ne l'exige plus, et la réponse est gardée ; gardée : rien ne change", () => {
+      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER];
+      const retiree = play([...base, DECIDE("drop:v1")]).state;
+      expect(retiree.story!.criteria[2]!.literals).toEqual([]);
+      expect(retiree.openQuestions[1]).toMatchObject({ id: "v1", answer: "Non : « 3 » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas." });
+      expect(retiree).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
+      const gardee = play([...base, DECIDE("keep:v1")]).state;
+      expect(gardee.story!.criteria[2]!.literals).toEqual(["3"]);
+      expect(gardee.openQuestions[1]).toMatchObject({ id: "v1", answer: "Oui : « 3 » est une valeur à tester ; la porte des valeurs l'exige." });
+    });
+
+    it("une question de la recherche garde sa numérotation en q", () => {
+      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER, DECIDE("keep:v1"), CP("RESEARCH"), REPORTED];
+      const { effects } = play([...base, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED]);
+      expect(effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
+    });
+
+    it("« Répondre » ou « Reporter » ne tranchent pas une valeur", () => {
+      const base = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER]);
+      expect(transition(base.state, DECIDE("answer:v1", "x"))).toEqual({ state: base.state, effects: [] });
+    });
+  });
+
   it("réponse à une question inconnue ou déjà tranchée : ignorée", () => {
     const base = play([...toFirstPhase("simple")]);
     expect(transition(base.state, DECIDE("answer:q9", "x"))).toEqual({ state: base.state, effects: [] });
@@ -536,6 +579,28 @@ describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le r
   });
 });
 
+// Un motif va à l'agent qui a produit le fichier en cause (11/11) : un refus sur un ADR ne relance
+// pas le modélisateur, qui n'écrit pas d'ADR.
+describe("Réducteur skraft — refus de DESIGN routé vers son auteur", () => {
+  const avantPorte = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED];
+  const ADR = "Numérotation des ADR : ADR-001 en double : docs/adr/adr-001-a.md et docs/adr/adr-001-b.md. Le prochain numéro libre est ADR-002.";
+  const MODELE = "Document manquant : .skraft/us-12/design/event-model.md.";
+  const refus = (...reasons: string[]): Ev => ({ type: "GATE_FAIL", gate: "cohérence", reasons });
+
+  it("un refus qui ne porte que sur un ADR relance l'architecte qui décide, seul", () => {
+    const { state, effects } = play([...avantPorte, refus(ADR)]);
+    expect(state.designStep).toBe("decide");
+    expect(effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-decide", feedback: [ADR] })]);
+  });
+
+  it("un refus sur le modèle relance le modélisateur avec son seul motif, puis l'architecte qui décide avec le sien", () => {
+    const apres = play([...avantPorte, refus(MODELE, ADR)]);
+    expect(apres.effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-model", feedback: [MODELE] })]);
+    const { effects } = play([...avantPorte, refus(MODELE, ADR), REPORTED]);
+    expect(effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-decide", feedback: [ADR] })]);
+  });
+});
+
 describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
   const toReview = () => [
     ...toFirstPhase(), ...researchPhase, ...designPhase,
@@ -550,6 +615,31 @@ describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
     expect(play(correction).state).toMatchObject({ stage: "REVIEW", acceptanceHash: "apres", regressions: ["nouvelle"] });
     const approuve = [...correction, LENSES(lens("APPROVED")), COMMITTED, CP("DELIVER"), PLANNED];
     expect(play(approuve).state.deliver?.acceptanceHash).toBe("apres");
+  });
+
+  // ADR 0081 : hors DELIVER, rien à corriger ne fait plus rejouer la phase.
+  it.each([
+    ["mineurs seulement", lens("CHANGES_REQUESTED", ["minor"])],
+    ["changements demandés sans défaut", lens("CHANGES_REQUESTED")],
+  ])("revue de DISTILL sans défaut à corriger (%s) : approuvée, commitée sans consommer d'essai", (_nom, verdict) => {
+    const avant = play(toReview()).state;
+    const { state, effects } = play([...toReview(), LENSES(verdict)]);
+    expect(state).toMatchObject({ stage: "COMMIT", phase: "DISTILL", attempts: avant.attempts });
+    expect(kinds(effects)).toEqual(["commitPhase"]);
+  });
+
+  it("revue de DISTILL : une lentille REJECTED sans défaut à corriger escalade, sans consommer d'essai", () => {
+    const avant = play(toReview()).state;
+    const { state } = play([...toReview(), LENSES(lens("REJECTED", ["minor"]))]);
+    expect(state).toMatchObject({ stage: "ESCALATED", attempts: avant.attempts });
+    expect(state.escalation?.reason).toContain("Revue sans défaut à corriger");
+  });
+
+  // ADR 0082 : les vérifications faites par l'agent sont gardées pour le bilan, quelle que soit la suite.
+  it("les vérifications de l'agent d'acceptance sont gardées dans l'état, avec sa phase", () => {
+    const base = [...toFirstPhase(), ...researchPhase, ...designPhase, CP("DISTILL")];
+    const { state } = play([...base, { type: "AGENT_REPORTED", role: "skraft-acceptance", summary: "fait", files: [], verifications: 2 } as Ev]);
+    expect(state.verifications).toEqual([{ phase: "DISTILL", role: "skraft-acceptance", appels: 2 }]);
   });
 
   it.each([

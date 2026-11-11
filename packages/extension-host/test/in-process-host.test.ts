@@ -346,7 +346,7 @@ describe("Hôte d'extension en processus", () => {
     await ctx.agents.run("writer", "x", { readOnly: ["@stack:acceptanceTests"] });
     expect(seen).toHaveLength(1);
     const deny = await seen[0]!.check({ kind: "write", toolName: "edit", path: "tests/acceptance/cap.test.ts" });
-    expect(deny).toMatchObject({ decision: "deny", reason: expect.stringContaining("tests/acceptance/cap.test.ts est gelé") });
+    expect(deny).toMatchObject({ decision: "deny", reason: expect.stringContaining("tests/acceptance/cap.test.ts est en lecture seule pour ce tour") });
     expect(await seen[0]!.check({ kind: "write", toolName: "edit", path: "/projets/demo/tests/unit/cap.test.ts" })).toEqual({ decision: "allow" });
     expect(await seen[0]!.check({ kind: "read", toolName: "view", path: "tests/acceptance/cap.test.ts" })).toEqual({ decision: "allow" });
   });
@@ -368,5 +368,81 @@ describe("Hôte d'extension en processus", () => {
     await handle.deactivate();
     expect(deps.registry.command("demo")).toBeUndefined();
     expect(deps.hooks.guards()).toEqual([]);
+  });
+});
+
+// ADR 0082 : l'agent vérifie son travail avec l'outil que la porte rejouera. L'hôte lui passe les
+// fichiers désignés, compte les appels, et rappelle une fois la vérification avant la sortie.
+describe("agents.run : outil de vérification (ADR 0082)", () => {
+  const AVEC_OUTIL = {
+    ...MANIFEST,
+    contributes: {
+      ...MANIFEST.contributes,
+      tools: [{ name: "verifier_demo", description: "Vérifie les tests." }],
+      agents: [{ name: "writer", title: "Rédacteur", role: "r", output: "report_phase", write: ["tests/**"], tools: ["verifier_demo"] }],
+    },
+  } as ExtensionManifest;
+
+  /** Un runner qui joue un tour : `pas` reçoit les outils et le contrôle de sortie. */
+  function rejouer(deps: HostDeps, pas: (outils: Map<string, (a: unknown) => Promise<string>>, sortir: () => Promise<string | null>) => Promise<void>) {
+    deps.agents = {
+      ...deps.agents,
+      run: async (_spec, _prompt, opts) => {
+        const outils = new Map((opts?.tools?.(() => {}) ?? []).map((t) => [t.name, async (a: unknown) => String(await t.handler(a))]));
+        await pas(outils, async () => (await opts?.avantSortie?.({ summary: "ok", files: [] })) ?? null);
+        return { output: { summary: "ok", files: [] } as never };
+      },
+    };
+  }
+
+  it("l'outil reçoit les fichiers désignés, lus par l'hôte, et les données ; ses appels sont comptés", async () => {
+    const vus: unknown[] = [];
+    const { ctx, deps } = await activateWith((c) => {
+      c.tools.register({ name: "verifier_demo", description: "d", parameters: { type: "object" }, handler: async (_a, v) => (vus.push(v), "Aucun motif.") });
+    }, AVEC_OUTIL);
+    const sorties: (string | null)[] = [];
+    rejouer(deps, async (outils, sortir) => {
+      await outils.get("verifier_demo")!({});
+      sorties.push(await sortir());
+    });
+    const r = await ctx.agents.run("writer", "x", { verification: { outil: "verifier_demo", fichiers: ["tests/**"], donnees: { critere: 1 } } });
+    expect(vus).toEqual([{ fichiers: { "tests/a.test.ts": "x" }, donnees: { critere: 1 } }]);
+    expect(sorties).toEqual([null]);
+    expect(r.verification).toEqual({ appels: 1, dernier: "Aucun motif." });
+  });
+
+  it("sans vérification, la sortie est refusée une seule fois, avec le nom de l'outil", async () => {
+    const { ctx, deps } = await activateWith((c) => {
+      c.tools.register({ name: "verifier_demo", description: "d", parameters: { type: "object" }, handler: async () => "Aucun motif." });
+    }, AVEC_OUTIL);
+    const sorties: (string | null)[] = [];
+    rejouer(deps, async (_outils, sortir) => {
+      sorties.push(await sortir(), await sortir());
+    });
+    const r = await ctx.agents.run("writer", "x", { verification: { outil: "verifier_demo", fichiers: ["tests/**"] } });
+    expect(sorties[0]).toContain("`verifier_demo`");
+    expect(sorties[1]).toBeNull();
+    expect(r.verification).toEqual({ appels: 0 });
+  });
+
+  it("fichiers modifiés depuis la dernière vérification : la sortie est refusée une fois", async () => {
+    const { ctx, deps } = await activateWith((c) => {
+      c.tools.register({ name: "verifier_demo", description: "d", parameters: { type: "object" }, handler: async () => "Aucun motif." });
+    }, AVEC_OUTIL);
+    const fichiers: Record<string, string> = { "tests/a.test.ts": "x" };
+    deps.workspace = { ...deps.workspace, files: { ...deps.workspace.files, read: async (p) => fichiers[p] ?? "", list: async () => Object.keys(fichiers) } };
+    const sorties: (string | null)[] = [];
+    rejouer(deps, async (outils, sortir) => {
+      await outils.get("verifier_demo")!({});
+      fichiers["tests/a.test.ts"] = "modifié";
+      sorties.push(await sortir());
+    });
+    await ctx.agents.run("writer", "x", { verification: { outil: "verifier_demo", fichiers: ["tests/**"] } });
+    expect(sorties[0]).toContain("ont changé depuis");
+  });
+
+  it("un outil de vérification que l'agent n'a pas est refusé", async () => {
+    const { ctx } = await activateWith(() => {}, MANIFEST);
+    await expect(ctx.agents.run("writer", "x", { verification: { outil: "verifier_demo", fichiers: ["tests/**"] } })).rejects.toThrow(/verifier_demo/);
   });
 });

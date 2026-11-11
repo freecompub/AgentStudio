@@ -1,4 +1,4 @@
-import { adrId, parseAdr, parseSupersessions } from "./adr.js";
+import { adrId, conventionAdr, numeroAdr, parseAdr, parseSupersessions, suitLaConvention } from "./adr.js";
 import { extractCodeIdentifiers, extractPascalIdentifiers } from "./text-analysis.js";
 
 /** Documents de conception attendus (§6.2) et sources des noms du modèle. */
@@ -13,8 +13,6 @@ export interface DesignInput {
   supersessions: string;
   /** ADR qui existaient au début de la phase et ont été modifiés ou supprimés. */
   modifiedExistingAdrs: string[];
-  /** Sources de production du projet : engagements structurels déjà en place (docs/15 §4.6). */
-  sources?: { path: string; content: string }[];
 }
 
 /**
@@ -47,9 +45,9 @@ export function checkDesign(i: DesignInput): string[] {
   for (const p of i.modifiedExistingAdrs)
     reasons.push(`ADR existant modifié : ${p} (les ADR sont append-only ; en rédiger un nouveau qui le remplace).`);
 
-  const parsed = i.adrs.map((a) => ({ ...a, adr: parseAdr(a.md) }));
+  const parsed = i.adrs.map((a) => ({ ...a, adr: parseAdr(a.md), numero: numeroAdr(a.path, a.md) }));
   for (const a of parsed.filter((x) => x.isNew)) {
-    if (!a.adr.id) reasons.push(`${a.path} : titre « # ADR-NNN — titre » absent.`);
+    if (!a.adr.id && !Number.isFinite(a.numero)) reasons.push(`${a.path} : titre « # ADR-NNN — titre » absent.`);
     for (const m of a.adr.missing) reasons.push(`${a.path} : section manquante « ${m} ».`);
     if (a.adr.status && a.adr.status !== "Proposed") reasons.push(`${a.path} : statut ${a.adr.status}, Proposed attendu.`);
 
@@ -72,19 +70,39 @@ export function checkDesign(i: DesignInput): string[] {
       );
   }
 
-  const numbers = parsed.map((a) => a.adr.number).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
-  const seen = new Set<number>();
-  for (const n of numbers) {
-    if (seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} en double.`);
-    seen.add(n);
+  // Un ADR existant compte par son numéro, même hors convention (les ADR du projet) ; un ADR de la
+  // story ne compte que s'il suit la convention, et sinon le motif dit lequel, et ce qui est attendu.
+  const conforme = (a: (typeof parsed)[number]) => suitLaConvention(a.path, a.adr);
+  const horsConvention = parsed.filter((a) => a.isNew && Number.isFinite(a.numero) && !conforme(a));
+  const numbers = parsed.filter((a) => !a.isNew || conforme(a)).map((a) => a.numero).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+  // Un doublon dit qui tient déjà le numéro, et lequel prendre ; un doublon entre ADR du projet
+  // n'est pas reproché à la story, qui ne peut pas le réparer.
+  const libre = Math.max(0, ...numbers, ...horsConvention.map((a) => a.numero)) + 1;
+  const parNumero = new Map<number, typeof parsed>();
+  for (const a of parsed.filter((x) => (!x.isNew || conforme(x)) && Number.isFinite(x.numero)))
+    parNumero.set(a.numero, [...(parNumero.get(a.numero) ?? []), a]);
+  for (const [n, tenants] of [...parNumero].sort((x, y) => x[0] - y[0])) {
+    const nouveaux = tenants.filter((a) => a.isNew).map((a) => a.path);
+    if (tenants.length < 2 || !nouveaux.length) continue;
+    const existant = tenants.find((a) => !a.isNew);
+    reasons.push(
+      existant
+        ? `Numérotation des ADR : ${adrId(n)} est déjà pris par ${existant.path} : ${nouveaux.join(", ")} doit prendre le prochain numéro libre, ${adrId(libre)}.`
+        : `Numérotation des ADR : ${adrId(n)} en double : ${nouveaux.join(" et ")}. Le prochain numéro libre est ${adrId(libre)}.`,
+    );
   }
+  const seen = new Set(parNumero.keys());
+  for (const a of horsConvention)
+    reasons.push(`Numérotation des ADR : ${adrId(a.numero)} existe (${a.path}) mais ne suit pas la convention skraft : ${conventionAdr(a.numero)}.`);
   // Seuls les trous que cette phase creuse sont reprochés : un ADR archivé avant la story
   // laisse un trou que l'agent ne peut pas combler, et le lui reprocher ferait échouer DESIGN
   // à chaque tentative, jusqu'à épuisement du budget.
-  const dejaLa = parsed.filter((a) => !a.isNew).map((a) => a.adr.number).filter((n) => Number.isFinite(n));
+  const dejaLa = parsed.filter((a) => !a.isNew).map((a) => a.numero).filter((n) => Number.isFinite(n));
   const depuis = (dejaLa.length ? Math.max(...dejaLa) : 0) + 1;
-  const max = numbers.at(-1) ?? 0;
-  for (let n = depuis; n <= max; n++) if (!seen.has(n)) reasons.push(`Numérotation des ADR : ${adrId(n)} manque.`);
+  const max = Math.max(numbers.at(-1) ?? 0, ...horsConvention.map((a) => a.numero));
+  for (let n = depuis; n <= max; n++)
+    if (!seen.has(n) && !horsConvention.some((a) => a.numero === n))
+      reasons.push(`Numérotation des ADR : ${adrId(n)} manque : aucun fichier de docs/adr/ ne porte ce numéro.`);
 
   const registry = parseSupersessions(i.supersessions);
   for (const a of parsed.filter((x) => x.isNew))
@@ -300,33 +318,18 @@ const NE_RATIFIE_PLUS = ["Rejected", "Superseded", "Deprecated"];
 /** Texte des ADR encore valables, hors de leurs alternatives écartées. */
 const adrsValables = (i: DesignInput): string[] => i.adrs.filter((a) => !NE_RATIFIE_PLUS.includes(parseAdr(a.md).status)).map((a) => horsAlternatives(a.md));
 
-/**
- * Engagements déjà présents dans le code (phase 7.0 de solution-architect, mêmes signatures) : le
- * marqueur est le bus, pas un gestionnaire seul, qui peut n'être que la séparation CQS du projet.
- */
-const ENGAGEMENTS: { nom: string; signature: RegExp; ratifie: RegExp }[] = [
-  { nom: "CQRS avec bus", signature: /\bI?(?:Command|Query)Bus\b/, ratifie: /\bCQRS\b|bus de (?:commandes|requêtes)|(?:command|query) bus/i },
-  { nom: "Event Sourcing", signature: /\b(?:IEventStore|EventStream)\b/, ratifie: /event[ -]sourcing|event store/i },
-  { nom: "saga", signature: /Saga|ProcessManager|ICorrelatedBy/, ratifie: /\bsagas?\b|process manager/i },
-];
 const ANTICORRUPTION = /\bACL\b|anti-?corruption/i;
 
 /**
- * Engagements structurels sans ADR qui les ratifie (phases 7.0 et 7 de solution-architect) : ceux
- * que le code du projet porte déjà, et la couche anticorruption de la carte des contextes. Les
- * autres déclencheurs obligatoires d'ADR sont jugés par la lentille architecture : écrits en prose,
- * « pas de CQRS » tromperait une simple recherche.
+ * Engagements structurels que la conception de la story introduit sans ADR qui les ratifie : la
+ * couche anticorruption de sa carte des contextes. La porte juge ce que la story produit, pas
+ * l'existant (décision du responsable, 11/11) : la phase 7.0 du plugin, qui exigeait un ADR de
+ * rattrapage pour un engagement déjà dans le code, est retirée. Les autres déclencheurs d'ADR sont
+ * jugés par la lentille architecture : écrits en prose, « pas de CQRS » tromperait une recherche.
  */
 export function engagementsSansAdr(i: DesignInput): string[] {
   const reasons: string[] = [];
   const valables = adrsValables(i);
-  for (const e of ENGAGEMENTS) {
-    const fichiers = (i.sources ?? []).filter((s) => e.signature.test(s.content)).map((s) => s.path);
-    if (fichiers.length && !valables.some((t) => e.ratifie.test(t)))
-      reasons.push(
-        `Le code du projet contient un engagement structurel sans ADR : ${e.nom} (${fichiers.slice(0, 3).join(", ")}${fichiers.length > 3 ? ", …" : ""}). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.`,
-      );
-  }
   for (const l of (i.docs["context-map.md"] ?? "").split("\n")) {
     const m = RELATION.exec(l);
     if (m && ANTICORRUPTION.test(l) && !valables.some((t) => ANTICORRUPTION.test(t)))
@@ -381,4 +384,24 @@ export function ligneNomsDuModele(slug: string, docs: Partial<Record<string, str
   if (!noms.length) return "";
   const chemins = MODEL_DOCS.map((d) => `\`.skraft/${slug}/design/${d}\``).join(", ");
   return `Noms définis par le modèle (${chemins}) : ${noms.map((n) => `\`${n}\``).join(", ")}. \`contracts.md\`, \`diagrams.md\` et les ADR ne citent que ceux-là : un autre nom sera refusé. Ajoute-le d'abord au modèle, ou ne le cite pas.`;
+}
+
+/** Documents du modélisateur ; ceux de l'architecte qui décide, ADR compris. */
+const DU_MODELE = /\b(?:event-model|domain-model|context-map)\.md\b/;
+const DES_DECISIONS = /docs\/adr\/|\bADR-\d+|\b(?:contracts|diagrams|consistency-matrix|supersessions)\.md\b|Numérotation des ADR/;
+/**
+ * Chaque motif d'un refus de DESIGN va à l'agent qui a produit le fichier en cause (11/11) : le
+ * modélisateur n'écrit pas d'ADR, l'architecte qui décide n'écrit pas le modèle. Un motif qui lie les
+ * deux, ou ne nomme aucun fichier, va aux deux. Sans motif pour lui, le modélisateur n'est pas relancé.
+ */
+export function routerMotifsDeDesign(motifs: readonly string[]): { modele: string[]; decisions: string[] } {
+  const modele: string[] = [];
+  const decisions: string[] = [];
+  for (const m of motifs) {
+    const duModele = DU_MODELE.test(m);
+    const desDecisions = DES_DECISIONS.test(m);
+    if (duModele || !desDecisions) modele.push(m);
+    if (desDecisions || !duModele) decisions.push(m);
+  }
+  return { modele, decisions };
 }

@@ -129,7 +129,11 @@ const DESCRIPTIONS: Record<TerminalToolName, string> = {
   report_blocker: "Signale une question qui t'empêche de continuer (valeur ou règle manquante) : ta tâche est suspendue jusqu'à la réponse.",
 };
 
-export function terminalTool<N extends TerminalToolName>(name: N, sink: (output: TerminalOutput<N>) => void): ToolSpec {
+/**
+ * `controle` : le code peut refuser une sortie valide (ADR 0082) ; son motif est rendu à l'agent,
+ * qui continue son tour, comme pour des arguments invalides.
+ */
+export function terminalTool<N extends TerminalToolName>(name: N, sink: (output: TerminalOutput<N>) => void, controle?: (output: TerminalOutput<N>) => Promise<string | null>): ToolSpec {
   const schema = terminalSchemas[name];
   return {
     name,
@@ -140,6 +144,8 @@ export function terminalTool<N extends TerminalToolName>(name: N, sink: (output:
       const parsed = schema.safeParse(args);
       if (!parsed.success)
         throw new Error(`Arguments invalides pour ${name} : ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+      const refus = controle ? await controle(parsed.data as TerminalOutput<N>) : null;
+      if (refus) throw new Error(refus);
       sink(parsed.data as TerminalOutput<N>);
       return "Enregistré.";
     },

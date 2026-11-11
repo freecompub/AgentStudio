@@ -352,7 +352,7 @@ Lire et valider la story, vérifier que les tests existants sont sains, ouvrir l
   ("", "Contenu"),
   ([Entrée], [Le chemin de la story (par exemple `stories/us-12.md`), donné à la commande `/skraft`. Options : `--auto` (difficulté retenue sans confirmation) et `--archi <skill>` (skill d'architecture du projet, par son nom ou son langage : `dotnet`, `java`, `python`, `react`) ; sans `--archi`, ou si la skill est inconnue (avec un avertissement), la clean architecture par défaut.]),
   ([Format exigé], [Un titre `# US-12 — Titre` ; une section « Critères d'acceptation » avec des lignes `1. …` (au moins une) ; une section « Questions ouvertes » facultative, en puces.]),
-  ([Sorties], [La story analysée (critères, valeurs littérales de chaque critère, questions numérotées `q1`, `q2`…) ; la branche `skraft/<slug>` ; les dossiers `.skraft/<slug>/research`, `/design`, `/distill/features`, `/reviews` ; un checkpoint « qualité initiale » qui sert de base à la couverture du diff de toute la tâche.]),
+  ([Sorties], [La story analysée (critères, valeurs littérales de chaque critère, questions numérotées `q1`, `q2`… ; un nombre seul d'un critère devient une question `v1`, `v2`… : l'humain le garde ou le retire de la porte des valeurs, ADR 0080 ; une référence comme « ADR 0069 » n'est pas une valeur) ; la branche `skraft/<slug>` ; les dossiers `.skraft/<slug>/research`, `/design`, `/distill/features`, `/reviews` ; un checkpoint « qualité initiale » qui sert de base à la couverture du diff de toute la tâche.]),
 )
 
 === Qui exécute quoi
@@ -474,7 +474,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
   ("Qui", "Ce qu'il fait"),
   ([#AGENT `skraft-architect-model`], [Premier tour : modèle d'événements, modèle du domaine, carte des contextes. Les noms sont en PascalCase entre accents graves.]),
   ([#AGENT `skraft-architect-decide`], [Second tour, avec le même motif : contrats et diagrammes, en ne citant que des noms définis par le modélisateur, chacun avec la même catégorie partout. Écrit les ADR *uniquement* par l'outil `render_adr` ; il n'a pas d'accès direct à `docs/adr/`.]),
-  ([#CODE `render_adr`], [Valide l'ADR (champs non vides, statut `Proposed`), le numérote (plus grand numéro + 1), l'écrit avec le gabarit (Contexte, Décision, Conséquences, Alternatives). Un même titre encore proposé est réécrit, pas dupliqué. Refuse d'amender un ADR déjà décidé.]),
+  ([#CODE `render_adr`], [Valide l'ADR (champs non vides, statut `Proposed`), le numérote (plus grand numéro de `docs/adr/` + 1, ADR du projet compris quel que soit leur format, ADR 0079), l'écrit avec le gabarit (Contexte, Décision, Conséquences, Alternatives). Un même titre encore proposé est réécrit, pas dupliqué. Refuse d'amender un ADR déjà décidé.]),
   ([#CODE porte « cohérence »], [Voir ci-dessous.]),
   ([#AGENT lentilles], [Revue par `cold-reader`, `test-integrity` et `architecture` (pas `quality-gates`).]),
   ([#HUMAIN architecte], [Ratifie chaque ADR proposé.]),
@@ -487,7 +487,7 @@ d'architecture (ADR), que l'architecte humain ratifie.
 - Un ADR existant ne se modifie pas : on en rédige un nouveau qui le remplace (append-only).
 - Chaque nouvel ADR : un titre, toutes les sections, le statut `Proposed`, pas de verdict dans le nom
   de fichier, pas de titre de bonne pratique (« ne pas », « toujours »…).
-- Numérotation sans doublon ni trou ; registre des remplacements (`supersessions.md`) cohérent dans
+- Numérotation sans doublon ni trou creusé par la story ; les ADR du projet comptent sans être jugés, et chaque motif nomme le fichier en cause et le numéro à prendre ; registre des remplacements (`supersessions.md`) cohérent dans
   les deux sens.
 - Chaque commande de `event-model.md` (« Commande `X` ») a au moins un événement : « `X` → événement
   `Y` », ou une ligne de tableau qui les associe. Une requête en est exemptée.

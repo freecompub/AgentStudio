@@ -43,8 +43,9 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
-  // Phase 7.0 de solution-architect (docs/15 §4.6) : la porte lit les sources du projet.
-  it("un bus de commandes déjà dans le code, sans ADR : DESIGN refusée, puis acceptée avec l'ADR de rattrapage", async () => {
+  // Phase 7.0 du plugin retirée le 11/11 (décision du responsable) : la porte juge ce que la story produit,
+  // pas l'existant. Un engagement déjà dans le code n'exige plus d'ADR de rattrapage.
+  it("un bus de commandes déjà dans le code, sans ADR : DESIGN n'est pas refusée, la ratification arrive au premier essai", async () => {
     await put(root, "src/app/command-bus.ts", "export class CommandBus {}\n");
     git(root, "add", "-A");
     git(root, "commit", "-qm", "bus");
@@ -56,7 +57,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
       await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
-      const args = decidePrompts.length === 1 ? ADR_ARGS : { ...ADR_ARGS, decision: `${ADR_ARGS.decision} Le bus de commandes existant (CQRS) est conservé.` };
+      const args = ADR_ARGS;
       await put(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md", renderAdr(1, args, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
@@ -69,10 +70,111 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
-    expect(decidePrompts).toHaveLength(2);
-    expect(decidePrompts[1]).toContain("Le code du projet contient un engagement structurel sans ADR : CQRS avec bus (src/app/command-bus.ts). Un ADR, nouveau ou existant, doit le ratifier, en rattrapage s'il existait avant la story.");
+    expect(decidePrompts).toHaveLength(1);
   }, 120_000);
 
+
+  // Vu au run de LEC-1 (11/11) : un ADR mal nommé restait sur le disque, l'architecte ne pouvant
+  // pas supprimer de fichier, et la porte le refusait à chaque essai. Le nom est donc refusé dès
+  // l'écriture, par la garde ; le titre, dès la fin du tour de l'architecte, avant la porte.
+  it("un ADR hors convention : nom refusé à l'écriture, titre reproché dès la sortie de l'architecte, avec le format attendu", async () => {
+    const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
+    const decidePrompts: string[] = [];
+    const probes: Record<string, unknown> = {};
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      for (const path of ["docs/adr/0001-plafond.md", ADR1, "docs/adr/supersessions.md"])
+        probes[path] = (await t.config.guard.check({ kind: "write", toolName: "edit", path })) as { decision: string };
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      const md = renderAdr(1, ADR_ARGS, "2026-10-10");
+      await put(root, ADR1, decidePrompts.length === 1 ? md.replace("# ADR-001 —", "# ADR 0001 —") : md);
+      await t.callTool("report_phase", { summary: "décisions", files: [ADR1] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
+    expect(probes["docs/adr/0001-plafond.md"]).toEqual(expect.objectContaining({ decision: "deny" }));
+    expect(probes[ADR1]).not.toEqual(expect.objectContaining({ decision: "deny" }));
+    expect(probes["docs/adr/supersessions.md"]).not.toEqual(expect.objectContaining({ decision: "deny" }));
+    expect(decidePrompts).toHaveLength(2);
+    expect(decidePrompts[1]).toContain(`${ADR1} ne suit pas la convention skraft : fichier attendu docs/adr/adr-001-<titre>.md, titre attendu « # ADR-001 — <Titre> ».`);
+  }, 120_000);
+
+  // Run 3 de LEC-1 (11/11) : l'architecte numérotait depuis 001 à côté des `0001-….md` du projet, la
+  // porte répondait « ADR-001 en double », et il ne pouvait pas supprimer son fichier pour renuméroter.
+  it("le code donne le numéro à l'architecte, et lui interdit d'écrire un numéro déjà pris", async () => {
+    await put(root, "docs/adr/0001-monorepo.md", "# ADR 0001 — Monorepo\n\n- Statut : Accepté\n");
+    git(root, "add", "-A");
+    git(root, "commit", "-qm", "adr du projet");
+    const decidePrompts: string[] = [];
+    const probes: Record<string, unknown> = {};
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      for (const path of ["docs/adr/adr-001-plafond-applique-dans-le-domaine.md", "docs/adr/adr-002-plafond-applique-dans-le-domaine.md"])
+        probes[path] = await t.config.guard.check({ kind: "write", toolName: "edit", path });
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md", renderAdr(2, ADR_ARGS, "2026-10-10"));
+      await t.callTool("report_phase", { summary: "décisions", files: [] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-002"), 60_000);
+    expect(decidePrompts).toHaveLength(1);
+    expect(decidePrompts[0]).toContain("ton prochain ADR est ADR-002 (docs/adr/adr-002-<titre>.md)");
+    expect(probes["docs/adr/adr-001-plafond-applique-dans-le-domaine.md"]).toEqual(expect.objectContaining({ decision: "deny" }));
+    expect(probes["docs/adr/adr-002-plafond-applique-dans-le-domaine.md"]).not.toEqual(expect.objectContaining({ decision: "deny" }));
+  }, 120_000);
+
+  // Un motif va à l'agent qui a produit le fichier en cause (11/11) : le modélisateur n'écrit pas d'ADR.
+  it("un refus qui ne porte que sur un ADR relance l'architecte qui décide, pas le modélisateur", async () => {
+    const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
+    const modelPrompts: string[] = [];
+    const decidePrompts: string[] = [];
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      const md = renderAdr(1, ADR_ARGS, "2026-10-10");
+      await put(root, ADR1, decidePrompts.length === 1 ? md.replace("# ADR-001 —", "# ADR 0001 —") : md);
+      await t.callTool("report_phase", { summary: "décisions", files: [ADR1] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      modelPrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
+    expect(decidePrompts).toHaveLength(2);
+    expect(decidePrompts[1]).toContain("ne suit pas la convention skraft");
+    expect(modelPrompts).toHaveLength(1);
+  }, 120_000);
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {

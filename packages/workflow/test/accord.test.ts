@@ -15,6 +15,7 @@ const META: MetaWorkflow = {
   description: "Livre une user story.",
   commande: "skraft",
   entrees: {},
+  outils: {},
   phases: {},
   humains: { "ratifier-adr": ["architecte"] },
   permissions: { ecriture: [".skraft/**", "@stack:unitTests"], tests: true, git: ["branche", "commit"] },

@@ -8,7 +8,7 @@ import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSu
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
-import type { Story } from "./story.js";
+import type { Story, ValeurDouteuse } from "./story.js";
 
 export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
 
@@ -191,7 +191,8 @@ export interface SkraftState {
   attempts: number;
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
-  openQuestions: { id: string; text: string; answer?: string }[];
+  /** `valeur` : une valeur douteuse de la porte des valeurs, que l'humain garde ou retire (ADR 0080). */
+  openQuestions: { id: string; text: string; answer?: string; valeur?: ValeurDouteuse; retiree?: boolean }[];
   /** Matrice du plan de test gardée depuis DISTILL (ADR 0067). */
   planDeTest?: Record<string, LigneDuPlan>;
   /** Écarts au plan de test déclarés et validés en DELIVER, commités dans `ecarts-au-plan.md` (ADR 0067). */
@@ -265,6 +266,8 @@ export interface SkraftState {
   granularitySetting: Granularity | null;
   /** Skills chargées à la demande par `load_skill`, tracées par rôle et par phase (D26) ; absent d'un état antérieur. */
   skillsLoaded?: { phase: Phase | null; role: Role; skills: string[] }[];
+  /** Vérifications faites par les agents avec l'outil de leur porte (ADR 0082), pour le bilan. */
+  verifications?: { phase: Phase | null; role: Role; appels: number }[];
   /** Réessais par phase (mesures d'usage, §12) ; absent d'un état persisté avant S6. */
   retries?: Record<string, number>;
   /** Fils des défauts de revue de la phase en cours (ADR 0046) ; vidés au commit de la phase. */
@@ -291,7 +294,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string; gherkinAvant?: { path: string; content: string }[] }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[] }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[]; /** Vérifications faites par l'agent (ADR 0082). */ verifications?: number }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
   | { type: "LENS_BLOCKED"; lens: LensName; question: string; choices: string[] }
@@ -353,7 +356,7 @@ export type SkraftEffect =
   | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
   /** `lens` : question d'une lentille de revue (D4 de docs/12). */
   | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
-  | { kind: "askQuestion"; id: string; text: string }
+  | { kind: "askQuestion"; id: string; text: string; valeur?: ValeurDouteuse }
   | { kind: "askEscalation"; reason: string; options: ("obsolete" | "exempt" | "retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "arbitrateMutants"; threads: DefectThread[] }
@@ -434,7 +437,7 @@ const stateSchema = z.object({
   attempts: z.number().int().min(0),
   budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
-  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
+  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional(), valeur: z.object({ critere: z.number().int(), valeur: z.string() }).optional(), retiree: z.boolean().optional() })),
   recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
   architecture: z.string().optional(),
   planDeTest: z.record(z.string(), z.object({ couche: z.string(), doublure: z.string() })).optional(),
@@ -444,6 +447,7 @@ const stateSchema = z.object({
   retries: z.record(z.string(), z.number().int().min(0)).optional(),
   rejections: z.number().int().min(0).optional(),
   skillsLoaded: z.array(z.object({ phase: phase.nullable(), role: z.string(), skills: z.array(z.string()) })).optional(),
+  verifications: z.array(z.object({ phase: phase.nullable(), role: z.string(), appels: z.number().int().min(0) })).optional(),
   deliver: z
     .object({
       scenarios: z.array(z.object({ id: z.string(), ac: z.number(), acceptanceTestId: z.string(), role: z.enum(["driver", "regression"]), status: z.enum(["pending", "in_progress", "done"]) })),

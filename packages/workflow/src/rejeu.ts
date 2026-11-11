@@ -84,6 +84,7 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
         ...(opts.lectureSeule?.length ? { lectureSeule: [...opts.lectureSeule] } : {}),
         ...(opts.gelApresRouge ? { gelApresRouge: true } : {}),
         ...(opts.preuve ? { preuve: { ...opts.preuve } } : {}),
+        ...(opts.verification ? { verification: { outil: opts.verification.outil, fichiers: [...opts.verification.fichiers], ...(opts.verification.donnees !== undefined ? { donnees: opts.verification.donnees } : {}) } } : {}),
       });
     },
     humain: async (id, question, options, opts = {}) => {

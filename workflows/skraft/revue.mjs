@@ -7,7 +7,7 @@
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
-import { reviewReport, synthesize } from "./review.mjs";
+import { reviewReport, revueSansDefautCorrigible, synthesize } from "./review.mjs";
 import { agentFeedback, appliquerRefutations, applyArbitration, applyResponses, defautsARefuter, isActive, rangerHorsChangement, verifierOccurrences, lensesAfterThreads, lensHistory, numberDefects, reviewRound } from "./review-thread.mjs";
 import { GELÉS } from "./support.mjs";
 /**
@@ -25,7 +25,7 @@ export function oublierLeRun(s) {
 * Tour d'un spécialiste ; ses réponses aux défauts mettent les fils à jour. Une question bloquante
 * passe à l'humain, puis il repart avec la réponse et le même motif (D9 de docs/12).
 */
-export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
+export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "", lectureSeule = [], verification = undefined) {
   for (;;) {
     await w.etape(phase);
     // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
@@ -40,7 +40,10 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "") {
         pile += `\n${ligneBdd(disp.bdd)}`;
     }
     await ecrirePassation(w, d);
-    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides] });
+    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides, ...lectureSeule], ...(verification ? { verification } : {}) });
+    // Vérifications faites par l'agent (ADR 0082) : comptées pour le bilan.
+    if (r.verification)
+      d.verifications = [...(d.verifications ?? []), { phase, agent: nom, appels: r.verification.appels }];
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);
@@ -157,6 +160,15 @@ async function juger(w, d, s, phase, essai, bruts, disp, entrees) {
     const motifs = motifsDeRejet(lenses);
     await w.rejet("revue", motifs);
     throw new Escalade([`Revue : verdict REJECTED (${motifs.join(" ; ")})`]);
+  }
+  // Hors DELIVER, rien à corriger (ADR 0081) : rejouer la phase consommerait un essai pour rien.
+  // DELIVER garde sa règle : ses mineurs sont corrigés de façon ciblée (ADR 0062).
+  if (phase !== "DELIVER" && !s.fils.some(isActive)) {
+    if (revueSansDefautCorrigible(lenses) === "approuver")
+      return undefined;
+    const motif = sansDefautCorrigible(lenses);
+    await w.rejet("revue", [motif]);
+    throw new Escalade([`Revue sans défaut à corriger : ${motif}`]);
   }
   return {
     motifs: s.fils.some(isActive) ? agentFeedback(s.fils, () => true) : [sansDefautCorrigible(lenses)],

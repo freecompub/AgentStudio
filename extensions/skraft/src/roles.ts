@@ -37,7 +37,9 @@ export const ROLES = {
   classifier: `${PASSATION}
 Rends le niveau et sa justification avec l'outil submit_difficulty.`,
 
-  researcher: PASSATION,
+  researcher: `${PASSATION}
+Avant de rendre ton travail, appelle \`verifier_recherche\` : il rend ce que la porte des citations dirait de ton document,
+avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.`,
 
   architectModel: PASSATION,
 
@@ -48,7 +50,9 @@ pour amender un ADR encore proposé, rappelle render_adr avec son numéro. Tu n'
   acceptance: `${PASSATION}
 ${SKILLS_ARBITRATION}
 L'emplacement des tests d'acceptance du projet est indiqué dans le dossier de passation. Le code vérifie ensuite chaque valeur
-recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.`,
+recopiée et la raison de chaque rouge : un écart est rejeté avec son motif.
+Avant de rendre ton travail, appelle \`verifier_scenarios\` : il rend ce que les portes gherkin, valeurs et plan de test diraient
+de tes fichiers, avec les mêmes règles que le code appliquera après ton tour. Corrige chaque motif, puis vérifie de nouveau.`,
 
   test: `${PASSATION}
 ${SKILLS_ARBITRATION}

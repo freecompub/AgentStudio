@@ -75,7 +75,9 @@ Et ce que **nous** contrôlons et qu'ils n'ont pas :
 
 - **ADR en ajout seul.** Modifier un ADR existant est refusé : *« les ADR sont append-only ; en
   rédiger un nouveau qui le remplace »*. Chez eux, rien n'empêche de réécrire l'histoire.
-- **Numérotation sans trou ni doublon.**
+- **Numérotation sans trou ni doublon**, calculée par le code (ADR 0079). Les ADR du projet comptent
+  quel que soit leur format, sans être jugés ; un motif dit quel fichier tient le numéro, et lequel
+  prendre.
 - **Identifiants croisés.** Un nom cité dans `contracts.md` ou `diagrams.md` doit exister dans
   `event-model.md` ou `domain-model.md`. C'est leur G7/G8 pris par l'autre bout : au lieu de
   demander qu'un événement existe pour chaque commande, nous refusons qu'un document cite un nom
@@ -203,6 +205,8 @@ arrondisse le palier à « 5 % » en « 5,0 % ».
 - **Chez nous** : la porte `valeurs` extrait les littéraux du critère — `10`, `5 %`, `10`, `2,00 €`,
   `1,00 €` — et exige chacun **dans le scénario** et **dans le test**. Le refus nomme la valeur :
   *« La valeur « 1,00 € » du critère 2 n'apparaît pas dans le test d'acceptance du critère 2. »*
+  Le `10` seul, sans unité, est une valeur douteuse : il est d'abord soumis à l'humain, avant
+  RESEARCH, qui le garde ou le retire de la porte (ADR 0080).
 
 Puis la porte lance les tests et exige que le test d'acceptance soit **rouge pour la bonne raison**.
 Sur .NET, `RemiseParPalier` n'existant pas encore, la compilation échoue : notre profil lit l'erreur

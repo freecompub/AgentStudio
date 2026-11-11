@@ -6,7 +6,7 @@
  * impossible à rompre par mégarde, et on le dit clairement quand on essaie.
  */
 import vm from "node:vm";
-import type { ScriptWorkflow } from "../protocols.js";
+import type { OutilsWorkflow, ScriptWorkflow } from "../protocols.js";
 import { bibliotheque as bibliothequeParDefaut, type Bibliotheque } from "./bibliotheque.js";
 
 const PREAMBULE = `"use strict";
@@ -16,7 +16,7 @@ Object.defineProperty(globalThis, "Date", {
 Math.random = function () { throw new Error("Le hasard n'est pas disponible dans un workflow : il rendrait le rejeu faux."); };
 `;
 
-export function evaluerScript(code: string, bib: Bibliotheque = bibliothequeParDefaut): { meta: unknown; script: ScriptWorkflow<never> } {
+export function evaluerScript(code: string, bib: Bibliotheque = bibliothequeParDefaut): { meta: unknown; script: ScriptWorkflow<never>; outils: OutilsWorkflow } {
   // `URL` et `URLSearchParams` ne sont pas du langage mais des API de Node et du web : purs et
   // déterministes, ils sont fournis (la porte des citations de skraft vérifie les URL avec).
   const ctx = vm.createContext({ URL, URLSearchParams }, { name: "workflow", codeGeneration: { strings: false, wasm: false } });
@@ -34,5 +34,8 @@ export function evaluerScript(code: string, bib: Bibliotheque = bibliothequeParD
   fabrique(module, module.exports, exiger);
   const script = module.exports["default"];
   if (typeof script !== "function") throw new Error("le script doit exporter par défaut une fonction `async (w, entree) => …`");
-  return { meta: module.exports["meta"], script: script as ScriptWorkflow<never> };
+  // Outils apportés aux agents (ADR 0082) : des fonctions, exportées sous `outils`.
+  const outils = module.exports["outils"] ?? {};
+  if (typeof outils !== "object" || Object.values(outils as object).some((f) => typeof f !== "function")) throw new Error("`outils` doit être un objet de fonctions `({ args, fichiers, donnees }) => texte`");
+  return { meta: module.exports["meta"], script: script as ScriptWorkflow<never>, outils: outils as OutilsWorkflow };
 }

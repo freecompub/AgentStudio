@@ -1268,6 +1268,62 @@
       "verify": "pnpm vitest run --project stack-adapters test/outils.test.ts && pnpm vitest run --project project-services test/pile.test.ts test/stack-command.test.ts",
       "passes": true,
       "notes": "Fait le 2026-11-10 (branche fix/outils-monorepo), après une découverte refusée trois fois sur un monorepo (souscription-dab, shell) : l'agent proposait ../../node_modules/.bin, et la règle refusait tout `..`."
+    },
+    {
+      "id": "design-adr-produits-seulement",
+      "title": "La porte de DESIGN juge les ADR que la story produit, pas l'existant : un engagement déjà présent dans le code (bus CQRS, event store, saga) n'exige plus d'ADR de rattrapage, et la porte ne lit plus les sources ; la couche anticorruption de la carte de la story reste à ratifier (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, après un run réel de LEC-1 (freecompub/AgentStudio#32) bloqué 40 min en DESIGN (21,27 $) : la phase 7.0 du plugin prenait les skills qui décrivent CQRS pour du code, et ne reconnaissait pas les ADR « ADR 0001 »."
+    },
+    {
+      "id": "design-adr-hors-convention",
+      "title": "Un ADR hors convention skraft est signalé avec la bonne raison : un ADR existant du projet (`0078-x.md`, `# ADR 0078 —`) compte par son numéro et la story continue après lui ; un numéro absent est dit « aucun fichier ne porte ce numéro » ; un ADR de la story hors convention est nommé, avec le fichier et le titre attendus. Dans le workflow, le nom est refusé dès l'écriture (périmètre `docs/adr/adr-???-*.md`), le titre dès la sortie de l'architecte",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 2 de LEC-1 (20,54 $) : la porte ne lisait que les `adr-NNN-*.md`, réclamait ADR-001 à ADR-078, et l'architecte ne pouvait pas supprimer le fichier qu'on lui demandait de renommer."
+    },
+    {
+      "id": "design-adr-numero-par-le-code",
+      "title": "Le numéro d'un ADR est calculé par le code, après tous les ADR de docs/adr/ quel que soit leur format (ADR 0079) : `render_adr` le prend ; dans le workflow, le dossier de passation le donne à l'architecte et les numéros pris sont en lecture seule pendant son tour. Un doublon nomme le fichier qui tient le numéro et le prochain numéro libre ; un doublon entre ADR du projet n'est pas reproché",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate adr.test render-adr e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 3 de LEC-1 arrêté en DESIGN (12,44 $) : l'architecte numérotait depuis 001 à côté des 0001-….md d'AgentStudio, la porte répondait « ADR-001 en double », et il ne pouvait pas supprimer son fichier pour renuméroter."
+    },
+    {
+      "id": "valeurs-douteuses-a-l-humain",
+      "title": "Porte des valeurs (ADR 0080) : une référence (« ADR 0069 », « #32 ») n'est pas une valeur ; un nombre seul est soumis à l'humain en ROUTE, avant RESEARCH (« Valeur à tester », la garder d'abord), qui le retire valeur par valeur ; la réponse va dans le dossier de passation et le bilan nomme les valeurs retirées (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft story.test reducer.test e2e-valeurs-douteuses",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, après le run 4 de LEC-1 : « (ADR 0069) » dans le critère 3 faisait exiger « 0069 » dans le scénario. Remplacer la porte par une lentille a été écarté."
+    },
+    {
+      "id": "revue-sans-defaut-hors-deliver",
+      "title": "Hors DELIVER, une revue « changements demandés » sans défaut bloquant ni majeur à corriger ne fait plus rejouer la phase (ADR 0081) : approuvée, mineurs au rapport ; escaladée sans essai si une lentille est REJECTED ou une question sans lentille. DELIVER garde l'ADR 0062 (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft review-synthesis reducer.test e2e-revue-sans-defaut",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, après le run 4 de LEC-1 : deux revues de DISTILL sans défaut à corriger ont épuisé le budget et provoqué la seconde escalade. Changer synthesize a été écarté : cela aurait contredit l'ADR 0062 en DELIVER (sept tests le rappelaient)."
+    },
+    {
+      "id": "agent-se-verifie-avec-sa-porte",
+      "title": "L'agent se vérifie avec l'outil de sa porte (ADR 0082) : un workflow apporte ses outils (meta.outils, export const outils, exécutés dans son processus isolé) ; l'hôte lit les fichiers désignés, compte les appels et refuse une fois la sortie sans vérification depuis la dernière modification ; verifier_scenarios en DISTILL, même calcul que la porte (extension et workflow)",
+      "verify": "pnpm vitest run --project core task-agent-runner && pnpm vitest run --project extension-host in-process-host && pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-scenarios",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable, qui révise le point 3 de l'ADR 0055. Niveaux 1 (mesurer) et 2 (un rappel) ; le niveau 3 (exiger) a été écarté. verifier_conception (DESIGN) reste à faire."
+    },
+    {
+      "id": "chercheur-se-verifie",
+      "title": "Le chercheur se vérifie avec verifier_recherche (ADR 0082) : même calcul que la porte des citations (motifsDeLaRecherche), le document lu par l'hôte, les fichiers cités lus à la demande ; un outil de workflow lit par lire(chemin), servi par l'hôte, limité à la liste du dépôt (extension et workflow)",
+      "verify": "pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-recherche",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, demande du responsable, après le run 6 de LEC-1 : le gabarit `docs/adr/00NN-titre.md`, cité comme un fichier, avait coûté un essai de RESEARCH."
+    },
+    {
+      "id": "refus-de-design-route",
+      "title": "Un refus de DESIGN est routé vers l'agent qui a produit le fichier en cause (routerMotifsDeDesign) : un motif sur un ADR ne relance pas le modélisateur ; après le premier essai, le modélisateur n'est relancé que si un motif le concerne (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate reducer.test e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, demande du responsable : le modélisateur recevait les refus sur les ADR, qu'il ne peut pas corriger, et coûtait une session par essai."
     }
   ]
 }

@@ -7,17 +7,18 @@ import type { ArtifactRecord, Phase, SkraftEffect, SkraftState } from "./model.j
 import type { DefectThread } from "./review-thread.js";
 import type { Ev } from "./reducer.js";
 import { preselectFiles } from "./preselect.js";
-import { checkResearch, extraireInventaire } from "./research.js";
+import { contenusCites, extraireInventaire, motifsDeLaRecherche } from "./research.js";
 import { parseAdr, setAdrStatus } from "./adr.js";
 import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.js";
-import { checkAcceptanceRed, checkPlans, checkValues, planDeTest, testsDeLaStory } from "./distill.js";
-import { checkGherkin, checkTitresBdd, gherkinDeLaStory, gherkinDuDisque } from "./gherkin.js";
+import { checkAcceptanceRed, planDeTest, testsDeLaStory } from "./distill.js";
+import { gherkinDuDisque } from "./gherkin.js";
+import { fichiersDesScenarios, motifsDesScenarios, type DonneesDesScenarios } from "./verifier-scenarios.js";
 import { matchesAny } from "@agent-studio/extension-api";
 import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
-import { parseStory, slugOf } from "./story.js";
+import { ligneValeursRetirees, parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees, sansTestsObsoletes } from "./deliver.js";
 import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects, rangerHorsChangement, verifierOccurrences } from "./review-thread.js";
@@ -197,7 +198,15 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       if (effect.phase === "DISTILL" && ctx.stack.bdd?.length) brief += `\n${ligneBdd(ctx.stack.bdd)}`;
       // Un ADR décidé ne se réécrit plus (D3 de docs/12) : la garde refuse l'écriture.
       const decides = state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path);
-      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase) });
+      // Le chercheur et l'agent d'acceptance vérifient leur travail avec la porte que le code rejouera (ADR 0082).
+      const document = `.skraft/${state.slug}/research/research.md`;
+      const verification =
+        effect.role === "skraft-acceptance"
+          ? { verification: { outil: "verifier_scenarios", fichiers: fichiersDesScenarios(state.slug, ctx.stack.bdd, ctx.stack.layout.acceptanceTests), donnees: donneesDesScenarios(ctx, state) } }
+          : effect.role === "skraft-researcher"
+            ? { verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } }
+            : {};
+      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase), ...verification });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return {
         type: "AGENT_REPORTED",
@@ -206,6 +215,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         files: r.output.files,
         ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
         ...(r.output.responses?.length ? { responses: r.output.responses } : {}),
+        ...(r.verification ? { verifications: r.verification.appels } : {}),
       };
     }
 
@@ -298,13 +308,25 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     case "askQuestion":
       await ctx.interactions.request({
         taskId,
-        title: `Question ouverte (${state.story?.id ?? "skraft"})`,
-        detail: effect.text,
-        options: [
-          { id: `answer:${effect.id}`, label: "Répondre" },
-          { id: `defer:${effect.id}`, label: "Reporter" },
-        ],
-        freeText: true,
+        // Valeur douteuse (ADR 0080) : la garder d'abord, c'est ce que retient un répondeur qui ne lit pas.
+        ...(effect.valeur
+          ? {
+              title: `Valeur à tester (${state.story?.id ?? "skraft"}, critère ${effect.valeur.critere})`,
+              detail: effect.text,
+              options: [
+                { id: `keep:${effect.id}`, label: "Oui : la garder dans la porte des valeurs" },
+                { id: `drop:${effect.id}`, label: "Non : la retirer de la porte des valeurs" },
+              ],
+            }
+          : {
+              title: `Question ouverte (${state.story?.id ?? "skraft"})`,
+              detail: effect.text,
+              options: [
+                { id: `answer:${effect.id}`, label: "Répondre" },
+                { id: `defer:${effect.id}`, label: "Reporter" },
+              ],
+              freeText: true,
+            }),
         requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
       });
       // Demande créée : une panne sur une question suivante ne la fera pas reposer (D17 de docs/12).
@@ -509,15 +531,8 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
   } catch {
     return { type: "GATE_FAIL", gate: "citations", reasons: [`Document de recherche absent : ${path}`] };
   }
-  const files = new Set(await ctx.workspace.listFiles());
-  const contenus = new Map<string, string>();
-  for (const cited of new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))) {
-    if (files.has(cited)) contenus.set(cited, await ctx.workspace.readFile(cited));
-  }
-  const { reasons, openQuestions } = checkResearch(md, {
-    lineCount: (p) => (contenus.has(p) ? contenus.get(p)!.replace(/\n$/, "").split("\n").length : null),
-    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
-  });
+  // Le même calcul que l'outil `verifier_recherche` du chercheur (ADR 0082).
+  const { reasons, openQuestions } = motifsDeLaRecherche(md, await contenusCites(ctx, md));
   if (reasons.length) return { type: "GATE_FAIL", gate: "citations", reasons };
   const known = new Set(state.openQuestions.map((q) => q.text));
   return {
@@ -529,6 +544,8 @@ async function researchGate(ctx: ExtensionContext, state: SkraftState, attempt: 
 }
 
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+/** Tout fichier de `docs/adr/`, y compris hors convention : la porte doit voir les ADR du projet. */
+const estFichierAdr = (p: string) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS;
 /** Les rapports de revue sont écrits par le code à chaque revue : ce ne sont pas des livrables (D6 de docs/12). */
 const pasUnRapport = (f: { path: string }) => !f.path.includes("/reviews/");
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
@@ -548,9 +565,9 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   }
   const changed = await ctx.workspace.changedFiles(cp);
   const added = new Set(changed.filter((f) => f.status === "added").map((f) => f.path));
-  const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && ADR_FILE.test(f.path)).map((f) => f.path);
+  const modifiedExistingAdrs = changed.filter((f) => f.status !== "added" && estFichierAdr(f.path)).map((f) => f.path);
   const fichiers = await ctx.workspace.listFiles();
-  const adrPaths = fichiers.filter((p) => ADR_FILE.test(p));
+  const adrPaths = fichiers.filter(estFichierAdr);
   // Un ADR déjà décidé n'est plus « nouveau » : son statut n'est plus Proposed (D3 de docs/12).
   const decides = new Set(state.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
   const adrs = await Promise.all(adrPaths.map(async (path) => ({ path, md: await ctx.workspace.readFile(path), isNew: added.has(path) && !decides.has(path) })));
@@ -560,13 +577,8 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
   } catch {
     supersessions = "";
   }
-  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
-  const sources = await Promise.all(
-    fichiers
-      .filter((p) => matchesAny(ctx.stack.layout.sources, p) && !ctx.stack.isTestFile(p))
-      .map(async (path) => ({ path, content: await ctx.workspace.readFile(path).catch(() => "") })),
-  );
-  const input = { docs, adrs, supersessions, modifiedExistingAdrs, sources };
+  // La porte ne lit plus les sources du projet : elle juge ce que la story produit (11/11).
+  const input = { docs, adrs, supersessions, modifiedExistingAdrs };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `${dir}/consistency-matrix.md`;
@@ -585,37 +597,21 @@ async function designGate(ctx: ExtensionContext, state: SkraftState, attempt: nu
 }
 
 /** Porte valeurs puis porte RED d'acceptance (§7.3) ; à la sortie, gel des tests d'acceptance. */
+/** Ce que la porte des scénarios sait, hors fichiers : les données de la vérification de l'agent (ADR 0082). */
+function donneesDesScenarios(ctx: ExtensionContext, state: SkraftState): DonneesDesScenarios {
+  return { slug: state.slug, bdd: ctx.stack.bdd ?? null, gherkinAvant: state.gherkinAvant ?? [], criteria: state.story?.criteria ?? [], globsAcceptance: ctx.stack.layout.acceptanceTests };
+}
+
 async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: number, signal: AbortSignal, taskId: string): Promise<Ev> {
   const dir = `.skraft/${state.slug}/distill`;
-  const files = await ctx.workspace.listFiles();
-  const read = async (paths: string[]) => Promise.all(paths.map(async (path) => ({ path, content: await ctx.workspace.readFile(path) })));
-  // BDD (ADR 0074) : le Gherkin vit dans les dossiers `features` du projet, non dans `.skraft/`.
-  // Seuls les scénarios de la story sont jugés ; toucher à ceux d'une story précédente est refusé.
-  const { features, modifies } = gherkinDeLaStory(state.gherkinAvant ?? [], await gherkinDuDisque(ctx, state.slug));
-  if (modifies.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: modifies };
-  const acceptanceGlobs = ctx.stack.layout.acceptanceTests;
-  const acceptanceTests = await read(files.filter((f) => matchesAny(acceptanceGlobs, f)));
   const criteria = state.story?.criteria ?? [];
-
-  // Porte `gherkin` AVANT la porte `valeurs` : un scénario couplé à un détail technique doit être
-  // refusé même s'il contient les bonnes valeurs, et surtout avant le gel des tests d'acceptance —
-  // passé ce point, plus personne ne peut le réécrire.
-  const gherkinReasons = [...checkGherkin(features), ...(ctx.stack.bdd?.length ? checkTitresBdd(features) : [])];
-  if (gherkinReasons.length) return { type: "GATE_FAIL", gate: "gherkin", reasons: gherkinReasons };
-
-  const valueReasons = checkValues({ criteria, features, acceptanceTests });
-  if (valueReasons.length) return { type: "GATE_FAIL", gate: "valeurs", reasons: valueReasons };
-
-  let testPlan = "";
-  try {
-    testPlan = await ctx.workspace.readFile(`${dir}/test-plan.md`);
-  } catch {
-    return { type: "GATE_FAIL", gate: "plan de test", reasons: [`Plan de test absent : ${dir}/test-plan.md`] };
-  }
-  // Plans vérifiés avant d'exécuter quoi que ce soit (option C de docs/15 §4.5).
-  const implPlan = await ctx.workspace.readFile(`${dir}/impl-plan.md`).catch(() => null);
-  const planReasons = checkPlans({ criteria, testPlan, implPlan });
-  if (planReasons.length) return { type: "GATE_FAIL", gate: "plan de test", reasons: planReasons };
+  // Portes de forme : le même calcul que l'outil `verifier_scenarios` de l'agent (ADR 0082).
+  const motifs = fichiersDesScenarios(state.slug, ctx.stack.bdd, ctx.stack.layout.acceptanceTests);
+  const fichiers: Record<string, string> = {};
+  for (const path of (await ctx.workspace.listFiles()).filter((f) => matchesAny(motifs, f))) fichiers[path] = await ctx.workspace.readFile(path);
+  const forme = motifsDesScenarios({ fichiers, ...donneesDesScenarios(ctx, state) });
+  if (forme.motifs.length) return { type: "GATE_FAIL", gate: forme.porte, reasons: forme.motifs };
+  const testPlan = fichiers[`${dir}/test-plan.md`]!;
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
   // La suite entière est transmise : c'est la porte qui reconnaît ses tests, au marqueur `ac-<n>`
@@ -814,6 +810,8 @@ function finalReport(s: SkraftState): string {
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
+    ...[ligneValeursRetirees(s.openQuestions)].filter((l): l is string => l !== null),
+    ...(s.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${s.verifications.map((v) => `${v.phase ?? "?"} ${v.role} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(s.nonCommitees?.length ? [`Phases non commitées : ${s.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(s.derogationsCouverture?.length
       ? [`Lignes exemptées de la couverture du diff : ${s.derogationsCouverture.length} (détail dans .skraft/${s.slug}/deliver/derogations.md).`]

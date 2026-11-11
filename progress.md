@@ -5,6 +5,127 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/11 — Essai réel de LEC-1 sur AgentStudio, et la porte de DESIGN ne juge plus l'existant
+
+- **Essais sur les vraies issues d'AgentStudio** :
+  - #33 (LEC-2), bloquée par #32 : refusée. Le message nomme le bloqueur.
+  - #32 (LEC-1), au format et sans commentaire : reprise telle quelle et commitée sur
+    `skraft/lec-1`, sans agent.
+- **Run complet de LEC-1** (Claude, `scripts/essai-mcp-skraft.ts --installer`, pile cadrée dans un
+  clone : la commande de test ne lance que `acceptance/`, `lecons*` et les canaris, car les deux
+  projets entiers prennent 5 min 44 la passe) :
+  - RESEARCH en 4 min, avec cinq questions ouvertes pertinentes, auxquelles le répondeur a donné
+    « l'option la plus simple ». **À trancher par le responsable** avant le prochain run : run
+    annulé, escalade en attente, défaut accepté par l'humain, run rembobiné, second run sur une même
+    story ;
+  - DESIGN bloquée 36 min, en cinq essais, pour **21,27 $**, puis arrêtée : la porte réclamait un ADR
+    de rattrapage pour « CQRS avec bus », trouvé dans les skills de skraft, et ne reconnaissait pas
+    les ADR d'AgentStudio (`# ADR 0001 —`).
+- **Décision du responsable** : la porte juge les ADR que la story produit, pas l'existant.
+  - La phase 7.0 du plugin (`engagementsSansAdr` sur les sources) est retirée des deux copies.
+  - La porte ne lit plus les sources.
+  - La consigne « ADR de rattrapage » est retirée du prompt de l'architecte qui décide.
+  - La couche anticorruption de la carte de la story reste à ratifier.
+  - `docs/15` §4.6 le note.
+- **Run 2 de LEC-1**, arrêté en DESIGN (20,54 $) : « ADR-001 manque … ADR-078 manque ». La porte
+  ne lisait que les `docs/adr/adr-NNN-*.md`, et les ADR d'AgentStudio (`0078-….md`,
+  `# ADR 0078 —`) lui étaient invisibles. Le répondeur a choisi de renuméroter, mais l'architecte ne
+  peut pas supprimer de fichier : un ADR mal nommé restait, refusé à chaque essai.
+- **Demande du responsable** : dire à l'architecte la bonne raison, et dès sa sortie.
+  - La porte lit tout `docs/adr/` (sauf `supersessions.md`). Un ADR existant compte par son
+    numéro, même hors convention (`numeroAdr`), et la story numérote après lui.
+  - Deux motifs distincts : « ADR-005 manque : aucun fichier de docs/adr/ ne porte ce numéro », ou
+    « ADR-079 existe (chemin) mais ne suit pas la convention skraft : fichier attendu …, titre
+    attendu … » (`suitLaConvention`, `conventionAdr`).
+  - Workflow : le périmètre de l'architecte qui décide passe à `docs/adr/adr-???-*.md` et
+    `docs/adr/supersessions.md`. Un nom hors convention est refusé par la garde à l'écriture, donc
+    n'existe jamais. Le titre est contrôlé à la fin de son tour (`controlerAdrs`), avant la porte.
+    Les ADR existants hors convention sont désormais protégés eux aussi (restaurés s'ils sont touchés).
+  - Extension : `render_adr` nomme déjà les fichiers ; seule la lecture de la porte change.
+- **Run 3 de LEC-1**, arrêté à la main en DESIGN, essai 4 (28 min, 12,44 $). Les ADR d'AgentStudio
+  étaient reconnus, mais l'architecte numérotait depuis 001 (`adr-001-couche-anticorruption-….md`).
+  La porte répondait « ADR-001 en double », sans dire avec quoi, et il ne pouvait pas supprimer
+  son fichier pour renuméroter.
+- **Fait (ADR 0079)** :
+  - le code calcule le numéro (`numerotationAdrs`) : `render_adr` le prend, le workflow le donne
+    dans le dossier de passation (`ligneNumerotation`) ;
+  - les numéros pris sont en lecture seule pendant le tour de l'architecte (`motifsNumerosPris`,
+    paramètre `lectureSeule` de `specialiste`) ;
+  - un doublon nomme le fichier qui tient le numéro et le prochain numéro libre ; un doublon entre
+    ADR du projet n'est pas reproché ;
+  - le message de `readOnlyGuard` devient générique (tests gelés, ou fichier interdit par le
+    dossier de passation).
+- **Piège** : le moteur de workflow n'a pas de suppression de fichier. Toute erreur de nom ou de
+  numéro doit être empêchée à l'écriture, pas réparée après coup.
+- **Pas fait** : les PDF de `docs/pdf/skraft-fonctionnement-*` ne sont pas régénérés (Typst absent
+  de la machine) ; seule leur source `skraft.typ` est à jour.
+- **Run 4 de LEC-1** (1 h 23, 30,12 $), arrêté à la main en DISTILL, essai 7. RESEARCH du premier
+  coup ; DESIGN terminée, ADR-079 à 081 numérotés à la suite et ratifiés : le correctif des ADR tient.
+  DISTILL a bouclé :
+  - la porte des valeurs exigeait « 0069 », tiré de « (ADR 0069) » dans le critère 3 ;
+  - « Q2 : voir décision 2 », question de RESEARCH qui renvoie à une décision absente : l'agent a
+    inventé un thème, la revue l'a refusé ;
+  - deux refus de revue « changements demandés » sans défaut bloquant ni majeur (`revue.mjs:162`),
+    donc rien à corriger : deux escalades, relancées par le répondeur.
+- **Fait (ADR 0080, décision du responsable)** : une référence d'ADR ou d'issue n'est plus une
+  valeur ; un nombre seul est soumis à l'humain en ROUTE (« Valeur à tester », questions `v1`…), qui
+  le garde (première option, ce que prend un répondeur) ou le retire de son seul critère. Réponse
+  dans la passation, ligne au bilan (`ligneValeursRetirees`). Remplacer la porte par une lentille a
+  été écarté : c'est un contrôle mécanique.
+- **Run 5 de LEC-1** (47 min, 26,43 $), arrêté à la main en DISTILL, essai 3 : aucune porte du code
+  n'a refusé, ni en DESIGN ni en DISTILL ; trois refus de revue sur des défauts majeurs fondés.
+  Anomalie à vérifier : l'état affichait « essai 3 » en DESIGN avant tout refus, juste après deux
+  questions bloquantes.
+- **Fait (ADR 0081)** : hors DELIVER, une revue sans défaut bloquant ni majeur à corriger est
+  approuvée (mineurs au rapport), ou escaladée sans essai si une lentille est REJECTED ou une
+  question sans lentille (`revueSansDefautCorrigible`).
+- **Fait (ADR 0082, décision du responsable, révise le point 3 de l'ADR 0055)** : l'agent se vérifie
+  avec l'outil de sa porte.
+  - Cœur : `avantSortie`, contrôle facultatif de l'outil terminal (un motif refuse, l'agent continue).
+  - Hôte : `verification: { outil, fichiers, donnees }` dans `ctx.agents.run` ; l'hôte lit les
+    fichiers, compte les appels, garde l'empreinte, refuse une fois la sortie ; le résultat rapporte
+    `verification: { appels, dernier }`. Le contexte traverse le RPC d'une extension isolée.
+  - Moteur de workflow : `meta.outils`, `export const outils`, exécutés par le processus enfant
+    (`rejoueur.outil`) ; `w.agent(…, { verification })` journalisé.
+  - skraft : `verifier_scenarios` pour l'agent d'acceptance (`motifsDesScenarios`, même calcul que
+    la porte, dans les deux copies) ; bilan « Vérifications par les agents ».
+- **Run 6 de LEC-1**, arrêté à la main en DESIGN (7 min, 2,41 $) : RESEARCH refusée une fois sur
+  `docs/adr/00NN-titre.md`, un gabarit cité comme un fichier ; le chercheur n'avait pas d'outil pour
+  le voir avant de rendre.
+- **Fait** : `verifier_recherche` pour le chercheur (même calcul que la porte, `motifsDeLaRecherche`).
+  La porte ne sait qu'après lecture quels fichiers lire : un outil de workflow reçoit `lire(chemin)`,
+  servi par l'hôte, qui ne rend que les fichiers de la liste du dépôt (ceux que voit la porte), sinon
+  `null`. Dans l'extension, l'outil lit par `ctx.workspace`.
+- **Run 7 de LEC-1**, arrêté à la main en DELIVER (1 h 05, 17,46 $) : premier run arrivé en DELIVER.
+  RESEARCH, DESIGN et DISTILL sans aucun refus de porte ; un refus de revue en DISTILL (7 défauts
+  majeurs, tous maintenus par le réfutateur, corrigés en un tour). Le langage technique des scénarios
+  vient des critères de LEC-1, eux-mêmes techniques.
+- **Fait** : un refus de DESIGN est routé vers son auteur (`routerMotifsDeDesign`) ; après le premier
+  essai, le modélisateur n'est relancé que si un motif le concerne.
+- **Instable** : « l'architecte qui décide reçoit les noms du modèle écrit juste avant lui » a échoué
+  une fois sous charge (3,9 s), puis passé seul et en suite complète.
+- **Proposé, non tranché** : préciser la consigne de l'agent d'acceptance pour un critère technique
+  (le traduire en langage métier, chemins et noms de champs dans le test) ; refuser par la porte
+  gherkin un identifiant entre accents graves ou un chemin dans une étape.
+- **Piège** : le RPC rend `undefined` pour un `null` ; `lire` le normalise côté enfant.
+- **Piège** : le rappel refuse le premier `report_phase` de tout agent qui ne vérifie pas. Les
+  agents simulés des bancs (`ignoreLeRappel`) le rappellent, comme un agent réel qui ignore le
+  rappel ; `rappelsVus` permet aux essais de le constater.
+- **Piège** : changer `synthesize` aurait été plus simple, mais l'ADR 0062 règle déjà DELIVER
+  autrement (mineurs corrigés de façon ciblée). Sept tests de DELIVER l'ont rappelé.
+- **Prochaine étape** :
+  - `verifier_conception` (DESIGN), sur le modèle de `verifier_scenarios` ;
+  - faux positif de la porte des citations : un gabarit (`docs/adr/00NN-titre.md`, `<…>`, `{…}`, `*`)
+    n'est pas une citation ;
+  - refuser une question ouverte qui renvoie à un élément absent (« voir décision 2 ») ;
+  - un critère coupé sur plusieurs lignes, dans une story donnée par fichier, n'est lu que sur sa
+    première ligne : le refuser, comme pour une issue ;
+  - faire trancher par le responsable les questions de RESEARCH de LEC-1 (issue #32), puis relancer.
+- **Reste ouvert** : les ADR produits gardent la convention skraft, pas celle du projet (option B,
+  une section `adr` dans `projet.yaml`, non tranchée).
+
+---
+
 ## 10/11 — La story d'une issue commitée avant le run
 
 - **Demande du responsable** : commiter la story avant le premier test, pour lire le diff.

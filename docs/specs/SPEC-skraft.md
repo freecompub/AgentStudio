@@ -253,7 +253,7 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 - Le plafond s'applique-t-il par prise ou par jour ?
 ```
 
-Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3).
+Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3). Une référence (« ADR 0069 », « #32 ») n'en est pas un. Un nombre seul, sans unité, est une valeur douteuse : il est soumis à l'humain en ROUTE, avant RESEARCH, qui le garde ou le retire de la porte (ADR 0080).
 
 **Précontrôle avant tout appel LLM (ADR 0060)** : le code exécute les tests existants
 (`INIT_BASELINE`). Échec, test ignoré, délai dépassé ou sortie non nulle bloquent le
@@ -341,6 +341,8 @@ Toujours exécutée, quelle que soit la difficulté, comme dans skraft 1.6.0.
 
 **Agent** `skraft-researcher` : enquête sur le code et les sources externes, produit `research/research.md` selon le gabarit : périmètre et critères de succès, fichiers analysés, recherches effectuées, conventions du projet, découvertes clés (chaque affirmation sourcée), approches évaluées, recommandation unique, passage de relais à DESIGN (décisions à valider, questions ouvertes).
 
+**Vérification par le chercheur (ADR 0082)** : le chercheur dispose de l'outil `verifier_recherche`, qui rend ce que la porte des citations dirait de son document ; c'est le même calcul que la porte, rejouée par le code après son tour. Sans vérification depuis sa dernière modification, sa sortie est refusée une fois.
+
 **Porte citations (code), pas de reviewer LLM** :
 
 | Contrôle | Rejet si |
@@ -364,12 +366,14 @@ Deux sessions successives, dans la même phase.
 
 **`skraft-architect-decide`** : applique le test d'éligibilité aux ADR (une convention déjà imposée par le projet ne mérite pas d'ADR), rédige chaque ADR **uniquement via `render_adr`** en statut `Proposed`, produit `contracts.md`, `diagrams.md`, `consistency-matrix.md`, et met à jour `supersessions.md` via `render_adr`. Refus d'adopter CQRS, Event Sourcing ou microservices sans justification mesurée (règle reprise de skraft).
 
+**Refus routé vers son auteur** : chaque motif d'un refus de DESIGN va à l'agent qui a produit le fichier en cause. Le modèle (`event-model.md`, `domain-model.md`, `context-map.md`) au modélisateur ; les ADR, `contracts.md`, `diagrams.md`, la matrice et `supersessions.md` à l'architecte qui décide ; un motif qui lie les deux, ou ne nomme aucun fichier, aux deux. Après le premier essai, le modélisateur n'est relancé que si un motif le concerne.
+
 **Porte cohérence (code)** :
 
 | Contrôle | Rejet si |
 | --- | --- |
 | En-tête de chaque nouvel ADR | Champ obligatoire absent, statut différent de `Proposed` |
-| Numérotation | Trou ou doublon |
+| Numérotation | Trou ou doublon creusé par la story ; un ADR de la story hors convention (`docs/adr/adr-NNN-titre.md`, `# ADR-NNN — Titre`). Les ADR existants comptent par leur numéro, quel que soit leur format, et ne sont pas jugés ; chaque motif nomme le fichier et le numéro attendu (ADR 0079) |
 | Événements cités dans `contracts.md` et `diagrams.md` | Absent de `event-model.md` |
 | Agrégats cités | Absent du modèle |
 | Remplacements | Un ADR remplacé n'apparaît pas à la fois dans le nouvel ADR et dans `supersessions.md` |
@@ -379,6 +383,8 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Revue** : lentilles `cold-reader` et `architecture` (section 9).
 
+**Numéro d'un ADR** : calculé par le code, après tous les ADR de `docs/adr/` (ADR 0079) ; `render_adr` le prend lui-même. Dans le workflow, où l'architecte écrit ses fichiers, le dossier de passation le lui donne, et la garde refuse un nom hors convention ou un numéro déjà pris.
+
 **Ratification** : une demande d'interaction par ADR, réservée au profil architecte ; options `accept`, `reject`, `amend` (avec texte). Tant qu'un ADR est `Proposed`, DISTILL est inatteignable (invariant 7).
 
 **US-12** : `contracts.md` cite `BolusLimited`, absent du modèle qui définit `BolusCapped` → rejet « `BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ». Après correction et approbation, l'`ADR-008 — Plafond appliqué dans le domaine` est ratifié par l'architecte.
@@ -387,7 +393,9 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Agent** `skraft-acceptance` : associe chaque critère d'acceptation à un ou plusieurs scénarios ; écrit les `.feature` ; rédige `test-plan.md` (couche testée et type de doublure par scénario, stratégie de walking skeleton) et `impl-plan.md` (étapes ordonnées par scénario) ; écrit **les tests d'acceptance de tous les scénarios** avec les signatures minimales nécessaires à la compilation, aux emplacements déclarés dans le profil de stack ; les valeurs sont copiées mot pour mot des critères.
 
-**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables.
+**Vérification par l'agent (ADR 0082)** : l'agent d'acceptance dispose de l'outil `verifier_scenarios`, qui rend ce que les portes gherkin, valeurs et plan de test diraient de ses fichiers ; c'est le même calcul que la porte, rejouée par le code après son tour. Sans vérification depuis sa dernière modification, sa sortie est refusée une fois.
+
+**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables. Une valeur douteuse retirée par l'humain (6.1, ADR 0080) n'est pas exigée ; le bilan du run la nomme.
 
 **Porte RED d'acceptance (code)** : exécution des tests d'acceptance selon le profil de stack, classification des échecs par le moteur générique.
 
@@ -531,6 +539,8 @@ La table de pondération de la skill `adversarial-review-lenses` est transcrite 
 - deux lentilles `REJECTED` → `REJECTED` ;
 - toutes `APPROVED` sans défaut `major` → `APPROVED` ;
 - sinon `CHANGES_REQUESTED`.
+
+Hors DELIVER, un `CHANGES_REQUESTED` qui ne laisse aucun défaut bloquant ni majeur à corriger ne fait pas rejouer la phase : la revue est approuvée, ses mineurs restent au rapport ; si une lentille a rendu `REJECTED` ou qu'une question reste sans lentille, l'humain décide, sans qu'un essai soit consommé (ADR 0081). DELIVER suit l'ADR 0062.
 
 Le code génère ensuite le rapport lisible `reviews/<phase>-review-<n>.md` depuis les JSON. Lors d'un réessai, seuls les défauts `blocker` et `major` sont transmis au spécialiste, avec fichier et ligne.
 

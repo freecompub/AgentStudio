@@ -41,6 +41,8 @@ export interface TaskAgentRunOptions {
   resumeKey?: string;
   /** Tâche et phase auxquelles rattacher la trace (ADR 0032) ; absentes, rien n'est tracé. */
   trace?: { taskId: string; phase?: string };
+  /** Contrôle du code avant d'accepter la sortie du rôle : un motif la refuse, l'agent continue (ADR 0082). */
+  avantSortie?: (output: unknown) => Promise<string | null>;
 }
 
 /** Sortie structurée du rôle, ou blocage signalé par `report_blocker`. */
@@ -284,7 +286,7 @@ export function createTaskAgentRunner(deps: TaskAgentRunnerDeps): TaskAgentRunne
           workingDirectory: deps.root,
           systemPrompt: spec.systemPrompt,
           tools: [
-            terminalTool(spec.output, (o) => void (output = o)),
+            terminalTool(spec.output, (o) => void (output = o), opts.avantSortie),
             ...(spec.blocker ? [terminalTool("report_blocker", (b) => void (blocker = b))] : []),
             ...outilsPropres,
           ],

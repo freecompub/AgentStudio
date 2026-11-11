@@ -85,6 +85,24 @@ export function parseAdr(md: string): ParsedAdr {
   return { number, id: h ? adrId(number) : "", title: h?.[2] ?? "", status, supersedes, missing };
 }
 
+/** Nom de fichier d'un ADR selon la convention skraft : `docs/adr/adr-NNN-titre.md`. */
+const FICHIER_ADR = /^docs\/adr\/adr-(\d{3,})-[^/]+\.md$/;
+/**
+ * Le numéro d'un ADR, même hors convention skraft : titre « # ADR-NNN — », « # ADR NNNN — », ou nom
+ * de fichier `NNNN-titre.md` (les ADR d'un projet qui a sa propre convention). NaN s'il n'en porte pas.
+ */
+export function numeroAdr(path: string, md: string): number {
+  const t = /^#\s+ADR[\s_-]*(\d+)\b/im.exec(md);
+  const f = /^(?:adr[-_]?)?(\d+)[-_.]/i.exec(path.split("/").at(-1) ?? "");
+  return Number(t?.[1] ?? f?.[1] ?? NaN);
+}
+/** L'ADR suit la convention skraft : nom `adr-NNN-titre.md` et titre « # ADR-NNN — Titre », même numéro. */
+export function suitLaConvention(path: string, adr: Pick<ParsedAdr, "id" | "number">): boolean {
+  const m = FICHIER_ADR.exec(path);
+  return !!adr.id && !!m && Number(m[1]) === adr.number;
+}
+/** Ce que la convention attend pour le numéro n, à dire à l'architecte. */
+export const conventionAdr = (n: number) => `fichier attendu docs/adr/adr-${pad(n)}-<titre>.md, titre attendu « # ${adrId(n)} — <Titre> »`;
 export function nextAdrNumber(existing: number[]): number {
   return existing.length ? Math.max(...existing) + 1 : 1;
 }

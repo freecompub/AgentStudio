@@ -6,6 +6,7 @@
 - Garde : ADR 0052 points 1 à 3, 6 et 7 (script rejouable, journal, déterminisme, aucun pouvoir de
   plus qu'avant) ; ADR 0053 ; ADR 0054 (comparaison avec l'extension skraft)
 - Détail : `docs/11-workflows-dynamiques.md`
+- Révisé : point 3 par l'ADR 0082 (2026-11-11) — un workflow peut apporter ses propres outils à ses agents
 
 ## Contexte
 
@@ -21,7 +22,7 @@ description, posé dans le projet ou sur la machine, sans passer par le système
 2. On les lance **par une commande**, ou **l'agent principal propose** et l'utilisateur confirme.
 3. Un workflow est **un dossier** : `workflow.mjs` (JavaScript, modules ES), ses agents, ses skills
    et le code de ses contrôles et de sa revue. Ni hooks, ni outils propres, ni `ctx` : seulement
-   `w.*`.
+   `w.*`. *Révisé par l'ADR 0082 : un workflow peut apporter ses outils (`meta.outils`).*
 4. Deux emplacements : **machine** (`~/.agent-studio/workflows/`) et **projet**
    (`.agent-studio/workflows/`). Une copie à la main est prise en compte ; le projet l'emporte à
    nom égal ; `/workflow ajouter` copie un modèle.

@@ -6,7 +6,7 @@
  * décident. Un calcul ne doit jamais pouvoir rattraper une porte.
  */
 import { describe, expect, it } from "vitest";
-import { assessQuestions, synthesize, uncoveredQuestions, REVIEW_QUESTIONS, type LensVerdict } from "../../../workflows/skraft/review.mjs";
+import { assessQuestions, revueSansDefautCorrigible, synthesize, uncoveredQuestions, REVIEW_QUESTIONS, type LensVerdict } from "../../../workflows/skraft/review.mjs";
 
 type Severite = "blocker" | "major" | "minor";
 
@@ -92,5 +92,18 @@ describe("Les quatre questions et leurs poids", () => {
 
   it("une lentille inconnue ne répond à aucune question : elle ne couvre rien", () => {
     expect(uncoveredQuestions([lens("inventée", "APPROVED")])).toEqual(["completeness", "businessFit", "quality", "risk"]);
+  });
+});
+
+// ADR 0081 : hors DELIVER, une revue « changements demandés » sans défaut bloquant ni majeur ne laisse
+// rien à corriger. Rejouer la phase consommait un essai pour rien (run 4 de LEC-1, deux escalades).
+describe("Revue sans défaut à corriger, hors DELIVER (ADR 0081)", () => {
+  it.each([
+    ["mineurs seulement", couvrant({ architecture: lens("architecture", "CHANGES_REQUESTED", ["minor"]) }), "approuver"],
+    ["changements demandés sans défaut", couvrant({ "quality-gates": lens("quality-gates", "CHANGES_REQUESTED") }), "approuver"],
+    ["une lentille REJECTED sans défaut à corriger", couvrant({ "cold-reader": lens("cold-reader", "REJECTED", ["minor"]) }), "escalader"],
+    ["une question de revue sans lentille", [lens("cold-reader", "CHANGES_REQUESTED", ["minor"])], "escalader"],
+  ] as const)("%s → %s", (_label, lenses, attendu) => {
+    expect(revueSansDefautCorrigible([...lenses])).toBe(attendu);
   });
 });

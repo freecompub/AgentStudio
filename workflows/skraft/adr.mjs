@@ -58,6 +58,41 @@ export function parseAdr(md) {
   const number = h ? Number(h[1]) : NaN;
   return { number, id: h ? adrId(number) : "", title: h?.[2] ?? "", status, supersedes, missing };
 }
+/** Nom de fichier d'un ADR selon la convention skraft : `docs/adr/adr-NNN-titre.md`. */
+const FICHIER_ADR = /^docs\/adr\/adr-(\d{3,})-[^/]+\.md$/;
+/**
+ * Le numéro d'un ADR, même hors convention skraft : titre « # ADR-NNN — », « # ADR NNNN — », ou nom
+ * de fichier `NNNN-titre.md` (les ADR d'un projet qui a sa propre convention). NaN s'il n'en porte pas.
+ */
+export function numeroAdr(path, md) {
+  const t = /^#\s+ADR[\s_-]*(\d+)\b/im.exec(md);
+  const f = /^(?:adr[-_]?)?(\d+)[-_.]/i.exec(path.split("/").at(-1) ?? "");
+  return Number(t?.[1] ?? f?.[1] ?? NaN);
+}
+/** L'ADR suit la convention skraft : nom `adr-NNN-titre.md` et titre « # ADR-NNN — Titre », même numéro. */
+export function suitLaConvention(path, adr) {
+  const m = FICHIER_ADR.exec(path);
+  return !!adr.id && !!m && Number(m[1]) === adr.number;
+}
+/** Ce que la convention attend pour le numéro n, à dire à l'architecte. */
+export const conventionAdr = (n) => `fichier attendu docs/adr/adr-${pad(n)}-<titre>.md, titre attendu « # ${adrId(n)} — <Titre> »`;
+/**
+ * Numérotation des ADR, calculée par le code (11/11) : le prochain numéro suit tous les ADR de
+ * `docs/adr/`, quel que soit leur format ; les numéros « pris » sont ceux des ADR qui ne sont pas
+ * de cette story, que l'architecte ne doit pas réécrire.
+ */
+export function numerotationAdrs(adrs, slug) {
+  const avecNumero = adrs.map((a) => ({ ...a, n: numeroAdr(a.path, a.md) })).filter((a) => Number.isFinite(a.n));
+  const pris = [...new Set(avecNumero.filter((a) => storyDe(a.md) !== slug).map((a) => a.n))].sort((x, y) => x - y);
+  return { prochain: nextAdrNumber(avecNumero.map((a) => a.n)), pris };
+}
+/** La ligne du dossier de passation de l'architecte qui décide. */
+export function ligneNumerotation({ prochain, pris }) {
+  const ligne = `Numérotation des ADR, calculée par le code : ton prochain ADR est ${adrId(prochain)} (docs/adr/adr-${pad(prochain)}-<titre>.md), puis ${adrId(prochain + 1)}, et ainsi de suite.`;
+  return pris.length ? `${ligne} Les numéros des autres ADR du projet (${pris.length}, jusqu'à ${adrId(pris.at(-1))}) sont pris : tu ne peux pas les écrire.` : ligne;
+}
+/** Les numéros pris, en motifs interdits en écriture pendant le tour de l'architecte. */
+export const motifsNumerosPris = (pris) => pris.map((n) => `docs/adr/adr-${pad(n)}-*.md`);
 export function nextAdrNumber(existing) {
   return existing.length ? Math.max(...existing) + 1 : 1;
 }

@@ -84,6 +84,21 @@ describe("Exécuteur d'agent de tâche", () => {
     expect(errors[0]).toMatch(/invalides/);
   });
 
+  // ADR 0082 : un contrôle du code, avant d'accepter la sortie, peut la refuser ; l'agent voit le motif
+  // et continue son tour. C'est le rappel de vérification avant de rendre son travail.
+  it("contrôle de la sortie : un motif refuse l'appel, l'agent le voit et rappelle l'outil terminal", async () => {
+    const { runtime, runner } = setup();
+    const errors: string[] = [];
+    let vus = 0;
+    runtime.behave("tdd-test", async (t) => {
+      await t.callTool("report_phase", { summary: "premier", files: [] }).catch((e: Error) => errors.push(e.message));
+      await t.callTool("report_phase", { summary: "second", files: [] });
+    });
+    const r = await runner.run(TEST_AGENT, "x", { avantSortie: async () => (vus++ === 0 ? "Vérifie d'abord ton travail." : null) });
+    expect(errors).toEqual(["Vérifie d'abord ton travail."]);
+    expect(r.output).toEqual({ summary: "second", files: [] });
+  });
+
   it("agent muet : TurnTimeoutError après abort", async () => {
     vi.useFakeTimers();
     const { runtime, runner } = setup(1_000);

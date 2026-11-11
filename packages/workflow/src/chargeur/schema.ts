@@ -8,7 +8,7 @@ import { z } from "zod";
 
 const NOM = /^[a-z][a-z0-9-]{0,39}$/;
 const PROFILS = ["testeur", "po", "developpeur", "architecte", "administrateur"] as const;
-/** Outils que la plateforme fournit aux agents ; un workflow n'en apporte pas (point 3). */
+/** Outils que la plateforme fournit aux agents ; un workflow peut en apporter d'autres, déclarés dans `outils` (ADR 0082). */
 export const OUTILS_PLATEFORME = ["list_files", "run_tests", "run_lint", "report_blocker"] as const;
 const SKILL = /^[a-z][a-z0-9-]*(#.+)?$/;
 const texte = (max: number) => z.string().trim().min(1).max(max);
@@ -46,6 +46,8 @@ export const schemaMeta = z
       .object({ ecriture: z.array(texte(200)).default([]), tests: z.boolean().default(false), git: z.array(z.enum(["branche", "commit", "revert"])).default([]) })
       .strict()
       .default({ ecriture: [], tests: false, git: [] }),
+    /** Outils apportés par le workflow à ses agents (ADR 0082) ; leur code est exporté par le script (`outils`). */
+    outils: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "outil : minuscules, chiffres et soulignés"), z.object({ description: texte(500) }).strict()).default({}),
     agents: z.record(z.string().regex(NOM), agent).default({}),
   })
   .strict();
@@ -78,7 +80,8 @@ export async function verifierMeta(brut: unknown, dossier: string): Promise<{ ok
       if (!(await existe(join(dossier, "skills", base, "SKILL.md")))) motifs.push(`agents.${nom} : skill ${base} introuvable (skills/${base}/SKILL.md)`);
     }
     for (const o of a.outils ?? []) {
-      if (!(OUTILS_PLATEFORME as readonly string[]).includes(o)) motifs.push(`agents.${nom} : outil inconnu ${o} (outils de la plateforme : ${OUTILS_PLATEFORME.join(", ")})`);
+      if (o in m.outils) continue;
+      if (!(OUTILS_PLATEFORME as readonly string[]).includes(o)) motifs.push(`agents.${nom} : outil inconnu ${o} (outils de la plateforme : ${OUTILS_PLATEFORME.join(", ")} ; ou déclare-le dans meta.outils)`);
       else if ((o === "run_tests" || o === "run_lint") && !m.permissions.tests) motifs.push(`agents.${nom} : ${o} exige permissions.tests`);
     }
     // Un agent n'écrit jamais plus que le workflow ne déclare : chaque motif doit y figurer tel quel.

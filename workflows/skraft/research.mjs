@@ -48,6 +48,39 @@ function wellFormedUrl(u) {
 * dans les limites, URL bien formées, recommandation unique. Renvoie les motifs exacts de rejet et
 * les questions ouvertes à poser à l'utilisateur.
 */
+/** Les chemins que cite une recherche, tels que la porte des citations les cherche. */
+export function citesDansLaRecherche(md) {
+  return [...new Set([...md.matchAll(/[\w./-]+\.[A-Za-z][A-Za-z0-9]{0,9}/g)].map((m) => m[0]))];
+}
+/**
+* La porte des citations sur des contenus déjà lus (`contenus` : chemin → contenu des fichiers cités
+* qui existent). La porte et l'outil `verifier_recherche` du chercheur appellent ce même calcul (ADR 0082).
+*/
+export function motifsDeLaRecherche(md, contenus) {
+  return checkResearch(md, {
+    lineCount: (p) => (contenus.has(p) ? contenus.get(p).replace(/\n$/, "").split("\n").length : null),
+    contains: (p, nom) => contenus.get(p)?.includes(nom) ?? false,
+  });
+}
+/** Réponse de l'outil `verifier_recherche` au chercheur : ce que la porte des citations dirait de son document. */
+export function texteDeVerificationRecherche(reasons) {
+  if (!reasons.length)
+    return "Aucun motif : la porte des citations accepterait ce document en l'état.";
+  return ["La porte « citations » refuserait ce document :", ...reasons.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau."].join("\n");
+}
+/** L'outil du chercheur : le document lu par l'hôte, les fichiers cités lus à la demande. */
+export async function verifierRecherche({ fichiers, donnees, lire }) {
+  const md = fichiers[donnees.chemin];
+  if (md === undefined)
+    return texteDeVerificationRecherche([`Document de recherche absent : ${donnees.chemin}`]);
+  const contenus = new Map();
+  for (const cite of citesDansLaRecherche(md)) {
+    const c = await lire(cite);
+    if (c !== null)
+      contenus.set(cite, c);
+  }
+  return texteDeVerificationRecherche(motifsDeLaRecherche(md, contenus).reasons);
+}
 export function checkResearch(md, index) {
   const reasons = [];
   const secs = sections(md);

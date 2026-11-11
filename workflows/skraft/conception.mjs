@@ -5,14 +5,16 @@
 * pas tranchés ici.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
-import { avecStory, parseAdr, setAdrStatus, storyDe } from "./adr.mjs";
-import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.mjs";
+import { avecStory, conventionAdr, ligneNumerotation, motifsNumerosPris, numeroAdr, numerotationAdrs, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
+import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS, routerMotifsDeDesign } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
+/** Tout fichier de `docs/adr/`, y compris hors convention : la porte doit voir les ADR du projet. */
+const estFichierAdr = (p) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS;
 const DESIGN_DOCS = ["event-model.md", "domain-model.md", "context-map.md", "contracts.md", "diagrams.md", "consistency-matrix.md"];
 export async function concevoir(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
@@ -57,8 +59,13 @@ async function adrsDuDisque(w, slug) {
 * amendement ne relance que les décisions et ne consomme pas d'essai (§13, écart 3).
 */
 async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
-  await specialiste(w, d, s, "DESIGN", "skraft-architect-model", motifs);
-  let retour = motifs;
+  // Chaque motif va à l'agent qui a produit le fichier en cause (11/11). Au premier essai, le modèle
+  // est à écrire (ou à réécrire après un rembobinage) ; ensuite, sans motif pour lui, le modélisateur
+  // n'est pas relancé : l'architecte qui décide repart du modèle déjà écrit.
+  const { modele, decisions } = routerMotifsDeDesign(motifs);
+  if (essai === 1 || modele.length)
+    await specialiste(w, d, s, "DESIGN", "skraft-architect-model", modele);
+  let retour = decisions;
   for (;;) {
     const avant = await instantaneAdrs(w);
     // Les noms du modèle, tels que la porte de cohérence les lira (08/11).
@@ -69,7 +76,10 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
         docs[doc] = md;
     }
     const noms = ligneNomsDuModele(d.slug, docs);
-    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, noms ? `\n${noms}` : "");
+    // Le code donne le numéro et interdit ceux qui sont pris : un ADR mal numéroté ne pourrait plus
+    // être renommé, l'architecte ne supprimant pas de fichier (run 3 de LEC-1, 11/11).
+    const numerotation = numerotationAdrs([...avant].map(([path, md]) => ({ path, md })), d.slug);
+    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, `${noms ? `\n${noms}` : ""}\n${ligneNumerotation(numerotation)}`, motifsNumerosPris(numerotation.pris));
     const horsStory = await controlerAdrs(w, d, avant);
     if (horsStory.length)
       return { motifs: horsStory, porte: "adr" };
@@ -99,7 +109,7 @@ async function porteCoherence(w, d, s, cp, essai) {
   const ajoutes = new Set(changes.filter((f) => f.status === "added").map((f) => f.path));
   const adrs = [];
   const decides = new Set(d.adrs.filter((a) => a.status !== "Proposed").map((a) => a.path));
-  for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p))) {
+  for (const path of (await w.listerFichiers()).filter(estFichierAdr)) {
     const md = await w.lireFichier(path);
     // Un ADR de cette story est « nouveau » pour la porte même s'il existait avant la phase :
     // il a pu être proposé avant un arrêt, puis amendé après la reprise.
@@ -107,13 +117,9 @@ async function porteCoherence(w, d, s, cp, essai) {
     adrs.push({ path, md, isNew: !decides.has(path) && (ajoutes.has(path) || storyDe(md) === d.slug) });
   }
   const siens = new Set(adrs.filter((a) => storyDe(a.md) === d.slug).map((a) => a.path));
-  const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && ADR_FILE.test(f.path) && !siens.has(f.path)).map((f) => f.path);
-  // Sources de production : engagements structurels déjà en place (docs/15 §4.6).
-  const disp = await w.disposition();
-  const sources = [];
-  for (const path of (await w.listerFichiers()).filter((p) => matchesAny(disp.sources, p) && !matchesAny([...disp.acceptanceTests, ...disp.unitTests], p)))
-    sources.push({ path, content: (await lire(path)) ?? "" });
-  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs, sources };
+  const modifiedExistingAdrs = changes.filter((f) => f.status !== "added" && estFichierAdr(f.path) && !siens.has(f.path)).map((f) => f.path);
+  // La porte ne lit plus les sources du projet : elle juge ce que la story produit (11/11).
+  const input = { docs, adrs, supersessions: (await lire(SUPERSESSIONS)) ?? "", modifiedExistingAdrs };
   // La matrice de cohérence est écrite par le code, à chaque essai, même refusé : c'est lui qui la
   // juge (G10 de skraft-plugin, docs/15 §4.5), pas l'architecte qui se la décernerait.
   const matrice = `.skraft/${d.slug}/design/consistency-matrix.md`;
@@ -129,7 +135,7 @@ async function porteCoherence(w, d, s, cp, essai) {
 /** Contenu de chaque ADR du dépôt, relevé avant le tour de l'architecte. */
 async function instantaneAdrs(w) {
   const m = new Map();
-  for (const path of (await w.listerFichiers()).filter((p) => ADR_FILE.test(p)))
+  for (const path of (await w.listerFichiers()).filter(estFichierAdr))
     m.set(path, await w.lireFichier(path));
   return m;
 }
@@ -150,6 +156,10 @@ async function controlerAdrs(w, d, avant) {
       const marque = avecStory((await w.lireFichier(path)), d.slug);
       if (marque !== (await w.lireFichier(path)))
         await w.ecrireFichier(path, marque);
+      // Dès la sortie de l'architecte, pas à la porte : il réécrit le fichier au format attendu.
+      const n = numeroAdr(path, md);
+      if (!suitLaConvention(path, parseAdr(md)))
+        motifs.push(`${path} ne suit pas la convention skraft : ${Number.isFinite(n) ? conventionAdr(n) : "titre attendu « # ADR-NNN — <Titre> »"}.`);
       continue;
     }
     const ancien = avant.get(path);

@@ -4,20 +4,30 @@
  */
 import { dirname } from "node:path";
 import { createRpcEndpoint, type ChildHandle, type ProcessLauncher, type RpcEndpoint } from "@agent-studio/extension-host";
-import type { DeclarationWorkflow, EntreeJournal, EtatWorkflow, Profil } from "../protocols.js";
+import type { DeclarationWorkflow, EntreeJournal, EntreeOutil, EtatWorkflow, Profil } from "../protocols.js";
 import { rejouer } from "../rejeu.js";
 
 export interface Rejoueur {
   /** Relance le script contre le journal de `etat` ; rend l'état complété et les entrées nouvelles. */
   rejouer(etat: EtatWorkflow): Promise<{ etat: EtatWorkflow; nouveaux: EntreeJournal[] }>;
+  /** Exécute un outil apporté par le workflow (ADR 0082) ; rend le texte destiné à l'agent. */
+  outil(nom: string, entree: Omit<EntreeOutil, "lire">): Promise<string>;
   arreter(): void;
 }
 
-export function createRejoueurLocal(decl: DeclarationWorkflow<never>): Rejoueur {
+/** Lecture à la demande d'un outil (ADR 0082) : un fichier de la liste du dépôt, ou `null`. */
+export type LecteurDOutil = (chemin: string) => Promise<string | null>;
+
+export function createRejoueurLocal(decl: DeclarationWorkflow<never>, lire: LecteurDOutil = async () => null): Rejoueur {
   return {
     async rejouer(etat) {
       const nouveaux = await rejouer(decl, etat);
       return { etat, nouveaux };
+    },
+    async outil(nom, entree) {
+      const f = decl.outils?.[nom];
+      if (!f) throw new Error(`outil ${nom} non exporté par le script (export const outils)`);
+      return f({ ...entree, lire });
     },
     arreter() {},
   };
@@ -33,6 +43,8 @@ export interface OptionsRejoueurIsole {
   agents?: readonly string[];
   /** Délai d'un rejeu : au-delà, le script est tenu pour bloqué (boucle). Défaut : 30 s. */
   delaiMs?: number;
+  /** Lecture à la demande des outils du workflow (ADR 0082). Absente : rien n'est lisible. */
+  lire?: LecteurDOutil;
 }
 
 /**
@@ -52,7 +64,7 @@ export function createRejoueurIsole(o: OptionsRejoueurIsole): Rejoueur {
 
   async function demarrer(): Promise<{ handle: ChildHandle; rpc: RpcEndpoint }> {
     const handle = o.launcher.launch({ entry: o.runtimeEntry, readPaths: [dirname(o.runtimeEntry)] });
-    const rpc = createRpcEndpoint(handle.channel, {});
+    const rpc = createRpcEndpoint(handle.channel, { lire: async ([chemin]) => (o.lire ? o.lire(String(chemin)) : null) });
     handle.onExit(() => {
       rpc.close("processus du workflow arrêté");
       if (enfant?.handle === handle) enfant = null;
@@ -84,6 +96,11 @@ export function createRejoueurIsole(o: OptionsRejoueurIsole): Rejoueur {
               : `Le processus du workflow a échoué : ${message}`;
         return { etat: { ...etat, fin: { statut: "echec", motif } }, nouveaux: [] };
       }
+    },
+    async outil(nom, entree) {
+      // Pas de réessai : une erreur de l'outil est rendue à l'agent, qui peut continuer son tour.
+      const e = enfant ?? (await demarrer());
+      return String(await e.rpc.call("outil", [nom, entree], { timeoutMs: delai }));
     },
     arreter,
   };
