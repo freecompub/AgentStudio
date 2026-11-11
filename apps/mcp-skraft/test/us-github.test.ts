@@ -16,8 +16,10 @@ function us(o: Partial<UsGithub> = {}): UsGithub {
 
 function monter(o: { us?: UsGithub; verifier?: { ok: true } | { ok: false; motif: string }; mettreEnForme?: MiseEnForme } = {}) {
   const fichiers = new Map<string, string>();
+  const commits: { branche: string; chemins: string[]; message: string }[] = [];
   return {
     fichiers,
+    commits,
     preparer: (texte = "org/app#12") =>
       preparerUsGithub({
         texte,
@@ -25,6 +27,7 @@ function monter(o: { us?: UsGithub; verifier?: { ok: true } | { ok: false; motif
         gh: { verifier: async () => o.verifier ?? { ok: true }, lire: async () => o.us ?? us() },
         lire: async (rel) => fichiers.get(rel) ?? null,
         ecrire: async (rel, contenu) => void fichiers.set(rel, contenu),
+        commiter: async (branche, chemins, message) => void commits.push({ branche, chemins, message }),
         ...(o.mettreEnForme ? { mettreEnForme: o.mettreEnForme } : {}),
       }),
   };
@@ -60,6 +63,22 @@ describe("preparerUsGithub", () => {
     expect(await m.preparer("org/app#2")).toEqual({ ok: true, chemin: ".skraft/github/US-7.md", notes: [expect.any(String)] });
     expect(m.fichiers.get(".skraft/github/US-7.md")).toMatch(/^# US-7 — Livraison offerte\n/);
     expect(m.fichiers.has(".skraft/github/US-7-contexte.md")).toBe(true);
+  });
+
+  // Demande du responsable (10/11) : la story et son contexte ont leur propre commit, sur la branche du
+  // run, avant le premier test ; le diff de chaque phase se lit sans eux.
+  it("la story et son contexte sont commités seuls, sur la branche skraft/<slug>, avant le run", async () => {
+    const m = monter();
+    await m.preparer();
+    expect(m.commits).toEqual([{ branche: "skraft/us-12", chemins: [".skraft/github/US-12.md", ".skraft/github/US-12-contexte.md"], message: "docs(us-12): story US-12 depuis org/app#12" }]);
+  });
+
+  it("une préparation refusée ne commite rien", async () => {
+    const bloquee = monter({ us: us({ bloqueePar: [issue(10)] }) });
+    await bloquee.preparer();
+    const horsFormat = monter({ us: us({ issue: issue(12, { corps: "sans format" }) }) });
+    await horsFormat.preparer();
+    expect([...bloquee.commits, ...horsFormat.commits]).toEqual([]);
   });
 
   it("issue sans le format, ou avec des commentaires : mise en forme par l'agent, puis vérifiée", async () => {

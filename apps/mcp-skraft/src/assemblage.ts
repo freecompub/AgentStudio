@@ -115,6 +115,11 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
       gh,
       lire: (rel) => ws.files.read(rel).catch(() => null),
       ecrire: (rel, contenu) => ws.files.write(rel, contenu),
+      // La story a son propre commit, sur la branche du run, avant le premier test.
+      commiter: async (branche, chemins, message) => {
+        await ws.repo.switchBranch(branche);
+        await ws.repo.commit(message, { paths: chemins });
+      },
       mettreEnForme: createMiseEnFormeParAgent({
         agents: async () => createTaskAgentRunner({ runtime: createLazyRuntime(runtime), root, logger: logger.child({ component: "redacteur-us" }) }),
         modele: () => modelFor("standard"),

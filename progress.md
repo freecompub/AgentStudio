@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 10/11 — La story d'une issue commitée avant le run
+
+- **Demande du responsable** : commiter la story avant le premier test, pour lire le diff.
+- **Vérifié dans le code** : les portes et les revues ne voyaient pas la story dans leur diff,
+  parce qu'un checkpoint capture aussi les fichiers non suivis (`snapshotTree`). Mais la story
+  n'avait pas de commit à elle, et partait mêlée au premier commit de phase.
+- **Fait** : la préparation passe sur `skraft/<slug>` et commite les deux seuls fichiers de la story
+  (`repo.commit` avec `paths`).
+- **Essai réel** sur le clone de `exemple-dotnet-tdd` : commit `docs(us-7): …` de deux fichiers,
+  arbre propre.
+- **Limite** : `repo.commit` ajoute ces chemins, mais commite tout ce qui est déjà indexé ; un
+  fichier que l'utilisateur aurait mis en index partirait avec.
+
+---
+
 ## 10/11 — Outils d'un composant de monorepo
 
 - **Vu sur l'autre poste** : la découverte de la pile d'un monorepo (applications `souscription-dab` et

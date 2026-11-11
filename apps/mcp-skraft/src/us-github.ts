@@ -9,7 +9,7 @@
  * Le format de story est celui du workflow, qu'on lit avec son propre code (`parseStory`).
  */
 import { bloqueursOuverts, lireRefIssue, rendreContexte, type RefIssue, type UsGithub } from "@agent-studio/github-auth";
-import { extractLiterals, normalizeLiteral, parseStory } from "../../../workflows/skraft/story.mjs";
+import { extractLiterals, normalizeLiteral, parseStory, slugOf } from "../../../workflows/skraft/story.mjs";
 
 export interface GhLecteur {
   verifier(ref: RefIssue): Promise<{ ok: true } | { ok: false; motif: string }>;
@@ -78,6 +78,11 @@ export async function preparerUsGithub(o: {
   gh: GhLecteur;
   lire(rel: string): Promise<string | null>;
   ecrire(rel: string, contenu: string): Promise<void>;
+  /**
+   * Commite ces seuls chemins sur cette branche (créée si besoin), avant le run : la story a son propre
+   * commit, et le diff de chaque phase se lit sans elle (demande du responsable, 10/11).
+   */
+  commiter?(branche: string, chemins: string[], message: string): Promise<void>;
   mettreEnForme?: MiseEnForme;
 }): Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }> {
   const ref = lireRefIssue(o.texte, o.hote);
@@ -109,11 +114,15 @@ export async function preparerUsGithub(o: {
   const contexte = rendreContexte(us);
   await o.ecrire(cheminContexte, contexte);
   const lien = `Issue : ${us.issue.url}. Ses commentaires et ses dépendances sont dans \`${cheminContexte}\`.`;
+  const slug = slugOf(identifiant);
+  // La branche est celle que le run reprendra (`skraft/<slug>`, `preparer` du workflow).
+  const commiter = () => o.commiter?.(`skraft/${slug}`, [chemin, cheminContexte], `docs(${slug}): story ${identifiant} depuis ${nom}`);
 
   // Déjà au format, et rien de décidé dans les commentaires : reprise telle quelle.
   const telleQuelle = `# ${identifiant} — ${titre}\n\n${lien}\n\n${us.issue.corps.trim()}\n`;
   if (us.commentaires.length === 0 && verifierStory(telleQuelle, identifiant, us).length === 0) {
     await o.ecrire(chemin, telleQuelle);
+    await commiter();
     return { ok: true, chemin, notes: [`Story ${identifiant} reprise telle quelle de ${nom}.`] };
   }
   if (!o.mettreEnForme)
@@ -130,6 +139,7 @@ export async function preparerUsGithub(o: {
     const motifs = verifierStory(md, identifiant, us);
     if (!motifs.length) {
       await o.ecrire(chemin, avecLienContexte(md, lien));
+      await commiter();
       return { ok: true, chemin, notes: [`Story ${identifiant} mise en forme par un agent à partir de ${nom}, vérifiée par le code.`] };
     }
     precedent = { motifs };
