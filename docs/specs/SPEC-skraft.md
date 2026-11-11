@@ -368,6 +368,8 @@ Deux sessions successives, dans la même phase.
 
 **Refus routé vers son auteur** : chaque motif d'un refus de DESIGN va à l'agent qui a produit le fichier en cause. Le modèle (`event-model.md`, `domain-model.md`, `context-map.md`) au modélisateur ; les ADR, `contracts.md`, `diagrams.md`, la matrice et `supersessions.md` à l'architecte qui décide ; un motif qui lie les deux, ou ne nomme aucun fichier, aux deux. Après le premier essai, le modélisateur n'est relancé que si un motif le concerne.
 
+**Défaut du modèle signalé** : le modèle appartient au modélisateur. L'architecte qui décide le lit sans pouvoir l'écrire ; s'il lui trouve un défaut, il le décrit dans le champ `modelDefects` de `report_phase`. Le code relance alors le modélisateur avec ces remarques, puis l'architecte qui décide, une seule fois par essai et sans en consommer un ; au-delà, la porte et la revue tranchent.
+
 **Porte cohérence (code)** :
 
 | Contrôle | Rejet si |

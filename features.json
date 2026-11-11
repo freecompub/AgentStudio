@@ -1324,6 +1324,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate reducer.test e2e-s3",
       "passes": true,
       "notes": "Fait le 2026-11-11, demande du responsable : le modélisateur recevait les refus sur les ADR, qu'il ne peut pas corriger, et coûtait une session par essai."
+    },
+    {
+      "id": "design-retour-au-modele",
+      "title": "L'architecte qui décide signale les défauts du modèle (modelDefects dans report_phase) au lieu de le corriger : il ne peut plus écrire event-model.md, domain-model.md ni context-map.md ; le code relance le modélisateur avec ses remarques, puis lui, une seule fois par essai, sans en consommer un (extension et workflow)",
+      "verify": "pnpm vitest run --project core terminal-tools && pnpm vitest run --project ext-skraft --project workflow-skraft reducer.test e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, décision du responsable : aucun canal ne permettait à l'architecte qui décide de renvoyer un problème au modélisateur ; sa consigne l'autorisait à compléter le modèle lui-même."
     }
   ]
 }

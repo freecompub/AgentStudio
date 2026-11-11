@@ -16,6 +16,15 @@ describe("report_phase : écarts au plan de test", () => {
   });
 });
 
+// L'architecte qui décide signale les défauts du modèle au lieu de le corriger lui-même : le code
+// relance son auteur avec ces remarques (11/11).
+describe("report_phase : défauts du modèle signalés", () => {
+  it("facultatifs ; chacun est une remarque non vide", () => {
+    expect(terminalSchemas.report_phase.safeParse({ ...base, modelDefects: ["`BolusCap` manque au modèle de domaine."] }).success).toBe(true);
+    expect(terminalSchemas.report_phase.safeParse({ ...base, modelDefects: [""] }).success).toBe(false);
+  });
+});
+
 describe("submit_lens_verdict : contrat de défaut enrichi", () => {
   const defaut = { severity: "major", target: "code", file: "src/a.ts", line: 3, description: "Nom flou.", severityReason: "Le nom cache la règle métier du plafond." };
   const verdict = (d: object) => ({ lens: "cold-reader", verdict: "CHANGES_REQUESTED", defects: [d] });
