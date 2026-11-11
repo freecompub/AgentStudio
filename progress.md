@@ -96,6 +96,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   La porte ne sait qu'après lecture quels fichiers lire : un outil de workflow reçoit `lire(chemin)`,
   servi par l'hôte, qui ne rend que les fichiers de la liste du dépôt (ceux que voit la porte), sinon
   `null`. Dans l'extension, l'outil lit par `ctx.workspace`.
+- **Run 7 de LEC-1**, arrêté à la main en DELIVER (1 h 05, 17,46 $) : premier run arrivé en DELIVER.
+  RESEARCH, DESIGN et DISTILL sans aucun refus de porte ; un refus de revue en DISTILL (7 défauts
+  majeurs, tous maintenus par le réfutateur, corrigés en un tour). Le langage technique des scénarios
+  vient des critères de LEC-1, eux-mêmes techniques.
+- **Fait** : un refus de DESIGN est routé vers son auteur (`routerMotifsDeDesign`) ; après le premier
+  essai, le modélisateur n'est relancé que si un motif le concerne.
+- **Instable** : « l'architecte qui décide reçoit les noms du modèle écrit juste avant lui » a échoué
+  une fois sous charge (3,9 s), puis passé seul et en suite complète.
+- **Proposé, non tranché** : préciser la consigne de l'agent d'acceptance pour un critère technique
+  (le traduire en langage métier, chemins et noms de champs dans le test) ; refuser par la porte
+  gherkin un identifiant entre accents graves ou un chemin dans une étape.
 - **Piège** : le RPC rend `undefined` pour un `null` ; `lire` le normalise côté enfant.
 - **Piège** : le rappel refuse le premier `report_phase` de tout agent qui ne vérifie pas. Les
   agents simulés des bancs (`ignoreLeRappel`) le rappellent, comme un agent réel qui ignore le

@@ -579,6 +579,28 @@ describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le r
   });
 });
 
+// Un motif va à l'agent qui a produit le fichier en cause (11/11) : un refus sur un ADR ne relance
+// pas le modélisateur, qui n'écrit pas d'ADR.
+describe("Réducteur skraft — refus de DESIGN routé vers son auteur", () => {
+  const avantPorte = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED];
+  const ADR = "Numérotation des ADR : ADR-001 en double : docs/adr/adr-001-a.md et docs/adr/adr-001-b.md. Le prochain numéro libre est ADR-002.";
+  const MODELE = "Document manquant : .skraft/us-12/design/event-model.md.";
+  const refus = (...reasons: string[]): Ev => ({ type: "GATE_FAIL", gate: "cohérence", reasons });
+
+  it("un refus qui ne porte que sur un ADR relance l'architecte qui décide, seul", () => {
+    const { state, effects } = play([...avantPorte, refus(ADR)]);
+    expect(state.designStep).toBe("decide");
+    expect(effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-decide", feedback: [ADR] })]);
+  });
+
+  it("un refus sur le modèle relance le modélisateur avec son seul motif, puis l'architecte qui décide avec le sien", () => {
+    const apres = play([...avantPorte, refus(MODELE, ADR)]);
+    expect(apres.effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-model", feedback: [MODELE] })]);
+    const { effects } = play([...avantPorte, refus(MODELE, ADR), REPORTED]);
+    expect(effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-decide", feedback: [ADR] })]);
+  });
+});
+
 describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
   const toReview = () => [
     ...toFirstPhase(), ...researchPhase, ...designPhase,

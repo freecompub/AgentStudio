@@ -2,7 +2,7 @@
 // @ts-nocheck — le workflow est en JavaScript, sans types (ADR 0055) : ce test vérifie son comportement, pas ses types.
 import { describe, expect, it } from "vitest";
 import { renderAdr, supersessionLine } from "../../../workflows/skraft/adr.mjs";
-import { checkDesign, ligneNomsDuModele, matriceDeCoherence, matriceMarkdown, type DesignInput } from "../../../workflows/skraft/design.mjs";
+import { checkDesign, ligneNomsDuModele, matriceDeCoherence, matriceMarkdown, type DesignInput, routerMotifsDeDesign } from "../../../workflows/skraft/design.mjs";
 
 const adr = (n: number, over: Record<string, unknown> = {}) =>
   renderAdr(n, { title: `Décision ${n}`, status: "Proposed", context: "c", decision: "d", consequences: "q", alternatives: "a", ...over } as never, "2026-09-23");
@@ -386,5 +386,20 @@ describe("Noms du modèle dans le dossier de l'architecte qui décide", () => {
   it("la liste est exactement ce que la porte accepte : un nom de la liste cité dans un ADR passe", () => {
     const docs = { "domain-model.md": "### Agrégat `Panier`\n" };
     expect(ligneNomsDuModele("us-2", docs)).toContain("`Panier`");
+  });
+});
+
+// Un motif va à l'agent qui a produit le fichier en cause (11/11) : un refus sur un ADR ne relance pas
+// le modélisateur, qui n'écrit pas d'ADR.
+describe("Routage des motifs d'un refus de DESIGN", () => {
+  const adr = "Numérotation des ADR : ADR-001 est déjà pris par docs/adr/0001-x.md : docs/adr/adr-001-y.md doit prendre le prochain numéro libre, ADR-079.";
+  const modele = "Document manquant : .skraft/us-12/design/event-model.md.";
+  const croise = "`BolusLimited` cité dans contracts.md n'existe pas dans event-model.md.";
+  const neutre = "Question de la revue (cold-reader) : x — Réponse de l'utilisateur : y";
+  it("un motif sur un ADR ou un document de décision ne va qu'à l'architecte qui décide", () => {
+    expect(routerMotifsDeDesign([adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us-12/design/contracts.md:3)"])).toEqual({ modele: [], decisions: [adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us-12/design/contracts.md:3)"] });
+  });
+  it("un motif sur le modèle ne va qu'au modélisateur ; un motif qui lie les deux, ou ne nomme aucun fichier, va aux deux", () => {
+    expect(routerMotifsDeDesign([modele, croise, neutre])).toEqual({ modele: [modele, croise, neutre], decisions: [croise, neutre] });
   });
 });

@@ -366,6 +366,8 @@ Deux sessions successives, dans la même phase.
 
 **`skraft-architect-decide`** : applique le test d'éligibilité aux ADR (une convention déjà imposée par le projet ne mérite pas d'ADR), rédige chaque ADR **uniquement via `render_adr`** en statut `Proposed`, produit `contracts.md`, `diagrams.md`, `consistency-matrix.md`, et met à jour `supersessions.md` via `render_adr`. Refus d'adopter CQRS, Event Sourcing ou microservices sans justification mesurée (règle reprise de skraft).
 
+**Refus routé vers son auteur** : chaque motif d'un refus de DESIGN va à l'agent qui a produit le fichier en cause. Le modèle (`event-model.md`, `domain-model.md`, `context-map.md`) au modélisateur ; les ADR, `contracts.md`, `diagrams.md`, la matrice et `supersessions.md` à l'architecte qui décide ; un motif qui lie les deux, ou ne nomme aucun fichier, aux deux. Après le premier essai, le modélisateur n'est relancé que si un motif le concerne.
+
 **Porte cohérence (code)** :
 
 | Contrôle | Rejet si |

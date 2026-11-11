@@ -385,3 +385,23 @@ export function ligneNomsDuModele(slug: string, docs: Partial<Record<string, str
   const chemins = MODEL_DOCS.map((d) => `\`.skraft/${slug}/design/${d}\``).join(", ");
   return `Noms définis par le modèle (${chemins}) : ${noms.map((n) => `\`${n}\``).join(", ")}. \`contracts.md\`, \`diagrams.md\` et les ADR ne citent que ceux-là : un autre nom sera refusé. Ajoute-le d'abord au modèle, ou ne le cite pas.`;
 }
+
+/** Documents du modélisateur ; ceux de l'architecte qui décide, ADR compris. */
+const DU_MODELE = /\b(?:event-model|domain-model|context-map)\.md\b/;
+const DES_DECISIONS = /docs\/adr\/|\bADR-\d+|\b(?:contracts|diagrams|consistency-matrix|supersessions)\.md\b|Numérotation des ADR/;
+/**
+ * Chaque motif d'un refus de DESIGN va à l'agent qui a produit le fichier en cause (11/11) : le
+ * modélisateur n'écrit pas d'ADR, l'architecte qui décide n'écrit pas le modèle. Un motif qui lie les
+ * deux, ou ne nomme aucun fichier, va aux deux. Sans motif pour lui, le modélisateur n'est pas relancé.
+ */
+export function routerMotifsDeDesign(motifs: readonly string[]): { modele: string[]; decisions: string[] } {
+  const modele: string[] = [];
+  const decisions: string[] = [];
+  for (const m of motifs) {
+    const duModele = DU_MODELE.test(m);
+    const desDecisions = DES_DECISIONS.test(m);
+    if (duModele || !desDecisions) modele.push(m);
+    if (desDecisions || !duModele) decisions.push(m);
+  }
+  return { modele, decisions };
+}

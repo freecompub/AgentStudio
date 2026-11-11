@@ -6,7 +6,7 @@
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
 import { avecStory, conventionAdr, ligneNumerotation, motifsNumerosPris, numeroAdr, numerotationAdrs, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
-import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS } from "./design.mjs";
+import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS, routerMotifsDeDesign } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
 import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
@@ -59,8 +59,13 @@ async function adrsDuDisque(w, slug) {
 * amendement ne relance que les décisions et ne consomme pas d'essai (§13, écart 3).
 */
 async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
-  await specialiste(w, d, s, "DESIGN", "skraft-architect-model", motifs);
-  let retour = motifs;
+  // Chaque motif va à l'agent qui a produit le fichier en cause (11/11). Au premier essai, le modèle
+  // est à écrire (ou à réécrire après un rembobinage) ; ensuite, sans motif pour lui, le modélisateur
+  // n'est pas relancé : l'architecte qui décide repart du modèle déjà écrit.
+  const { modele, decisions } = routerMotifsDeDesign(motifs);
+  if (essai === 1 || modele.length)
+    await specialiste(w, d, s, "DESIGN", "skraft-architect-model", modele);
+  let retour = decisions;
   for (;;) {
     const avant = await instantaneAdrs(w);
     // Les noms du modèle, tels que la porte de cohérence les lira (08/11).

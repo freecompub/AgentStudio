@@ -144,6 +144,37 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(probes["docs/adr/adr-001-plafond-applique-dans-le-domaine.md"]).toEqual(expect.objectContaining({ decision: "deny" }));
     expect(probes["docs/adr/adr-002-plafond-applique-dans-le-domaine.md"]).not.toEqual(expect.objectContaining({ decision: "deny" }));
   }, 120_000);
+
+  // Un motif va à l'agent qui a produit le fichier en cause (11/11) : le modélisateur n'écrit pas d'ADR.
+  it("un refus qui ne porte que sur un ADR relance l'architecte qui décide, pas le modélisateur", async () => {
+    const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
+    const modelPrompts: string[] = [];
+    const decidePrompts: string[] = [];
+    const decide: ScriptedBehavior = async (t) => {
+      decidePrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      const md = renderAdr(1, ADR_ARGS, "2026-10-10");
+      await put(root, ADR1, decidePrompts.length === 1 ? md.replace("# ADR-001 —", "# ADR 0001 —") : md);
+      await t.callTool("report_phase", { summary: "décisions", files: [ADR1] });
+    };
+    const model: ScriptedBehavior = async (t) => {
+      modelPrompts.push(t.prompt);
+      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await t.callTool("report_phase", { summary: "modèle", files: [] });
+    };
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("stories/us-12.md");
+    await until(async () => (await app.engine.list()).length > 0);
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Difficulté")));
+    const difficulty = (await app.interactions.pending()).find((p) => p.title.startsWith("Difficulté"))!;
+    await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
+    await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
+    expect(decidePrompts).toHaveLength(2);
+    expect(decidePrompts[1]).toContain("ne suit pas la convention skraft");
+    expect(modelPrompts).toHaveLength(1);
+  }, 120_000);
   it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {

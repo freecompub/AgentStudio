@@ -1317,6 +1317,13 @@
       "verify": "pnpm vitest run --project workflow activer && pnpm vitest run --project ext-skraft --project workflow-skraft e2e-verifier-recherche",
       "passes": true,
       "notes": "Fait le 2026-11-11, demande du responsable, après le run 6 de LEC-1 : le gabarit `docs/adr/00NN-titre.md`, cité comme un fichier, avait coûté un essai de RESEARCH."
+    },
+    {
+      "id": "refus-de-design-route",
+      "title": "Un refus de DESIGN est routé vers l'agent qui a produit le fichier en cause (routerMotifsDeDesign) : un motif sur un ADR ne relance pas le modélisateur ; après le premier essai, le modélisateur n'est relancé que si un motif le concerne (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate reducer.test e2e-s3",
+      "passes": true,
+      "notes": "Fait le 2026-11-11, demande du responsable : le modélisateur recevait les refus sur les ADR, qu'il ne peut pas corriger, et coûtait une session par essai."
     }
   ]
 }

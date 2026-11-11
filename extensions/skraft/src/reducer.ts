@@ -6,6 +6,7 @@ import type { AdrRecord, Phase, SkraftEffect, SkraftEvent, SkraftInput, SkraftSt
 import type { MutantSurvivant } from "./deliver.js";
 import { questionDeValeur, sansValeur, valeursDouteuses, type Story } from "./story.js";
 import { revueSansDefautCorrigible, synthesize, type LensVerdict } from "./review.js";
+import { routerMotifsDeDesign } from "./design.js";
 import { agentFeedback, applyArbitration, applyResponses, isActive, lensesAfterThreads, minorThreads, reviewRound, type DefectThread } from "./review-thread.js";
 import { disjoncte, memeRefus } from "@agent-studio/extension-api";
 import { bumpRetries, deciderSelonLaCause, deliverTransition, escalateDeliver, resumeDeliver, retryDeliver, retryFix, startReviewFix } from "./deliver-machine.js";
@@ -136,9 +137,9 @@ export function transition(s0: SkraftState, e: Ev): Out {
         // Réponses aux défauts de revue transmis (ADR 0046) : corrigé, ou contesté avec raison.
         const s1: SkraftState = e.responses?.length && s.reviewThreads ? { ...s, reviewThreads: applyResponses(s.reviewThreads, e.responses, () => true) } : s;
         if (p === "DESIGN" && s1.designStep === "model") {
-          // Les deux sessions d'un réessai reçoivent le motif du dernier rejet.
+          // L'architecte qui décide reçoit les motifs du dernier rejet qui le concernent (11/11).
           const ns: SkraftState = { ...s1, designStep: "decide" };
-          return lancer(ns, s1.lastRejection?.reasons ?? []);
+          return lancer(ns, routerMotifsDeDesign(s1.lastRejection?.reasons ?? []).decisions);
         }
         return { state: { ...s1, stage: "ARTIFACT_GATE" }, effects: [{ kind: "runGate", phase: p, attempt: s1.attempts + 1 }] };
       }
@@ -325,7 +326,7 @@ function afterReviewQuestion(s: SkraftState, lens: LensName, question: string, a
   };
   if (p === "DELIVER") return { state: { ...ns, stage: "REVIEW" }, effects: [{ kind: "runReview", phase: p, lenses: lensesForPhase(ns.lenses, p), attempt: ns.attempts + 1 }] };
   const replay: SkraftState = { ...ns, stage: "SPECIALIST", designStep: "model" };
-  return lancer(replay, [motif]);
+  return relancerLaPhase(replay, [motif]);
 }
 
 /**
@@ -633,7 +634,18 @@ function failure(etat: SkraftState, gate: string, motifs: string[], essaiGaranti
     };
   }
   const ns: SkraftState = { ...s, stage: "SPECIALIST", attempts, lastRejection, designStep: "model" };
-  return lancer(ns, reasons, rollback);
+  return relancerLaPhase(ns, reasons, rollback);
+}
+
+/**
+ * Relance d'une phase refusée. En DESIGN, chaque motif va à l'agent qui a produit le fichier en cause
+ * (11/11) : sans motif pour lui, le modélisateur n'est pas relancé et l'architecte qui décide repart
+ * sur le modèle déjà écrit, qu'un refus sans escalade n'efface pas.
+ */
+function relancerLaPhase(ns: SkraftState, reasons: string[], avant: SkraftEffect[] = []): Out {
+  if (ns.phase !== "DESIGN") return lancer(ns, reasons, avant);
+  const { modele, decisions } = routerMotifsDeDesign(reasons);
+  return modele.length ? lancer({ ...ns, designStep: "model" }, modele, avant) : lancer({ ...ns, designStep: "decide" }, decisions, avant);
 }
 
 /** Panne d'environnement : escalade immédiate, sans consommer le budget (D25). */
