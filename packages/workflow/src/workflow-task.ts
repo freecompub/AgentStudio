@@ -20,6 +20,7 @@ export function createWorkflowTask<E>(declaration: DeclarationWorkflow<E>): Task
     nom: decl.nom,
     empreinte: decl.empreinte ?? empreinteDe(decl.script.toString()),
     ...(decl.humains ? { humains: decl.humains } : {}),
+    ...(decl.agentsEnLectureSeule ? { agentsEnLectureSeule: decl.agentsEnLectureSeule } : {}),
     rejoueur: createRejoueurLocal(decl),
   });
 }
@@ -34,13 +35,42 @@ export interface OptionsTache {
   rejoueur: Rejoueur;
   /** Workflow en dossier : un refus de permission se dit en termes du `meta` (ADR 0055). */
   refusEnTermesDuMeta?: boolean;
+  /** Agents qui n'écrivent rien ni ne lancent de tests : appelés ensemble, ils tournent en même temps (ADR 0086). */
+  agentsEnLectureSeule?: readonly string[];
 }
 
 /** Définition de tâche à partir d'un rejoueur : le script peut tourner hors de ce processus. */
 export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWorkflow, EvenementWorkflow, EffetWorkflow, ExtensionContext> {
   const { empreinte } = o;
-  const effetsDe = (entrees: EntreeJournal[]): EffetWorkflow[] =>
-    entrees.filter((e) => !e.resultat && !e.erreur).map((e) => ({ kind: e.appel as EffetWorkflow["kind"], n: e.n }));
+  const lectureSeule = new Set(o.agentsEnLectureSeule ?? []);
+  // Le moteur exécute ses effets un par un : les tours d'agents en lecture seule en attente ensemble
+  // (les lentilles d'une revue) deviennent un seul effet, à la place du premier d'entre eux.
+  const effetsDe = (entrees: EntreeJournal[], contenus: EtatWorkflow["contenus"]): EffetWorkflow[] => {
+    const attente = entrees.filter((e) => !e.resultat && !e.erreur);
+    const groupe = attente.filter((e) => e.appel === "agent" && lectureSeule.has((relire(e.args, contenus) as { nom: string }).nom)).map((e) => e.n);
+    const effets: EffetWorkflow[] = [];
+    for (const e of attente) {
+      if (groupe.length < 2 || !groupe.includes(e.n)) effets.push({ kind: e.appel as Exclude<NomAppel, "phase">, n: e.n });
+      else if (e.n === groupe[0]) effets.push({ kind: "agents", ns: groupe });
+    }
+    return effets;
+  };
+
+  const un = async (n: number, kind: Exclude<NomAppel, "phase">, ctx: ExtensionContext, taskId: string, state: EtatWorkflow, signal: AbortSignal) => {
+    const entree = state.journal[n - 1];
+    if (!entree) throw new Error(`Appel ${n} absent du journal`);
+    const args = relire(entree.args, state.contenus) as unknown as Args;
+    try {
+      const r = await executer(kind, args, { ctx, taskId, state, signal, n, humains: o.humains });
+      if (r === ATTENTE) return;
+      return { type: "RESULTAT" as const, n, resultat: (r ?? null) as Json };
+    } catch (err) {
+      const nature: NatureErreur = err instanceof WorkDefectError ? "tour-interrompu" : err instanceof EnvFailureError ? "panne" : "erreur";
+      const permission = o.refusEnTermesDuMeta && err instanceof Error && err.name === "PermissionDeniedError" ? (err as { permission?: string }).permission : undefined;
+      const message = permission ? `${permission} : action non déclarée dans meta.permissions du workflow` : err instanceof Error ? err.message : String(err);
+      return { type: "ERREUR" as const, n, nature, message };
+    }
+  };
 
   return {
     name: o.nom,
@@ -50,7 +80,7 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
       return avecRejets((await o.rejoueur.rejouer(etat)).etat);
     },
 
-    initialEffects: (etat) => (etat.fin ? [] : effetsDe(etat.journal)),
+    initialEffects: (etat) => (etat.fin ? [] : effetsDe(etat.journal, etat.contenus)),
 
     async transition(state, event) {
       const etat = structuredClone(state);
@@ -68,28 +98,18 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
       }
       appliquer(etat, event);
       const r = await o.rejoueur.rejouer(etat);
-      return { state: avecRejets(r.etat), effects: r.etat.fin ? [] : effetsDe(r.nouveaux) };
+      return { state: avecRejets(r.etat), effects: r.etat.fin ? [] : effetsDe(r.nouveaux, r.etat.contenus) };
     },
 
     async runEffect(effet, ctx, { taskId, state, signal }) {
-      const entree = state.journal[effet.n - 1];
-      if (!entree) throw new Error(`Appel ${effet.n} absent du journal`);
-      const args = relire(entree.args, state.contenus) as unknown as Args;
-      try {
-        const r = await executer(effet.kind, args, { ctx, taskId, state, signal, n: effet.n, humains: o.humains });
-        if (r === ATTENTE) return;
-        return { type: "RESULTAT", n: effet.n, resultat: (r ?? null) as Json };
-      } catch (err) {
-        const nature: NatureErreur = err instanceof WorkDefectError ? "tour-interrompu" : err instanceof EnvFailureError ? "panne" : "erreur";
-        const permission = o.refusEnTermesDuMeta && err instanceof Error && err.name === "PermissionDeniedError" ? (err as { permission?: string }).permission : undefined;
-        const message = permission ? `${permission} : action non déclarée dans meta.permissions du workflow` : err instanceof Error ? err.message : String(err);
-        return { type: "ERREUR", n: effet.n, nature, message };
-      }
+      if (effet.kind !== "agents") return un(effet.n, effet.kind, ctx, taskId, state, signal);
+      const resultats = await Promise.all(effet.ns.map((n) => un(n, "agent", ctx, taskId, state, signal)));
+      return { type: "RESULTATS", resultats: resultats.filter((r) => r !== undefined) };
     },
 
-    checkpointBefore: (effet) => AVEC_CHECKPOINT.has(effet.kind),
+    checkpointBefore: (effet) => effet.kind === "agents" || AVEC_CHECKPOINT.has(effet.kind),
     // Le workflow rend ses erreurs comme événements : la trace des effets doit les voir (docs/10 P2).
-    estUnEchec: (e) => e.type === "ERREUR",
+    estUnEchec: (e) => e.type === "ERREUR" || (e.type === "RESULTATS" && e.resultats.some((r) => r.type === "ERREUR")),
     isTerminal: (etat) => etat.fin !== undefined,
     phaseOf: (etat) => phaseDe(etat),
   };
@@ -120,6 +140,9 @@ function appliquer(etat: EtatWorkflow, event: TaskEvent<EvenementWorkflow>): voi
     return e && !e.resultat && !e.erreur ? e : undefined;
   };
   switch (event.type) {
+    case "RESULTATS":
+      for (const r of event.resultats) appliquer(etat, r);
+      return;
     case "RESULTAT": {
       const e = attente(event.n);
       if (e) e.resultat = ranger(event.resultat, etat.contenus);
@@ -208,7 +231,7 @@ export function agentsDepuis(etat: EtatWorkflow, checkpoint: string): string[] {
   return [...new Set(noms)];
 }
 
-async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Promise<unknown> {
+async function executer(kind: Exclude<NomAppel, "phase">, a: Args, x: Execution): Promise<unknown> {
   const { ctx, taskId, signal } = x;
   const evidence = { taskId, phase: phaseDe(x.state) };
   switch (kind) {

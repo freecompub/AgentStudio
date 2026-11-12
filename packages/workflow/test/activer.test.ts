@@ -8,7 +8,7 @@ import { createTaskEngine, MemoryTaskStore } from "@agent-studio/task-engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createJsonAccordStore } from "../src/accord/accords.js";
 import { trouverWorkflows } from "../src/chargeur/chargeur.js";
-import { activerWorkflow, lireEntrees, manifesteDuWorkflow } from "../src/hote/activer.js";
+import { activerWorkflow, agentsEnLectureSeule, lireEntrees, manifesteDuWorkflow } from "../src/hote/activer.js";
 import type { EtatWorkflow } from "../src/protocols.js";
 
 /**
@@ -271,6 +271,58 @@ export default async function (w, entree) {
     await h.deps.registry.command("demo")!.handler("stories/us-2.md");
     await derniere(h.engine);
     expect(reponses).toEqual(["export const a = 1; | null"]);
+    await r.handle.deactivate();
+  }, 30_000);
+});
+
+describe("lentilles en parallèle (ADR 0086)", () => {
+  it("en lecture seule : ni écriture, ni run_tests, ni run_lint ; les autres outils n'y changent rien", () => {
+    const a = (x: object) => ({ prompt: "a.md", sortie: "report_phase", ...x }) as never;
+    const agents = { juge: a({ outils: ["report_blocker"] }), nu: a({}), redacteur: a({ ecriture: [".skraft/**"] }), testeur: a({ outils: ["run_tests"] }), lint: a({ outils: ["run_lint"] }) };
+    expect(agentsEnLectureSeule({ agents })).toEqual(["juge", "nu"]);
+  });
+
+  const REVUE = `export const meta = {
+  name: "demo",
+  description: "Démo.",
+  commande: "demo",
+  entrees: { story: { type: "fichier", obligatoire: true, aide: "La story." } },
+  phases: { REVUE: "Revue" },
+  permissions: { ecriture: [], tests: false, git: [] },
+  agents: {
+    "juge-a": { prompt: "agents/juge.agent.md", outils: ["report_blocker"], sortie: "report_phase" },
+    "juge-b": { prompt: "agents/juge.agent.md", outils: ["report_blocker"], sortie: "report_phase" },
+  },
+};
+export default async function (w, entree) {
+  const r = await w.phase("REVUE", () => Promise.all([w.agent("juge-a", "x"), w.agent("juge-b", "y")]));
+  return r.map((x) => x.sortie.summary);
+}
+`;
+
+  it("les agents du meta qui n'écrivent rien ni ne lancent de tests, appelés ensemble, tournent en même temps", async () => {
+    const p = await mkdtemp(join(racine, "projet-"));
+    const d = join(p, ".agent-studio/workflows/demo");
+    for (const [rel, c] of Object.entries({ "workflow.mjs": REVUE, "agents/juge.agent.md": "Tu juges." })) {
+      await mkdir(dirname(join(d, rel)), { recursive: true });
+      await writeFile(join(d, rel), c);
+    }
+    const trouves = await trouverWorkflows({ projet: join(p, ".agent-studio/workflows") });
+    expect(trouves.erreurs).toEqual([]);
+    const debuts = new Set<string>();
+    const runtime = new ScriptedRuntime();
+    for (const nom of ["juge-a", "juge-b"])
+      runtime.behave(`workflow.demo/${nom}`, async (t) => {
+        debuts.add(nom);
+        for (let i = 0; i < 200 && debuts.size < 2; i++) await new Promise((r) => setTimeout(r, 5));
+        await t.callTool("report_phase", { summary: debuts.size < 2 ? `${nom} seul` : `${nom} ensemble`, files: [] });
+      });
+    const h = hote(runtime);
+    const r = await activerWorkflow(trouves.workflows[0]!, h.deps, { isolation: { launcher: createNodeLauncher(), runtimeEntry: enfant }, accords: createJsonAccordStore(join(p, "accords.json")), confirmer: confirmeur("allow-once") });
+    if (!r.ok) throw new Error(r.motifs.join(" ; "));
+    await h.deps.registry.command("demo")!.handler("stories/us-2.md");
+    const s = await derniere(h.engine);
+    expect(s?.fin).toEqual({ statut: "fini", valeur: { clair: ["juge-a ensemble", "juge-b ensemble"] } });
     await r.handle.deactivate();
   }, 30_000);
 });
