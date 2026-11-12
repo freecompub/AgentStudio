@@ -268,6 +268,8 @@ export interface SkraftState {
   skillsLoaded?: { phase: Phase | null; role: Role; skills: string[] }[];
   /** Vérifications faites par les agents avec l'outil de leur porte (ADR 0082), pour le bilan. */
   verifications?: { phase: Phase | null; role: Role; appels: number }[];
+  /** Le modélisateur a déjà été relancé sur les remarques de l'architecte qui décide, pendant cet essai (11/11). */
+  retourAuModele?: boolean;
   /** Réessais par phase (mesures d'usage, §12) ; absent d'un état persisté avant S6. */
   retries?: Record<string, number>;
   /** Fils des défauts de revue de la phase en cours (ADR 0046) ; vidés au commit de la phase. */
@@ -294,7 +296,7 @@ export type SkraftEvent =
   | { type: "INIT_FAILED"; reasons: string[] }
   | { type: "DIFFICULTY_PROPOSED"; level: string; justification: string }
   | { type: "PHASE_CHECKPOINTED"; phase: Phase; checkpointId: string; gherkinAvant?: { path: string; content: string }[] }
-  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[]; /** Vérifications faites par l'agent (ADR 0082). */ verifications?: number }
+  | { type: "AGENT_REPORTED"; role: Role; summary: string; files: string[]; skills?: string[]; coveredBy?: string; responses?: DefectResponse[]; /** Écarts au plan de test déclarés (ADR 0067). */ planDeviations?: EcartDeclare[]; /** Vérifications faites par l'agent (ADR 0082). */ verifications?: number; /** Défauts du modèle signalés par l'architecte qui décide (11/11). */ modelDefects?: string[] }
   | { type: "BLOCKER_REPORTED"; question: string; choices: string[] }
   /** Une lentille demande une décision que ni la story ni les réponses ne tranchent (D4 de docs/12). */
   | { type: "LENS_BLOCKED"; lens: LensName; question: string; choices: string[] }
@@ -448,6 +450,7 @@ const stateSchema = z.object({
   rejections: z.number().int().min(0).optional(),
   skillsLoaded: z.array(z.object({ phase: phase.nullable(), role: z.string(), skills: z.array(z.string()) })).optional(),
   verifications: z.array(z.object({ phase: phase.nullable(), role: z.string(), appels: z.number().int().min(0) })).optional(),
+  retourAuModele: z.boolean().optional(),
   deliver: z
     .object({
       scenarios: z.array(z.object({ id: z.string(), ac: z.number(), acceptanceTestId: z.string(), role: z.enum(["driver", "regression"]), status: z.enum(["pending", "in_progress", "done"]) })),

@@ -48,7 +48,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "", lec
     if (r.sortie) {
       if (r.sortie.responses?.length)
         s.fils = applyResponses(s.fils, r.sortie.responses, () => true);
-      return;
+      return r.sortie;
     }
     const choix = r.blocage.choix.length ? r.blocage.choix : ["Répondre"];
     await w.etape("BLOCKED");

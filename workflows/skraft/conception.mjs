@@ -59,6 +59,12 @@ async function adrsDuDisque(w, slug) {
   }
   return adrs;
 }
+/** Les documents du modélisateur : l'architecte qui décide les lit, il ne les écrit pas (11/11). */
+const MODELE_DU_MODELISATEUR = ["event-model.md", "domain-model.md", "context-map.md"];
+/** Les remarques de l'architecte qui décide, dans le dossier de passation du modélisateur. */
+function ligneRemarquesSurLeModele(remarques) {
+  return ["", "Remarques de l'architecte qui décide sur le modèle (corrige chacune ; le reste du modèle ne change pas) :", ...remarques.map((r) => `  - ${r}`)].join("\n");
+}
 /**
 * Un essai : modélisation puis décisions avec les mêmes motifs, porte, revue, ratification. Un
 * amendement ne relance que les décisions et ne consomme pas d'essai (§13, écart 3).
@@ -71,6 +77,10 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
   if (essai === 1 || modele.length)
     await specialiste(w, d, s, "DESIGN", "skraft-architect-model", modele);
   let retour = decisions;
+  // Un seul retour au modèle par essai : au-delà, la porte et la revue tranchent (11/11).
+  let retourAuModele = false;
+  // Le modèle est à son auteur : l'architecte qui décide le lit, signale ses défauts, et ne l'écrit pas.
+  const modeleEnLecture = MODELE_DU_MODELISATEUR.map((doc) => `.skraft/${d.slug}/design/${doc}`);
   for (;;) {
     const avant = await instantaneAdrs(w);
     // Les noms du modèle, tels que la porte de cohérence les lira (08/11).
@@ -84,10 +94,17 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
     // Le code donne le numéro et interdit ceux qui sont pris : un ADR mal numéroté ne pourrait plus
     // être renommé, l'architecte ne supprimant pas de fichier (run 3 de LEC-1, 11/11).
     const numerotation = numerotationAdrs([...avant].map(([path, md]) => ({ path, md })), d.slug);
-    await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, `${noms ? `\n${noms}` : ""}\n${ligneNumerotation(numerotation)}`, motifsNumerosPris(numerotation.pris));
+    const sortie = await specialiste(w, d, s, "DESIGN", "skraft-architect-decide", retour, `${noms ? `\n${noms}` : ""}\n${ligneNumerotation(numerotation)}`, [...motifsNumerosPris(numerotation.pris), ...modeleEnLecture]);
     const horsStory = await controlerAdrs(w, d, avant);
     if (horsStory.length)
       return { motifs: horsStory, porte: "adr" };
+    // Défauts du modèle signalés par l'architecte qui décide : le code relance le modélisateur avec ces
+    // remarques, sans consommer d'essai, puis l'architecte qui décide sur le modèle corrigé (11/11).
+    if (!retourAuModele && sortie?.modelDefects?.length) {
+      retourAuModele = true;
+      await specialiste(w, d, s, "DESIGN", "skraft-architect-model", [], ligneRemarquesSurLeModele(sortie.modelDefects));
+      continue;
+    }
     const porte = await porteCoherence(w, d, s, cp, essai);
     if (porte.length)
       return { motifs: porte, porte: "cohérence" };
