@@ -12,7 +12,8 @@ proposé, reprends-le à son numéro plutôt que d'en créer un nouveau.
 Écris dans `.skraft/<slug>/design/` : `contracts.md` et `diagrams.md`. N'y cite que des noms
 définis dans `.skraft/<slug>/design/event-model.md` ou `.skraft/<slug>/design/domain-model.md`, avec le
 même nommage, y compris pour un nom qui vient du code existant : s'il n'est pas dans le modèle, ne le
-cite pas, ou ajoute-le d’abord au modèle. Le dossier de passation donne la liste de ces noms.
+cite pas. Le modèle appartient à son auteur : tu ne le modifies pas, tu signales ce qui lui manque.
+Le dossier de passation donne la liste de ces noms.
 Donne à chacun la même catégorie partout
 (« Commande `X` », « Requête `Q` », « Agrégat `A` », « objet-valeur `V` »…) : la matrice de
 cohérence (`consistency-matrix.md`) est construite par le code à partir de ces catégories, et un

@@ -45,6 +45,13 @@ export const terminalSchemas = {
       .max(20)
       .optional()
       .describe("Seulement si un test s'écarte de la couche ou de la doublure que le plan de test prévoit pour son critère"),
+    // Défauts du modèle signalés par l'architecte qui décide, au lieu de le corriger lui-même : le code
+    // relance l'auteur du modèle avec ces remarques (11/11).
+    modelDefects: z
+      .array(z.string().min(1).max(2_000))
+      .max(20)
+      .optional()
+      .describe("Seulement si le modèle (event-model.md, domain-model.md, context-map.md) a un défaut que tu ne dois pas corriger toi-même : une remarque par défaut, précise, avec le nom en cause"),
   }),
   submit_plan: z.object({
     steps: z

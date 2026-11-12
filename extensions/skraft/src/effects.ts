@@ -206,7 +206,9 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
           : effect.role === "skraft-researcher"
             ? { verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } }
             : {};
-      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides], evidence: tag(effect.phase), ...verification });
+      // Le modèle est à son auteur : l'architecte qui décide le lit et signale ses défauts (11/11).
+      const modele = effect.role === "skraft-architect-decide" ? ["event-model.md", "domain-model.md", "context-map.md"].map((f) => `.skraft/${state.slug}/design/${f}`) : [];
+      const r = await ctx.agents.run<"report_phase">(effect.role, brief, { signal, readOnly: [...GELÉS, ...decides, ...modele], evidence: tag(effect.phase), ...verification });
       if (r.blocker) return { type: "BLOCKER_REPORTED", question: r.blocker.question, choices: r.blocker.choices };
       return {
         type: "AGENT_REPORTED",
@@ -216,6 +218,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         ...(r.skillsLoaded ? { skills: r.skillsLoaded } : {}),
         ...(r.output.responses?.length ? { responses: r.output.responses } : {}),
         ...(r.verification ? { verifications: r.verification.appels } : {}),
+        ...(r.output.modelDefects?.length ? { modelDefects: r.output.modelDefects } : {}),
       };
     }
 
