@@ -601,6 +601,27 @@ describe("Réducteur skraft — refus de DESIGN routé vers son auteur", () => {
   });
 });
 
+// L'architecte qui décide signale un défaut du modèle au lieu de le corriger : le code relance le
+// modélisateur avec la remarque, une seule fois par essai, puis l'architecte qui décide (11/11).
+describe("Réducteur skraft — défaut du modèle signalé par l'architecte qui décide", () => {
+  const jusquADecide = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED];
+  const REMARQUE = "`MaxBolus` manque au modèle de domaine.";
+  const decide = (modelDefects?: string[]): Ev => ({ type: "AGENT_REPORTED", role: "skraft-architect-decide", summary: "décisions", files: [], ...(modelDefects ? { modelDefects } : {}) }) as Ev;
+
+  it("relance le modélisateur avec la remarque, sans consommer d'essai, puis l'architecte qui décide", () => {
+    const avant = play(jusquADecide).state;
+    const apres = play([...jusquADecide, decide([REMARQUE])]);
+    expect(apres.state).toMatchObject({ stage: "SPECIALIST", designStep: "model", attempts: avant.attempts });
+    expect(apres.effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-model", feedback: [`Remarque de l'architecte qui décide sur le modèle : ${REMARQUE}`] })]);
+    expect(play([...jusquADecide, decide([REMARQUE]), REPORTED]).effects).toEqual([expect.objectContaining({ kind: "runSpecialist", role: "skraft-architect-decide" })]);
+  });
+
+  it("une seule fois par essai : signalé de nouveau, le défaut ne relance plus le modélisateur", () => {
+    const { effects } = play([...jusquADecide, decide([REMARQUE]), REPORTED, decide([REMARQUE])]);
+    expect(effects).toEqual([expect.objectContaining({ kind: "runGate", phase: "DESIGN" })]);
+  });
+});
+
 describe("Réducteur skraft — gel révisable pendant DISTILL", () => {
   const toReview = () => [
     ...toFirstPhase(), ...researchPhase, ...designPhase,
