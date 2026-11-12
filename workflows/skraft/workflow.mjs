@@ -315,7 +315,7 @@ export default async function skraft(w0, entree) {
   if (registre.erreurs.length)
     await w.commiter(`docs(skraft): registre des erreurs de ${slug}`, [registre.chemin]);
   // Leçons tirées des erreurs répétées (LEC-2), à jour pour le run suivant.
-  vue.lecons = await tirerLesLecons(w, slug, vue.injectees);
+  vue.lecons = await tirerLesLecons(w, slug, vue.injectees, registre.erreurs);
   await w.etape("DONE");
   await w.informer(bilan(vue, !entree.auto));
   return {

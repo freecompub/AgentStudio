@@ -131,8 +131,12 @@ describe("Leçons réinjectées (LEC-3)", () => {
   it("une erreur de la story qui a la signature d'une leçon injectée dans sa phase incrémente sa récidive malgré la leçon", () => {
     const l = base("L-07", { sources: ["us-4#7"], exemple: "us-4#7" });
     const erreurs = [...erreursDe([l]), { id: "us-9#1", story: "us-9", type: "defaut", description: "encore", signature: l.groupe, phase: "DELIVER" }, { id: "us-9#2", story: "us-9", type: "defaut", description: "ailleurs", signature: l.groupe, phase: "DESIGN" }];
-    const r = recidivesMalgreLecons({ lecons: [l], erreurs, story: "us-9", injectees: [{ phase: "DELIVER", ids: ["L-07"] }] });
+    // Seules les erreurs établies pendant ce run comptent : celles d'un run précédent de la même story, restées
+    // dans le registre, ne sont pas des récidives (essai sur l'exemple .NET, 12/11).
+    const duRun = erreurs.filter((e) => e.story === "us-9");
+    const r = recidivesMalgreLecons({ lecons: [l], erreursDuRun: duRun, injectees: [{ phase: "DELIVER", ids: ["L-07"] }] });
     expect(r).toEqual(new Map([["L-07", 1]]));
+    expect(recidivesMalgreLecons({ lecons: [l], erreursDuRun: [], injectees: [{ phase: "DELIVER", ids: ["L-07"] }] })).toEqual(new Map());
     const apres = mettreAJourLesLecons({ lecons: [{ ...l, recidivesMalgreLecon: 1 }], erreurs, stories: ["us-4", "us-9"], proposees: [], recidives: r });
     expect(apres[0].recidivesMalgreLecon).toBe(2);
     expect(ligneDesRecidives(apres)).toBe("Leçons qui n'ont pas suffi (au moins 2 récidives) : L-07, candidate à devenir une porte de code.");

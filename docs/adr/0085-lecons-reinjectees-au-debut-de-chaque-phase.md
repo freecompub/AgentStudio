@@ -32,8 +32,10 @@ réessais.
 5. **Chaque injection est notée** : la phase, le rôle (ou `lentilles`) et les identifiants. *Provisoire* :
    la liste est rendue dans la valeur finale du run (`leconsInjectees`, lisible par `skraft_rapport`),
    en plus du dossier de passation, journalisé avec l'appel de l'agent.
-6. **Une récidive malgré une leçon** : une erreur de la story qui a la signature d'une leçon injectée
-   dans un dossier de la même phase incrémente `recidivesMalgreLecon` de cette leçon, une fois par run.
+6. **Une récidive malgré une leçon** : une erreur établie pendant ce run qui a la signature d'une leçon
+   injectée dans un dossier de la même phase incrémente `recidivesMalgreLecon` de cette leçon, une fois
+   par run. Les erreurs d'un run précédent de la même story, restées dans le registre, ne comptent pas
+   (corrigé le 12/11 après un essai sur l'exemple .NET, qui les comptait toutes).
    À deux récidives, le bilan la signale comme candidate à devenir une porte de code. Sa
    transformation en porte est hors périmètre.
 

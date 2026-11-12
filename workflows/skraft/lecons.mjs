@@ -160,14 +160,16 @@ export function vigilanceDesLecons({ lecons, erreurs, stories, phase }) {
 }
 
 /**
-* Récidives malgré une leçon (critère 8) : une erreur de la story qui a la signature d'une leçon
-* injectée dans un dossier de la même phase. `injectees` : `[{ phase, ids }]`, une entrée par dossier.
+* Récidives malgré une leçon (critère 8) : une erreur établie pendant ce run qui a la signature d'une
+* leçon injectée dans un dossier de la même phase. Seules les erreurs du run comptent : celles d'un run
+* précédent de la même story, restées dans le registre, ne sont pas des récidives. `injectees` :
+* `[{ phase, ids }]`, une entrée par dossier.
 */
-export function recidivesMalgreLecons({ lecons, erreurs, story, injectees }) {
+export function recidivesMalgreLecons({ lecons, erreursDuRun, injectees }) {
   const r = new Map();
   for (const l of lecons) {
     const phases = new Set(injectees.filter((x) => x.ids.includes(l.id)).map((x) => x.phase));
-    if ([...phases].some((p) => erreurs.some((e) => e.story === story && e.signature === l.groupe && e.phase === p)))
+    if ([...phases].some((p) => erreursDuRun.some((e) => e.signature === l.groupe && e.phase === p)))
       r.set(l.id, 1);
   }
   return r;
@@ -253,7 +255,7 @@ export function leconsPour(d, phase, role) {
   return s;
 }
 
-export async function tirerLesLecons(w, slug, injectees = []) {
+export async function tirerLesLecons(w, slug, injectees = [], erreursDuRun = []) {
   const { erreurs, avantLecons, avantStories, lecons, stories } = await lireLaMemoire(w);
   if (!stories.includes(slug))
     stories.push(slug);
@@ -288,7 +290,7 @@ export async function tirerLesLecons(w, slug, injectees = []) {
     }
   }
   // Récidives malgré une leçon donnée pendant ce run (LEC-3, critère 8).
-  const recidives = recidivesMalgreLecons({ lecons, erreurs, story: slug, injectees });
+  const recidives = recidivesMalgreLecons({ lecons, erreursDuRun, injectees });
   const apres = mettreAJourLesLecons({ lecons, erreurs, stories, proposees, recidives });
   const ecrits = [];
   for (const [chemin, contenu, avant] of [[FICHIER_DES_LECONS, ecrireJsonl(apres), avantLecons], [FICHIER_DES_STORIES, ecrireJsonl(stories.map((story) => ({ story }))), avantStories]])

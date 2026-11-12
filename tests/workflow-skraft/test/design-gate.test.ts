@@ -403,3 +403,16 @@ describe("Routage des motifs d'un refus de DESIGN", () => {
     expect(routerMotifsDeDesign([modele, croise, neutre])).toEqual({ modele: [modele, croise, neutre], decisions: [croise, neutre] });
   });
 });
+
+// Un nom suivi de sa référence dans le dépôt désigne l'existant, que la porte ne juge pas (décision du
+// 11/11). Faux positif vu sur l'exemple .NET (12/11) : `TreatWarningsAsErrors` (`Directory.Build.props:7-8`).
+describe("Noms cités : l'existant, référencé dans le dépôt, n'est pas exigé dans le modèle", () => {
+  const avecContrat = (contrat: string) => input({ docs: { ...input().docs, "contracts.md": `${input().docs["contracts.md"]}\n${contrat}\n` } });
+  it("un nom suivi de sa référence (chemin ou chemin:ligne) n'est pas exigé dans le modèle", () => {
+    expect(checkDesign(avecContrat("Les avertissements bloquent : `TreatWarningsAsErrors` (`Directory.Build.props:7-8`) est activé."))).toEqual([]);
+    expect(checkDesign(avecContrat("Le calcul passe par `BolusCalculator` (`src/domain/bolus-calculator.ts`)."))).toEqual([]);
+  });
+  it("un nom cité seul reste exigé dans le modèle", () => {
+    expect(checkDesign(avecContrat("Les avertissements bloquent : `TreatWarningsAsErrors` est activé."))).toEqual(["`TreatWarningsAsErrors` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md."]);
+  });
+});

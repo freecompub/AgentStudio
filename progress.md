@@ -17,8 +17,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   trace = valeur finale du run.
 - **Piège** : la valeur finale d'un workflow est rangée par référence (`fin.valeur.ref` dans `contenus`)
   dès qu'elle dépasse la taille en clair.
-- **Prochaine étape** : merger LEC-1, LEC-2 puis LEC-3, dans l'ordre ; un run réel pour voir les leçons
-  naître puis revenir dans les dossiers.
+- **Essais réels d'US-2 sur l'exemple .NET (12/11)**, même story, même pile, mêmes réponses :
+  - sans leçons : 22 min 36 s, 6,49 $ ; 3 refus de revue en DISTILL et une correction en DELIVER ;
+    4 erreurs enregistrées, 4 leçons candidates (dont deux doublons, L-01 et L-03, sur la même
+    nouvelle entrée de catalogue) ;
+  - avec ces leçons, validées à la main dans une copie locale : 18 min 37 s, 7,10 $ ; DISTILL et
+    DELIVER du premier coup ; un faux positif de la porte de cohérence en DESIGN (2,61 $).
+  - Le premier essai a été tué faute de mémoire (machine de 7,7 Go sans swap, `/tmp` en tmpfs plein
+    de clones d'essai) : nettoyer `/tmp/essai-mcp-skraft-*` entre les essais.
+- **Corrigé** : les récidives ne comptent que les erreurs du run (le registre gardait celles du run
+  précédent de la même story) ; la porte de cohérence n'exige pas dans le modèle un nom suivi de sa
+  référence dans le dépôt.
+- **Prochaine étape** : fusionner deux leçons qui visent la même entrée de catalogue (doublons) ;
+  merger LEC-1, LEC-2 puis LEC-3, dans l'ordre.
 
 ## 12/11 — LEC-2 : les leçons tirées des erreurs répétées
 

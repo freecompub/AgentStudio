@@ -1352,6 +1352,13 @@
       "verify": "pnpm vitest run --project workflow-skraft lecons.test e2e-reinjection",
       "passes": true,
       "notes": "Fait le 2026-11-12. Choix provisoires : dernière occurrence = rang de la dernière story touchée dans l'ordre des runs ; trace = liste leconsInjectees dans la valeur finale du run, en plus du dossier journalisé."
+    },
+    {
+      "id": "design-nom-reference-existant",
+      "title": "Porte de cohérence de DESIGN : un nom suivi de sa référence dans le dépôt (`Nom` (`chemin` ou `chemin:ligne`)) désigne l'existant et n'est pas exigé dans le modèle ; un nom cité seul l'est toujours (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate",
+      "passes": true,
+      "notes": "Fait le 2026-11-12, après un essai d'US-2 sur l'exemple .NET : `TreatWarningsAsErrors` (`Directory.Build.props:7-8`), cité dans contracts.md, a refusé DESIGN et coûté 2,61 $. Application de la décision du 11/11 : la porte juge ce que la story produit, pas l'existant."
     }
   ]
 }
