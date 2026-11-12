@@ -77,7 +77,7 @@ function statut(lecon, erreurs, stories) {
 * est recalculé ; une leçon proposée pour un groupe sans leçon est ajoutée, candidate. `stories` : les
 * stories dans l'ordre de leurs runs.
 */
-export function mettreAJourLesLecons({ lecons, erreurs, stories, proposees }) {
+export function mettreAJourLesLecons({ lecons, erreurs, stories, proposees, recidives = new Map() }) {
   const duGroupe = (g) => erreurs.filter((e) => e.signature === g);
   const couverts = new Set(lecons.map((l) => l.groupe));
   let rang = Math.max(0, ...lecons.map((l) => Number(/^L-(\d+)$/.exec(l.id)?.[1] ?? 0)));
@@ -92,8 +92,94 @@ export function mettreAJourLesLecons({ lecons, erreurs, stories, proposees }) {
   }
   return [...lecons, ...ajoutees].map((l) => {
     const src = duGroupe(l.groupe);
-    return { ...l, sources: src.map((e) => e.id), statut: statut(l, src, stories) };
+    const recidive = (l.recidivesMalgreLecon ?? 0) + (recidives.get(l.id) ?? 0);
+    return { ...l, sources: src.map((e) => e.id), statut: statut(l, src, stories), ...(recidive ? { recidivesMalgreLecon: recidive } : {}) };
   });
+}
+
+// ---------- Réinjection (LEC-3) ---------------------------------------------------------------
+
+/** Au plus autant de leçons par section, et autant de caractères : un rappel, pas une consigne de plus. */
+const LECONS_PAR_SECTION = 6;
+const CARACTERES_PAR_SECTION = 2000;
+/** Un exemple réel est cité, borné : la leçon compte, pas le détail de l'occurrence. */
+const CARACTERES_PAR_EXEMPLE = 200;
+
+/**
+* Les leçons validées, classées par nombre de stories touchées puis par dernière occurrence. Le
+* registre ne date pas les erreurs : la dernière occurrence est le rang, dans l'ordre des runs, de
+* la dernière story touchée (choix provisoire, LEC-3).
+*/
+function classees(lecons, erreurs, stories) {
+  const mesure = (l) => {
+    const touchees = new Set(erreurs.filter((e) => e.signature === l.groupe).map((e) => e.story));
+    return { touchees: touchees.size, derniere: Math.max(-1, ...[...touchees].map((s) => stories.indexOf(s))) };
+  };
+  return lecons
+    .filter((l) => l.statut === "validee")
+    .map((l) => ({ l, ...mesure(l) }))
+    .sort((a, b) => b.touchees - a.touchees || b.derniere - a.derniere)
+    .map((x) => x.l);
+}
+
+const reference = (c) => (c.nouvelle ? `${c.nouvelle.skill}, nouvelle entrée « ${c.nouvelle.titre} »` : `${c.skill} § ${c.section}`);
+
+function exempleDe(l, erreurs) {
+  const e = erreurs.find((x) => x.id === l.exemple);
+  if (!e)
+    return null;
+  const t = texteDe(e);
+  return `${e.story}, ${t.length > CARACTERES_PAR_EXEMPLE ? `${t.slice(0, CARACTERES_PAR_EXEMPLE)}…` : t}`;
+}
+
+/** Les lignes retenues sous un titre, en ôtant les dernières leçons tant que la section est trop longue. */
+function borne(titre, blocs, fin = []) {
+  let retenus = blocs.slice(0, LECONS_PAR_SECTION);
+  const texte = (b) => [titre, ...b.map((x) => x.texte), ...fin].join("\n");
+  while (retenus.length && texte(retenus).length > CARACTERES_PAR_SECTION)
+    retenus = retenus.slice(0, -1);
+  return retenus.length ? { texte: texte(retenus), ids: retenus.map((x) => x.id) } : null;
+}
+
+/**
+* La section du dossier de passation d'un agent (critères 1 à 5) : les leçons validées de sa phase et
+* de son rôle. `null` s'il n'y en a aucune : pas de section vide.
+*/
+export function sectionDesLecons({ lecons, erreurs, stories, phase, role }) {
+  const blocs = classees(lecons.filter((l) => l.phase === phase && l.role === role), erreurs, stories).map((l) => {
+    const exemple = exempleDe(l, erreurs);
+    return { id: l.id, texte: [`  - [${l.id}] ${l.regle} (${reference(l.catalogue)})`, `    Quand : ${l.quand}`, `    À faire : ${l.aFaire}`, ...(exemple ? [`    Déjà vu : ${/[.!?…]$/.test(exemple) ? exemple : `${exemple}.`}`] : [])].join("\n") };
+  });
+  return borne(`Erreurs déjà commises en ${phase} sur ce projet (à éviter) :`, blocs);
+}
+
+/** Le dossier d'une lentille (critère 6) : les leçons validées de la phase, tous rôles, puis la consigne. */
+export function vigilanceDesLecons({ lecons, erreurs, stories, phase }) {
+  const blocs = classees(lecons.filter((l) => l.phase === phase), erreurs, stories).map((l) => ({ id: l.id, texte: `  - [${l.id}] ${l.regle} (${reference(l.catalogue)})` }));
+  return borne("Points de vigilance connus :", blocs, ["Cette liste ne remplace pas ton examen général : juge tout le livrable, pas seulement ces points."]);
+}
+
+/**
+* Récidives malgré une leçon (critère 8) : une erreur établie pendant ce run qui a la signature d'une
+* leçon injectée dans un dossier de la même phase. Seules les erreurs du run comptent : celles d'un run
+* précédent de la même story, restées dans le registre, ne sont pas des récidives. `injectees` :
+* `[{ phase, ids }]`, une entrée par dossier.
+*/
+export function recidivesMalgreLecons({ lecons, erreursDuRun, injectees }) {
+  const r = new Map();
+  for (const l of lecons) {
+    const phases = new Set(injectees.filter((x) => x.ids.includes(l.id)).map((x) => x.phase));
+    if ([...phases].some((p) => erreursDuRun.some((e) => e.signature === l.groupe && e.phase === p)))
+      r.set(l.id, 1);
+  }
+  return r;
+}
+
+/** Une leçon qui ne suffit pas : à signaler comme candidate à devenir une porte de code (critère 9). */
+const RECIDIVES_POUR_UNE_PORTE = 2;
+export function ligneDesRecidives(lecons) {
+  const ids = lecons.filter((l) => (l.recidivesMalgreLecon ?? 0) >= RECIDIVES_POUR_UNE_PORTE).map((l) => l.id);
+  return ids.length ? `Leçons qui n'ont pas suffi (au moins ${RECIDIVES_POUR_UNE_PORTE} récidives) : ${ids.join(", ")}, candidate${ids.length > 1 ? "s" : ""} à devenir une porte de code.` : null;
 }
 
 /** Les lignes d'un fichier JSONL, parsées ; les lignes vides sont ignorées. */
@@ -138,7 +224,8 @@ export function briefDuClassement(slug, groupes, motifs = []) {
 * recalculées et commitées. Un classement qui échoue ne fait pas échouer le run : le groupe attend le
 * run suivant.
 */
-export async function tirerLesLecons(w, slug) {
+/** Le registre, les leçons et l'ordre des stories du projet, tels que le disque les porte. */
+async function lireLaMemoire(w) {
   const fichiers = await w.listerFichiers();
   const lire = async (p) => (fichiers.includes(p) ? w.lireFichier(p) : "");
   const erreurs = [];
@@ -146,8 +233,30 @@ export async function tirerLesLecons(w, slug) {
     erreurs.push(...lireJsonl(await w.lireFichier(p)));
   const avantLecons = await lire(FICHIER_DES_LECONS);
   const avantStories = await lire(FICHIER_DES_STORIES);
-  const lecons = lireJsonl(avantLecons);
-  const stories = lireJsonl(avantStories).map((x) => x.story);
+  return { erreurs, avantLecons, avantStories, lecons: lireJsonl(avantLecons), stories: lireJsonl(avantStories).map((x) => x.story) };
+}
+
+/** Au début du run (LEC-3) : ce que les dossiers de passation citeront. */
+export async function chargerLaMemoire(w) {
+  const { erreurs, lecons, stories } = await lireLaMemoire(w);
+  return { erreurs, lecons, stories };
+}
+
+/**
+* La section d'un dossier de passation (LEC-3) : les leçons du rôle pour la phase, notées comme
+* injectées (critère 7). `null` si le run n'a pas de mémoire ou s'il n'y a pas de leçon.
+*/
+export function leconsPour(d, phase, role) {
+  if (!d.memoire)
+    return null;
+  const s = role === "lentilles" ? vigilanceDesLecons({ ...d.memoire, phase }) : sectionDesLecons({ ...d.memoire, phase, role });
+  if (s)
+    (d.injectees ??= []).push({ phase, role, ids: s.ids });
+  return s;
+}
+
+export async function tirerLesLecons(w, slug, injectees = [], erreursDuRun = []) {
+  const { erreurs, avantLecons, avantStories, lecons, stories } = await lireLaMemoire(w);
   if (!stories.includes(slug))
     stories.push(slug);
   const couverts = new Set(lecons.map((l) => l.groupe));
@@ -180,7 +289,9 @@ export async function tirerLesLecons(w, slug) {
       restants = encore;
     }
   }
-  const apres = mettreAJourLesLecons({ lecons, erreurs, stories, proposees });
+  // Récidives malgré une leçon donnée pendant ce run (LEC-3, critère 8).
+  const recidives = recidivesMalgreLecons({ lecons, erreursDuRun, injectees });
+  const apres = mettreAJourLesLecons({ lecons, erreurs, stories, proposees, recidives });
   const ecrits = [];
   for (const [chemin, contenu, avant] of [[FICHIER_DES_LECONS, ecrireJsonl(apres), avantLecons], [FICHIER_DES_STORIES, ecrireJsonl(stories.map((story) => ({ story }))), avantStories]])
     if (contenu !== avant) {
@@ -189,16 +300,17 @@ export async function tirerLesLecons(w, slug) {
     }
   if (ecrits.length)
     await w.commiter(`docs(skraft): leçons après ${slug}`, ecrits);
-  return { nouvelles: apres.length - lecons.length, validees: apres.filter((l) => l.statut === "validee").length, enAttente: restants.map((g) => g.signature) };
+  return { nouvelles: apres.length - lecons.length, validees: apres.filter((l) => l.statut === "validee").length, enAttente: restants.map((g) => g.signature), recidives: ligneDesRecidives(apres) };
 }
 
 /** La ligne du bilan. */
 export function ligneDesLecons(r) {
-  if (!r || (!r.nouvelles && !r.validees && !r.enAttente.length))
+  if (!r || (!r.nouvelles && !r.validees && !r.enAttente.length && !r.recidives))
     return null;
   const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
   return [
     `Leçons : ${pluriel(r.nouvelles, "nouvelle")}, ${pluriel(r.validees, "validée")} au total (${FICHIER_DES_LECONS}).`,
     ...(r.enAttente.length ? [`Groupes d'erreurs sans leçon acceptée, repris au prochain run : ${r.enAttente.join(", ")}.`] : []),
+    ...(r.recidives ? [r.recidives] : []),
   ].join(" ");
 }

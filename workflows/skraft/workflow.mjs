@@ -202,7 +202,7 @@ import { livrer, barreDeQualite } from "./livraison.mjs";
 import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
 import { ecrireLeRegistre, ligneDuRegistre, nouveauRegistre, ouvrirLeRegistre, suivreLesRefus } from "./registre.mjs";
-import { ligneDesLecons, tirerLesLecons } from "./lecons.mjs";
+import { chargerLaMemoire, leconsPour, ligneDesLecons, tirerLesLecons } from "./lecons.mjs";
 const RELANCER_OU_ABANDONNER = [
   { id: "relancer", label: "Relancer" },
   { id: "abandonner", label: "Abandonner" },
@@ -214,6 +214,8 @@ export default async function skraft(w0, entree) {
   const w = suivreLesRefus(w0, registre);
   const { story, slug, indicateurs } = await preparer(w, entree.story);
   await ouvrirLeRegistre(w, registre, slug);
+  // Les leçons validées du projet, données aux agents de leur rôle au début de leur phase (LEC-3).
+  const memoire = await chargerLaMemoire(w);
   const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
   // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
   const racinesMuettes = (await w.disposition()).bddNonDecide ?? [];
@@ -245,6 +247,8 @@ export default async function skraft(w0, entree) {
     slug,
     niveau,
     registre,
+    memoire,
+    injectees: [],
     phasesFaites: [],
     phasesSautees: effets.skipResearch ? ["RESEARCH"] : [],
     architecture: architecture.skill,
@@ -311,7 +315,7 @@ export default async function skraft(w0, entree) {
   if (registre.erreurs.length)
     await w.commiter(`docs(skraft): registre des erreurs de ${slug}`, [registre.chemin]);
   // Leçons tirées des erreurs répétées (LEC-2), à jour pour le run suivant.
-  vue.lecons = await tirerLesLecons(w, slug);
+  vue.lecons = await tirerLesLecons(w, slug, vue.injectees, registre.erreurs);
   await w.etape("DONE");
   await w.informer(bilan(vue, !entree.auto));
   return {
@@ -322,6 +326,8 @@ export default async function skraft(w0, entree) {
     phases: vue.phasesFaites.map((p) => p.phase),
     adrs: vue.adrs,
     livraison: vue.livraison ?? null,
+    // Les leçons données à chaque dossier de passation (LEC-3, critère 7).
+    leconsInjectees: vue.injectees,
   };
 }
 /**
@@ -500,7 +506,7 @@ function rechercher(w, vue, max, relance) {
       const fichiers = await w.listerFichiers();
       const utiles = preselectFiles(vue.story, fichiers);
       await ecrirePassation(w, vue);
-      const consigne = buildBrief(vue, "RESEARCH", motifs) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
+      const consigne = buildBrief(vue, "RESEARCH", motifs, leconsPour(vue, "RESEARCH", "skraft-researcher")) + (utiles.length ? `\nFichiers utiles (présélection) :\n${utiles.map((f) => `  - ${f}`).join("\n")}` : "");
       // Le chercheur vérifie son document avec la porte que le code rejouera (ADR 0082).
       const document = `.skraft/${vue.slug}/research/research.md`;
       const r = await w.agent("skraft-researcher", consigne, { lectureSeule: GELÉS, verification: { outil: "verifier_recherche", fichiers: [document], donnees: { chemin: document } } });

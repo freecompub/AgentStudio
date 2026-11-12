@@ -4,6 +4,7 @@
 * fils de défauts (ADR 0046) vivent dans `Suivi`, déclaré par la phase hors de `w.phase` : comme
 * dans le réducteur, ils survivent à une relance par l'humain.
 */
+import { leconsPour } from "./lecons.mjs";
 import { correspond as matchesAny, Escalade, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, ligneBdd, lignePile } from "./brief.mjs";
 import { lensBrief, latestArtifacts, refuterBrief } from "./review-brief.mjs";
@@ -40,7 +41,7 @@ export async function specialiste(w, d, s, phase, nom, motifs, suffixe = "", lec
         pile += `\n${ligneBdd(disp.bdd)}`;
     }
     await ecrirePassation(w, d);
-    const r = await w.agent(nom, buildBrief(d, phase, motifs) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides, ...lectureSeule], ...(verification ? { verification } : {}) });
+    const r = await w.agent(nom, buildBrief(d, phase, motifs, leconsPour(d, phase, nom)) + pile + suffixe, { lectureSeule: [...GELÉS, ...decides, ...lectureSeule], ...(verification ? { verification } : {}) });
     // Vérifications faites par l'agent (ADR 0082) : comptées pour le bilan.
     if (r.verification)
       d.verifications = [...(d.verifications ?? []), { phase, agent: nom, appels: r.verification.appels }];
@@ -70,7 +71,8 @@ export async function reviser(w, d, s, cp, phase, lentilles, essai, faits) {
     await w.etape("REVIEW");
     const disp = await w.disposition();
     const fichiers = await fichiersDePhase(w, s, cp, disp);
-    const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted"), slug: d.slug };
+    const vigilance = leconsPour(d, phase, "lentilles");
+    const contexte = { criteria: d.story.criteria, adrs: d.adrs.filter((a) => a.status === "Accepted"), slug: d.slug, ...(vigilance ? { vigilance: vigilance.texte } : {}) };
     const reponses = [...d.questions.filter((q) => q.answer).map((q) => ({ question: q.text, answer: q.answer })), ...d.reponses];
     const tousFaits = [...faits, ...reponses.map((r) => `Réponse de l'utilisateur : « ${r.question} » → ${r.answer}`)];
     const issues = await Promise.all(lentilles.map((l) => lentille(w, l, lensBrief(l, contexte, phase, fichiers, tousFaits, lensHistory(s.fils, l)), reponses)));

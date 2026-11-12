@@ -82,3 +82,11 @@ export function extractPascalIdentifiers(md: string): string[] {
   for (const m of md.matchAll(/`([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+)`/g)) if (!out.includes(m[1]!)) out.push(m[1]!);
   return out;
 }
+
+/**
+ * Identifiants suivis de leur référence dans le dépôt (`Nom` (`chemin` ou `chemin:ligne`)) : ils
+ * désignent l'existant du projet, que la porte de DESIGN ne juge pas (décision du 11/11).
+ */
+export function extractReferencedIdentifiers(md: string): Set<string> {
+  return new Set([...md.matchAll(/`([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+)`\s*\(?\s*`[\w./-]+\.[A-Za-z][A-Za-z0-9]*(?::\d+(?:-\d+)?)?`/g)].map((m) => m[1]!));
+}

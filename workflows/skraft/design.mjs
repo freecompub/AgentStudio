@@ -2,7 +2,7 @@
 // Copie de extensions/skraft/src/design.ts (2026-10-08) : skraft-workflow est indépendante de skraft
 // et n'en importe rien ; une correction de l'une ne se reporte pas seule dans l'autre.
 import { adrId, conventionAdr, numeroAdr, parseAdr, parseSupersessions, suitLaConvention } from "./adr.mjs";
-import { extractCodeIdentifiers, extractPascalIdentifiers } from "./text-analysis.mjs";
+import { extractCodeIdentifiers, extractPascalIdentifiers, extractReferencedIdentifiers } from "./text-analysis.mjs";
 /** Documents de conception attendus (§6.2) et sources des noms du modèle. */
 export const MODEL_DOCS = ["event-model.md", "domain-model.md"];
 export const CITING_DOCS = ["contracts.md", "diagrams.md"];
@@ -18,8 +18,10 @@ export function checkDesign(i) {
   // le DÉFINIT n'importe où dans son code (signature dans un bloc, appel `Taux.AppliqueA(x)`).
   const known = new Set(MODEL_DOCS.flatMap((d) => extractCodeIdentifiers(i.docs[d] ?? "")));
   for (const doc of CITING_DOCS) {
+    // Un nom suivi de sa référence dans le dépôt désigne l'existant : il n'est pas exigé dans le modèle.
+    const existant = extractReferencedIdentifiers(i.docs[doc] ?? "");
     for (const id of extractPascalIdentifiers(i.docs[doc] ?? ""))
-      if (!known.has(id))
+      if (!known.has(id) && !existant.has(id))
         reasons.push(`\`${id}\` cité dans ${doc} n'existe pas dans ${MODEL_DOCS.join(" ni dans ")}.`);
   }
   for (const x of commandesSansEvenement(i.docs["event-model.md"] ?? ""))
