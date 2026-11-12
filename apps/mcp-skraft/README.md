@@ -96,7 +96,7 @@ l'on a démarré `copilot`. Ce que Copilot CLI fait du serveur, vu à l'essai :
 Copilot CLI n'affiche pas les prompts MCP comme des commandes, mais il affiche chaque **skill** en
 `/<nom>`, comme Claude Code. Les mêmes skills servent donc aux deux clients. `skills/` en contient un par outil : `/skraft-connexion`, `/skraft-pile`,
 `/skraft-demarrer`, `/skraft-attendre`, `/skraft-etat`, `/skraft-repondre`, `/skraft-rapport`,
-`/skraft-pr`, `/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
+`/skraft-pr`, `/skraft-lecons`, `/skraft-reprendre`, `/skraft-arreter`. Chacun dit à Copilot quel outil appeler, comment lire ce qui
 suit la commande (`/skraft-demarrer stories/US-2.md auto`), et que les questions reviennent à
 l'utilisateur.
 
@@ -278,6 +278,7 @@ buildErrors:
 | `skraft_attendre` | `tache`, `delai` (secondes, 30 par défaut, 50 au plus : un client MCP abandonne souvent un appel au-delà de 60 s), `projet` | **Attend un changement**, puis rend ce qui a changé **depuis le dernier appel** (phase, étape, rejet avec sa porte et son motif, lus dans la trace du run, question à poser, réponse reçue, message, fin), la ligne de progression de chaque run, les questions en attente et `termine`. Rien ne se perd entre deux appels. Run déjà fini : réponse immédiate. |
 | `skraft_repondre` | `question`, `option`, `texte`, `projet` | Répond à une question en attente, par l'identifiant et l'option lus dans `skraft_etat` ; `texte` : réponse libre ou commentaire. L'hôte pose la question à l'utilisateur, il ne répond jamais à sa place. |
 | `skraft_pr` | `tache`, `issue`, `projet` | Publie un run fini dont la story vient d'une issue : pousse `skraft/<slug>` et ouvre une PR liée à l'issue (« Closes #n »), après l'accord de l'utilisateur. `issue` : l'issue à lier, si la story n'en était pas une. |
+| `skraft_lecons` | `statut`, `action` (`ratifier` ou `retirer`), `lecon`, `projet` | **Les leçons du projet** (LEC-2) : celles que skraft a tirées des erreurs répétées, par statut (`candidate`, `validee`, `retiree`), avec leurs sources et leur entrée de catalogue. Avec `action` et `lecon`, propose à l'utilisateur de ratifier une leçon qui ajoute une entrée de catalogue, ou de retirer une leçon ; c'est lui qui décide, par la question que le client lui pose. Réservé aux profils architecte et administrateur (`admin.json`) ; sans question possible, la liste seule. |
 | `skraft_rapport` | `tache`, `projet` | JSON : statut (`en-cours`, `fini`, `echec`, `annule`), valeur ou motif, messages (dont le bilan final), dernier rejet, arbitrages, et **étapes** (une par phase et par rejeu : début, fin, durée, tours, rejets, unités Copilot `aiu`, coût Claude `coutUsd`, modèles). |
 | `skraft_reprendre` | `projet` | Prend la main si aucun autre serveur ne pilote le projet, et reprend les runs interrompus (rejeu du journal). |
 | `skraft_arreter` | `tache`, `projet` | Abandonne un run ; ses questions en attente sont annulées. |

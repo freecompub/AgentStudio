@@ -193,7 +193,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     const p = await projet();
     const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const { tools } = await s.client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_pile", "skraft_pr", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["skraft_arreter", "skraft_attendre", "skraft_connexion", "skraft_demarrer", "skraft_etat", "skraft_lecons", "skraft_pile", "skraft_pr", "skraft_rapport", "skraft_repondre", "skraft_reprendre"]);
     await s.fermer();
   }, 30_000);
 
@@ -679,6 +679,66 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     expect(await s.appel("skraft_demarrer", { story: "deux mots.md", accord: "une-fois" })).toMatchObject({ erreur: true, texte: expect.stringMatching(/espace/) });
     expect(await s.appel("skraft_demarrer", { story: "x.md", archi: "clean java", accord: "une-fois" })).toMatchObject({ erreur: true, texte: expect.stringMatching(/espace/) });
     expect((await s.etat()).taches).toEqual([]);
+    await s.fermer();
+  }, 30_000);
+});
+
+// LEC-2 (freecompub/AgentStudio#33, critères 11 à 14) : les leçons d'un projet, listées par statut ;
+// ratifier ou retirer passe par une question du client, réservée aux profils architecte et administrateur.
+describe("skraft_lecons", () => {
+  const FICHIER = ".agent-studio/lecons/lecons.jsonl";
+  const CLEAN = "architecture-review-criteria/references/clean-arch-violations.md";
+  const L01 = { id: "L-01", groupe: "a", regle: "Le domaine ne dépend pas de l'infrastructure.", quand: "q", aFaire: "f", exemple: "us-4#1", sources: ["us-4#1", "us-7#2"], catalogue: { skill: CLEAN, section: "V-CA-01: Domain Importing from Infrastructure" }, role: "skraft-dev", phase: "DELIVER", statut: "validee" };
+  const L02 = { ...L01, id: "L-02", groupe: "b", regle: "Un port se déclare dans le domaine.", sources: ["us-7#3"], exemple: "us-7#3", catalogue: { nouvelle: { skill: CLEAN, titre: "Port déclaré hors du domaine" } }, statut: "candidate" };
+  const avecLecons = () => projet({ contenus: { [FICHIER]: `${JSON.stringify(L01)}\n${JSON.stringify(L02)}\n` } });
+  const lues = async (root: string) => (await import("node:fs/promises")).readFile(join(root, FICHIER), "utf8").then((t) => t.trim().split("\n").map((l) => JSON.parse(l)));
+
+  it("liste les leçons par statut, avec leurs sources et leur catalogue ; un statut filtre la liste", async () => {
+    const p = await avecLecons();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
+    const tout = await s.appel("skraft_lecons", {});
+    expect(tout.erreur).toBe(false);
+    expect(tout.texte).toMatch(/Validées[\s\S]*L-01[\s\S]*Le domaine ne dépend pas de l'infrastructure\.[\s\S]*V-CA-01[\s\S]*us-4#1, us-7#2/);
+    expect(tout.texte).toMatch(/Candidates[\s\S]*L-02[\s\S]*nouvelle entrée « Port déclaré hors du domaine »/);
+    const candidates = await s.appel("skraft_lecons", { statut: "candidate" });
+    expect(candidates.texte).toContain("L-02");
+    expect(candidates.texte).not.toContain("L-01");
+    await s.fermer();
+  }, 30_000);
+
+  it("ratifier ou retirer, après l'accord de l'utilisateur demandé par le client", async () => {
+    const p = await avecLecons();
+    const questions: string[] = [];
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte", repondre: (q) => (questions.push(q), "Oui, cette fois") });
+    expect((await s.appel("skraft_lecons", { action: "ratifier", lecon: "L-02" })).erreur).toBe(false);
+    expect(questions.at(-1)).toMatch(/^Ratifier la leçon L-02 \?[\s\S]*Port déclaré hors du domaine/);
+    expect((await s.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).erreur).toBe(false);
+    const apres = await lues(p.root);
+    expect(apres.find((l) => l.id === "L-02")).toMatchObject({ ratifiee: true });
+    expect(apres.find((l) => l.id === "L-01")).toMatchObject({ statut: "retiree" });
+    await s.fermer();
+  }, 30_000);
+
+  it("refusé par l'utilisateur, ou par un profil autre qu'architecte ou administrateur : rien ne change", async () => {
+    const p = await avecLecons();
+    const non = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte", repondre: () => "Non" });
+    expect(await non.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).toEqual({ erreur: true, texte: expect.stringMatching(/rien n'a changé/i) });
+    await non.fermer();
+    const questions: string[] = [];
+    const dev = await serveur(p, { pid: 2, vivants: new Set([2]), role: "developpeur", repondre: (q) => (questions.push(q), "Oui, cette fois") });
+    expect(await dev.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).toEqual({ erreur: true, texte: expect.stringMatching(/architecte[\s\S]*administrateur/) });
+    expect(questions).toEqual([]);
+    await dev.fermer();
+    expect((await lues(p.root)).find((l) => l.id === "L-01")).toMatchObject({ statut: "validee" });
+  }, 30_000);
+
+  it("sans question possible, la liste est rendue, rien n'est ratifié ni retiré, et c'est dit", async () => {
+    const p = await avecLecons();
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte" });
+    const r = await s.appel("skraft_lecons", { action: "ratifier", lecon: "L-02" });
+    expect(r.erreur).toBe(true);
+    expect(r.texte).toMatch(/ne sait pas[\s\S]*Candidates[\s\S]*L-02/);
+    expect((await lues(p.root)).find((l) => l.id === "L-02")?.ratifiee).toBeUndefined();
     await s.fermer();
   }, 30_000);
 });

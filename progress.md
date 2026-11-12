@@ -5,7 +5,7 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
-## 12/11 — LEC-2 : les leçons tirées des erreurs répétées (en cours)
+## 12/11 — LEC-2 : les leçons tirées des erreurs répétées
 
 - **Décisions du responsable** : le classement tourne à la fin de chaque run ; la ratification d'une
   leçon est réservée au profil déclaré dans la configuration du serveur MCP. (Il a d'abord compris
@@ -21,7 +21,11 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   - agent `skraft-lecons` ; leçons et ordre des stories (`stories.jsonl`) commités après le registre.
 - **Piège** : chaque run appelle maintenant l'agent des leçons s'il a des erreurs ; le banc doit le
   simuler (`submit_lecons` vide par défaut), sinon l'essai attend 60 s.
-- **Prochaine étape** : l'outil MCP `skraft_lecons` (critères 11 à 14).
+- **Fait aussi** : l'outil MCP `skraft_lecons` (critères 11 à 14), sa commande `/skraft-lecons`, et
+  l'ADR 0084. Le profil vient d'`admin.json` (`admin.profile.role`), déjà passé au serveur.
+- **Piège** : ouvrir le projet par l'enveloppe `outil` du serveur exige une pile ; `skraft_lecons` ne
+  fait que résoudre le dossier du projet, puis lit le fichier.
+- **Prochaine étape** : reporter les décisions dans l'issue #33 ; puis LEC-3, la réinjection.
 
 ## 11/11 — LEC-1 : le registre des erreurs commises
 
