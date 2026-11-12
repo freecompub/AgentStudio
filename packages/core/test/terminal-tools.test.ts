@@ -57,3 +57,25 @@ describe("submit_pile", () => {
     expect(terminalSchemas.submit_pile.safeParse({ piles: [pile] }).success).toBe(false);
   });
 });
+
+// LEC-2 : l'agent de classement rattache chaque groupe d'erreurs à une entrée de catalogue ; le code vérifie.
+describe("submit_lecons", () => {
+  const lecon = {
+    groupe: "a1b2c3d4e5f6a7b8",
+    regle: "Le domaine ne dépend d'aucun type d'infrastructure.",
+    quand: "Une entité du domaine a besoin de persister.",
+    aFaire: "Déclarer un port dans le domaine.",
+    exemple: "us-4#2",
+    sources: ["us-4#2", "us-7#1"],
+    catalogue: { skill: "architecture-review-criteria/references/clean-arch-violations.md", section: "V-CA-01: Domain Importing from Infrastructure" },
+  };
+  it("une leçon par groupe, rattachée à une entrée existante ou à une nouvelle entrée proposée", () => {
+    expect(terminalSchemas.submit_lecons.safeParse({ lecons: [lecon] }).success).toBe(true);
+    expect(terminalSchemas.submit_lecons.safeParse({ lecons: [{ ...lecon, catalogue: { nouvelle: { skill: "craft-discipline/references/test-theater-patterns.md", titre: "Assertion sur un booléen nu" } } }] }).success).toBe(true);
+  });
+  it("chaque champ est obligatoire ; une leçon sans source est refusée", () => {
+    const { regle: _, ...sansRegle } = lecon;
+    expect(terminalSchemas.submit_lecons.safeParse({ lecons: [sansRegle] }).success).toBe(false);
+    expect(terminalSchemas.submit_lecons.safeParse({ lecons: [{ ...lecon, sources: [] }] }).success).toBe(false);
+  });
+});

@@ -1338,6 +1338,20 @@
       "verify": "pnpm vitest run --project core meme-refus && pnpm vitest run --project workflow-skraft registre.test e2e-registre",
       "passes": true,
       "notes": "Fait le 2026-11-11, demande du responsable. Choix provisoires : tâche annulée sans écriture, relance en ajout, champs en français. Les critères 3 et 5 (défaut réfuté, défaut hors du changement) tiennent par construction : le registre lit les fils de revue, que la réfutation et le rangement hors changement ont déjà filtrés ; pas de test dédié."
+    },
+    {
+      "id": "lec-2-lecons-tirees-des-erreurs",
+      "title": "LEC-2 (freecompub/AgentStudio#33), dans le workflow : à la fin de chaque run, l'agent skraft-lecons (classe light, sortie submit_lecons) rattache chaque groupe d'erreurs sans leçon à une section de catalogue ; le code vérifie la référence, les sources et l'exemple (un second tour avec les motifs), tire le rôle de la cible, tient les statuts candidate, validee (2 stories), retiree (10 stories sans occurrence) ; leçons et ordre des stories commités (critères 1 à 10)",
+      "verify": "pnpm vitest run --project core terminal-tools && pnpm vitest run --project workflow-skraft lecons.test registre.test e2e-lecons e2e-registre",
+      "passes": true,
+      "notes": "Fait le 2026-11-12 (ADR 0084). Décisions du responsable : classement à la fin de chaque run ; ratification réservée au profil déclaré au serveur MCP. Les titres des catalogues sont recopiés dans catalogues.mjs, le script ne lisant pas le dossier du workflow ; un test les compare aux skills."
+    },
+    {
+      "id": "lec-2-outil-skraft-lecons",
+      "title": "LEC-2, critères 11 à 14 : l'outil MCP skraft_lecons liste les leçons par statut, avec leurs sources et leur catalogue ; ratifier ou retirer passe par une question du client, réservée aux profils architecte et administrateur (admin.json) ; sans question possible, la liste seule, et c'est dit ; commande /skraft-lecons",
+      "verify": "pnpm vitest run --project mcp-skraft serveur.test skills.test stdio.test",
+      "passes": true,
+      "notes": "Fait le 2026-11-12. Une ratification ou un retrait écrit le fichier des leçons sans le commiter."
     }
   ]
 }

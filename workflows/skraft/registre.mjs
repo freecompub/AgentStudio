@@ -57,9 +57,14 @@ export function refusCompte(porte) {
   return !(p === "délai" || p === "question de revue" || p.startsWith("revue") || p.startsWith("panne"));
 }
 
-/** Le fichier : les lignes déjà écrites, telles quelles, puis les nouvelles erreurs, une par ligne. */
+/**
+* Le fichier : les lignes déjà écrites, telles quelles, puis les nouvelles erreurs, une par ligne. Chaque
+* erreur reçoit un identifiant, la story et son rang dans le fichier : une leçon cite ses sources ainsi
+* (LEC-2), et une relance continue la numérotation.
+*/
 export function contenuDuRegistre(avant, erreurs) {
-  const lignes = erreurs.map((e) => JSON.stringify(e));
+  const deja = avant.split("\n").filter((l) => l.trim()).length;
+  const lignes = erreurs.map((e, i) => JSON.stringify({ id: `${e.story}#${deja + i + 1}`, ...e }));
   if (!lignes.length)
     return avant;
   return `${avant && !avant.endsWith("\n") ? `${avant}\n` : avant}${lignes.join("\n")}\n`;

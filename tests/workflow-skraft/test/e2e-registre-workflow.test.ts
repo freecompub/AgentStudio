@@ -59,9 +59,10 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     await until(async () => (await app.engine.status(id))?.status === "finished", 90_000);
 
-    expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): registre des erreurs de us-12");
-    expect(git(root, "show", "--name-only", "--format=", "HEAD").trim()).toBe(REGISTRE);
-    const erreurs = git(root, "show", `HEAD:${REGISTRE}`).trim().split("\n").map((l) => JSON.parse(l));
+    // Le commit des leçons (LEC-2) suit celui du registre : on le retrouve par son message.
+    const commit = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): registre des erreurs de us-12"))!.split(" ")[0]!;
+    expect(git(root, "show", "--name-only", "--format=", commit).trim()).toBe(REGISTRE);
+    const erreurs = git(root, "show", `${commit}:${REGISTRE}`).trim().split("\n").map((l) => JSON.parse(l));
     expect(erreurs).toEqual([
       expect.objectContaining({ type: "defaut", story: "us-12", phase: "DESIGN", lentille: "architecture", cible: "deliverable", description: "contracts.md ne nomme pas l'agrégat." }),
       expect.objectContaining({ type: "refus", story: "us-12", phase: "DISTILL", porte: "valeurs" }),

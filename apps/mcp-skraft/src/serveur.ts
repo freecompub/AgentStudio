@@ -16,6 +16,7 @@ import type { Mode, ProjetOuvert, Projets } from "./projets.js";
 import { resoudreProjet, type ProjetResolu } from "./projet.js";
 import { lireRefIssue, type RefIssue } from "@agent-studio/github-auth";
 import { changements, ligneDeProgression, vueDeTache, type Instantane, type VueTache } from "./progression.js";
+import { decrireLecon, ecrireLecons, FICHIER_DES_LECONS, lireLecons, listeDesLecons, type StatutDeLecon } from "./lecons.js";
 
 export interface OptionsServeur {
   projets: Projets;
@@ -428,6 +429,53 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       if (!r.ok) return erreur(r.motif);
       return texte(r.nouvelle ? `PR ouverte : ${r.url}. La branche ${branche} est poussée.` : `Une PR était déjà ouverte pour ${branche} : ${r.url}. La branche est poussée à jour.`);
     }, { agents: false }),
+  );
+
+  /**
+   * Les leçons du projet (LEC-2, critères 11 à 14). Ratifier ou retirer est demandé à l'utilisateur par
+   * le client, jamais décidé par un argument : l'action dit seulement quoi lui proposer. Réservé aux
+   * profils architecte et administrateur, celui déclaré au serveur (`admin.json`).
+   */
+  mcp.registerTool(
+    "skraft_lecons",
+    {
+      description:
+        "Liste les leçons tirées des erreurs répétées du projet, par statut (candidate, validee, retiree), avec leurs sources et leur entrée de catalogue. Avec `action` et `lecon`, propose à l'utilisateur de ratifier une leçon qui ajoute une entrée de catalogue, ou de retirer une leçon : c'est lui qui décide, par la question que le client lui pose.",
+      inputSchema: {
+        statut: z.enum(["candidate", "validee", "retiree"]).optional().describe("Ne lister que les leçons de ce statut."),
+        action: z.enum(["ratifier", "retirer"]).optional().describe("Ce qu'il faut proposer à l'utilisateur, pour la leçon `lecon`."),
+        lecon: z.string().min(1).optional().describe("Identifiant de la leçon (ex. L-03), avec `action`."),
+        projet,
+      },
+    },
+    async (a) => {
+      try {
+        const r = await resoudre(a.projet);
+        if (!r.ok) return erreur(r.motif);
+        const lecons = await lireLecons(r.root);
+        const liste = listeDesLecons(lecons, a.statut as StatutDeLecon | undefined);
+        if (!a.action) return texte(liste);
+        if (!a.lecon) return erreur(`Dis quelle leçon ${a.action} dans \`lecon\` (ex. L-03).\n\n${liste}`);
+        if (o.role !== "architecte" && o.role !== "administrateur")
+          return erreur(`Ratifier ou retirer une leçon est réservé aux profils architecte et administrateur ; ton profil est « ${o.role} » (admin.json). Rien n'a changé.`);
+        const l = lecons.find((x) => x.id === a.lecon);
+        if (!l) return erreur(`Leçon inconnue dans ce projet : ${a.lecon}.\n\n${liste}`);
+        if (a.action === "ratifier" && !("nouvelle" in l.catalogue)) return erreur(`${l.id} se rattache à une section existante de catalogue : elle n'a rien à ratifier. Rien n'a changé.`);
+        if (a.action === "ratifier" && l.ratifiee) return texte(`${l.id} est déjà ratifiée.`);
+        if (a.action === "retirer" && l.statut === "retiree") return texte(`${l.id} est déjà retirée.`);
+        if (!confirmer.peutDemander())
+          return erreur(`Ce client ne sait pas poser de question à l'utilisateur : rien n'est ratifié ni retiré. Voici les leçons :\n\n${liste}`);
+        const reponse = await confirmer.confirm({
+          title: `${a.action === "ratifier" ? "Ratifier" : "Retirer"} la leçon ${l.id} ?`,
+          detail: `${decrireLecon(l)}\n\n${a.action === "ratifier" ? "Ratifiée, la nouvelle entrée de catalogue est acceptée : la leçon sera validée dès que ses erreurs couvriront deux stories." : "Retirée, la leçon n'est plus donnée aux agents, même si l'erreur revient."}`,
+        });
+        if (reponse === "deny") return erreur(`Rien n'a changé : l'accord n'a pas été donné pour ${l.id}.`);
+        await ecrireLecons(r.root, lecons.map((x) => (x.id !== l.id ? x : a.action === "ratifier" ? { ...x, ratifiee: true } : { ...x, statut: "retiree" as const })));
+        return texte(`${l.id} ${a.action === "ratifier" ? "ratifiée" : "retirée"}, dans ${FICHIER_DES_LECONS}. Le fichier est à commiter avec le reste du projet ; le prochain run en tiendra compte.`);
+      } catch (e) {
+        return erreur(e instanceof Error ? e.message : String(e));
+      }
+    },
   );
 
   /**

@@ -118,6 +118,28 @@ export const terminalSchemas = {
       .max(20),
     justification: z.string().min(1).max(2_000).describe("Ce qui, dans le projet, justifie ces choix"),
   }),
+  // Leçons tirées des erreurs répétées (LEC-2) : l'agent de classement rattache chaque groupe à une
+  // entrée de catalogue ; le code vérifie la référence, les sources et l'exemple.
+  submit_lecons: z.object({
+    lecons: z
+      .array(
+        z.object({
+          groupe: z.string().min(1).max(100).describe("Signature du groupe d'erreurs, telle que donnée"),
+          regle: z.string().min(1).max(300).describe("La règle, en une phrase, au niveau d'une ligne de checklist"),
+          quand: z.string().min(1).max(500).describe("Quand la règle s'applique"),
+          aFaire: z.string().min(1).max(500).describe("Ce qu'il faut faire"),
+          exemple: z.string().min(1).max(100).describe("Identifiant de l'erreur la plus parlante, parmi les sources"),
+          sources: z.array(z.string().min(1).max(100)).min(1).max(50).describe("Identifiants des erreurs du groupe, tels que donnés"),
+          catalogue: z
+            .union([
+              z.object({ skill: z.string().min(1).max(300), section: z.string().min(1).max(300) }).strict(),
+              z.object({ nouvelle: z.object({ skill: z.string().min(1).max(300), titre: z.string().min(1).max(300) }).strict() }).strict(),
+            ])
+            .describe("L'entrée du catalogue : un fichier de skill et le titre d'une de ses sections, ou une nouvelle entrée proposée"),
+        }),
+      )
+      .max(50),
+  }),
   report_blocker: z.object({
     question: z.string().min(1).max(2_000).describe("Question métier ou technique qui bloque"),
     choices: z.array(z.string().min(1).max(300)).max(10).describe("Réponses possibles, si elles sont connues"),
@@ -133,6 +155,7 @@ const DESCRIPTIONS: Record<TerminalToolName, string> = {
   submit_difficulty: "Soumets le niveau de difficulté retenu et sa justification : cet appel clôt ton tour.",
   submit_lens_verdict: "Soumets ton verdict de revue et les défauts trouvés : cet appel clôt ton tour.",
   submit_pile: "Soumets la pile du projet, une par racine : cet appel clôt ton tour, et le code la vérifie.",
+  submit_lecons: "Soumets une leçon par groupe d'erreurs, rattachée à son entrée de catalogue : cet appel clôt ton tour, et le code la vérifie.",
   report_blocker: "Signale une question qui t'empêche de continuer (valeur ou règle manquante) : ta tâche est suspendue jusqu'à la réponse.",
 };
 
