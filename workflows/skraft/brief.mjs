@@ -5,7 +5,7 @@
 */
 import { ARCHITECTURE_PAR_DEFAUT, ligneArchitecture } from "./architecture.mjs";
 
-export function buildBrief(d, phase, rejet) {
+export function buildBrief(d, phase, rejet, lecons = null) {
   const lines = [`Story : ${d.story.id} — ${d.story.title}`, d.story.statement, "Critères d'acceptation :"];
   for (const c of d.story.criteria)
     lines.push(`  ${c.n}. ${c.text}`);
@@ -46,6 +46,9 @@ export function buildBrief(d, phase, rejet) {
     lines.push(`Scénarios livrés : ${d.livres.join(", ")}`);
   if (d.constats?.length)
     lines.push("Constats de DELIVER :", ...d.constats.map((n) => `  - ${n}`));
+  // Les erreurs déjà commises sur ce projet (LEC-3), juste avant le motif du dernier rejet.
+  if (lecons)
+    lines.push(lecons.texte);
   if (rejet.length)
     lines.push("Rejet précédent :", ...rejet.map((f) => `  - ${f}`));
   return lines.join("\n");

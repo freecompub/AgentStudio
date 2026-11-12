@@ -1345,6 +1345,13 @@
       "verify": "pnpm vitest run --project mcp-skraft serveur.test skills.test stdio.test",
       "passes": true,
       "notes": "Fait le 2026-11-12. Une ratification ou un retrait écrit le fichier des leçons sans le commiter."
+    },
+    {
+      "id": "lec-3-lecons-reinjectees",
+      "title": "LEC-3 (freecompub/AgentStudio#34, ADR 0085), dans le workflow : au début de chaque phase, le dossier d'un agent reçoit les leçons validées de sa phase et de son rôle (au plus 6, 2000 caractères, avec un exemple réel), les lentilles leurs points de vigilance ; chaque injection est notée dans la valeur du run ; une récidive malgré une leçon est comptée, et signalée au bilan à deux",
+      "verify": "pnpm vitest run --project workflow-skraft lecons.test e2e-reinjection",
+      "passes": true,
+      "notes": "Fait le 2026-11-12. Choix provisoires : dernière occurrence = rang de la dernière story touchée dans l'ordre des runs ; trace = liste leconsInjectees dans la valeur finale du run, en plus du dossier journalisé."
     }
   ]
 }

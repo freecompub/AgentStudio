@@ -5,6 +5,21 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
+
+- **Demande du responsable** : continuer après LEC-2 (freecompub/AgentStudio#34, ADR 0085).
+- **Fait** (branche `feat/lec-3-reinjection`, partie de `feat/lec-2-lecons`) :
+  - `sectionDesLecons`, `vigilanceDesLecons`, `recidivesMalgreLecons`, `ligneDesRecidives` (purs) ;
+  - leçons chargées au début du run (`chargerLaMemoire`) ; `leconsPour` donne la section et note
+    l'injection ; `buildBrief` reste pur et la reçoit ; lentilles par `lensBrief` (`vigilance`) ;
+  - récidives comptées à la fin du run ; `leconsInjectees` dans la valeur finale.
+- **Choix provisoires** : dernière occurrence = rang dans `stories.jsonl` (le registre ne date pas) ;
+  trace = valeur finale du run.
+- **Piège** : la valeur finale d'un workflow est rangée par référence (`fin.valeur.ref` dans `contenus`)
+  dès qu'elle dépasse la taille en clair.
+- **Prochaine étape** : merger LEC-1, LEC-2 puis LEC-3, dans l'ordre ; un run réel pour voir les leçons
+  naître puis revenir dans les dossiers.
+
 ## 12/11 — LEC-2 : les leçons tirées des erreurs répétées
 
 - **Décisions du responsable** : le classement tourne à la fin de chaque run ; la ratification d'une

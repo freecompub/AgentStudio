@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CATALOGUES, entreesDuCatalogue } from "../../../workflows/skraft/catalogues.mjs";
-import { mettreAJourLesLecons, roleDeLecon, verifierLecon } from "../../../workflows/skraft/lecons.mjs";
+import { ligneDesRecidives, mettreAJourLesLecons, recidivesMalgreLecons, roleDeLecon, sectionDesLecons, verifierLecon, vigilanceDesLecons } from "../../../workflows/skraft/lecons.mjs";
 
 const SKILLS = join(import.meta.dirname, "../../../workflows/skraft/skills");
 const CLEAN = "architecture-review-criteria/references/clean-arch-violations.md";
@@ -82,5 +82,59 @@ describe("Statut d'une leçon (LEC-2, critères 7 à 10)", () => {
     const apres = mettreAJourLesLecons({ lecons: [l], erreurs: [erreur("us-4#1", "us-4"), erreur("us-9#1", "us-9")], stories: ["us-4", "us-9"], proposees: [lecon({ regle: "doublon" })] });
     expect(apres).toHaveLength(1);
     expect(apres[0]).toMatchObject({ id: "L-01", sources: ["us-4#1", "us-9#1"], statut: "validee", regle: l.regle });
+  });
+});
+
+// LEC-3 (freecompub/AgentStudio#34) : les leçons validées, données à chaque agent au début de sa phase.
+describe("Leçons réinjectées (LEC-3)", () => {
+  const CLEAN = "architecture-review-criteria/references/clean-arch-violations.md";
+  const base = (id, over = {}) => ({ id, groupe: `g-${id}`, regle: `Règle ${id}.`, quand: "Quand on persiste.", aFaire: "Déclarer un port.", exemple: `us-4#${id.slice(2)}`, sources: [`us-4#${id.slice(2)}`], catalogue: { skill: CLEAN, section: "V-CA-01: Domain Importing from Infrastructure" }, role: "skraft-dev", phase: "DELIVER", statut: "validee", ...over });
+  const erreursDe = (lecons) => lecons.flatMap((l) => l.sources.map((s) => ({ id: s, story: s.split("#")[0], type: "defaut", description: `Commande dépendait de DbContext (${l.id}).`, signature: l.groupe, phase: l.phase })));
+
+  it("la section donne, pour la phase et le rôle, chaque leçon validée : règle, identifiant, catalogue, quand, quoi faire, un exemple réel", () => {
+    const lecons = [base("L-07"), base("L-08", { role: "skraft-test" }), base("L-09", { statut: "candidate" }), base("L-10", { phase: "DESIGN" })];
+    const s = sectionDesLecons({ lecons, erreurs: erreursDe(lecons), stories: ["us-4"], phase: "DELIVER", role: "skraft-dev" });
+    expect(s.ids).toEqual(["L-07"]);
+    expect(s.texte).toBe([
+      "Erreurs déjà commises en DELIVER sur ce projet (à éviter) :",
+      `  - [L-07] Règle L-07. (${CLEAN} § V-CA-01: Domain Importing from Infrastructure)`,
+      "    Quand : Quand on persiste.",
+      "    À faire : Déclarer un port.",
+      "    Déjà vu : us-4, Commande dépendait de DbContext (L-07).",
+    ].join("\n"));
+  });
+
+  it("une phase sans leçon validée pour le rôle n'a aucune section", () => {
+    expect(sectionDesLecons({ lecons: [base("L-07")], erreurs: [], stories: [], phase: "DISTILL", role: "skraft-acceptance" })).toBeNull();
+  });
+
+  it("au plus 6 leçons, classées par stories touchées puis par dernière occurrence ; au plus 2000 caractères", () => {
+    const stories = ["s1", "s2", "s3"];
+    const lecons = Array.from({ length: 8 }, (_, i) => base(`L-${String(i + 1).padStart(2, "0")}`, { sources: i === 4 ? ["s1#1", "s2#1", "s3#1"] : [`s${(i % 3) + 1}#${i}`], exemple: i === 4 ? "s1#1" : `s${(i % 3) + 1}#${i}` }));
+    const s = sectionDesLecons({ lecons, erreurs: erreursDe(lecons), stories, phase: "DELIVER", role: "skraft-dev" });
+    expect(s.ids).toHaveLength(6);
+    expect(s.ids[0]).toBe("L-05");
+    expect(s.ids.slice(1, 3)).toEqual(["L-03", "L-06"]);
+    const longues = Array.from({ length: 6 }, (_, i) => base(`L-${i + 1}0`, { regle: "x".repeat(400) }));
+    expect(sectionDesLecons({ lecons: longues, erreurs: erreursDe(longues), stories: ["us-4"], phase: "DELIVER", role: "skraft-dev" }).texte.length).toBeLessThanOrEqual(2000);
+  });
+
+  it("les lentilles reçoivent les leçons validées de la phase, puis la consigne que la liste ne remplace pas leur examen", () => {
+    const lecons = [base("L-07"), base("L-08", { role: "skraft-test" })];
+    const v = vigilanceDesLecons({ lecons, erreurs: erreursDe(lecons), stories: ["us-4"], phase: "DELIVER" });
+    expect(v.ids).toEqual(["L-07", "L-08"]);
+    expect(v.texte.split("\n")[0]).toBe("Points de vigilance connus :");
+    expect(v.texte.split("\n").at(-1)).toBe("Cette liste ne remplace pas ton examen général : juge tout le livrable, pas seulement ces points.");
+    expect(vigilanceDesLecons({ lecons, erreurs: [], stories: [], phase: "DESIGN" })).toBeNull();
+  });
+
+  it("une erreur de la story qui a la signature d'une leçon injectée dans sa phase incrémente sa récidive malgré la leçon", () => {
+    const l = base("L-07", { sources: ["us-4#7"], exemple: "us-4#7" });
+    const erreurs = [...erreursDe([l]), { id: "us-9#1", story: "us-9", type: "defaut", description: "encore", signature: l.groupe, phase: "DELIVER" }, { id: "us-9#2", story: "us-9", type: "defaut", description: "ailleurs", signature: l.groupe, phase: "DESIGN" }];
+    const r = recidivesMalgreLecons({ lecons: [l], erreurs, story: "us-9", injectees: [{ phase: "DELIVER", ids: ["L-07"] }] });
+    expect(r).toEqual(new Map([["L-07", 1]]));
+    const apres = mettreAJourLesLecons({ lecons: [{ ...l, recidivesMalgreLecon: 1 }], erreurs, stories: ["us-4", "us-9"], proposees: [], recidives: r });
+    expect(apres[0].recidivesMalgreLecon).toBe(2);
+    expect(ligneDesRecidives(apres)).toBe("Leçons qui n'ont pas suffi (au moins 2 récidives) : L-07, candidate à devenir une porte de code.");
   });
 });

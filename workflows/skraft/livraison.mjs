@@ -7,6 +7,7 @@
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
 import { ecrireLeRegistre, releverLesDefauts } from "./registre.mjs";
+import { leconsPour } from "./lecons.mjs";
 import { disjoncte, memeRefus, problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.mjs";
 import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, restreindreAuChangement, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
@@ -421,7 +422,7 @@ async function agentDuPas(w, d, L, i, etape, motifs, unitTests, nouveau, correct
   for (;;) {
     await w.etape("DELIVER");
     const consigne = [
-      buildBrief(d, "DELIVER", rejet),
+      buildBrief(d, "DELIVER", rejet, leconsPour(d, "DELIVER", testeur ? "skraft-test" : "skraft-dev")),
       lignePile(L.disp.pile, L.disp),
       `Scénario en cours : ${sc.id}${critere ? ` (critère ${critere.n} : ${critere.text})` : ""}`,
       ...(gherkin ? ["Scénario :", gherkin.trim()] : []),

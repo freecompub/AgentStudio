@@ -108,6 +108,9 @@ export function lensBrief(lens, c, phase, files, facts, history = []) {
       break;
   }
   lines.push(...list(`Points à examiner en ${phase} :`, (CONSIGNES_DE_PHASE[phase]?.[lens] ?? []).map((x) => x.replace("<slug>", c.slug ?? "<slug>"))));
+  // Les erreurs déjà commises sur ce projet en cette phase (LEC-3, critère 6).
+  if (c.vigilance)
+    lines.push(c.vigilance);
   return lines.join("\n");
 }
 /**
