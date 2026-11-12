@@ -5,7 +5,7 @@
  * ici évite que le dossier embarque des modules, et garde le rejeu exact.
  */
 import { baselineProblems, bddNonDeclare, coverageForChanges, coreFilesMissing, layerOf, MANIFESTE, matchesAny, parseQualityBar } from "@agent-studio/stack-adapters";
-import { disjoncte, memeRefus } from "@agent-studio/core";
+import { disjoncte, memeRefus, normaliserMotifs } from "@agent-studio/core";
 import { parse as parseYaml } from "yaml";
 import { agir, essayer, motifsInterruption } from "../aides.js";
 import { empreinteDe } from "../contenus.js";
@@ -37,6 +37,7 @@ export const bibliotheque = Object.freeze({
   estUnManifeste: (chemin: string): boolean => MANIFESTE.test(chemin),
   /** Disjoncteur des réessais (ADR 0073) : même porte, mêmes motifs ; et le préfixe de l'escalade. */
   memeRefus,
+  normaliserMotifs,
   disjoncte,
 });
 

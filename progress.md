@@ -5,6 +5,25 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 11/11 — LEC-1 : le registre des erreurs commises
+
+- **Demande du responsable** : coder LEC-1 (freecompub/AgentStudio#32) directement. Il a tranché quatre
+  questions : LEC-1 seule ; motif normalisé comme le disjoncteur ; seuls les refus qui consomment un
+  essai ; un défaut donné à l'agent par l'humain n'est pas enregistré (ADR 0083).
+- **Fait** (branche `feat/lec-1-registre`, partie de `main`, sans la PR #37) :
+  - `workflows/skraft/registre.mjs` : erreurs, signature, contenu, regroupement (pur), puis collecte et
+    écriture ;
+  - `normaliserMotifs` exportée du cœur et de la bibliothèque des scripts ;
+  - enveloppe de `w` au début du script pour relever les refus ; défauts relevés à chaque succès de
+    phase et avant chaque rembobinage ; écriture à l'escalade, avant un abandon hors phase et à la
+    fin, commit seul ; `.agent-studio/lecons/**` dans `GELÉS`.
+- **Choix provisoires**, à faire trancher : tâche annulée sans écriture (le script ne tourne plus),
+  relance en ajout, champs en français.
+- **Piège** : le statut d'une tâche abandonnée est `finished` ; l'échec se lit dans `state.fin.statut`.
+- **Piège** : après un rembobinage, le registre revient au checkpoint ; ce n'est pas une modification
+  par un agent (`apresRembobinage: true`).
+- **Prochaine étape** : reporter dans l'issue #32 les décisions du 11/11 ; puis LEC-2.
+
 ## 11/11 — Essai réel de LEC-1 sur AgentStudio, et la porte de DESIGN ne juge plus l'existant
 
 - **Essais sur les vraies issues d'AgentStudio** :

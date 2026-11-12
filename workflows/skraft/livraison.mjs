@@ -6,6 +6,7 @@
 * correction ciblée des défauts (ADR 0046, 0047). Reproduit `deliver-machine.ts` et
 * `deliver-effects.ts` de skraft. Toutes les preuves viennent de `w.lancerTests` (D20).
 */
+import { ecrireLeRegistre, releverLesDefauts } from "./registre.mjs";
 import { disjoncte, memeRefus, problemesTestsExistants, couvertureDuDiff, couchesManquantes as coreFilesMissing, correspond as matchesAny, Escalade, lireBarreDeQualite as parseQualityBar, PanneEnvironnement, SauterPhase, TourInterrompu } from "@agent-studio/workflow";
 import { buildBrief, ecrirePassation, fichierDePassation, lignePile } from "./brief.mjs";
 import { causeDEchec, optionsSelonLaCause, sansTestsObsoletes, texteDeLaCause, checkCoverage, checkDependencies, checkFormat, checkLint, checkMutation, restreindreAuChangement, checkRedGreenSequence, concerns, defaultDependencyRules, lignesSousLeSeuil, mutantsSousLeSeuil, planScenarios, sansLignesExemptees } from "./deliver.mjs";
@@ -65,6 +66,7 @@ export async function livrer(w, d, lentilles, max) {
   const faite = await w.phase("DELIVER", async (cp, relance) => {
     const L = await phase(w, d, suivi, cp, lentilles, max, relance);
     d.livraison = { granularity: L.granularity, scenarios: L.scenarios.map((x) => [x.id, x.role, x.status]), notes: L.notes };
+    releverLesDefauts(d.registre, suivi, "DELIVER");
     await ecrireRapports(w, d.slug, "DELIVER", suivi);
     // Dérogations de mutation commitées avec la livraison : elles restent dans l'historique du projet (ADR 0065).
     if (d.derogations.length || d.derogationsCouverture.length || d.testsObsoletes.length)
@@ -77,7 +79,10 @@ export async function livrer(w, d, lentilles, max) {
     commit: commitMessage("DELIVER", d.slug),
     // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
     commitManque: () => void d.nonCommitees.push("DELIVER"),
-    apresRembobinage: () => {
+    apresRembobinage: async () => {
+      // Les défauts retenus du run effacé sont des erreurs commises : relevés avant d'être oubliés (LEC-1).
+      releverLesDefauts(d.registre, suivi, "DELIVER");
+      await ecrireLeRegistre(w, d.registre, { apresRembobinage: true });
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).
       oublierLeRun(suivi);
       // Le code effacé emporte les mutants qu'on avait exemptés (ADR 0065) ; la trace les garde.

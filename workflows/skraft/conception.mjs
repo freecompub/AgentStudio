@@ -5,6 +5,7 @@
 * pas tranchés ici.
 */
 import { correspond as matchesAny, essayer, PanneEnvironnement } from "@agent-studio/workflow";
+import { ecrireLeRegistre, releverLesDefauts } from "./registre.mjs";
 import { avecStory, conventionAdr, ligneNumerotation, motifsNumerosPris, numeroAdr, numerotationAdrs, parseAdr, setAdrStatus, storyDe, suitLaConvention } from "./adr.mjs";
 import { checkDesign, matriceDeCoherence, matriceMarkdown, ligneNomsDuModele, MODEL_DOCS, routerMotifsDeDesign } from "./design.mjs";
 import { lensesForPhase } from "./difficulty.mjs";
@@ -22,6 +23,7 @@ export async function concevoir(w, d, lentilles, max) {
     // Relancée après une escalade : le premier essai reçoit son motif (D15 de docs/12).
     await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lensesForPhase(lentilles, "DESIGN"), motifs, essai));
     await statuerAdrs(w, d);
+    releverLesDefauts(d.registre, suivi, "DESIGN");
     await ecrireRapports(w, d.slug, "DESIGN", suivi);
     return true;
   }, {
@@ -30,6 +32,9 @@ export async function concevoir(w, d, lentilles, max) {
     commitManque: () => void d.nonCommitees.push("DESIGN"),
     // Le rembobinage efface les ADR de la phase : la liste les oublie aussi (D2 de docs/12).
     apresRembobinage: async () => {
+      // Les défauts retenus du run effacé sont des erreurs commises : relevés avant d'être oubliés (LEC-1).
+      releverLesDefauts(d.registre, suivi, "DESIGN");
+      await ecrireLeRegistre(w, d.registre, { apresRembobinage: true });
       await creerDossiers(w, d.slug);
       d.adrs = await adrsDuDisque(w, d.slug);
       // Livrables et rapports du run effacé : oubliés (D6, D8 de docs/12).

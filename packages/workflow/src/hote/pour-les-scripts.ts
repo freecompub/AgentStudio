@@ -26,5 +26,6 @@ export const {
   bddNonDeclare,
   estUnManifeste,
   memeRefus,
+  normaliserMotifs,
   disjoncte,
 } = bibliotheque;
