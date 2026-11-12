@@ -52,10 +52,18 @@ describe("Registre des erreurs (LEC-1)", () => {
   });
 
   it("le contenu garde chaque ligne déjà écrite telle quelle, et ajoute les nouvelles à la suite", () => {
-    const avant = '{"type":"refus","story":"lec-1"}';
+    const avant = '{"id":"lec-1#1","type":"refus","story":"lec-1"}';
     const e = erreurDeRefus({ porte: "valeurs", motifs: ["x"], phase: "DISTILL", story: "lec-1" });
-    expect(contenuDuRegistre(avant, [e])).toBe(`${avant}\n${JSON.stringify(e)}\n`);
+    expect(contenuDuRegistre(avant, [e])).toBe(`${avant}\n${JSON.stringify({ id: "lec-1#2", ...e })}\n`);
     expect(contenuDuRegistre("", [])).toBe("");
+  });
+
+  // LEC-2 : une leçon cite ses sources par identifiant ; il est stable, et continue le fichier à une relance.
+  it("chaque erreur reçoit un identifiant : la story et son rang dans le fichier", () => {
+    const e = (m) => erreurDeRefus({ porte: "valeurs", motifs: [m], phase: "DISTILL", story: "lec-1" });
+    const premier = contenuDuRegistre("", [e("a"), e("b")]);
+    expect(premier.trim().split("\n").map((l) => JSON.parse(l).id)).toEqual(["lec-1#1", "lec-1#2"]);
+    expect(contenuDuRegistre(premier, [e("c")]).trim().split("\n").map((l) => JSON.parse(l).id)).toEqual(["lec-1#1", "lec-1#2", "lec-1#3"]);
   });
 
   it("regroupe les erreurs de toutes les stories par signature, avec le nombre de stories distinctes", () => {

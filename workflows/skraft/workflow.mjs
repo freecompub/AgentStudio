@@ -25,6 +25,7 @@ export const meta = {
     BLOCKED: "Question d'un agent",
     ESCALATED: "Escalade",
     DONE: "Terminé",
+    LECONS: "Leçons tirées des erreurs",
     RESEARCH: "Enquête sur le code existant",
     DESIGN: "Conception",
     DISTILL: "Scénarios d'acceptance",
@@ -54,6 +55,12 @@ export const meta = {
     verifier_scenarios: { description: "Vérifie tes scénarios, ton plan de test et tes tests d'acceptance avec les portes du code (gherkin, valeurs, plan de test). Sans argument : le code lit lui-même tes fichiers." },
   },
   agents: {
+    "skraft-lecons": {
+      prompt: "agents/skraft-lecons.agent.md",
+      consignes: "Le dossier de passation, construit par l'orchestrateur, donne les groupes d'erreurs à classer et les catalogues avec leurs sections. Rends une leçon par groupe avec l'outil submit_lecons ; le code vérifie chaque référence de catalogue, chaque source et l'exemple.",
+      classe: "light",
+      sortie: "submit_lecons",
+    },
     "skraft-classifier": {
       prompt: "agents/skraft-classifier.agent.md",
       consignes: "Le dossier de passation, construit par l'orchestrateur, donne la story, le dossier de travail (`.skraft/<slug>/`) et le résultat des phases précédentes.\nRends le niveau et sa justification avec l'outil submit_difficulty.",
@@ -195,6 +202,7 @@ import { livrer, barreDeQualite } from "./livraison.mjs";
 import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
 import { ecrireLeRegistre, ligneDuRegistre, nouveauRegistre, ouvrirLeRegistre, suivreLesRefus } from "./registre.mjs";
+import { ligneDesLecons, tirerLesLecons } from "./lecons.mjs";
 const RELANCER_OU_ABANDONNER = [
   { id: "relancer", label: "Relancer" },
   { id: "abandonner", label: "Abandonner" },
@@ -302,6 +310,8 @@ export default async function skraft(w0, entree) {
   await ecrireLeRegistre(w, registre);
   if (registre.erreurs.length)
     await w.commiter(`docs(skraft): registre des erreurs de ${slug}`, [registre.chemin]);
+  // Leçons tirées des erreurs répétées (LEC-2), à jour pour le run suivant.
+  vue.lecons = await tirerLesLecons(w, slug);
   await w.etape("DONE");
   await w.informer(bilan(vue, !entree.auto));
   return {
@@ -342,6 +352,7 @@ function bilan(d, confirmee) {
     `Phases exécutées : ${d.phasesFaites.map((p) => p.phase).join(", ") || "aucune"} ; sautées : ${d.phasesSautees.join(", ") || "aucune"}.`,
     `ADR : ${adrs}.`,
     ...[ligneDuRegistre(d.registre)].filter((l) => l !== null),
+    ...[ligneDesLecons(d.lecons)].filter((l) => l !== null),
     ...[ligneValeursRetirees(d.questions)].filter((l) => l !== null),
     ...(d.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${d.verifications.map((v) => `${v.phase} ${v.agent} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(d.derogationsCouverture?.length

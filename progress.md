@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 12/11 — LEC-2 : les leçons tirées des erreurs répétées (en cours)
+
+- **Décisions du responsable** : le classement tourne à la fin de chaque run ; la ratification d'une
+  leçon est réservée au profil déclaré dans la configuration du serveur MCP. (Il a d'abord compris
+  « agent de classement » comme `skraft-classifier`, le classifieur de difficulté : les deux noms se
+  confondent, à éviter dans les questions.)
+- **Fait** (branche `feat/lec-2-lecons`, partie de `feat/lec-1-registre`) :
+  - registre : chaque erreur a un identifiant `<story>#<rang>`, qui continue le fichier à une relance ;
+  - cœur : outil terminal `submit_lecons` ; `sortie` du meta et du manifeste l'acceptent ;
+  - `catalogues.mjs` : les titres des cinq catalogues, recopiés (le script ne lit pas le dossier du
+    workflow) et comparés aux fichiers des skills par un test ;
+  - `lecons.mjs` : vérification d'une leçon (critères 3 à 5), rôle (6), statuts (7 à 10), puis la fin
+    de run `tirerLesLecons` (un second tour avec les motifs ; un échec ne fait pas échouer le run) ;
+  - agent `skraft-lecons` ; leçons et ordre des stories (`stories.jsonl`) commités après le registre.
+- **Piège** : chaque run appelle maintenant l'agent des leçons s'il a des erreurs ; le banc doit le
+  simuler (`submit_lecons` vide par défaut), sinon l'essai attend 60 s.
+- **Prochaine étape** : l'outil MCP `skraft_lecons` (critères 11 à 14).
+
 ## 11/11 — LEC-1 : le registre des erreurs commises
 
 - **Demande du responsable** : coder LEC-1 (freecompub/AgentStudio#32) directement. Il a tranché quatre

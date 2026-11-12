@@ -196,6 +196,8 @@ export function simulatedAgents(
     await t.callTool("report_phase", { summary: `écrit ${rel}`, files: [rel] });
   };
   const behaviors: Record<string, ScriptedBehavior> = {
+    // Agent de classement des leçons (LEC-2) : par défaut, il ne propose rien ; les groupes attendent.
+    "skraft-lecons": async (t) => void (await t.callTool("submit_lecons", { lecons: [] })),
     "skraft-classifier": async (t) => {
       const proposed = /Niveau proposé par la grille : (\S+)/.exec(t.prompt)?.[1] ?? "medium";
       await t.callTool("submit_difficulty", { level: proposed, justification: "conforme à la grille" });

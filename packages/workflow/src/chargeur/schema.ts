@@ -24,7 +24,7 @@ const agent = z
     ecriture: z.array(texte(200)).optional(),
     outils: z.array(texte(40)).optional(),
     skills: z.object({ obligatoires: z.array(z.string().regex(SKILL)).optional(), aLaDemande: z.array(z.string().regex(SKILL)).optional() }).strict().optional(),
-    sortie: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict"]),
+    sortie: z.enum(["report_phase", "submit_plan", "submit_difficulty", "submit_lens_verdict", "submit_lecons"]),
     memoire: z.enum(["tache", "tour"]).optional(),
   })
   .strict();
