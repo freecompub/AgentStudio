@@ -50,8 +50,14 @@ function codeHasLiteral(code: string, literal: string): boolean {
   return new RegExp(`(?<![\\d.])${value.replace(".", "[.,]")}(?![\\d])`).test(code) || hasLiteral(code, literal);
 }
 
-export function checkValues(i: { criteria: Criterion[]; features: SourceFile[]; acceptanceTests: SourceFile[] }): string[] {
+/**
+ * Porte des valeurs (§7.3, ADR 0090). Bloquant : un scénario tagué et un test marqué par critère.
+ * Avertissement seulement : une valeur du critère absente de son scénario ou de son test, souvent écrite
+ * sous une autre forme (`0.05` pour « 5 % », des centimes, une valeur lue du Gherkin) ; la revue en juge.
+ */
+export function checkValues(i: { criteria: Criterion[]; features: SourceFile[]; acceptanceTests: SourceFile[] }): { motifs: string[]; avertissements: string[] } {
   const reasons: string[] = [];
+  const avertissements: string[] = [];
   const scenarios = new Map<number, { text: string; path: string }>();
   for (const f of i.features)
     for (const [n, text] of featureScenarios(f.content)) scenarios.set(n, { text: `${scenarios.get(n)?.text ?? ""}${text}`, path: scenarios.get(n)?.path ?? f.path });
@@ -63,12 +69,12 @@ export function checkValues(i: { criteria: Criterion[]; features: SourceFile[]; 
     if (!tests.length) reasons.push(`Aucun test d'acceptance ne porte le marqueur ac-${c.n} (critère ${c.n}).`);
     for (const literal of c.literals) {
       if (scenario && !hasLiteral(scenario.text, literal))
-        reasons.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le scénario @ac-${c.n} (${scenario.path}).`);
+        avertissements.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le scénario @ac-${c.n} (${scenario.path}).`);
       if (tests.length && !tests.some((t) => codeHasLiteral(t.content, literal)))
-        reasons.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le test d'acceptance du critère ${c.n} (${tests.map((t) => t.path).join(", ")}).`);
+        avertissements.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le test d'acceptance du critère ${c.n} (${tests.map((t) => t.path).join(", ")}).`);
     }
   }
-  return [...new Set(reasons)];
+  return { motifs: [...new Set(reasons)], avertissements: [...new Set(avertissements)] };
 }
 
 /** Un test au relevé d'INIT (ADR 0074 §4) : ceux des stories précédentes. */

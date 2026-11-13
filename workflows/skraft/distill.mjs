@@ -28,8 +28,14 @@ function codeHasLiteral(code, literal) {
   const value = num[1].replace(",", ".");
   return new RegExp(`(?<![\\d.])${value.replace(".", "[.,]")}(?![\\d])`).test(code) || hasLiteral(code, literal);
 }
+/**
+* Porte des valeurs (§7.3, ADR 0090). Bloquant : un scénario tagué et un test marqué par critère.
+* Avertissement seulement : une valeur du critère absente de son scénario ou de son test, souvent écrite
+* sous une autre forme (`0.05` pour « 5 % », des centimes, une valeur lue du Gherkin) ; la revue en juge.
+*/
 export function checkValues(i) {
   const reasons = [];
+  const avertissements = [];
   const scenarios = new Map();
   for (const f of i.features)
     for (const [n, text] of featureScenarios(f.content))
@@ -43,12 +49,12 @@ export function checkValues(i) {
       reasons.push(`Aucun test d'acceptance ne porte le marqueur ac-${c.n} (critère ${c.n}).`);
     for (const literal of c.literals) {
       if (scenario && !hasLiteral(scenario.text, literal))
-        reasons.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le scénario @ac-${c.n} (${scenario.path}).`);
+        avertissements.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le scénario @ac-${c.n} (${scenario.path}).`);
       if (tests.length && !tests.some((t) => codeHasLiteral(t.content, literal)))
-        reasons.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le test d'acceptance du critère ${c.n} (${tests.map((t) => t.path).join(", ")}).`);
+        avertissements.push(`La valeur « ${literal} » du critère ${c.n} n'apparaît pas dans le test d'acceptance du critère ${c.n} (${tests.map((t) => t.path).join(", ")}).`);
     }
   }
-  return [...new Set(reasons)];
+  return { motifs: [...new Set(reasons)], avertissements: [...new Set(avertissements)] };
 }
 const existaient = (avant) => new Set((avant ?? []).map((t) => t.id));
 /**

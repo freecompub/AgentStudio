@@ -8,7 +8,7 @@ import type { CauseDEchec, DeliverScenario, Granularity, MutantExempte, MutantSu
 import type { Difficulty, DifficultyIndicators, LensName } from "./difficulty.js";
 import type { LensVerdict, Verdict } from "./review.js";
 import type { DefectResponse, DefectThread } from "./review-thread.js";
-import type { Story, ValeurDouteuse } from "./story.js";
+import type { Story } from "./story.js";
 
 export type Phase = "RESEARCH" | "DESIGN" | "DISTILL" | "DELIVER";
 
@@ -191,8 +191,7 @@ export interface SkraftState {
   attempts: number;
   budget: { maxAttemptsPerPhase: number; maxCyclesPerScenario: number };
   lastRejection: { gate: string; reasons: string[] } | null;
-  /** `valeur` : une valeur douteuse de la porte des valeurs, que l'humain garde ou retire (ADR 0080). */
-  openQuestions: { id: string; text: string; answer?: string; valeur?: ValeurDouteuse; retiree?: boolean }[];
+  openQuestions: { id: string; text: string; answer?: string }[];
   /** Matrice du plan de test gardée depuis DISTILL (ADR 0067). */
   planDeTest?: Record<string, LigneDuPlan>;
   /** Écarts au plan de test déclarés et validés en DELIVER, commités dans `ecarts-au-plan.md` (ADR 0067). */
@@ -262,6 +261,8 @@ export interface SkraftState {
   testsAvant?: TestAvant[];
   /** Tests d'acceptance de la story, relevés à la porte de DISTILL : DELIVER n'en fait pas d'autres scénarios. */
   testsDeLaStory?: string[];
+  /** Valeurs des critères absentes des scénarios ou des tests, à la porte de DISTILL : non bloquant, jugé par la revue (ADR 0090). */
+  avertissementsDeValeurs?: string[];
   /** Granularité imposée par réglage, sinon choisie selon la difficulté. */
   granularitySetting: Granularity | null;
   /** Skills chargées à la demande par `load_skill`, tracées par rôle et par phase (D26) ; absent d'un état antérieur. */
@@ -312,6 +313,7 @@ export type SkraftEvent =
       acceptanceHash?: string;
       regressions?: string[];
       testsDeLaStory?: string[];
+      avertissementsDeValeurs?: string[];
       /** DELIVER : faits et notes de la mutation de fin de phase, pour les lentilles (ADR 0049). */
       facts?: string[];
       notes?: string[];
@@ -358,7 +360,7 @@ export type SkraftEffect =
   | { kind: "applyAdrStatuses"; adrs: { path: string; status: "Accepted" | "Rejected" }[] }
   /** `lens` : question d'une lentille de revue (D4 de docs/12). */
   | { kind: "askBlocker"; question: string; choices: string[]; lens?: LensName }
-  | { kind: "askQuestion"; id: string; text: string; valeur?: ValeurDouteuse }
+  | { kind: "askQuestion"; id: string; text: string }
   | { kind: "askEscalation"; reason: string; options: ("obsolete" | "exempt" | "retry" | "skip" | "continue" | "abort")[] }
   | { kind: "askArbitration"; thread: DefectThread }
   | { kind: "arbitrateMutants"; threads: DefectThread[] }
@@ -434,12 +436,13 @@ const stateSchema = z.object({
   gherkinAvant: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
   testsAvant: z.array(z.object({ id: z.string(), status: z.enum(["passed", "failed", "skipped"]) })).optional(),
   testsDeLaStory: z.array(z.string()).optional(),
+  avertissementsDeValeurs: z.array(z.string()).optional(),
   artifacts: byPhase(z.object({ path: z.string(), sha256: z.string(), producedBy: z.string(), attempt: z.number() })),
   reviews: byPhase(z.object({ attempt: z.number(), lenses: z.array(z.unknown()), verdict: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]), reportPath: z.string() })),
   attempts: z.number().int().min(0),
   budget: z.object({ maxAttemptsPerPhase: z.number().int().min(1), maxCyclesPerScenario: z.number().int().min(1) }),
   lastRejection: z.object({ gate: z.string(), reasons: z.array(z.string()) }).nullable(),
-  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional(), valeur: z.object({ critere: z.number().int(), valeur: z.string() }).optional(), retiree: z.boolean().optional() })),
+  openQuestions: z.array(z.object({ id: z.string(), text: z.string(), answer: z.string().optional() })),
   recherche: z.object({ conventions: z.string(), existant: z.string() }).nullable().optional(),
   architecture: z.string().optional(),
   planDeTest: z.record(z.string(), z.object({ couche: z.string(), doublure: z.string() })).optional(),

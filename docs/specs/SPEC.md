@@ -782,7 +782,7 @@ Quatre niveaux : `simple`, `medium`, `medium-hard`, `challenging`. Écrite une s
 | RESEARCH | Préparation | Fichiers candidats présélectionnés par mots-clés de la story, placés dans le dossier de passation |
 | DESIGN | Porte cohérence | En-tête valide sur chaque nouvel ADR ; chaque événement et agrégat cité dans les contrats existe dans le modèle d'événements ; remplacements présents dans le nouvel ADR **et** dans le registre ; numérotation continue |
 | DESIGN | Ratification | État bloquant et persisté ; décision `accept` / `reject` / `amend` par ADR, par l'utilisateur, quel qu'il soit (ADR 0087) |
-| DISTILL | Porte valeurs | Chaque littéral des critères d'acceptation apparaît dans le `.feature` et dans le test d'acceptance correspondant |
+| DISTILL | Porte valeurs | Chaque critère a son scénario et son test d'acceptance ; un littéral absent de l'un ou de l'autre est un avertissement non bloquant, jugé par la revue (ADR 0090) |
 | DISTILL | Porte RED d'acceptance | Le code exécute les tests d'acceptance : échec sur assertion ou symbole manquant accepté ; test qui passe déjà signalé et requalifié en non-régression |
 | DELIVER | Sous-machine | Voir 9.6 |
 

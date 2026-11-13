@@ -2,6 +2,9 @@
 
 ## Statut
 
+**Remplacé** le 2026-11-13 par l'ADR 0090 : les nombres des critères ne sont plus soumis à
+l'humain, et une valeur absente n'est plus un refus.
+
 **Accepté** le 2026-11-11 par le responsable du projet :
 - « je pense que la gate est trop restrictive » ;
 - « que penses-tu du fait de remonter le problème à l'utilisateur, lui expliquer le problème, qu'il

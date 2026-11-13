@@ -373,46 +373,31 @@ describe("Réducteur skraft — questions ouvertes (§7.1, §11)", () => {
     expect(kinds(effects)).toEqual(["askQuestion"]);
   });
 
-  // ADR 0080 : un nombre seul d'un critère est peut-être un compte, une date, un numéro. L'humain dit
-  // s'il faut le tester, avant tout travail ; sans réponse, la porte le garde.
-  describe("valeurs douteuses de la porte des valeurs", () => {
-    const avecDouteuse = (() => {
+  // ADR 0090 (remplace l'ADR 0080) : les nombres des critères ne sont plus soumis à l'utilisateur.
+  describe("nombres des critères", () => {
+    const avecNombre = (() => {
       const r = parseStory(US12.replace("3. Aucun plafond configuré", "3. Après 3 refus, aucun plafond configuré"));
       if (!r.ok) throw new Error();
       return r.story;
     })();
-    const INIT_DOUTE: Ev = { ...INITIALIZED, story: avecDouteuse } as Ev;
-    const texte = "Le critère 3 cite « 3 » : « Après 3 refus, aucun plafond configuré : dose proposée égale au calcul, pas d'alerte. ». Est-ce une valeur que les scénarios et les tests d'acceptance doivent contenir ? Si c'est un compte, une date ou un numéro sans portée métier, retire-la : la porte des valeurs ne l'exigera pas.";
+    const INIT_NOMBRE: Ev = { ...INITIALIZED, story: avecNombre } as Ev;
 
-    it("posée avec les questions de la story, avant RESEARCH, avec la valeur et son critère", () => {
-      const { state, effects } = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard")]);
+    it("un nombre seul n'est pas une question : seules celles de la story sont posées", () => {
+      const { state, effects } = play([INIT_NOMBRE, PROPOSED("medium-hard"), DECIDE("medium-hard")]);
       expect(state.stage).toBe("ROUTE");
-      expect(effects).toEqual([
-        { kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" },
-        { kind: "askQuestion", id: "v1", text: texte, valeur: { critere: 3, valeur: "3" } },
-      ]);
+      expect(effects).toEqual([{ kind: "askQuestion", id: "q1", text: "Le plafond s'applique-t-il par prise ou par jour ?" }]);
     });
 
-    it("retirée : la porte ne l'exige plus, et la réponse est gardée ; gardée : rien ne change", () => {
-      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER];
-      const retiree = play([...base, DECIDE("drop:v1")]).state;
-      expect(retiree.story!.criteria[2]!.literals).toEqual([]);
-      expect(retiree.openQuestions[1]).toMatchObject({ id: "v1", answer: "Non : « 3 » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas." });
-      expect(retiree).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
-      const gardee = play([...base, DECIDE("keep:v1")]).state;
-      expect(gardee.story!.criteria[2]!.literals).toEqual(["3"]);
-      expect(gardee.openQuestions[1]).toMatchObject({ id: "v1", answer: "Oui : « 3 » est une valeur à tester ; la porte des valeurs l'exige." });
+    it("la question répondue, RESEARCH démarre ; le nombre reste dans son critère", () => {
+      const { state } = play([INIT_NOMBRE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER]);
+      expect(state).toMatchObject({ stage: "SPECIALIST", phase: "RESEARCH" });
+      expect(state.story!.criteria[2]!.literals).toEqual(["3"]);
     });
 
-    it("une question de la recherche garde sa numérotation en q", () => {
-      const base = [INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER, DECIDE("keep:v1"), CP("RESEARCH"), REPORTED];
+    it("une question de la recherche suit la numérotation des questions de la story", () => {
+      const base = [INIT_NOMBRE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER, CP("RESEARCH"), REPORTED];
       const { effects } = play([...base, { type: "GATE_OK", artifacts: [], openQuestions: ["Affiché ?"] } as Ev, COMMITTED]);
       expect(effects).toEqual([{ kind: "askQuestion", id: "q2", text: "Affiché ?" }]);
-    });
-
-    it("« Répondre » ou « Reporter » ne tranchent pas une valeur", () => {
-      const base = play([INIT_DOUTE, PROPOSED("medium-hard"), DECIDE("medium-hard"), ANSWER]);
-      expect(transition(base.state, DECIDE("answer:v1", "x"))).toEqual({ state: base.state, effects: [] });
     });
   });
 

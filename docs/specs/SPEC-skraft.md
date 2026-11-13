@@ -253,7 +253,7 @@ je veux que la dose proposée soit limitée à ce plafond et qu'une alerte m'exp
 - Le plafond s'applique-t-il par prise ou par jour ?
 ```
 
-Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3). Une référence (« ADR 0069 », « #32 ») n'en est pas un. Un nombre seul, sans unité, est une valeur douteuse : il est soumis à l'humain en ROUTE, avant RESEARCH, qui le garde ou le retire de la porte (ADR 0080).
+Validation à INIT : titre avec identifiant, au moins un critère numéroté. Les **littéraux** des critères (nombres, unités, chaînes entre guillemets) sont extraits et stockés : ils alimentent la porte valeurs (7.3). Une référence (« ADR 0069 », « #32 ») n'en est pas un. Les nombres des critères ne sont pas soumis à l'humain (ADR 0090, qui remplace l'ADR 0080).
 
 **Précontrôle avant tout appel LLM (ADR 0060)** : le code exécute les tests existants
 (`INIT_BASELINE`). Échec, test ignoré, délai dépassé ou sortie non nulle bloquent le
@@ -397,7 +397,7 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Vérification par l'agent (ADR 0082)** : l'agent d'acceptance dispose de l'outil `verifier_scenarios`, qui rend ce que les portes gherkin, valeurs et plan de test diraient de ses fichiers ; c'est le même calcul que la porte, rejouée par le code après son tour. Sans vérification depuis sa dernière modification, sa sortie est refusée une fois.
 
-**Porte valeurs (code)** : chaque littéral extrait de la story (6.1) doit apparaître dans le `.feature` du scénario correspondant **et** dans le fichier de test d'acceptance. Normalisation : séparateur décimal `,` ou `.`, espaces insécables. Une valeur douteuse retirée par l'humain (6.1, ADR 0080) n'est pas exigée ; le bilan du run la nomme.
+**Porte valeurs (code)** : chaque critère a un scénario tagué `@ac-<n>` et un test d'acceptance marqué `ac-<n>` ; sinon, refus. Chaque littéral extrait de la story (6.1) absent du `.feature` du scénario correspondant ou du fichier de test d'acceptance est un **avertissement non bloquant** (ADR 0090) : il est montré à l'utilisateur, à l'agent par `verifier_scenarios`, et à la revue de DISTILL, qui juge si la valeur est testée sous une autre forme. Normalisation : séparateur décimal `,` ou `.`, espaces insécables.
 
 **Porte RED d'acceptance (code)** : exécution des tests d'acceptance selon le profil de stack, classification des échecs par le moteur générique.
 

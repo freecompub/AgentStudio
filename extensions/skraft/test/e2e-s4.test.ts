@@ -71,15 +71,15 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
     const acceptance: ScriptedBehavior = async (t) => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
-      await put(root, ".skraft/us12-f15ade30/distill/features/plafond.feature", FEATURE(attempt === 1 ? "12 U" : "12,5 U"));
+      await put(root, ".skraft/us12-f15ade30/distill/features/plafond.feature", FEATURE("12,5 U"));
       await put(root, ".skraft/us12-f15ade30/distill/impl-plan.md", implPlanDe([1, 2, 3], "tests/acceptance/plafond.test.ts"));
       await put(
         root,
         ".skraft/us12-f15ade30/distill/test-plan.md",
-        testPlanDe([1, 2, 3], attempt >= 3 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""),
+        testPlanDe([1, 2, 3], attempt >= 2 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""),
       );
       await put(root, "tests/acceptance/plafond.test.ts", ACCEPTANCE);
-      if (attempt === 4)
+      if (attempt === 3)
         await put(root, "tests/acceptance/complement.test.ts", `import { it, expect } from "vitest";\nit("ac-2 complément", () => expect(0).toBe(1));\n`);
       await t.callTool("report_phase", { summary: "scénarios", files: [] });
     };
@@ -113,13 +113,11 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
 
     await until(async () => deliverPrompt !== "" || stateOf(await app.engine.status(id))?.stage === "ESCALATED", 120_000);
     expect(stateOf(await app.engine.status(id))?.escalation).toBeNull();
-    expect(prompts).toHaveLength(4);
-    expect(prompts[3]).not.toContain("Les tests d'acceptance sont gelés");
+    expect(prompts).toHaveLength(3);
+    expect(prompts[2]).not.toContain("Les tests d'acceptance sont gelés");
     expect(deliverPrompt).toContain("Les tests d'acceptance sont gelés");
-    // 1. porte valeurs : « 12 U » au lieu de « 12,5 U »
-    expect(prompts[1]).toContain("La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us12-f15ade30/distill/features/plafond.feature).");
-    // 2. porte RED : ac-3 déjà vert sans justification
-    expect(prompts[2]).toContain("« tests/acceptance/plafond.test.ts > ac-3 aucun plafond » (critère 3) passe déjà");
+    // La porte des valeurs n'est plus un refus (ADR 0090). 1. porte RED : ac-3 déjà vert sans justification
+    expect(prompts[1]).toContain("« tests/acceptance/plafond.test.ts > ac-3 aucun plafond » (critère 3) passe déjà");
     expect(prompts[0]).toContain("Tests d'acceptance à écrire dans : tests/acceptance/**");
 
     const s = stateOf(await app.engine.status(id))!;

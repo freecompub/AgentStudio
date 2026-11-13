@@ -39,6 +39,9 @@ export function reviewFacts(state: SkraftState, phase: Phase, evidence: Evidence
         : `Empreinte des tests d'acceptance prise (${short(state.acceptanceHash)}) : le gel devient définitif au commit de DISTILL.`,
     );
   for (const r of state.regressions) facts.push(`Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`);
+  // Non bloquants, jugés par la revue (ADR 0090).
+  if (phase === "DISTILL")
+    for (const a of state.avertissementsDeValeurs ?? []) facts.push(`Avertissement de la porte des valeurs, non bloquant (à juger : la valeur est-elle testée sous une autre forme ?) : ${a}`);
   if (phase === "DELIVER")
     for (const x of state.derogations ?? [])
       facts.push(`Dérogation de mutation (${x.par}) : ${x.file}:${x.line} (${x.operator}) — ${x.raison}. Mutant exempté de la porte de mutation après arbitrage.`);

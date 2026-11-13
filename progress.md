@@ -5,6 +5,20 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/11 — La porte des valeurs avertit sans bloquer (ADR 0090)
+
+- **Demande du responsable** : les contrôles 3 et 4 de la porte des valeurs (valeur dans le scénario,
+  valeur dans le test) deviennent des avertissements, dont l'utilisateur est informé ; plus de question
+  sur les nombres des critères avant RESEARCH. Branche `feat/valeurs-avertissement`, de `main`.
+- **Fait** (extension et workflow) : `checkValues` rend `{ motifs, avertissements }` ; les avertissements
+  vont à l'utilisateur (message), à l'agent (`verifier_scenarios`) et à la revue de DISTILL (faits) ;
+  valeurs douteuses de l'ADR 0080 supprimées (question, retrait, ligne du bilan, fonctions de `story`).
+- **Piège** : un test de la porte contenait une espace insécable (`12.5 U`) : un remplacement textuel
+  ordinaire ne le trouvait pas.
+- **Piège** : le test S4 enchaînait quatre essais, dont le premier refusé par la porte des valeurs ; il
+  passe maintenant, et deux refus RED identiques de suite déclenchaient le disjoncteur. Décalé d'un essai.
+- **Prochaine étape** : un essai réel, pour voir si la revue relève les valeurs vraiment absentes.
+
 ## 13/11 — Reprise d'une US : le slug (ADR 0088)
 
 - **Demande du responsable** : relancer une US abandonnée et continuer ; le slug combine le numéro et
