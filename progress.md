@@ -22,6 +22,16 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 - **Numéro d'ADR** : 0087, parce que 0086 est pris sur `feat/revue-lentilles`, qui n'est pas encore
   mergée.
 - **Prochaine étape** : pousser et ouvrir la PR quand le responsable le demande.
+## 12/11 — Revue : les lentilles en parallèle
+
+- **Demande du responsable** : paralléliser les lentilles, puis retirer celles qui n'apportent rien
+  à leur phase.
+- **Fait** (branche `feat/revue-lentilles`, ADR 0086) : la tâche de workflow regroupe les tours
+  d'agents en lecture seule en attente ensemble en un seul effet `agents`, qui les lance en même
+  temps et rend `RESULTATS`. « En lecture seule » est déduit du `meta` (`agentsEnLectureSeule`) :
+  ni écriture, ni `run_tests`, ni `run_lint`.
+- **Piège** : le `Promise.all` du script ne suffisait pas. Chaque appel devient un effet, et le
+  moteur de tâches (`drain`) les exécute un par un.
 
 ## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
 
