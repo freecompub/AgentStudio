@@ -86,8 +86,18 @@ export interface Repository {
   commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
   /** Avance rapide depuis l'amont puis push ; échoue en cas de divergence. */
   sync(): Promise<SyncResult>;
-  /** Se place sur la branche `name`, créée depuis HEAD si besoin (modifications en cours conservées). */
-  switchBranch(name: string): Promise<void>;
+  /**
+   * Se place sur la branche `name`, créée depuis HEAD si besoin (modifications en cours conservées).
+   * `ecraser` : la branche est recréée depuis `depuis` (ou HEAD), ce qu'elle portait est perdu (ADR 0089).
+   */
+  switchBranch(name: string, opts?: { depuis?: string; ecraser?: boolean }): Promise<void>;
+  /** Commits de HEAD, du plus récent au plus ancien (200 au plus). */
+  log(): Promise<{ sha: string; subject: string }[]>;
+  /**
+   * Ramène la branche courante à `sha`, un commit de son historique : ce qui a été commité ou modifié
+   * depuis disparaît. Les fichiers non suivis restent en place, et sont rendus (ADR 0089).
+   */
+  resetTo(sha: string): Promise<{ nonSuivis: string[] }>;
 }
 
 /** Façade composée, seule porte d'accès au disque et à Git. */

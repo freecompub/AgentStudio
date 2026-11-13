@@ -51,6 +51,9 @@ export type NomAppel =
   | "arbitrage"
   | "etape"
   | "brancher"
+  | "tete"
+  | "historique"
+  | "revenirA"
   | "checkpoint"
   | "rembobiner"
   | "commiter"
@@ -186,7 +189,14 @@ export interface W {
   disposition(): Promise<{ pile: string; acceptanceTests: string[]; unitTests: string[]; sources: string[]; infrastructureModules: string[]; bdd?: { lanceur: string; features: string; etapes: string }[]; bddNonDecide?: string[] }>;
   /** Empreinte des fichiers correspondant aux motifs : geler des tests, puis vérifier le gel (D21). */
   empreinte(motifs: readonly string[]): Promise<string>;
-  brancher(nom: string): Promise<void>;
+  /** Se place sur la branche, créée si besoin ; `ecraser` : la recrée depuis `depuis` (ou la tête), ce qu'elle portait est perdu (ADR 0089). */
+  brancher(nom: string, opts?: { depuis?: string; ecraser?: boolean }): Promise<void>;
+  /** Commit de tête de la branche courante. */
+  tete(): Promise<string>;
+  /** Commits de la branche courante, du plus récent au plus ancien. */
+  historique(): Promise<{ sha: string; subject: string }[]>;
+  /** Ramène la branche à un commit de son historique ; rend les fichiers non suivis laissés en place (ADR 0089). */
+  revenirA(sha: string): Promise<{ nonSuivis: string[] }>;
   checkpoint(nom: string): Promise<string>;
   /** Revient au checkpoint et fait oublier les agents qui ont travaillé depuis (ADR 0053). */
   rembobiner(checkpoint: string): Promise<void>;

@@ -73,7 +73,7 @@ describe("Extension tierce installée depuis un fichier (J6)", () => {
       repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
       worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
-      head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+      head: async () => "h", commit: async () => null, sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {}, log: async () => [], resetTo: async () => ({ nonSuivis: [] }) },
     };
     await mkdir(workspace.root, { recursive: true });
     services = await workspaceServicesFactory({

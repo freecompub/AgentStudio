@@ -33,6 +33,8 @@ export const meta = {
   },
   humains: {
     "confirmer-difficulte": [],
+    // Continuer une session précédente de la story, ou l'écraser (ADR 0089).
+    reprise: [],
     "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
     "valeur-a-tester": ["po", "developpeur", "architecte", "administrateur"],
     blocage: ["po", "developpeur", "architecte", "administrateur"],
@@ -203,6 +205,7 @@ import { checkCoverage } from "./deliver.mjs";
 import { commitMessage, creerDossiers, GELÉS, LEVEL_LABELS, repositoryShape } from "./support.mjs";
 import { ecrireLeRegistre, ligneDuRegistre, nouveauRegistre, ouvrirLeRegistre, suivreLesRefus } from "./registre.mjs";
 import { chargerLaMemoire, leconsPour, ligneDesLecons, tirerLesLecons } from "./lecons.mjs";
+import { noterLEtat, proposerLaReprise, releveDeDepart, restaurer } from "./reprise.mjs";
 const RELANCER_OU_ABANDONNER = [
   { id: "relancer", label: "Relancer" },
   { id: "abandonner", label: "Abandonner" },
@@ -212,11 +215,17 @@ export default async function skraft(w0, entree) {
   // code les trace ; le reste du script ne voit aucune différence.
   const registre = nouveauRegistre();
   const w = suivreLesRefus(w0, registre);
-  const { story, slug, indicateurs } = await preparer(w, entree.story);
+  const { story, slug, indicateurs, base } = await preparer(w, entree.story);
+  // Une session précédente sur la branche de la story : continuer ou l'écraser, au choix de l'utilisateur
+  // (ADR 0089). Le registre est ouvert ensuite : le retour au commit de phase a pu changer le disque.
+  const reprise = await proposerLaReprise(w, story, slug, base);
+  if (reprise)
+    await creerDossiers(w, slug);
   await ouvrirLeRegistre(w, registre, slug);
   // Les leçons validées du projet, données aux agents de leur rôle au début de leur phase (LEC-3).
   const memoire = await chargerLaMemoire(w);
-  const run = await w.lancerTests({ etiquette: "INIT_BASELINE" });
+  // Session continuée : les tests d'acceptance de la story sont rouges en attendant DELIVER (ADR 0089).
+  const run = releveDeDepart(await w.lancerTests({ etiquette: "INIT_BASELINE" }), reprise);
   // BDD non déclaré (08/11) : un composant muet qui en montre les signes partirait dans le mauvais mode.
   const racinesMuettes = (await w.disposition()).bddNonDecide ?? [];
   const tousLesFichiers = racinesMuettes.length ? await w.listerFichiers() : [];
@@ -239,12 +248,13 @@ export default async function skraft(w0, entree) {
   const architecture = skillDArchitecture(entree.archi);
   if (architecture.avertissement)
     await w.informer(architecture.avertissement);
-  const niveau = await evaluerDifficulte(w, story, indicateurs, !entree.auto, registre);
+  const niveau = reprise?.niveau ?? (await evaluerDifficulte(w, story, indicateurs, !entree.auto, registre));
   const effets = levelEffects(niveau);
   // Ce que le dossier de passation raconte, tenu à jour au fil du script.
   const vue = {
     story,
     slug,
+    base,
     niveau,
     registre,
     memoire,
@@ -278,13 +288,22 @@ export default async function skraft(w0, entree) {
     // Matrice du plan de test (DISTILL) et écarts déclarés en DELIVER, vérifiés contre elle (ADR 0067).
     planDeTest: null,
     ecartsAuPlan: [],
-  };
+  };  // Session continuée (ADR 0089) : les phases approuvées et ce qu'elles ont laissé, relus du disque.
+  if (reprise)
+    restaurer(vue, reprise);
+  const dejaFaite = (phase) => vue.reprise?.phases.includes(phase) ?? false;
+
   // Les questions de la story sont tranchées avant RESEARCH (décision du 08/11, ADR 0014 révisé) :
   // le chercheur reçoit leurs réponses, au lieu de s'arrêter pour les poser lui-même.
   await trancher(w, vue, story.id);
-  if (!effets.skipResearch) {
+  if (!effets.skipResearch && !dejaFaite("RESEARCH")) {
     // `w.phase` rend `undefined` si l'humain saute la phase : la fonction rend donc une valeur.
-    const faite = await w.phase("RESEARCH", async (_cp, relance) => (await rechercher(w, vue, effets.maxAttempts, relance), true), {
+    const faite = await w.phase("RESEARCH", async (_cp, relance) => {
+      await rechercher(w, vue, effets.maxAttempts, relance);
+      // L'état de la phase, commité avec elle : une relance de la story le retrouve (ADR 0089).
+      await noterLEtat(w, vue, "RESEARCH");
+      return true;
+    }, {
       commit: commitMessage("RESEARCH", slug),
       // Commit impossible, continué par l'humain : le bilan le dit (D19 de docs/12).
       commitManque: () => void vue.nonCommitees.push("RESEARCH"),
@@ -298,18 +317,15 @@ export default async function skraft(w0, entree) {
   }
   // Celles que la recherche a levées sont tranchées avant DESIGN.
   await trancher(w, vue, story.id);
-  if (await concevoir(w, vue, effets.lenses, effets.maxAttempts))
-    vue.phasesFaites = [...vue.phasesFaites, { phase: "DESIGN", fichiers: [] }];
-  else
-    vue.phasesSautees = [...vue.phasesSautees, "DESIGN"];
-  if (await distiller(w, vue, effets.lenses, effets.maxAttempts))
-    vue.phasesFaites = [...vue.phasesFaites, { phase: "DISTILL", fichiers: [] }];
-  else
-    vue.phasesSautees = [...vue.phasesSautees, "DISTILL"];
-  if (await livrer(w, vue, effets.lenses, effets.maxAttempts))
-    vue.phasesFaites = [...vue.phasesFaites, { phase: "DELIVER", fichiers: [] }];
-  else
-    vue.phasesSautees = [...vue.phasesSautees, "DELIVER"];
+  // Une phase approuvée dans la session continuée n'est pas refaite (ADR 0089).
+  for (const [phase, faire] of [["DESIGN", concevoir], ["DISTILL", distiller], ["DELIVER", livrer]]) {
+    if (dejaFaite(phase) || vue.phasesSautees.includes(phase))
+      continue;
+    if (await faire(w, vue, effets.lenses, effets.maxAttempts))
+      vue.phasesFaites = [...vue.phasesFaites, { phase, fichiers: [] }];
+    else
+      vue.phasesSautees = [...vue.phasesSautees, phase];
+  }
   // Le registre de la story est écrit, puis commité seul : sa trace reste dans l'historique (LEC-1).
   await ecrireLeRegistre(w, registre);
   if (registre.erreurs.length)
@@ -452,10 +468,12 @@ async function preparer(w, chemin) {
       const lue = parseStory(await w.lireFichier(chemin));
       if (lue.ok) {
         const slug = slugOf(lue.story.id, lue.story.title);
+        // Le point de départ de la session : une nouvelle session y recrée la branche (ADR 0089).
+        const base = await w.tete();
         await w.brancher(`skraft/${slug}`);
         await creerDossiers(w, slug);
         const indicateurs = computeIndicators(lue.story, repositoryShape(await w.listerFichiers()));
-        return { story: lue.story, slug, indicateurs };
+        return { story: lue.story, slug, indicateurs, base };
       }
       motifs = lue.errors;
     }

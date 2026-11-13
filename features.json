@@ -1373,6 +1373,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft story.test sha256 && pnpm vitest run --project mcp-skraft us-github",
       "passes": true,
       "notes": "Fait le 2026-11-13 (ADR 0088), premier temps de la reprise d'une US abandonnée."
+    },
+    {
+      "id": "reprise-story-arretee",
+      "title": "Reprise d'une story arrêtée (workflow, serveur MCP) : l'état de chaque phase approuvée est commité dans .skraft/<slug>/etat.json ; au relancement, l'utilisateur choisit de continuer (retour au dernier commit de phase, phases faites sautées) ou une nouvelle session (branche recréée depuis le départ)",
+      "verify": "pnpm vitest run --project workspace reprise && pnpm vitest run --project workflow reprise && pnpm vitest run --project workflow-skraft test/reprise e2e-reprise",
+      "passes": true,
+      "notes": "Fait le 2026-11-13 (ADR 0089). Reprise à la phase, pas au scénario."
     }
   ]
 }

@@ -1,18 +1,19 @@
-// Repris de extensions/skraft-workflow/test/e2e-reprise-workflow.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 /**
- * Reprise après un crash au milieu de DELIVER (ADR 0052, D23) : la pile entière redémarre sur le
- * même dépôt et le même dossier de tâches ; le script est rejoué contre son journal. Rien de ce
- * qui était fait n'est refait : seul le tour coupé est relancé, depuis son checkpoint.
+ * Reprise d'une story (ADR 0089) : un run arrêté en DELIVER, puis relancé sur la même story. L'utilisateur
+ * choisit de continuer la session (les phases approuvées ne sont pas refaites) ou d'en ouvrir une
+ * nouvelle, qui écrase la précédente.
  */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { answerQuestions, assemble, createProject, put, ROLE, shutdownHosts, simulatedAgents, until } from "./support/harness.js";
-import { fin, lancerWorkflow } from "./support/fin.js";
+import { answerQuestions, assemble, createProject, git, shutdownHosts, simulatedAgents, unitTestWriter, until } from "./support/harness.js";
+import { fin } from "./support/fin.js";
 
-describe("skraft en workflow — reprise après un crash", () => {
+const SLUG = "us12-f15ade30";
+
+describe("skraft en workflow — reprise d'une story arrêtée (ADR 0089)", () => {
   let root: string;
   let tasksDir: string;
   beforeEach(async () => {
@@ -25,35 +26,59 @@ describe("skraft en workflow — reprise après un crash", () => {
     await rm(tasksDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
-  it("crash pendant le tour du développeur : au redémarrage, seul ce tour est rejoué, et la story est livrée", async () => {
-    // Premier démarrage : le développeur écrit un fichier à moitié, puis le processus « meurt ».
-    const avant = simulatedAgents(new ScriptedRuntime(), root, {
-      "skraft-dev": async (t) => {
-        await put(root, "src/domain/bolus-cap.ts", "export class BolusCap { // à moitié écrit\n");
-        t.hang();
+  /** Un premier run qui va jusqu'à DELIVER, où le testeur pose une question restée sans réponse ; puis arrêté. */
+  async function premierRunArrete() {
+    let bloque = true;
+    const testeur = unitTestWriter(root);
+    const runtime = simulatedAgents(new ScriptedRuntime(), root, {
+      "skraft-test": async (t) => {
+        if (bloque) return void (await t.callTool("report_blocker", { question: "Quelle unité pour le plafond ?", choices: ["U", "mL"] }));
+        return testeur(t);
       },
     });
-    const app1 = await assemble(root, avant, tasksDir);
-    answerQuestions(app1);
-    const id = await lancerWorkflow(app1, "stories/us-12.md");
-    await until(async () => avant.history.some((h) => avant.configs.get(h.id)?.role === ROLE("skraft-dev")), 60_000);
-    const roles = (r: ScriptedRuntime) => r.history.map((h) => r.configs.get(h.id)!.role.split("/")[1]!);
-    expect(roles(avant)).toContain("skraft-researcher");
-    await shutdownHosts();
+    const app = await assemble(root, runtime, tasksDir);
+    answerQuestions(app);
+    await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question de l'agent")), 60_000);
+    const [premier] = await app.engine.list();
+    await app.engine.cancel(premier!.id);
+    await until(async () => (await app.engine.status(premier!.id))?.status === "finished");
+    bloque = false;
+    return { app, runtime };
+  }
 
-    // Second démarrage : nouvelle pile, même dépôt, même dossier de tâches.
-    const apres = simulatedAgents(new ScriptedRuntime(), root);
-    const app2 = await assemble(root, apres, tasksDir);
-    answerQuestions(app2);
-    await app2.engine.resumeAll();
-    const s = await fin(app2, id, 60_000);
+  async function relancer(app: Awaited<ReturnType<typeof assemble>>, choix: "continuer" | "nouvelle") {
+    const avant = new Set((await app.engine.list()).map((t) => t.id));
+    await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
+    await until(async () => (await app.interactions.pending()).some((p) => p.title === "US-12 a déjà une session : la continuer ?"), 60_000);
+    const q = (await app.interactions.pending()).find((p) => p.title === "US-12 a déjà une session : la continuer ?")!;
+    expect(q.detail).toContain("Phases approuvées : RESEARCH, DESIGN, DISTILL.");
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${choix}`))!.id);
+    return (await app.engine.list()).find((t) => !avant.has(t.id))!.id;
+  }
 
-    // Seul le tour coupé (développeur) et la suite sont exécutés : ni classifieur, ni recherche, ni
-    // architectes, ni acceptance, ni le test unitaire déjà rouge.
-    expect(roles(apres).filter((r) => !r.startsWith("skraft-lens-"))).toEqual(["skraft-dev"]);
-    expect(s.phases).toEqual(["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]);
-    // Le fichier à moitié écrit a été effacé par le retour au checkpoint du tour, puis réécrit.
-    const { readFile } = await import("node:fs/promises");
-    expect(await readFile(join(root, "src/domain/bolus-cap.ts"), "utf8")).toBe("export class BolusCap {}\n");
-  }, 120_000);
+  it("continuer : les phases approuvées ne sont pas refaites, DELIVER reprend depuis le commit de DISTILL, la story est livrée", async () => {
+    const { app, runtime } = await premierRunArrete();
+    const tours = runtime.history.length;
+    const id = await relancer(app, "continuer");
+    const bilan = await fin(app, id, 90_000);
+    const roles = runtime.history.slice(tours).map((x) => runtime.configs.get(x.id)?.role ?? "");
+    for (const r of ["skraft-researcher", "skraft-architect-model", "skraft-architect-decide", "skraft-acceptance", "skraft-classifier"]) expect(roles.some((x) => x.endsWith(`/${r}`)), r).toBe(false);
+    expect(roles.some((x) => x.endsWith("/skraft-test"))).toBe(true);
+    expect(bilan.phases).toEqual(["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]);
+    const sujets = git(root, "log", "--format=%s").split("\n");
+    expect(sujets.filter((s) => s === `docs(skraft): distill de ${SLUG}`)).toHaveLength(1);
+    expect(sujets).toContain(`feat(${SLUG}): livraison de la story`);
+  }, 180_000);
+
+  it("nouvelle session : la branche est recréée depuis le départ, tout est refait", async () => {
+    const { app, runtime } = await premierRunArrete();
+    const tours = runtime.history.length;
+    const id = await relancer(app, "nouvelle");
+    await fin(app, id, 90_000);
+    const roles = runtime.history.slice(tours).map((x) => runtime.configs.get(x.id)?.role ?? "");
+    expect(roles.some((x) => x.endsWith("/skraft-researcher"))).toBe(true);
+    // Une seule session sur la branche : celle-ci.
+    expect(git(root, "log", "--format=%s").split("\n").filter((s) => s === `docs(skraft): research de ${SLUG}`)).toHaveLength(1);
+  }, 180_000);
 });

@@ -10,6 +10,7 @@ import { ecrireLeRegistre, releverLesDefauts } from "./registre.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
+import { noterLEtat } from "./reprise.mjs";
 /** Rend vrai si la phase est faite, faux si l'humain l'a sautée. */
 export async function distiller(w, d, lentilles, max) {
   const suivi = nouveauSuivi();
@@ -21,6 +22,8 @@ export async function distiller(w, d, lentilles, max) {
     await essayer(w, { max, motifs: relance }, (motifs, essai) => unEssai(w, d, suivi, cp, lentilles, motifs, essai));
     releverLesDefauts(d.registre, suivi, "DISTILL");
     await ecrireRapports(w, d.slug, "DISTILL", suivi);
+    // L'état de la phase, commité avec elle : une relance de la story le retrouve (ADR 0089).
+    await noterLEtat(w, d, "DISTILL");
     return true;
   }, {
     commit: commitMessage("DISTILL", d.slug),

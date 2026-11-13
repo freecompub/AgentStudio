@@ -4,7 +4,7 @@ import { createRejoueurLocal, type Rejoueur } from "./hote/rejoueur.js";
 import type { Arbitrage, DeclarationWorkflow, EffetWorkflow, EntreeJournal, EtatWorkflow, EvenementWorkflow, Json, NatureErreur, NomAppel, Profil } from "./protocols.js";
 
 /** Appels qui écrivent ou lancent un agent : checkpoint avant (D23). */
-const AVEC_CHECKPOINT = new Set<NomAppel>(["agent", "ecrireFichier", "creerDossier", "commiter", "brancher"]);
+const AVEC_CHECKPOINT = new Set<NomAppel>(["agent", "ecrireFichier", "creerDossier", "commiter", "brancher", "revenirA"]);
 
 /** L'effet a demandé une réponse humaine : rien à rendre, la décision arrivera par `HUMAN_DECISION`. */
 const ATTENTE = Symbol("attente");
@@ -180,6 +180,8 @@ interface Args {
   preuve?: { phase?: string; etape?: string };
   verification?: { outil: string; fichiers: string[]; donnees?: unknown };
   regles: { module: string; forbidden: string[] }[];
+  ecraser?: boolean;
+  sha: string;
 }
 
 /** Le dossier d'un workflow est gelé, pour le script comme pour les agents (ADR 0055). */
@@ -266,7 +268,13 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return { pile: ctx.stack.id, acceptanceTests, unitTests, sources, infrastructureModules: [...ctx.stack.infrastructureModules], ...(ctx.stack.bdd ? { bdd: ctx.stack.bdd.map((c) => ({ ...c })) } : {}), ...(ctx.stack.bddNonDecide ? { bddNonDecide: [...ctx.stack.bddNonDecide] } : {}) };
     }
     case "brancher":
-      return ctx.git.branch(a.nom);
+      return ctx.git.branch(a.nom, a.ecraser ? { ecraser: true, ...(a.depuis ? { depuis: a.depuis } : {}) } : undefined);
+    case "tete":
+      return ctx.git.head();
+    case "historique":
+      return ctx.git.log();
+    case "revenirA":
+      return ctx.git.resetTo(a.sha);
     case "checkpoint":
       return (await ctx.workspace.checkpoint(a.nom)).id;
     case "rembobiner": {

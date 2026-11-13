@@ -19,6 +19,7 @@ import { agentFeedback, allDisputed, applyResponses, endTurn, isActive, minorThr
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
 import { declaredIdentifiers } from "./text-analysis.mjs";
+import { noterLEtat } from "./reprise.mjs";
 const QUALITY = ".agent-studio/quality.yaml";
 const QUALITY_LEGACY = ".skraft/quality.json";
 /** Fichier de projet (ADR 0071) : sa section `qualite` fait foi. */
@@ -75,6 +76,8 @@ export async function livrer(w, d, lentilles, max) {
     // Écarts au plan de test commités avec la livraison (ADR 0067).
     if (d.ecartsAuPlan.length)
       await w.ecrireFichier(`.skraft/${d.slug}/deliver/ecarts-au-plan.md`, rapportDEcarts(d));
+    // L'état de la phase, commité avec elle : une relance de la story le retrouve (ADR 0089).
+    await noterLEtat(w, d, "DELIVER");
     return true;
   }, {
     commit: commitMessage("DELIVER", d.slug),

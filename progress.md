@@ -15,8 +15,17 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
   ressortait en « Story introuvable » : le motif masque toute erreur de ce bloc.
 - **Piège** : un remplacement en masse de `us-12` dans les tests a aussi renommé le fichier de la story
   (`stories/us-12.md`), qui garde son nom.
-- **Prochaine étape** : la reprise elle-même (question « continuer ou nouvelle session », état des
-  phases commité dans `.skraft/<slug>/etat.json`), en attente de l'accord du responsable sur le plan.
+- **Reprise faite** (ADR 0089, accord du responsable le 13/11) :
+  - Workspace : `switchBranch(nom, { depuis, ecraser })`, `log()`, `resetTo(sha)` (ancêtre de HEAD seulement,
+    fichiers non suivis laissés et nommés) ; API des extensions, hôtes et runtime enfant ; moteur :
+    `w.tete`, `w.historique`, `w.revenirA`, `w.brancher(…, { ecraser })` ;
+  - workflow : `reprise.mjs` (pur, sauf `noterLEtat` et `proposerLaReprise`) ; état noté en fin de chaque
+    phase, commité avec elle ; question `reprise` déclarée dans `meta.humains` (ouverte à tous).
+- **Piège** : au départ d'une session continuée après DISTILL, les tests d'acceptance de la story sont
+  rouges : le précontrôle bloquait. `releveDeDepart` les met à part, sans masquer un autre test rouge.
+- **Piège** : ouvrir le registre après la reprise, pas avant : le retour au commit de phase change le disque.
+- **Prochaine étape** : un essai réel (arrêter un run en DELIVER, le relancer) ; la reprise au scénario si
+  le besoin se confirme.
 
 ## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
 
