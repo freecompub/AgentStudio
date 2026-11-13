@@ -31,7 +31,7 @@ describe("skraft en workflow — réfutateur des défauts de revue (ADR 0069)", 
     let lentille = 0;
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const architecture: ScriptedBehavior = async (t) => {
@@ -40,7 +40,7 @@ describe("skraft en workflow — réfutateur des défauts de revue (ADR 0069)", 
         return void (await t.callTool("submit_lens_verdict", {
           lens: "architecture",
           verdict: "CHANGES_REQUESTED",
-          defects: [{ severity: "major", severityReason: "Un contrat doit se lire seul.", occurrences: [".skraft/us-12/design/event-model.md:1", "absent/inexistant.md:3"], description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
+          defects: [{ severity: "major", severityReason: "Un contrat doit se lire seul.", occurrences: [".skraft/us12-f15ade30/design/event-model.md:1", "absent/inexistant.md:3"], description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }],
         }));
       await t.callTool("submit_lens_verdict", { lens: "architecture", verdict: "APPROVED", defects: [] });
     };
@@ -59,25 +59,25 @@ describe("skraft en workflow — réfutateur des défauts de revue (ADR 0069)", 
   }
 
   it("défaut réfuté par une citation d'un fichier qui existe : aucun tour de plus pour l'architecte, la phase passe, le rapport garde la réfutation", async () => {
-    const raison = "L'agrégat est nommé en `.skraft/us-12/design/contracts.md:1` (BolusCapped).";
+    const raison = "L'agrégat est nommé en `.skraft/us12-f15ade30/design/contracts.md:1` (BolusCapped).";
     const { app, decidePrompts, refuterPrompts } = await run(raison);
     await until(async () => (await app.engine.list())[0]?.phase === "DISTILL", 60_000);
     expect(refuterPrompts).toHaveLength(1);
     // Le réfutateur reçoit le défaut, numéroté par le code, et les entrées de la lentille.
     expect(refuterPrompts[0]).toContain(`[${DEFAUT}]`);
     expect(refuterPrompts[0]).toContain("contracts.md ne nomme pas l'agrégat.");
-    expect(refuterPrompts[0]).toContain(".skraft/us-12/design/contracts.md");
+    expect(refuterPrompts[0]).toContain(".skraft/us12-f15ade30/design/contracts.md");
     expect(decidePrompts).toHaveLength(1);
-    const rapport = JSON.parse(await readFile(join(root, ".skraft/us-12/reviews/design-review-1.json"), "utf8")) as { lens: string; verdict: string; refuted?: { id: string; refutation: string }[] }[];
+    const rapport = JSON.parse(await readFile(join(root, ".skraft/us12-f15ade30/reviews/design-review-1.json"), "utf8")) as { lens: string; verdict: string; refuted?: { id: string; refutation: string }[] }[];
     expect(rapport.find((l) => l.lens === "architecture")).toMatchObject({ verdict: "APPROVED", refuted: [{ id: DEFAUT, refutation: raison }] });
-    const md = await readFile(join(root, ".skraft/us-12/reviews/design-review-1.md"), "utf8");
+    const md = await readFile(join(root, ".skraft/us12-f15ade30/reviews/design-review-1.md"), "utf8");
     expect(md).toContain(`- réfuté : \`${DEFAUT}\` **major** contracts.md ne nomme pas l'agrégat. — ${raison}`);
   }, 90_000);
 
   it("réfutation sans citation : le code ne la retient pas, le défaut part à l'architecte", async () => {
     const { decidePrompts } = await run("C'est faux, l'agrégat est nommé.");
     await until(async () => decidePrompts.length >= 2, 60_000);
-    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat. (.skraft/us-12/design/contracts.md) — gravité : Un contrat doit se lire seul. — aussi : .skraft/us-12/design/event-model.md:1`);
+    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat. (.skraft/us12-f15ade30/design/contracts.md) — gravité : Un contrat doit se lire seul. — aussi : .skraft/us12-f15ade30/design/event-model.md:1`);
     // L'occurrence qui vise un fichier absent est retirée par le code.
     expect(decidePrompts[1]).not.toContain("absent/inexistant.md");
   }, 90_000);

@@ -27,7 +27,7 @@ describe("skraft en workflow — revue sans défaut à corriger, hors DELIVER (A
     const decidePrompts: string[] = [];
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-decide": decide, "skraft-lens-architecture": architecture });
@@ -39,14 +39,14 @@ describe("skraft en workflow — revue sans défaut à corriger, hors DELIVER (A
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     return { app, decidePrompts };
   }
-  const design = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): design de us-12");
+  const design = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): design de us12-f15ade30");
 
   it("mineurs seulement : DESIGN approuvée et commitée, l'architecte n'est pas relancé", async () => {
     const { decidePrompts } = await lancer(async (t) =>
       void (await t.callTool("submit_lens_verdict", {
         lens: "architecture",
         verdict: "CHANGES_REQUESTED",
-        defects: [{ severity: "minor", severityReason: "raison d’essai", description: "Un nom pourrait être plus précis.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
+        defects: [{ severity: "minor", severityReason: "raison d’essai", description: "Un nom pourrait être plus précis.", file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }],
       })));
     await until(async () => design(), 60_000);
     expect(decidePrompts).toHaveLength(1);

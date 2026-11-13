@@ -47,17 +47,17 @@ describe("skraft en workflow — leçons réinjectées (LEC-3)", () => {
       await t.callTool("submit_lens_verdict", {
         lens: "architecture",
         verdict: revues === 1 ? "CHANGES_REQUESTED" : "APPROVED",
-        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: DEFAUT, file: ".skraft/us-12/design/contracts.md", target: "deliverable" }] : [],
+        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: DEFAUT, file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }] : [],
       });
     };
     const model: ScriptedBehavior = async (t) => {
       prompts.model.push(t.prompt);
-      await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const decide: ScriptedBehavior = async (t) => {
       prompts.decide.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-lens-architecture": architecture, "skraft-architect-model": model, "skraft-architect-decide": decide });

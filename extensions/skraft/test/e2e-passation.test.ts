@@ -48,7 +48,7 @@ describe("skraft — réponses de l'utilisateur écrites dans passation.md", () 
 
     expect(stateOf(await app.engine.status(id))!.escalation?.reason).toBeUndefined();
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
-    const passation = git(root, "show", "HEAD:.skraft/us-12/passation.md");
+    const passation = git(root, "show", "HEAD:.skraft/us12-f15ade30/passation.md");
     expect(passation).toMatch(/^# Réponses de l'utilisateur — US-12/);
     expect(passation).toMatch(/→ par prise$/m);
     expect(passation).toContain("- « Le plafond s'applique-t-il aux bolus de correction ? » → oui");

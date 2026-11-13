@@ -43,7 +43,7 @@ describe("skraft en workflow — réponses de l'utilisateur écrites dans passat
     const q = (await app.interactions.pending()).find((p) => p.title === "Question de l'agent (DELIVER)")!;
     await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":oui"))!.id, undefined, { role: "developpeur" });
     await fin(app, id, 90_000);
-    const passation = git(root, "show", "HEAD:.skraft/us-12/passation.md");
+    const passation = git(root, "show", "HEAD:.skraft/us12-f15ade30/passation.md");
     expect(passation).toMatch(/^# Réponses de l'utilisateur — US-12/);
     expect(passation).toMatch(/→ par prise$/m);
     expect(passation).toContain("- « Le plafond s'applique-t-il aux bolus de correction ? » → oui");

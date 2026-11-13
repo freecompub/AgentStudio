@@ -10,7 +10,7 @@ import { ScriptedRuntime, type ScriptedBehavior } from "@agent-studio/core/testi
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { acceptanceWriter, answerQuestions, assemble, createProject, git, put, shutdownHosts, simulatedAgents, until } from "./support/harness.js";
 
-const REGISTRE = ".agent-studio/lecons/brut/us-12.jsonl";
+const REGISTRE = ".agent-studio/lecons/brut/us12-f15ade30.jsonl";
 
 describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
   let root: string;
@@ -32,7 +32,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
       await t.callTool("submit_lens_verdict", {
         lens: "architecture",
         verdict: revues === 1 ? "CHANGES_REQUESTED" : "APPROVED",
-        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }] : [],
+        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }] : [],
       });
     };
     let essais = 0;
@@ -43,7 +43,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
       probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: REGISTRE }));
       await ecrire({ ...t, callTool: async (n, a) => (n === "report_phase" ? undefined : t.callTool(n, a)) });
       if (essais === 1) {
-        const feature = ".skraft/us-12/distill/features/plafond.feature";
+        const feature = ".skraft/us12-f15ade30/distill/features/plafond.feature";
         await put(root, feature, (await readFile(join(root, feature), "utf8")).replace("12,5 U", "douze unités"));
       }
       await t.callTool("report_phase", { summary: "scénarios", files: [] });
@@ -60,12 +60,12 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
     await until(async () => (await app.engine.status(id))?.status === "finished", 90_000);
 
     // Le commit des leçons (LEC-2) suit celui du registre : on le retrouve par son message.
-    const commit = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): registre des erreurs de us-12"))!.split(" ")[0]!;
+    const commit = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): registre des erreurs de us12-f15ade30"))!.split(" ")[0]!;
     expect(git(root, "show", "--name-only", "--format=", commit).trim()).toBe(REGISTRE);
     const erreurs = git(root, "show", `${commit}:${REGISTRE}`).trim().split("\n").map((l) => JSON.parse(l));
     expect(erreurs).toEqual([
-      expect.objectContaining({ type: "defaut", story: "us-12", phase: "DESIGN", lentille: "architecture", cible: "deliverable", description: "contracts.md ne nomme pas l'agrégat." }),
-      expect.objectContaining({ type: "refus", story: "us-12", phase: "DISTILL", porte: "valeurs" }),
+      expect.objectContaining({ type: "defaut", story: "us12-f15ade30", phase: "DESIGN", lentille: "architecture", cible: "deliverable", description: "contracts.md ne nomme pas l'agrégat." }),
+      expect.objectContaining({ type: "refus", story: "us12-f15ade30", phase: "DISTILL", porte: "valeurs" }),
     ]);
     expect(probes[0]).toEqual(expect.objectContaining({ decision: "deny" }));
     expect(app.posted.at(-1)).toContain(`Registre des erreurs : 2 erreur(s) enregistrée(s) dans ${REGISTRE}`);
@@ -74,7 +74,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
   it("phase escaladée puis abandonnée : le registre est écrit avant la question, et reste après l'abandon", async () => {
     // Le même refus deux fois : le disjoncteur escalade DESIGN (ADR 0073).
     const decide: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       await put(root, "docs/adr/adr-001-plafond.md", "# ADR 0001 — Plafond\n\n- Statut : Proposed\n");
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
@@ -90,7 +90,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
     const lignes = (await readFile(join(root, REGISTRE), "utf8")).trim().split("\n").map((l) => JSON.parse(l));
     expect(lignes.length).toBeGreaterThanOrEqual(2);
-    expect(lignes.every((e) => e.type === "refus" && e.phase === "DESIGN" && e.story === "us-12")).toBe(true);
+    expect(lignes.every((e) => e.type === "refus" && e.phase === "DESIGN" && e.story === "us12-f15ade30")).toBe(true);
     const escalade = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
     await app.interactions.respond(escalade.id, escalade.options.find((o) => /abandon/.test(o.id))!.id, undefined, { role: "architecte" });
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);

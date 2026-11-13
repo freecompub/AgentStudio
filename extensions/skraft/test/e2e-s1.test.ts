@@ -236,8 +236,8 @@ describe("skraft — critères de sortie de S1", () => {
       "skraft-acceptance": async (t) => {
         await accept(t);
         if (essais++ === 0) {
-          await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n");
-          await put(root, ".skraft/us-12/distill/test-plan.md", "# Plan de test\n");
+          await put(root, ".skraft/us12-f15ade30/distill/impl-plan.md", "1. ac-1\n");
+          await put(root, ".skraft/us12-f15ade30/distill/test-plan.md", "# Plan de test\n");
         }
       },
     });
@@ -263,7 +263,7 @@ describe("skraft — critères de sortie de S1", () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-acceptance": async (t) => {
         await accept(t);
-        if (essais++ === 0) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+        if (essais++ === 0) await rm(join(root, ".skraft/us12-f15ade30/distill/test-plan.md"));
       },
     });
     const app = await assemble(root, runtime, tasksDir, { isolated: true });
@@ -273,10 +273,10 @@ describe("skraft — critères de sortie de S1", () => {
     await until(async () => ["DONE", "ESCALATED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
-    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us-12/distill/test-plan.md"] }));
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us12-f15ade30/distill/test-plan.md"] }));
   }, 90_000);
 
-  it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us-12", async (isolated) => {
+  it.each([false, true])("pipeline complet à vide (extension isolée : %s) : US-12 medium-hard, quatre phases, revues, commits sur skraft/us12-f15ade30", async (isolated) => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
     const app = await assemble(root, runtime, tasksDir, { isolated });
     await app.registry.command("skraft")!.handler("stories/us-12.md");
@@ -290,22 +290,22 @@ describe("skraft — critères de sortie de S1", () => {
     expect(s.phasesCompleted).toEqual(["RESEARCH", "DESIGN", "DISTILL", "DELIVER"]);
     expect(s.skipPhases).toEqual([]);
     expect(s.reviews.DESIGN.map((r) => r.verdict)).toEqual(["APPROVED"]);
-    expect(s.artifacts.RESEARCH.map((a) => a.path)).toEqual([".skraft/us-12/research/research.md"]);
+    expect(s.artifacts.RESEARCH.map((a) => a.path)).toEqual([".skraft/us12-f15ade30/research/research.md"]);
 
-    expect(git(root, "branch", "--show-current")).toBe("skraft/us-12");
+    expect(git(root, "branch", "--show-current")).toBe("skraft/us12-f15ade30");
     expect(git(root, "log", "--format=%s", `${s.baseSha}..HEAD`).split("\n")).toEqual([
-      "feat(us-12): livraison de la story",
-      "feat(us-12): ac-1",
-      "test(us-12): ac-1, tests/unit/bolus-cap.test.ts > plafond 1",
-      "docs(skraft): distill de us-12",
-      "docs(skraft): design de us-12",
-      "docs(skraft): research de us-12",
+      "feat(us12-f15ade30): livraison de la story",
+      "feat(us12-f15ade30): ac-1",
+      "test(us12-f15ade30): ac-1, tests/unit/bolus-cap.test.ts > plafond 1",
+      "docs(skraft): distill de us12-f15ade30",
+      "docs(skraft): design de us12-f15ade30",
+      "docs(skraft): research de us12-f15ade30",
     ]);
     // Rapports de revue générés par le code depuis les JSON des lentilles.
-    const report = JSON.parse(await readFile(join(root, ".skraft/us-12/reviews/design-review-1.json"), "utf8"));
+    const report = JSON.parse(await readFile(join(root, ".skraft/us12-f15ade30/reviews/design-review-1.json"), "utf8"));
     // Trois lentilles en DESIGN : `quality-gates` est écartée d'une phase où rien n'est mesuré (ADR 0028).
     expect(report.map((l: { lens: string }) => l.lens)).toEqual(["cold-reader", "test-integrity", "architecture"]);
-    const deliverReport = JSON.parse(await readFile(join(root, ".skraft/us-12/reviews/deliver-review-1.json"), "utf8"));
+    const deliverReport = JSON.parse(await readFile(join(root, ".skraft/us12-f15ade30/reviews/deliver-review-1.json"), "utf8"));
     // Elle siège en revanche en DELIVER, où le code a vraiment exécuté des tests.
     expect(deliverReport.map((l: { lens: string }) => l.lens)).toContain("quality-gates");
     // DELIVER : un scénario moteur, les deux autres déjà verts ; constats transmis aux lentilles.
@@ -421,7 +421,7 @@ describe("skraft — critères de sortie de S1", () => {
       "skraft-researcher": async (t) => {
         briefAfterAnswer = t.prompt;
         const { put } = await import("./support/harness.js");
-        await put(root, ".skraft/us-12/research/research.md", researchDoc());
+        await put(root, ".skraft/us12-f15ade30/research/research.md", researchDoc());
         await t.callTool("report_phase", { summary: "ok", files: [] });
       },
     });

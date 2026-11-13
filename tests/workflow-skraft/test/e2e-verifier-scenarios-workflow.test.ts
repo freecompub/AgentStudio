@@ -33,7 +33,7 @@ describe("skraft en workflow — vérification des scénarios par l'agent (ADR 0
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium"))!.id);
     return app;
   }
-  const distill = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): distill de us-12");
+  const distill = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): distill de us12-f15ade30");
 
   it("l'agent voit le motif de la porte pendant son tour, corrige, et la porte accepte du premier coup", async () => {
     const prompts: string[] = [];
@@ -43,7 +43,7 @@ describe("skraft en workflow — vérification des scénarios par l'agent (ADR 0
       prompts.push(t.prompt);
       // Il écrit d'abord tout, comme l'agent par défaut, sans rendre la main.
       await ecrire({ ...t, callTool: async (n, a) => (n === "report_phase" ? undefined : t.callTool(n, a)) });
-      const feature = ".skraft/us-12/distill/features/plafond.feature";
+      const feature = ".skraft/us12-f15ade30/distill/features/plafond.feature";
       const { readFile } = await import("node:fs/promises");
       const juste = await readFile(join(root, feature), "utf8");
       await put(root, feature, juste.replace("12,5 U", "douze unités"));

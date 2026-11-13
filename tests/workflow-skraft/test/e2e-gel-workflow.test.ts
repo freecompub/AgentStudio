@@ -45,7 +45,7 @@ describe("skraft en workflow — annonce du gel des tests d'acceptance (D1)", ()
       // Le plan de test manque toujours : la porte échoue jusqu'à l'escalade.
       "skraft-acceptance": async (t) => {
         await accept(t);
-        await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+        await rm(join(root, ".skraft/us12-f15ade30/distill/test-plan.md"));
       },
     });
     const app = await assemble(root, runtime, tasksDir);

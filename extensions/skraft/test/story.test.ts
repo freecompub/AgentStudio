@@ -44,9 +44,18 @@ describe("Lecture de la story (SPEC-skraft §6.1)", () => {
     expect(r.ok && r.story.openQuestions).toEqual([]);
   });
 
-  it("slug stable dérivé de l'identifiant", () => {
-    expect(slugOf("US-12")).toBe("us-12");
-    expect(slugOf("PROJ 7/b")).toBe("proj-7-b");
+  // Le numéro, puis l'empreinte du titre : une même story garde son slug d'un run à l'autre, un autre
+  // titre en donne un autre (reprise d'une US, 13/11).
+  it("slug : préfixe et numéro sur deux chiffres, puis les 8 premiers caractères du sha256 du titre", () => {
+    expect(slugOf("US-12", "Plafonner le bolus proposé")).toBe("us12-f15ade30");
+    expect(slugOf("US-2", "Plafonner le bolus proposé")).toBe("us02-f15ade30");
+    expect(slugOf("US-123", "Plafonner le bolus proposé")).toBe("us123-f15ade30");
+    expect(slugOf("PAY-API-7", "Plafonner le bolus proposé")).toBe("payapi07-f15ade30");
+  });
+
+  it("slug : les espaces autour et répétés du titre ne comptent pas ; un autre titre donne un autre slug", () => {
+    expect(slugOf("US-12", "  Plafonner   le bolus proposé ")).toBe("us12-f15ade30");
+    expect(slugOf("US-12", "Plafonner le bolus")).not.toBe("us12-f15ade30");
   });
 });
 

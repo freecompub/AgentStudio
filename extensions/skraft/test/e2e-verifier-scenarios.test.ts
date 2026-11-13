@@ -33,7 +33,7 @@ describe("skraft — vérification des scénarios par l'agent (ADR 0082)", () =>
     await app.interactions.respond(difficulty.id, "medium");
     return app;
   }
-  const distill = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): distill de us-12");
+  const distill = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): distill de us12-f15ade30");
 
   it.each([false, true])("l'agent voit le motif de la porte pendant son tour, corrige, et la porte accepte (isolé : %s)", async (isolated) => {
     const prompts: string[] = [];
@@ -42,7 +42,7 @@ describe("skraft — vérification des scénarios par l'agent (ADR 0082)", () =>
     await lancer(async (t) => {
       prompts.push(t.prompt);
       await ecrire({ ...t, callTool: async (n, a) => (n === "report_phase" || n === "verifier_scenarios" ? undefined : t.callTool(n, a)) });
-      const feature = ".skraft/us-12/distill/features/plafond.feature";
+      const feature = ".skraft/us12-f15ade30/distill/features/plafond.feature";
       const juste = await readFile(join(root, feature), "utf8");
       await put(root, feature, juste.replace("12,5 U", "douze unités"));
       reponses.push(String(await t.callTool("verifier_scenarios", {})));

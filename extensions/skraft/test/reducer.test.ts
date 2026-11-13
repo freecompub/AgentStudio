@@ -16,10 +16,10 @@ const story = (() => {
 
 const INITIALIZED: Ev = {
   type: "INITIALIZED",
-  slug: "us-12",
+  slug: "us12-f15ade30",
   story,
   baseSha: "base",
-  branch: "skraft/us-12",
+  branch: "skraft/us12-f15ade30",
   indicators: { acceptanceCriteria: 3, modulesTouched: 2, newExternalIntegration: false, openBusinessQuestions: 1 },
 };
 const PROPOSED = (level = "medium-hard"): Ev => ({ type: "DIFFICULTY_PROPOSED", level, justification: "question ouverte" });
@@ -46,7 +46,7 @@ const LENSES = (...l: LensVerdict[]): Ev => {
   const completees = (["cold-reader", "test-integrity", "architecture", "quality-gates"] as const)
     .filter((n) => !citees.has(n))
     .map((n): LensVerdict => ({ lens: n, verdict: "APPROVED", defects: [] }));
-  return { type: "LENSES_DONE", lenses: [...l, ...completees], reportPath: ".skraft/us-12/reviews/x.md" };
+  return { type: "LENSES_DONE", lenses: [...l, ...completees], reportPath: ".skraft/us12-f15ade30/reviews/x.md" };
 };
 
 function play(events: Ev[], input = { storyPath: "stories/us-12.md" }) {
@@ -80,7 +80,7 @@ describe("Réducteur skraft — INIT, CLASSIFY, CONFIRM_DIFFICULTY (§5.2)", () 
 
   it("INIT + story valide → CLASSIFY : branche, SHA de départ, indicateurs, niveau proposé par la grille", () => {
     const { state, effects } = play([INITIALIZED]);
-    expect(state).toMatchObject({ stage: "CLASSIFY", slug: "us-12", baseSha: "base", branch: "skraft/us-12" });
+    expect(state).toMatchObject({ stage: "CLASSIFY", slug: "us12-f15ade30", baseSha: "base", branch: "skraft/us12-f15ade30" });
     expect(effects).toEqual([{ kind: "classify", indicators: INITIALIZED.type === "INITIALIZED" ? INITIALIZED.indicators : null, proposed: "medium-hard" }]);
   });
 
@@ -196,7 +196,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     const { state, effects } = play([...toFirstPhase(), CP("RESEARCH"), REPORTED, GATE_OK]);
     expect(state.stage).toBe("COMMIT");
     expect(state.artifacts.RESEARCH).toHaveLength(1);
-    expect(effects).toEqual([{ kind: "commitPhase", phase: "RESEARCH", message: "docs(skraft): research de us-12" }]);
+    expect(effects).toEqual([{ kind: "commitPhase", phase: "RESEARCH", message: "docs(skraft): research de us12-f15ade30" }]);
   });
 
   it("GATE_OK avec reviewer → REVIEW avec les lentilles du niveau, réduites à ce que la phase peut occuper", () => {
@@ -292,7 +292,7 @@ describe("Réducteur skraft — phases (§5.2)", () => {
     expect(state.stage).toBe("COMMIT");
     const consignees = LENSES(lens("APPROVED"));
     expect(state.reviews.DESIGN).toEqual([
-      { attempt: 1, lenses: consignees.type === "LENSES_DONE" ? consignees.lenses : [], verdict: "APPROVED", reportPath: ".skraft/us-12/reviews/x.md" },
+      { attempt: 1, lenses: consignees.type === "LENSES_DONE" ? consignees.lenses : [], verdict: "APPROVED", reportPath: ".skraft/us12-f15ade30/reviews/x.md" },
     ]);
     expect(kinds(effects)).toEqual(["commitPhase"]);
   });
@@ -584,7 +584,7 @@ describe("D9 (docs/12) : après une question bloquante, l'agent repart avec le r
 describe("Réducteur skraft — refus de DESIGN routé vers son auteur", () => {
   const avantPorte = [...toFirstPhase(), ...researchPhase, ANSWER, CP("DESIGN"), REPORTED, REPORTED];
   const ADR = "Numérotation des ADR : ADR-001 en double : docs/adr/adr-001-a.md et docs/adr/adr-001-b.md. Le prochain numéro libre est ADR-002.";
-  const MODELE = "Document manquant : .skraft/us-12/design/event-model.md.";
+  const MODELE = "Document manquant : .skraft/us12-f15ade30/design/event-model.md.";
   const refus = (...reasons: string[]): Ev => ({ type: "GATE_FAIL", gate: "cohérence", reasons });
 
   it("un refus qui ne porte que sur un ADR relance l'architecte qui décide, seul", () => {

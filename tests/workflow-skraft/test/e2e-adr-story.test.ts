@@ -34,7 +34,7 @@ describe("skraft en workflow — ADR rattachés à leur story", () => {
     const prompts: string[] = [];
     const decide: ScriptedBehavior = async (t) => {
       prompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       // Premier essai : l'architecte « corrige » l'ADR d'une autre story.
       if (prompts.length === 1) await put(root, "docs/adr/adr-001-arrondi-des-doses.md", AUTRE.replace("Arrondi des doses", "Arrondi supprimé"));
       await put(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md", renderAdr(2, ADR, "2026-10-10"));
@@ -51,6 +51,6 @@ describe("skraft en workflow — ADR rattachés à leur story", () => {
     // Seul l'ADR de cette story est soumis à ratification ; le code l'a marqué, même réécrit au tour 2.
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Ratifier")), 60_000);
     expect((await app.interactions.pending()).filter((p) => p.title.startsWith("Ratifier")).map((p) => p.title)).toEqual(["Ratifier ADR-002"]);
-    expect(await readFile(join(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md"), "utf8")).toContain("- Story : us-12");
+    expect(await readFile(join(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md"), "utf8")).toContain("- Story : us12-f15ade30");
   }, 120_000);
 });

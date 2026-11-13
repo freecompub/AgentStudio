@@ -5,6 +5,19 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/11 — Reprise d'une US : le slug (ADR 0088)
+
+- **Demande du responsable** : relancer une US abandonnée et continuer ; le slug combine le numéro et
+  l'empreinte du titre (format court retenu : `us12-f15ade30`). Branche `feat/reprise-us`, de `main`.
+- **Fait** : `slugOf(id, titre)` dans l'extension et le workflow ; `sha256.mjs` sans dépendance ; le
+  serveur MCP calcule la branche d'une issue GitHub à partir du titre écrit dans la story.
+- **Piège** : le processus isolé d'un workflow n'a pas `TextEncoder`. L'exception, attrapée dans INIT,
+  ressortait en « Story introuvable » : le motif masque toute erreur de ce bloc.
+- **Piège** : un remplacement en masse de `us-12` dans les tests a aussi renommé le fichier de la story
+  (`stories/us-12.md`), qui garde son nom.
+- **Prochaine étape** : la reprise elle-même (question « continuer ou nouvelle session », état des
+  phases commité dans `.skraft/<slug>/etat.json`), en attente de l'accord du responsable sur le plan.
+
 ## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
 
 - **Demande du responsable** : continuer après LEC-2 (freecompub/AgentStudio#34, ADR 0085).

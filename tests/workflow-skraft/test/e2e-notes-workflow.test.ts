@@ -29,7 +29,7 @@ describe("skraft en workflow — défauts hors du changement rangés en notes", 
     let lentille = 0;
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const architecture: ScriptedBehavior = async (t) => {
@@ -54,7 +54,7 @@ describe("skraft en workflow — défauts hors du changement rangés en notes", 
     expect(decidePrompts).toHaveLength(1);
     expect(refuterPrompts).toEqual([]);
     expect(app.posted).toContainEqual(expect.stringMatching(/Défaut bloquant hors du changement de la story.*stories\/us-12\.md:1.*La story fixe deux plafonds différents\..*après la fin du cycle skraft/s));
-    const md = await readFile(join(root, ".skraft/us-12/reviews/design-review-1.md"), "utf8");
+    const md = await readFile(join(root, ".skraft/us12-f15ade30/reviews/design-review-1.md"), "utf8");
     expect(md).toContain("- note (hors du changement) : `architecture#1.1` **blocker** La story fixe deux plafonds différents. (stories/us-12.md:1)");
     const bilan = app.posted.at(-1)!;
     expect(bilan).toContain("À corriger après le cycle");

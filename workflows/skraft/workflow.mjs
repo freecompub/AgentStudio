@@ -451,7 +451,7 @@ async function preparer(w, chemin) {
     try {
       const lue = parseStory(await w.lireFichier(chemin));
       if (lue.ok) {
-        const slug = slugOf(lue.story.id);
+        const slug = slugOf(lue.story.id, lue.story.title);
         await w.brancher(`skraft/${slug}`);
         await creerDossiers(w, slug);
         const indicateurs = computeIndicators(lue.story, repositoryShape(await w.listerFichiers()));

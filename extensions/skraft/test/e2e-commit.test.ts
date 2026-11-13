@@ -10,7 +10,7 @@ import { ScriptedRuntime } from "@agent-studio/core/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { answerQuestions, assemble, createProject, git, ROLE, shutdownHosts, simulatedAgents, stateOf, until } from "./support/harness.js";
 
-const DESIGN = "docs(skraft): design de us-12";
+const DESIGN = "docs(skraft): design de us12-f15ade30";
 type App = Awaited<ReturnType<typeof assemble>>;
 
 async function escaladeDuCommit(app: App) {
@@ -70,8 +70,8 @@ describe("skraft — commit de phase en échec (D19)", () => {
     await finie(app, id);
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-model"))).toHaveLength(1);
     expect(git(root, "log", "--format=%s")).not.toContain(DESIGN);
-    const distill = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): distill de us-12"))!.split(" ")[0]!;
-    expect(git(root, "show", "--name-only", "--format=", distill)).toContain(".skraft/us-12/design/");
+    const distill = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): distill de us12-f15ade30"))!.split(" ")[0]!;
+    expect(git(root, "show", "--name-only", "--format=", distill)).toContain(".skraft/us12-f15ade30/design/");
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet") as { porte: string; motifs: string[] }[];
     expect(rejets).toContainEqual(expect.objectContaining({ porte: "commit", motifs: [expect.stringMatching(/DESIGN.*index\.lock.*sans commit/)] }));
     expect(app.posted.at(-1)).toContain("Phases non commitées : DESIGN");
@@ -79,7 +79,7 @@ describe("skraft — commit de phase en échec (D19)", () => {
   // Défaut relevé le 13/10 (docs/skraft-fonctionnement) : la panne du commit de DISTILL levait le gel.
   it("commit de DISTILL en échec, continuer : DELIVER garde le gel des tests d'acceptance", async () => {
     const runtime = simulatedAgents(new ScriptedRuntime(), root);
-    const app = await assemble(root, runtime, tasksDir, { commitEchoue: (m) => m === "docs(skraft): distill de us-12", isolated: true });
+    const app = await assemble(root, runtime, tasksDir, { commitEchoue: (m) => m === "docs(skraft): distill de us12-f15ade30", isolated: true });
     answerQuestions(app);
     const id = await lancer(app);
     const q = await escaladeDuCommit(app);

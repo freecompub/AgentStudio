@@ -32,8 +32,8 @@ describe("skraft en workflow — vérification de la recherche par le chercheur 
     await app.interactions.respond(difficulty.id, difficulty.options.find((o) => o.id.endsWith(":medium-hard"))!.id);
     return app;
   }
-  const recherche = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): research de us-12");
-  const DOC = ".skraft/us-12/research/research.md";
+  const recherche = () => git(root, "log", "--format=%s").split("\n").some((l) => l === "docs(skraft): research de us12-f15ade30");
+  const DOC = ".skraft/us12-f15ade30/research/research.md";
 
   it("le chercheur voit le motif de la porte pendant son tour, corrige, et la porte accepte du premier coup", async () => {
     const prompts: string[] = [];

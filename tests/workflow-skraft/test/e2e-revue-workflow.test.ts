@@ -31,7 +31,7 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
     const lensPrompts: string[] = [];
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
       const n = decidePrompts.length;
       const responses =
         n === 2 || n === 3 ? [{ defect: DEFAUT, status: "contested", reason: "L'agrégat est nommé dans domain-model.md." }] : n === 4 ? [{ defect: DEFAUT, status: "fixed" }] : [];
@@ -44,7 +44,7 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
         return void (await t.callTool("submit_lens_verdict", {
           lens: "architecture",
           verdict: "CHANGES_REQUESTED",
-          defects: [{ severity: "major", severityReason: "raison d’essai", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us-12/design/contracts.md", target: "deliverable" }],
+          defects: [{ severity: "major", severityReason: "raison d’essai", description: "contracts.md ne nomme pas l'agrégat.", file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }],
         }));
       if (n === 2 || n === 3)
         return void (await t.callTool("submit_lens_verdict", {
@@ -66,7 +66,7 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
 
     // Essai 2 : le défaut, numéroté par le code, et ce qu'on attend de l'agent.
     await until(async () => decidePrompts.length >= 2);
-    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat. (.skraft/us-12/design/contracts.md)`);
+    expect(decidePrompts[1]).toContain(`[${DEFAUT}, major, deliverable] contracts.md ne nomme pas l'agrégat. (.skraft/us12-f15ade30/design/contracts.md)`);
     expect(decidePrompts[1]).toContain("Réponds à chaque défaut ci-dessus dans le champ `responses`");
 
     // Essai 3 : la lentille a revu la contestation, et l'a maintenue.

@@ -41,7 +41,7 @@ describe("skraft en workflow — leçons tirées des erreurs répétées (LEC-2)
       await t.callTool("submit_lens_verdict", {
         lens: "architecture",
         verdict: revues === 1 ? "CHANGES_REQUESTED" : "APPROVED",
-        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: DEFAUT, file: ".skraft/us-12/design/contracts.md", target: "deliverable" }] : [],
+        defects: revues === 1 ? [{ severity: "major", severityReason: "raison d’essai", description: DEFAUT, file: ".skraft/us12-f15ade30/design/contracts.md", target: "deliverable" }] : [],
       });
     };
     const leconsPrompts: string[] = [];
@@ -67,11 +67,11 @@ describe("skraft en workflow — leçons tirées des erreurs répétées (LEC-2)
     expect(leconsPrompts[0]).toContain(DEFAUT);
     expect(leconsPrompts[0]).toContain("V-CA-06: Infrastructure Details Leaking into Application Contracts");
     expect(leconsPrompts[1]).toContain(`« V-CA-99: Inventée » n'est pas une section de ${CLEAN}.`);
-    expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): leçons après us-12");
+    expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): leçons après us12-f15ade30");
     const lecons = git(root, "show", "HEAD:.agent-studio/lecons/lecons.jsonl").trim().split("\n").map((l) => JSON.parse(l));
     expect(lecons).toEqual([expect.objectContaining({ id: "L-01", statut: "validee", role: "skraft-architect-decide", phase: "DESIGN", catalogue: { skill: CLEAN, section: "V-CA-06: Infrastructure Details Leaking into Application Contracts" } })]);
     expect(lecons[0].sources).toHaveLength(2);
-    expect(git(root, "show", "HEAD:.agent-studio/lecons/stories.jsonl").trim().split("\n").map((l) => JSON.parse(l).story)).toEqual(["us-4", "us-12"]);
+    expect(git(root, "show", "HEAD:.agent-studio/lecons/stories.jsonl").trim().split("\n").map((l) => JSON.parse(l).story)).toEqual(["us-4", "us12-f15ade30"]);
     expect(app.posted.at(-1)).toContain("Leçons : 1 nouvelle, 1 validée");
   }, 150_000);
 });

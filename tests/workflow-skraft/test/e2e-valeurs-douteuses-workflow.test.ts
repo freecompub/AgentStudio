@@ -53,6 +53,6 @@ describe("skraft en workflow — valeurs douteuses soumises à l'humain (ADR 008
     await until(async () => researchPrompts.length >= 1, 60_000);
     const reponse = "→ Non : « 3 » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.";
     expect(researchPrompts[0]).toContain(reponse);
-    expect(await readFile(join(root, ".skraft/us-12/passation.md"), "utf8")).toContain("n'est pas une valeur à tester");
+    expect(await readFile(join(root, ".skraft/us12-f15ade30/passation.md"), "utf8")).toContain("n'est pas une valeur à tester");
   }, 120_000);
 });
