@@ -16,6 +16,12 @@ import { createWorkflowTaskDepuis } from "../workflow-task.js";
 import { compilerWorkflow } from "./compiler.js";
 import { createRejoueurIsole } from "./rejoueur.js";
 
+/** Agents qui n'écrivent rien ni ne lancent de tests : appelés ensemble, ils tournent en même temps (ADR 0086). */
+export const agentsEnLectureSeule = (m: Pick<MetaWorkflow, "agents">): string[] =>
+  Object.entries(m.agents)
+    .filter(([, a]) => !a.ecriture?.length && !a.outils?.some((x) => x === "run_tests" || x === "run_lint"))
+    .map(([nom]) => nom);
+
 const GIT: Record<string, Permission> = { branche: "git:branch", commit: "git:commit", revert: "git:revert" };
 
 /** Déclaration interne tirée du meta : permissions, agents, skills, commande, tâche. */
@@ -132,7 +138,7 @@ export async function activerWorkflow(w: WorkflowTrouve, deps: HostDeps, o: Opti
     // Un outil ne lit que ce que le script lui-même pourrait lire : la liste du dépôt (ADR 0082).
     lire: async (chemin) => ((await deps.workspace.files.list()).includes(chemin) ? deps.workspace.files.read(chemin).catch(() => null) : null),
   });
-  const tache = createWorkflowTaskDepuis({ nom: m.name, empreinte: w.empreinte, humains: m.humains, rejoueur, refusEnTermesDuMeta: true });
+  const tache = createWorkflowTaskDepuis({ nom: m.name, empreinte: w.empreinte, humains: m.humains, agentsEnLectureSeule: agentsEnLectureSeule(m), rejoueur, refusEnTermesDuMeta: true });
 
   const module: ExtensionModule = {
     activate(ctx) {

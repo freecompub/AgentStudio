@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-11-10",
-  "branch": "main",
+  "updated": "2026-11-12",
+  "branch": "feat/revue-lentilles",
   "items": [
     {
       "id": "banc-modeles-par-role",
@@ -1366,6 +1366,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate",
       "passes": true,
       "notes": "Fait le 2026-11-12, après un essai d'US-2 sur l'exemple .NET : `TreatWarningsAsErrors` (`Directory.Build.props:7-8`), cité dans contracts.md, a refusé DESIGN et coûté 2,61 $. Application de la décision du 11/11 : la porte juge ce que la story produit, pas l'existant."
+    },
+    {
+      "id": "workflow-lecture-seule-parallele",
+      "title": "Workflow : les tours d'agents en lecture seule (ni écriture, ni run_tests, ni run_lint) en attente ensemble tournent en parallèle, en un seul effet ; chaque résultat est rangé sous son appel ; un agent qui écrit reste seul",
+      "verify": "pnpm vitest run --project workflow paralleles activer",
+      "passes": true,
+      "notes": "Fait le 2026-11-12 (ADR 0086). Les lentilles du workflow skraft tournaient l'une après l'autre malgré le Promise.all du script : le moteur de tâches exécute ses effets un par un."
     }
   ]
 }
