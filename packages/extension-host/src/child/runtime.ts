@@ -129,7 +129,9 @@ export function runExtensionChild(channel: MessageChannelLike): RpcEndpoint {
       git: {
         commit: (message, opts) => call("git.commit", [message, opts ?? {}]),
         head: () => call("git.head", []),
-        branch: (name) => call("git.branch", [name]),
+        branch: (name, opts) => call("git.branch", [name, opts ?? {}]),
+        log: () => call("git.log", []),
+        resetTo: (sha) => call("git.resetTo", [sha]),
       },
       stack: {
         runTests: (opts) => {

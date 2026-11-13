@@ -94,8 +94,8 @@ describe("skraft en workflow — couverture du diff contestée, arbitrée par l'
     await trancher(app, "derogation", "défensif, validé par l'écran de réglage");
     await fin(app, id, 60_000);
     expect(await arbitrages(app, id)).toEqual([["couverture du diff", "humain", "dérogation"]]);
-    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us-12): livraison de la story"))!.split(" ")[0]!;
-    const fichier = git(root, "show", `${livraison}:.skraft/us-12/deliver/derogations.md`);
+    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us12-f15ade30): livraison de la story"))!.split(" ")[0]!;
+    const fichier = git(root, "show", `${livraison}:.skraft/us12-f15ade30/deliver/derogations.md`);
     expect(fichier).toContain(`${STUB}:2`);
     expect(fichier).toContain("défensif, validé par l'écran de réglage");
     expect(app.posted.at(-1)).toContain("Lignes exemptées de la couverture du diff : 1");

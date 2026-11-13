@@ -207,9 +207,16 @@ export interface WorkspaceApi {
 export interface GitApi {
   /** Commit de tous les changements, ou des seuls `paths`. */
   commit(message: string, opts?: { paths?: string[] }): Promise<string | null>;
-  /** Crée la branche (ou s'y place si elle existe) : exige `git:branch`. */
-  branch(name: string): Promise<void>;
+  /**
+   * Crée la branche (ou s'y place si elle existe) : exige `git:branch`. `ecraser` : la recrée depuis
+   * `depuis` (ou HEAD), ce qu'elle portait est perdu (ADR 0089).
+   */
+  branch(name: string, opts?: { depuis?: string; ecraser?: boolean }): Promise<void>;
   head(): Promise<string>;
+  /** Commits de HEAD, du plus récent au plus ancien (200 au plus). */
+  log(): Promise<{ sha: string; subject: string }[]>;
+  /** Ramène la branche à un commit de son historique : exige `git:revert`. Rend les fichiers non suivis laissés en place (ADR 0089). */
+  resetTo(sha: string): Promise<{ nonSuivis: string[] }>;
 }
 
 export interface StackApi {

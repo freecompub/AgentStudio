@@ -71,11 +71,11 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
     const acceptance: ScriptedBehavior = async (t) => {
       prompts.push(t.prompt);
       const attempt = prompts.length;
-      await put(root, ".skraft/us-12/distill/features/plafond.feature", FEATURE(attempt === 1 ? "12 U" : "12,5 U"));
-      await put(root, ".skraft/us-12/distill/impl-plan.md", implPlanDe([1, 2, 3], "tests/acceptance/plafond.test.ts"));
+      await put(root, ".skraft/us12-f15ade30/distill/features/plafond.feature", FEATURE(attempt === 1 ? "12 U" : "12,5 U"));
+      await put(root, ".skraft/us12-f15ade30/distill/impl-plan.md", implPlanDe([1, 2, 3], "tests/acceptance/plafond.test.ts"));
       await put(
         root,
-        ".skraft/us-12/distill/test-plan.md",
+        ".skraft/us12-f15ade30/distill/test-plan.md",
         testPlanDe([1, 2, 3], attempt >= 3 ? "- @ac-3 : role: regression — justification : le comportement « aucun plafond » existe déjà.\n" : ""),
       );
       await put(root, "tests/acceptance/plafond.test.ts", ACCEPTANCE);
@@ -85,7 +85,7 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-architect-model": async (t) => {
-        await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+        await put(root, ".skraft/us12-f15ade30/design/event-model.md", "`BolusCapped`\n");
         await t.callTool("report_phase", { summary: "m", files: [] });
       },
       "skraft-acceptance": acceptance,
@@ -117,7 +117,7 @@ describe("skraft — critères de sortie de S4 (DISTILL)", () => {
     expect(prompts[3]).not.toContain("Les tests d'acceptance sont gelés");
     expect(deliverPrompt).toContain("Les tests d'acceptance sont gelés");
     // 1. porte valeurs : « 12 U » au lieu de « 12,5 U »
-    expect(prompts[1]).toContain("La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us-12/distill/features/plafond.feature).");
+    expect(prompts[1]).toContain("La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us12-f15ade30/distill/features/plafond.feature).");
     // 2. porte RED : ac-3 déjà vert sans justification
     expect(prompts[2]).toContain("« tests/acceptance/plafond.test.ts > ac-3 aucun plafond » (critère 3) passe déjà");
     expect(prompts[0]).toContain("Tests d'acceptance à écrire dans : tests/acceptance/**");

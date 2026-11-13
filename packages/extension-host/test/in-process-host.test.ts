@@ -35,7 +35,7 @@ function fakeWorkspace(): Workspace {
     repo: {
       // Ce double ne sait pas ouvrir de copie isolée : échouer vaut mieux que rendre une racine vide.
       worktree: async () => { throw new Error("copie isolée non fournie par ce double"); },
-      head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {} },
+      head: async () => "h", commit: async () => "sha-1", sync: async () => ({ pulled: 0, pushed: 0 }), switchBranch: async () => {}, log: async () => [], resetTo: async () => ({ nonSuivis: [] }) },
   };
 }
 
@@ -242,6 +242,10 @@ describe("Hôte d'extension en processus", () => {
     await expect(ctx.git.commit("x")).rejects.toBeInstanceOf(PermissionDeniedError);
     await expect(ctx.stack.runTests()).rejects.toThrow(/shell:test/);
     await expect(ctx.workspace.rollback("cp")).rejects.toThrow(/git:revert/);
+    // Reprise d'une story (ADR 0089) : recréer une branche exige git:branch, revenir à un commit git:revert ; lire l'historique, rien.
+    await expect(ctx.git.branch("skraft/x", { ecraser: true, depuis: "abc1234" })).rejects.toThrow(/git:branch/);
+    await expect(ctx.git.resetTo("abc1234")).rejects.toThrow(/git:revert/);
+    expect(await ctx.git.log()).toEqual([]);
     await expect(ctx.agents.run("writer", "x")).rejects.toThrow(/copilot:sessions/);
     expect(await ctx.workspace.listFiles()).toHaveLength(2); // fs:read déclarée
   });

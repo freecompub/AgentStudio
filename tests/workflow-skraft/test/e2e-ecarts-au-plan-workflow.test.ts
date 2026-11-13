@@ -56,10 +56,10 @@ describe("skraft en workflow — écarts au plan de test (ADR 0067)", () => {
     const id = await lancerWorkflow(app, "stories/us-12.md");
     await fin(app, id, 90_000);
     expect(revue.at(-1)).toContain("Écart au plan déclaré par skraft-test (scénario ac-1, critère ac-1) : prévu Application, aucune → Domaine, aucune — règle : clean-architecture-testing");
-    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us-12): livraison de la story"))!.split(" ")[0]!;
-    expect(git(root, "show", `${livraison}:.skraft/us-12/deliver/ecarts-au-plan.md`)).toContain("| ac-1 | ac-1 | skraft-test | Application, aucune | Domaine, aucune |");
+    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us12-f15ade30): livraison de la story"))!.split(" ")[0]!;
+    expect(git(root, "show", `${livraison}:.skraft/us12-f15ade30/deliver/ecarts-au-plan.md`)).toContain("| ac-1 | ac-1 | skraft-test | Application, aucune | Domaine, aucune |");
     await until(async () => app.posted.some((p) => p.includes("Écarts au plan de test")), 30_000);
-    expect(app.posted.find((p) => p.includes("Écarts au plan de test"))).toContain("Écarts au plan de test : 1 (détail dans .skraft/us-12/deliver/ecarts-au-plan.md).");
+    expect(app.posted.find((p) => p.includes("Écarts au plan de test"))).toContain("Écarts au plan de test : 1 (détail dans .skraft/us12-f15ade30/deliver/ecarts-au-plan.md).");
   }, 150_000);
   it("écart déclaré sur un critère absent de la matrice : le pas est refusé, tracé, puis repris", async () => {
     const ecrire = unitTestWriter(root);

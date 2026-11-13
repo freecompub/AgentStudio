@@ -73,7 +73,7 @@ const repondreArbitrage = async (app: App, choix: "derogation" | "corriger", com
   return q;
 };
 
-const commitDeLivraison = (root: string) => git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us-12): livraison de la story"))!.split(" ")[0]!;
+const commitDeLivraison = (root: string) => git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us12-f15ade30): livraison de la story"))!.split(" ")[0]!;
 
 /** Lance skraft au niveau « assez difficile » ; rend l'identifiant de la tâche. */
 async function lancer(app: App): Promise<string> {
@@ -125,7 +125,7 @@ describe("skraft — arbitrage d'un mutant contesté (D22, ADR 0065)", () => {
     expect(arbitrePrompts[0]).toContain("mutant équivalent : à dose == max");
     expect(arbitrePrompts[0]).toContain("dose >= max");
     expect(await arbitrages(app, id)).toEqual([["agent", "dérogation"]]);
-    const fichier = git(root, "show", `${commitDeLivraison(root)}:.skraft/us-12/deliver/derogations.md`);
+    const fichier = git(root, "show", `${commitDeLivraison(root)}:.skraft/us12-f15ade30/deliver/derogations.md`);
     expect(fichier).toContain(`${CODE}:1 (EqualityOperator)`);
     expect(fichier).toContain("équivalent : même valeur à dose == max");
     expect(lensPrompts.at(-1)).toContain(`Dérogation de mutation (agent) : ${CODE}:1 (EqualityOperator)`);
@@ -145,7 +145,7 @@ describe("skraft — arbitrage d'un mutant contesté (D22, ADR 0065)", () => {
     expect(q.detail).toContain("un test à dose == max le distingue");
     await finie(app, id);
     expect(await arbitrages(app, id)).toEqual([["agent", "à corriger"], ["humain", "dérogation"]]);
-    expect(git(root, "show", `${commitDeLivraison(root)}:.skraft/us-12/deliver/derogations.md`)).toContain("équivalent, vérifié à la main");
+    expect(git(root, "show", `${commitDeLivraison(root)}:.skraft/us12-f15ade30/deliver/derogations.md`)).toContain("équivalent, vérifié à la main");
   }, 90_000);
 
   it("l'humain exige la correction : le testeur tue le mutant, aucune dérogation", async () => {
@@ -160,7 +160,7 @@ describe("skraft — arbitrage d'un mutant contesté (D22, ADR 0065)", () => {
     await finie(app, id);
     expect(await arbitrages(app, id)).toEqual([["agent", "à corriger"], ["humain", "à corriger"]]);
     expect(await readFile(join(root, UNIT), "utf8")).toContain(TUEUR);
-    expect(git(root, "ls-tree", "-r", "--name-only", commitDeLivraison(root), ".skraft/us-12/deliver/")).not.toContain("derogations.md");
+    expect(git(root, "ls-tree", "-r", "--name-only", commitDeLivraison(root), ".skraft/us12-f15ade30/deliver/")).not.toContain("derogations.md");
   }, 90_000);
 
   it("plafond : au-delà de deux dérogations accordées par l'arbitre, l'humain tranche", async () => {

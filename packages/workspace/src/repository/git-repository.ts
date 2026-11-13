@@ -62,13 +62,39 @@ export function createGitRepository(git: GitRunner): Repository {
       return head();
     },
 
-    async switchBranch(name) {
+    async switchBranch(name, opts = {}) {
       if (!/^[A-Za-z0-9._/-]{1,100}$/.test(name) || name.startsWith("-") || name.includes("..")) throw new Error(`Nom de branche refusé : ${name}`);
+      if (opts.ecraser) {
+        const depuis = await git.run(["rev-parse", "--verify", "--quiet", `${opts.depuis ?? "HEAD"}^{commit}`]).then((s) => s.trim(), () => null);
+        if (!depuis) throw new Error(`Commit inconnu : ${opts.depuis}`);
+        // Le travail en cours appartient à la session écrasée : il part avec elle.
+        await git.run(["reset", "-q", "--hard"]);
+        await git.run(["switch", "-q", "-C", name, depuis]);
+        return;
+      }
       const exists = await git.run(["rev-parse", "--verify", "--quiet", `refs/heads/${name}`]).then(
         () => true,
         () => false,
       );
       await git.run(exists ? ["switch", "-q", name] : ["switch", "-q", "-c", name]);
+    },
+
+    async log() {
+      const sortie = await git.run(["log", "-n", "200", "--format=%H%x1f%s"]);
+      return sortie.split("\n").filter(Boolean).map((l) => {
+        const [sha, subject] = l.split("\x1f");
+        return { sha: sha!, subject: subject ?? "" };
+      });
+    },
+
+    async resetTo(sha) {
+      if (!/^[0-9a-f]{7,64}$/.test(sha)) throw new Error(`Commit refusé : ${sha}`);
+      // Seulement vers un ancêtre de HEAD : revenir en arrière sur cette branche, jamais sauter ailleurs.
+      const ancetre = await git.run(["merge-base", "--is-ancestor", sha, "HEAD"]).then(() => true, () => false);
+      if (!ancetre) throw new Error(`Le commit ${sha.slice(0, 12)} n'est pas dans l'historique de la branche : rien n'a changé.`);
+      await git.run(["reset", "-q", "--hard", sha]);
+      const nonSuivis = (await git.run(["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean);
+      return { nonSuivis };
     },
 
     async sync() {

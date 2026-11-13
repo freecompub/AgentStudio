@@ -2,6 +2,7 @@
  * Lecture d'une story (SPEC-skraft §6.1) : identifiant et titre, énoncé, critères d'acceptation
  * numérotés et leurs littéraux, questions ouvertes. Pure : aucune I/O.
  */
+import { createHash } from "node:crypto";
 export interface Criterion {
   n: number;
   text: string;
@@ -61,11 +62,16 @@ export function normalizeLiteral(s: string): string {
     .trim();
 }
 
-export function slugOf(id: string): string {
-  return id
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+/**
+ * Slug d'une story (13/11) : le préfixe et le numéro de son identifiant, puis les 8 premiers
+ * caractères du sha256 de son titre. La même story garde son slug d'un run à l'autre, donc sa branche
+ * et son dossier : un run relancé les retrouve. Un autre titre est une autre story.
+ */
+export function slugOf(id: string, titre: string): string {
+  const m = /^(.*?)[^A-Za-z0-9]*(\d+)$/.exec(id.trim());
+  const prefixe = (m ? m[1]! : id).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const numero = m ? m[2]!.padStart(2, "0") : "";
+  return `${prefixe}${numero}-${createHash("sha256").update(titre.trim().replace(/\s+/g, " ")).digest("hex").slice(0, 8)}`;
 }
 
 export function parseStory(md: string): StoryParse {

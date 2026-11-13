@@ -224,8 +224,8 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
           prompts.push(t.prompt);
           if (prompts.length === 2) return void (await t.callTool("report_blocker", { question: "Par prise ?", choices: ["oui", "non"] }));
           const lignes = prompts.length === 1 ? "40-72" : "40-55";
-          await put(root, ".skraft/us-12/research/research.md", researchDoc({ Découvertes: `Le calcul vit dans \`src/domain/bolus-calculator.ts:${lignes}\`.` }));
-          await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
+          await put(root, ".skraft/us12-f15ade30/research/research.md", researchDoc({ Découvertes: `Le calcul vit dans \`src/domain/bolus-calculator.ts:${lignes}\`.` }));
+          await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us12-f15ade30/research/research.md"] });
         },
       });
       const app = await assemble(root, runtime, tasksDir);
@@ -244,7 +244,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
           prompts.push(t.prompt);
           if (prompts.length === 2) return void (await t.callTool("report_blocker", { question: "Par prise ?", choices: ["oui", "non"] }));
           await accept(t);
-          if (prompts.length === 1) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+          if (prompts.length === 1) await rm(join(root, ".skraft/us12-f15ade30/distill/test-plan.md"));
         },
       });
       const app = await assemble(root, runtime, tasksDir);
@@ -252,7 +252,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       repondreAuxBlocages(app);
       const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
       await fin(app, id, 60_000);
-      expect(prompts[2]).toContain("Plan de test absent : .skraft/us-12/distill/test-plan.md");
+      expect(prompts[2]).toContain("Plan de test absent : .skraft/us12-f15ade30/distill/test-plan.md");
     }, 90_000);
 
     it("DELIVER", async () => {
@@ -340,8 +340,8 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       "skraft-acceptance": async (t) => {
         await accept(t);
         if (essais++ === 0) {
-          await put(root, ".skraft/us-12/distill/impl-plan.md", "1. ac-1\n");
-          await put(root, ".skraft/us-12/distill/test-plan.md", "# Plan de test\n");
+          await put(root, ".skraft/us12-f15ade30/distill/impl-plan.md", "1. ac-1\n");
+          await put(root, ".skraft/us12-f15ade30/distill/test-plan.md", "# Plan de test\n");
         }
       },
     });
@@ -365,7 +365,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const runtime = simulatedAgents(new ScriptedRuntime(), root, {
       "skraft-acceptance": async (t) => {
         await accept(t);
-        if (essais++ === 0) await rm(join(root, ".skraft/us-12/distill/test-plan.md"));
+        if (essais++ === 0) await rm(join(root, ".skraft/us12-f15ade30/distill/test-plan.md"));
       },
     });
     const app = await assemble(root, runtime, tasksDir);
@@ -373,7 +373,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
     await fin(app, id, 60_000);
     const rejets = (await app.trace.list(id)).filter((e) => e.kind === "rejet");
-    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us-12/distill/test-plan.md"] }));
+    expect(rejets).toContainEqual(expect.objectContaining({ porte: "plan de test", motifs: ["Plan de test absent : .skraft/us12-f15ade30/distill/test-plan.md"] }));
   }, 90_000);
 
   it("verdict REJECTED : rejet tracé sous la porte « revue », avec les lentilles qui rejettent (D11)", async () => {
@@ -398,15 +398,15 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
       const bad = researchPrompts.length === 1;
       await put(
         root,
-        ".skraft/us-12/research/research.md",
+        ".skraft/us12-f15ade30/research/research.md",
         researchDoc({ Découvertes: bad ? "Le calcul vit dans `src/domain/bolus-calculator.ts:40-72`." : "Le calcul vit dans `src/domain/bolus-calculator.ts:40-55`." }),
       );
-      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
+      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us12-f15ade30/research/research.md"] });
     };
     let designBrief = "";
     const model: ScriptedBehavior = async (t) => {
       designBrief = t.prompt;
-      await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-researcher": researcher, "skraft-architect-model": model });
@@ -452,12 +452,12 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond est-il rappelé au patient ?"]);
     expect((await app.engine.status(id))!.phase).toBe("ROUTE");
     // RESEARCH est commitée avant les questions, avec le message du réducteur.
-    expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): research de us-12");
+    expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): research de us12-f15ade30");
     await app.interactions.respond(questions[0]!.id, option(questions[0]!, "defer"));
 
     // DESIGN reçoit les réponses et la phase RESEARCH dans son dossier de passation.
     await until(async () => designBrief !== "");
-    expect(designBrief).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
+    expect(designBrief).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us12-f15ade30/passation.md`, à citer comme source) :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
     // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
@@ -465,7 +465,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     // Pile tirée de l'adaptateur, et architecture par défaut faute d'argument (docs/15 §5).
     expect(designBrief).toContain("Pile du projet : typescript ;");
     expect(designBrief).toContain("Architecture du projet : clean architecture par défaut, skill `architecture-patterns`.");
-    expect(designBrief).toContain("RESEARCH : .skraft/us-12/research/research.md");
+    expect(designBrief).toContain("RESEARCH : .skraft/us12-f15ade30/research/research.md");
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(app.posted.at(-1)).toContain("Phases exécutées : RESEARCH, DESIGN, DISTILL, DELIVER");
   }, 120_000);
@@ -480,7 +480,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase RESEARCH")), 60_000);
     const [escalade] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Phase RESEARCH"));
-    expect(escalade!.title).toBe("Phase RESEARCH : Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md");
+    expect(escalade!.title).toBe("Phase RESEARCH : Même refus deux fois de suite : Document de recherche absent : .skraft/us12-f15ade30/research/research.md");
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role.endsWith("skraft-researcher"))).toHaveLength(2);
     expect(escalade).not.toHaveProperty("requiredRoles"); // ADR 0087 : réservée à personne
   }, 60_000);
@@ -490,14 +490,14 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     let briefDecide = "";
     const decide: ScriptedBehavior = async (t) => {
       briefDecide = t.prompt;
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
-      await t.callTool("report_phase", { summary: "contrats", files: [".skraft/us-12/design/contracts.md"] });
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
+      await t.callTool("report_phase", { summary: "contrats", files: [".skraft/us12-f15ade30/design/contracts.md"] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-decide": decide });
     const app = await assemble(root, runtime, tasksDir);
     answerQuestions(app);
     await app.registry.command("skraft-workflow")!.handler("--auto stories/us-12.md");
     await until(async () => briefDecide !== "", 60_000);
-    expect(briefDecide).toContain("Noms définis par le modèle (`.skraft/us-12/design/event-model.md`, `.skraft/us-12/design/domain-model.md`) : `BolusCapped`.");
+    expect(briefDecide).toContain("Noms définis par le modèle (`.skraft/us12-f15ade30/design/event-model.md`, `.skraft/us12-f15ade30/design/domain-model.md`) : `BolusCapped`.");
   }, 90_000);
 });

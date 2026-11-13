@@ -54,7 +54,7 @@ describe("Porte citations (SPEC-skraft §7.1, fixtures §13.2)", () => {
   });
 
   it("les chemins sous .skraft/ et les noms de fichiers sans dossier ne sont pas contrôlés comme citations du code", () => {
-    const r = checkResearch(doc({ "Fichiers analysés": "`.skraft/us-12/story.md` et Package.swift" }), index);
+    const r = checkResearch(doc({ "Fichiers analysés": "`.skraft/us12-f15ade30/story.md` et Package.swift" }), index);
     expect(r.reasons).toEqual([]);
   });
 

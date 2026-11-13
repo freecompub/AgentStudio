@@ -24,10 +24,10 @@ const ADR_ARGS = {
 
 /** Rapports de revue commités avec DESIGN (D8 de docs/12). */
 async function rapportsDuDesign(root: string): Promise<string[]> {
-  const ligne = async () => git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us-12"));
+  const ligne = async () => git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us12-f15ade30"));
   await until(async () => (await ligne()) !== undefined, 60_000);
   const sha = (await ligne())!.split(" ")[0]!;
-  return git(root, "ls-tree", "-r", "--name-only", sha, ".skraft/us-12/reviews/").split("\n").filter(Boolean).map((p) => p.split("/").at(-1)!);
+  return git(root, "ls-tree", "-r", "--name-only", sha, ".skraft/us12-f15ade30/reviews/").split("\n").filter(Boolean).map((p) => p.split("/").at(-1)!);
 }
 
 describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () => {
@@ -51,12 +51,12 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     git(root, "commit", "-qm", "bus");
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       const args = ADR_ARGS;
       await put(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md", renderAdr(1, args, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
@@ -85,13 +85,13 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
       decidePrompts.push(t.prompt);
       for (const path of ["docs/adr/0001-plafond.md", ADR1, "docs/adr/supersessions.md"])
         probes[path] = (await t.config.guard.check({ kind: "write", toolName: "edit", path })) as { decision: string };
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       const md = renderAdr(1, ADR_ARGS, "2026-10-10");
       await put(root, ADR1, decidePrompts.length === 1 ? md.replace("# ADR-001 —", "# ADR 0001 —") : md);
       await t.callTool("report_phase", { summary: "décisions", files: [ADR1] });
     };
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -122,12 +122,12 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
       decidePrompts.push(t.prompt);
       for (const path of ["docs/adr/adr-001-plafond-applique-dans-le-domaine.md", "docs/adr/adr-002-plafond-applique-dans-le-domaine.md"])
         probes[path] = await t.config.guard.check({ kind: "write", toolName: "edit", path });
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       await put(root, "docs/adr/adr-002-plafond-applique-dans-le-domaine.md", renderAdr(2, ADR_ARGS, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -152,14 +152,14 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const decidePrompts: string[] = [];
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       const md = renderAdr(1, ADR_ARGS, "2026-10-10");
       await put(root, ADR1, decidePrompts.length === 1 ? md.replace("# ADR-001 —", "# ADR 0001 —") : md);
       await t.callTool("report_phase", { summary: "décisions", files: [ADR1] });
     };
     const model: ScriptedBehavior = async (t) => {
       modelPrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -186,15 +186,15 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const probes: unknown[] = [];
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
-      probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ".skraft/us-12/design/event-model.md" }));
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
+      probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ".skraft/us12-f15ade30/design/event-model.md" }));
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n");
       await put(root, ADR1, renderAdr(1, ADR_ARGS, "2026-10-10"));
       // Il le signale à chaque tour : le code ne relance le modélisateur qu'une fois par essai.
       await t.callTool("report_phase", { summary: "décisions", files: [ADR1], modelDefects: [REMARQUE] });
     };
     const model: ScriptedBehavior = async (t) => {
       modelPrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -216,15 +216,15 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
   it("incohérence rejetée, ratification bloquante, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
-      await put(root, ".skraft/us-12/design/domain-model.md", "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/domain-model.md", "Agrégat `BolusCalculation`, objet-valeur `MaxBolus`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const decide: ScriptedBehavior = async (t) => {
       decidePrompts.push(t.prompt);
       const first = decidePrompts.length === 1;
       const amending = t.prompt.includes("Amendement demandé");
-      await put(root, ".skraft/us-12/design/contracts.md", first ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusLimited`.\n" : "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", first ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusLimited`.\n" : "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       // Plus d'outil render_adr (ADR 0055) : l'architecte écrit le fichier, au gabarit ; un amendement le réécrit.
       await put(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md", renderAdr(1, amending ? { ...ADR_ARGS, consequences: "Plafond par prise ; l'interface affiche l'alerte." } : ADR_ARGS, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
@@ -267,12 +267,12 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(adr).toContain("- Statut : Accepted");
     expect(adr).toContain("Plafond par prise");
     // Rattaché à son US par le code, et la ligne a survécu à l'amendement (réécriture complète).
-    expect(adr).toContain("- Story : us-12");
+    expect(adr).toContain("- Story : us12-f15ade30");
     // Les phases suivantes commitent ensuite : le commit de DESIGN est dans l'historique, avec l'ADR accepté.
-    const design = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us-12"))!.split(" ")[0]!;
+    const design = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("docs(skraft): design de us12-f15ade30"))!.split(" ")[0]!;
     expect(git(root, "show", `${design}:docs/adr/adr-001-plafond-applique-dans-le-domaine.md`)).toContain("- Statut : Accepted");
     // La matrice de cohérence est écrite par le code et commitée avec DESIGN (G10, docs/15 §4.5).
-    const matrice = git(root, "show", `${design}:.skraft/us-12/design/consistency-matrix.md`);
+    const matrice = git(root, "show", `${design}:.skraft/us12-f15ade30/design/consistency-matrix.md`);
     expect(matrice).toContain("| `CapBolus` | Commande |");
     expect(matrice).toContain("consistency-gate: PASS");
     expect(app.posted.at(-1)).toContain("ADR : ADR-001 (Accepted).");
@@ -288,7 +288,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const probes: unknown[] = [];
     const decide: ScriptedBehavior = async (t) => {
       const amending = t.prompt.includes("Amendement demandé sur ADR-002");
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       if (amending) {
         amendement = await readFile(join(root, ADR1), "utf8");
         probes.push(await t.config.guard.check({ kind: "write", toolName: "edit", path: ADR1 }));
@@ -303,7 +303,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -338,13 +338,13 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
   it("amendement : la revue d'avant et celle d'après ont chacune leur rapport (D8)", async () => {
     const ADR1 = "docs/adr/adr-001-plafond-applique-dans-le-domaine.md";
     const decide: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
       const amende = t.prompt.includes("Amendement demandé sur ADR-001");
       await put(root, ADR1, renderAdr(1, amende ? { ...ADR_ARGS, consequences: "Alerte par prise." } : ADR_ARGS, "2026-10-10"));
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-model": model, "skraft-architect-decide": decide });
@@ -369,13 +369,13 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const scenario = async (decision: "relancer" | "sauter") => {
       let escalade = false;
       const decide: ScriptedBehavior = async (t) => {
-        await put(root, ".skraft/us-12/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
+        await put(root, ".skraft/us12-f15ade30/design/contracts.md", "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped`.\n");
         if (escalade) await put(root, INTERFACE, renderAdr(1, { ...ADR_ARGS, title: "Plafond dans l'interface" }, "2026-10-10"));
         else await put(root, DOMAINE, renderAdr(1, { ...ADR_ARGS, title: "Plafond dans le domaine" }, "2026-10-10"));
         await t.callTool("report_phase", { summary: "décisions", files: [] });
       };
       const model: ScriptedBehavior = async (t) => {
-        await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+        await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
         await t.callTool("report_phase", { summary: "modèle", files: [] });
       };
       // Première revue de DESIGN : deux lentilles rejettent, donc REJECTED et escalade.
@@ -430,7 +430,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const model: ScriptedBehavior = async (t) => {
       modelPrompts.push(t.prompt);
       // Modèle du harnais : le décideur par défaut écrit un contrat sans sections (docs/15 §4.6).
-      await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const lentille = (lens: string): ScriptedBehavior => async (t) => {
@@ -464,11 +464,11 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     let relance = false;
     const prompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const decide: ScriptedBehavior = async (t) => {
-      await put(root, ".skraft/us-12/design/contracts.md", relance ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped` (v2).\n" : `## Commande \`CapBolus\`\n\n## Événement \`BolusCapped\`\n\n\`CapBolus\` produit \`BolusCapped\` (essai ${revues + 1}).\n`);
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", relance ? "## Commande `CapBolus`\n\n## Événement `BolusCapped`\n\n`CapBolus` produit `BolusCapped` (v2).\n" : `## Commande \`CapBolus\`\n\n## Événement \`BolusCapped\`\n\n\`CapBolus\` produit \`BolusCapped\` (essai ${revues + 1}).\n`);
       await t.callTool("report_phase", { summary: "décisions", files: [] });
     };
     // Run 1 : revue 1 « changements demandés », revue 2 REJECTED (escalade). Run 2 : approuvée.

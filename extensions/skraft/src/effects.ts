@@ -132,7 +132,7 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
       const warnings = run.coverage ? checkCoverage(run.coverage, sources, bar) : ["Couverture initiale non mesurée : la commande de test du projet n'en produit pas."];
       if (warnings.length || notes.length)
         ctx.chat.post(`Précontrôle skraft — avertissement non bloquant sur le code existant :\n${[...warnings, ...notes].map((p) => `- ${p}`).join("\n")}\nLes seuils de couverture de livraison portent uniquement sur les lignes ajoutées ou modifiées.`);
-      const slug = slugOf(parsed.story.id);
+      const slug = slugOf(parsed.story.id, parsed.story.title);
       const qualityCheckpoint = (await ctx.workspace.checkpoint(`skraft ${slug} : qualité initiale`)).id;
       const branch = `skraft/${slug}`;
       const baseSha = await ctx.git.head();

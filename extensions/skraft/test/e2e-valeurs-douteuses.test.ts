@@ -32,8 +32,8 @@ describe("skraft — valeurs douteuses soumises à l'humain (ADR 0080)", () => {
     const researchPrompts: string[] = [];
     const researcher: ScriptedBehavior = async (t) => {
       researchPrompts.push(t.prompt);
-      await put(root, ".skraft/us-12/research/research.md", researchDoc());
-      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
+      await put(root, ".skraft/us12-f15ade30/research/research.md", researchDoc());
+      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us12-f15ade30/research/research.md"] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-researcher": researcher });
     const app = await assemble(root, runtime, tasksDir);

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { lensBrief, refuterBrief } from "../../../workflows/skraft/review-brief.mjs";
 
 const c = { criteria: [{ n: 1, text: "Plafond de 10 U" }], adrs: [{ id: "ADR-001", path: "docs/adr/adr-001-plafond.md" }] };
-const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["src/domain/plafond.ts"], tests: ["test/domain/plafond.test.ts"] };
+const files = { artifacts: [".skraft/us12-f15ade30/distill/impl-plan.md"], code: ["src/domain/plafond.ts"], tests: ["test/domain/plafond.test.ts"] };
 const facts = ["Fait A."];
 
 describe("Contexte des lentilles (§9.2)", () => {
@@ -29,7 +29,7 @@ describe("Contexte des lentilles (§9.2)", () => {
 });
 
 describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
-  const f = { artifacts: [".skraft/us-12/design/diagrams.md"], code: [], tests: [] };
+  const f = { artifacts: [".skraft/us12-f15ade30/design/diagrams.md"], code: [], tests: [] };
 
   it("DESIGN : architecture examine les invariants d'agrégat et la justification des patrons", () => {
     const a = lensBrief("architecture", c, "DESIGN", f, []);
@@ -52,11 +52,11 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
   });
 
   it("DELIVER : test-integrity et quality-gates jugent le respect du plan de test et ses écarts déclarés (docs/15 §4.7, ADR 0067)", () => {
-    for (const lens of ["cold-reader", "architecture"]) expect(lensBrief(lens, { ...c, slug: "us-12" }, "DELIVER", f, [])).not.toContain("Points à examiner");
-    const t = lensBrief("test-integrity", { ...c, slug: "us-12" }, "DELIVER", f, []);
+    for (const lens of ["cold-reader", "architecture"]) expect(lensBrief(lens, { ...c, slug: "us12-f15ade30" }, "DELIVER", f, [])).not.toContain("Points à examiner");
+    const t = lensBrief("test-integrity", { ...c, slug: "us12-f15ade30" }, "DELIVER", f, []);
     expect(t).toContain("Points à examiner en DELIVER :");
-    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
-    expect(lensBrief("quality-gates", { ...c, slug: "us-12" }, "DELIVER", f, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
+    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us12-f15ade30/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
+    expect(lensBrief("quality-gates", { ...c, slug: "us12-f15ade30" }, "DELIVER", f, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
   });
 });
 
@@ -65,7 +65,7 @@ describe("Dossier du réfutateur (ADR 0069)", () => {
   it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
     const b = refuterBrief("cold-reader", c, "DELIVER", files, facts, [{ ...defauts[0], severityReason: "Le nom cache la règle.", occurrences: ["src/b.ts:12"] }]);
     expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (src/domain/plafond.ts:3) — gravité : Le nom cache la règle. — aussi : src/b.ts:12");
-    for (const vu of ["src/domain/plafond.ts", "test/domain/plafond.test.ts", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
+    for (const vu of ["src/domain/plafond.ts", "test/domain/plafond.test.ts", ".skraft/us12-f15ade30/distill/impl-plan.md"]) expect(b).toContain(vu);
     // Pas plus que la lentille : cold-reader ne reçoit ni faits, ni critères, ni ADR.
     for (const cache of ["Fait A.", "Plafond de 10 U", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);
   });

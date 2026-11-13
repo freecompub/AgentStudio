@@ -5,6 +5,27 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/11 — Reprise d'une US : le slug (ADR 0088)
+
+- **Demande du responsable** : relancer une US abandonnée et continuer ; le slug combine le numéro et
+  l'empreinte du titre (format court retenu : `us12-f15ade30`). Branche `feat/reprise-us`, de `main`.
+- **Fait** : `slugOf(id, titre)` dans l'extension et le workflow ; `sha256.mjs` sans dépendance ; le
+  serveur MCP calcule la branche d'une issue GitHub à partir du titre écrit dans la story.
+- **Piège** : le processus isolé d'un workflow n'a pas `TextEncoder`. L'exception, attrapée dans INIT,
+  ressortait en « Story introuvable » : le motif masque toute erreur de ce bloc.
+- **Piège** : un remplacement en masse de `us-12` dans les tests a aussi renommé le fichier de la story
+  (`stories/us-12.md`), qui garde son nom.
+- **Reprise faite** (ADR 0089, accord du responsable le 13/11) :
+  - Workspace : `switchBranch(nom, { depuis, ecraser })`, `log()`, `resetTo(sha)` (ancêtre de HEAD seulement,
+    fichiers non suivis laissés et nommés) ; API des extensions, hôtes et runtime enfant ; moteur :
+    `w.tete`, `w.historique`, `w.revenirA`, `w.brancher(…, { ecraser })` ;
+  - workflow : `reprise.mjs` (pur, sauf `noterLEtat` et `proposerLaReprise`) ; état noté en fin de chaque
+    phase, commité avec elle ; question `reprise` ouverte à tous (plus de `meta.humains` depuis l'ADR 0087).
+- **Piège** : au départ d'une session continuée après DISTILL, les tests d'acceptance de la story sont
+  rouges : le précontrôle bloquait. `releveDeDepart` les met à part, sans masquer un autre test rouge.
+- **Piège** : ouvrir le registre après la reprise, pas avant : le retour au commit de phase change le disque.
+- **Prochaine étape** : un essai réel (arrêter un run en DELIVER, le relancer) ; la reprise au scénario si
+  le besoin se confirme.
 ## 13/11 — Plus de profil : aucune action réservée (ADR 0087)
 
 - **Demande du responsable** : enlever toutes les restrictions par profil, dans tout le code, puis

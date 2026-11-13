@@ -42,7 +42,7 @@ it("ac-3 aucun plafond", () => expect(proposeDose(7)).toBe(7));
 
 const files = (feature = FEATURE, tests = TESTS) => ({
   criteria,
-  features: [{ path: ".skraft/us-12/distill/features/plafond.feature", content: feature }],
+  features: [{ path: ".skraft/us12-f15ade30/distill/features/plafond.feature", content: feature }],
   acceptanceTests: [{ path: "tests/acceptance/plafond.test.ts", content: tests }],
 });
 
@@ -57,7 +57,7 @@ describe("Porte valeurs (SPEC-skraft §7.3, fixture §13.2)", () => {
 
   it("« 12 U » au lieu de « 12,5 U » dans le scénario : rejet nommant le critère 2", () => {
     expect(checkValues(files(FEATURE.replace("12,5 U", "12 U")))).toEqual([
-      "La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us-12/distill/features/plafond.feature).",
+      "La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us12-f15ade30/distill/features/plafond.feature).",
     ]);
   });
 

@@ -4,7 +4,7 @@ import { buildBrief } from "../src/brief.js";
 import { initialState } from "../src/reducer.js";
 import type { SkraftState } from "../src/model.js";
 
-const base: SkraftState = { ...initialState({ storyPath: "stories/us-12.md" }), slug: "us-12" };
+const base: SkraftState = { ...initialState({ storyPath: "stories/us-12.md" }), slug: "us12-f15ade30" };
 const recherche = { conventions: "Doublures en mémoire pour les dépôts ; tests nommés d'après leur critère.", existant: "- `BolusCalculator` → `src/domain/bolus-calculator.ts`" };
 
 describe("Recherche dans le dossier de passation", () => {
@@ -58,7 +58,7 @@ describe("Réponses de l'utilisateur, citables", async () => {
 
   it("le dossier dit où elles sont écrites ; sans réponse, ni ligne ni fichier", () => {
     const b = buildBrief({ ...base, openQuestions: [{ id: "q1", text: "Le plafond est-il par prise ?", answer: "par prise" }] }, "DESIGN", []);
-    expect(b).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
+    expect(b).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us12-f15ade30/passation.md`, à citer comme source) :");
     expect(buildBrief(base, "DESIGN", [])).not.toContain("passation.md");
   });
 });

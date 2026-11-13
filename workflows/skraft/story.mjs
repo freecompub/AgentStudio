@@ -1,4 +1,5 @@
 // Converti en JavaScript le 2026-10-10 depuis extensions/skraft-workflow/src/story.ts (ADR 0055).
+import { sha256Hex } from "./sha256.mjs";
 const HEADING = /^#\s+([A-Za-z][\w-]*-\d+)\s*[—–-]\s*(.+?)\s*$/m;
 function section(md, title) {
   const lines = md.split("\n");
@@ -37,11 +38,16 @@ export function normalizeLiteral(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-export function slugOf(id) {
-  return id
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+/**
+* Slug d'une story (13/11) : le préfixe et le numéro de son identifiant, puis les 8 premiers caractères
+* du sha256 de son titre. La même story garde son slug d'un run à l'autre, donc sa branche et son
+* dossier : un run relancé les retrouve. Un autre titre est une autre story.
+*/
+export function slugOf(id, titre) {
+  const m = /^(.*?)[^A-Za-z0-9]*(\d+)$/.exec(id.trim());
+  const prefixe = (m ? m[1] : id).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const numero = m ? m[2].padStart(2, "0") : "";
+  return `${prefixe}${numero}-${sha256Hex(titre.trim().replace(/\s+/g, " ")).slice(0, 8)}`;
 }
 export function parseStory(md) {
   const errors = [];

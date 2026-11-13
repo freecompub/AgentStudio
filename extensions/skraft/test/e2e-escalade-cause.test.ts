@@ -91,8 +91,8 @@ describe("skraft — escalade d'un scénario selon sa cause (ADR 0066)", () => {
 
     const bilan = await finie(app, id);
     expect(await arbitrages(app, id)).toContainEqual(["tests existants", ANCIEN, "obsolète", "humain", "la story plafonne la dose"]);
-    expect(await readFile(join(root, ".skraft/us-12/deliver/derogations.md"), "utf8")).toContain(ANCIEN);
-    expect(git(root, "log", "--format=%s", "-1", "--", ".skraft/us-12/deliver/derogations.md")).toMatch(/livraison de la story/);
+    expect(await readFile(join(root, ".skraft/us12-f15ade30/deliver/derogations.md"), "utf8")).toContain(ANCIEN);
+    expect(git(root, "log", "--format=%s", "-1", "--", ".skraft/us12-f15ade30/deliver/derogations.md")).toMatch(/livraison de la story/);
     expect(bilan).toContain("À corriger après le cycle");
     expect(bilan).toContain(`- mettre à jour ${ANCIEN} : déclaré obsolète au scénario ac-1 (la story plafonne la dose).`);
   }, 120_000);
@@ -113,6 +113,6 @@ describe("skraft — escalade d'un scénario selon sa cause (ADR 0066)", () => {
 
     await finie(app, id);
     expect(await arbitrages(app, id)).toContainEqual(["couverture du diff", `${CODE}:1`, "dérogation", "humain", "garde défensive"]);
-    expect(await readFile(join(root, ".skraft/us-12/deliver/derogations.md"), "utf8")).toContain(`${CODE}:1`);
+    expect(await readFile(join(root, ".skraft/us12-f15ade30/deliver/derogations.md"), "utf8")).toContain(`${CODE}:1`);
   }, 120_000);
 });

@@ -65,9 +65,9 @@ describe("Numérotation des ADR calculée par le code, donnée à l'architecte (
     { path: "docs/adr/0002-renderer.md", md: "# ADR 0002 — Renderer\n" },
   ];
   it("le prochain numéro suit tous les ADR, quel que soit leur format ; ceux de la story ne sont pas « pris »", () => {
-    const sien = { path: "docs/adr/adr-003-x.md", md: avecStory(renderAdr(3, INPUT, "2026-11-11"), "us-12") };
-    expect(numerotationAdrs([...projet, sien], "us-12")).toEqual({ prochain: 4, pris: [1, 2] });
-    expect(numerotationAdrs([], "us-12")).toEqual({ prochain: 1, pris: [] });
+    const sien = { path: "docs/adr/adr-003-x.md", md: avecStory(renderAdr(3, INPUT, "2026-11-11"), "us12-f15ade30") };
+    expect(numerotationAdrs([...projet, sien], "us12-f15ade30")).toEqual({ prochain: 4, pris: [1, 2] });
+    expect(numerotationAdrs([], "us12-f15ade30")).toEqual({ prochain: 1, pris: [] });
   });
   it("la ligne du dossier de passation dit le numéro à prendre, et que les numéros pris sont interdits", () => {
     expect(ligneNumerotation({ prochain: 79, pris: [1, 78] })).toBe(

@@ -275,7 +275,9 @@ export async function activateInProcess(ext: LoadedExtension, deps: HostDeps): P
     git: {
       commit: async (message, opts) => (perm.require("git:commit"), deps.workspace.repo.commit(message, opts)),
       head: () => deps.workspace.repo.head(),
-      branch: async (name) => (perm.require("git:branch"), deps.workspace.repo.switchBranch(name)),
+      branch: async (name, opts) => (perm.require("git:branch"), deps.workspace.repo.switchBranch(name, opts)),
+      log: () => deps.workspace.repo.log(),
+      resetTo: async (sha) => (perm.require("git:revert"), deps.workspace.repo.resetTo(sha)),
     },
 
     stack: {

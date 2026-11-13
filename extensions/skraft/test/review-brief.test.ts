@@ -15,7 +15,7 @@ const story = (() => {
 
 const state: SkraftState = {
   ...initialState({ storyPath: "stories/us-12.md" }),
-  slug: "us-12",
+  slug: "us12-f15ade30",
   story,
   answers: [{ question: "Plafond par prise ?", answer: "par prise" }],
   acceptanceHash: "a".repeat(64),
@@ -92,20 +92,20 @@ describe("Livrables du dernier essai (après rollback)", () => {
         ...state.artifacts,
         DESIGN: [
           { path: "docs/adr/adr-001-ancien.md", sha256: "1".repeat(64), producedBy: "render_adr", attempt: 1 },
-          { path: ".skraft/us-12/design/contracts.md", sha256: "2".repeat(64), producedBy: "skraft-architect", attempt: 1 },
-          { path: ".skraft/us-12/design/contracts.md", sha256: "3".repeat(64), producedBy: "skraft-architect", attempt: 2 },
+          { path: ".skraft/us12-f15ade30/design/contracts.md", sha256: "2".repeat(64), producedBy: "skraft-architect", attempt: 1 },
+          { path: ".skraft/us12-f15ade30/design/contracts.md", sha256: "3".repeat(64), producedBy: "skraft-architect", attempt: 2 },
         ],
       },
     };
-    expect(latestArtifacts(s.artifacts.DESIGN).map((a) => [a.path, a.attempt])).toEqual([[".skraft/us-12/design/contracts.md", 2]]);
+    expect(latestArtifacts(s.artifacts.DESIGN).map((a) => [a.path, a.attempt])).toEqual([[".skraft/us12-f15ade30/design/contracts.md", 2]]);
     const facts = reviewFacts(s, "DESIGN", []).filter((f) => f.startsWith("Livrable"));
-    expect(facts).toEqual(["Livrable .skraft/us-12/design/contracts.md : porte de DESIGN validée à l'essai 2 (sha256 333333333333)."]);
+    expect(facts).toEqual(["Livrable .skraft/us12-f15ade30/design/contracts.md : porte de DESIGN validée à l'essai 2 (sha256 333333333333)."]);
     expect(latestArtifacts([])).toEqual([]);
   });
 });
 
 describe("Contexte des lentilles (§9.2)", () => {
-  const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/DomainTests/BolusCapPolicyTests.swift"] };
+  const files = { artifacts: [".skraft/us12-f15ade30/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/DomainTests/BolusCapPolicyTests.swift"] };
   const facts = ["Fait A."];
 
   it("cold-reader : aucun contexte du producteur (ni story, ni réponses, ni faits, ni ADR)", () => {
@@ -158,7 +158,7 @@ describe("Verdict reproductible (§9.3)", () => {
 });
 
 describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
-  const files = { artifacts: [".skraft/us-12/design/diagrams.md"], code: [], tests: [] };
+  const files = { artifacts: [".skraft/us12-f15ade30/design/diagrams.md"], code: [], tests: [] };
 
   it("DESIGN : architecture examine les invariants d'agrégat et la justification des patrons", () => {
     const a = lensBrief("architecture", state, "DESIGN", files, []);
@@ -184,18 +184,18 @@ describe("Consignes de phase des lentilles (option A de docs/15 §4.5)", () => {
     for (const lens of ["cold-reader", "architecture"] as const) expect(lensBrief(lens, state, "DELIVER", files, [])).not.toContain("Points à examiner");
     const t = lensBrief("test-integrity", state, "DELIVER", files, []);
     expect(t).toContain("Points à examiner en DELIVER :");
-    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us-12/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
+    expect(t).toContain("Chaque test respecte la couche et la doublure que la matrice de .skraft/us12-f15ade30/distill/test-plan.md prévoit pour son critère ; un écart non déclaré est un défaut, un écart déclaré dans les faits se juge sur sa règle.");
     expect(lensBrief("quality-gates", state, "DELIVER", files, ["Fait A."])).toContain("Chaque critère de la matrice du plan de test a au moins un test qui respecte sa ligne, sauf écart déclaré dans les faits.");
   });
 });
 
 describe("Dossier du réfutateur (ADR 0069)", () => {
-  const files = { artifacts: [".skraft/us-12/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/BolusCapTests.swift"] };
+  const files = { artifacts: [".skraft/us12-f15ade30/distill/impl-plan.md"], code: ["Sources/Domain/BolusCapPolicy.swift"], tests: ["Tests/BolusCapTests.swift"] };
   const defauts = [{ id: "cold-reader#1.1", severity: "major" as const, description: "Nom flou.", file: "Sources/Domain/BolusCapPolicy.swift", line: 3 }];
   it("les défauts numérotés par le code, puis les mêmes entrées que la lentille, sans ses consignes", () => {
     const b = refuterBrief("cold-reader", state, "DELIVER", files, ["Fait A."], [{ ...defauts[0]!, severityReason: "Le nom cache la règle.", occurrences: ["src/b.ts:12"] }]);
     expect(b).toContain("[cold-reader#1.1] (major) Nom flou. (Sources/Domain/BolusCapPolicy.swift:3) — gravité : Le nom cache la règle. — aussi : src/b.ts:12");
-    for (const vu of ["Tests/BolusCapTests.swift", ".skraft/us-12/distill/impl-plan.md"]) expect(b).toContain(vu);
+    for (const vu of ["Tests/BolusCapTests.swift", ".skraft/us12-f15ade30/distill/impl-plan.md"]) expect(b).toContain(vu);
     for (const cache of ["Fait A.", "ADR-001", "aucun contexte du producteur"]) expect(b).not.toContain(cache);
   });
   it("test-integrity : critères et faits ; architecture : ADR ratifiés et faits ; quality-gates : faits et livrables seulement", () => {

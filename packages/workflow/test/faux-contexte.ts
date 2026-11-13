@@ -79,11 +79,19 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
         }
         return "sha-1";
       },
-      async branch(nom: string) {
-        appels.push(`branche:${nom}`);
+      async branch(nom: string, opts?: { depuis?: string; ecraser?: boolean }) {
+        appels.push(`branche:${nom}${opts?.ecraser ? `:ecrasee-depuis:${opts.depuis ?? "HEAD"}` : ""}`);
       },
       async head() {
         return "h";
+      },
+      async log() {
+        appels.push("historique");
+        return [{ sha: "c2", subject: "feat(us02-x): ac-1" }, { sha: "c1", subject: "docs(skraft): research de us02-x" }];
+      },
+      async resetTo(sha: string) {
+        appels.push(`revenir:${sha}`);
+        return { nonSuivis: ["reste.txt"] };
       },
     },
     stack: {

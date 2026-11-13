@@ -13,6 +13,7 @@ import { SUPERSESSIONS } from "./adr.mjs";
 import { reviewFacts } from "./review-brief.mjs";
 import { ecrireRapports, enregistrerLivrables, nouveauSuivi, oublierLeRun, reviser, specialiste } from "./revue.mjs";
 import { commitMessage, creerDossiers, sha256 } from "./support.mjs";
+import { noterLEtat } from "./reprise.mjs";
 const ADR_FILE = /^docs\/adr\/adr-\d{3,}-[^/]+\.md$/;
 /** Tout fichier de `docs/adr/`, y compris hors convention : la porte doit voir les ADR du projet. */
 const estFichierAdr = (p) => /^docs\/adr\/[^/]+\.md$/.test(p) && p !== SUPERSESSIONS;
@@ -25,6 +26,8 @@ export async function concevoir(w, d, lentilles, max) {
     await statuerAdrs(w, d);
     releverLesDefauts(d.registre, suivi, "DESIGN");
     await ecrireRapports(w, d.slug, "DESIGN", suivi);
+    // L'état de la phase, commité avec elle : une relance de la story le retrouve (ADR 0089).
+    await noterLEtat(w, d, "DESIGN");
     return true;
   }, {
     commit: commitMessage("DESIGN", d.slug),

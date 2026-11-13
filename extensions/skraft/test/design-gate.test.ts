@@ -385,11 +385,11 @@ describe("Noms du modèle dans le dossier de l'architecte qui décide", () => {
 // le modélisateur, qui n'écrit pas d'ADR.
 describe("Routage des motifs d'un refus de DESIGN", () => {
   const adr = "Numérotation des ADR : ADR-001 est déjà pris par docs/adr/0001-x.md : docs/adr/adr-001-y.md doit prendre le prochain numéro libre, ADR-079.";
-  const modele = "Document manquant : .skraft/us-12/design/event-model.md.";
+  const modele = "Document manquant : .skraft/us12-f15ade30/design/event-model.md.";
   const croise = "`BolusLimited` cité dans contracts.md n'existe pas dans event-model.md.";
   const neutre = "Question de la revue (cold-reader) : x — Réponse de l'utilisateur : y";
   it("un motif sur un ADR ou un document de décision ne va qu'à l'architecte qui décide", () => {
-    expect(routerMotifsDeDesign([adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us-12/design/contracts.md:3)"])).toEqual({ modele: [], decisions: [adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us-12/design/contracts.md:3)"] });
+    expect(routerMotifsDeDesign([adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us12-f15ade30/design/contracts.md:3)"])).toEqual({ modele: [], decisions: [adr, "[architecture#1.1, major, deliverable] Contrat flou (.skraft/us12-f15ade30/design/contracts.md:3)"] });
   });
   it("un motif sur le modèle ne va qu'au modélisateur ; un motif qui lie les deux, ou ne nomme aucun fichier, va aux deux", () => {
     expect(routerMotifsDeDesign([modele, croise, neutre])).toEqual({ modele: [modele, croise, neutre], decisions: [croise, neutre] });

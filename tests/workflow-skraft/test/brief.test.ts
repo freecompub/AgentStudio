@@ -5,7 +5,7 @@ import { buildBrief } from "../../../workflows/skraft/brief.mjs";
 
 const vue = (over = {}) => ({
   story: { id: "US-12", title: "Plafonner", statement: "En tant que patient…", criteria: [{ n: 1, text: "Plafond" }] },
-  niveau: "medium-hard", slug: "us-12", phasesFaites: [], phasesSautees: [], adrs: [], questions: [], reponses: [], regressions: [], acceptanceHash: null,
+  niveau: "medium-hard", slug: "us12-f15ade30", phasesFaites: [], phasesSautees: [], adrs: [], questions: [], reponses: [], regressions: [], acceptanceHash: null,
   ...over,
 });
 const recherche = { conventions: "Doublures en mémoire pour les dépôts ; tests nommés d'après leur critère.", existant: "- `BolusCalculator` → `src/domain/bolus-calculator.ts`" };
@@ -50,7 +50,7 @@ describe("Réponses de l'utilisateur, citables", async () => {
 
   it("le dossier dit où elles sont écrites ; sans réponse, ni ligne ni fichier", () => {
     const b = buildBrief(vue({ questions: [{ id: "q1", text: "Le plafond est-il par prise ?", answer: "par prise" }] }), "DESIGN", []);
-    expect(b).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
+    expect(b).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us12-f15ade30/passation.md`, à citer comme source) :");
     expect(buildBrief(vue(), "DESIGN", [])).not.toContain("passation.md");
   });
 });

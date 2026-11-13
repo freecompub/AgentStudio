@@ -77,8 +77,8 @@ describe("skraft en workflow — escalade d'un scénario selon sa cause (ADR 006
 
     await fin(app, id, 90_000);
     expect(await arbitrages(app, id)).toContainEqual(["tests existants", ANCIEN, "obsolète", "humain", "la story plafonne la dose"]);
-    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us-12): livraison de la story"))!.split(" ")[0]!;
-    expect(git(root, "show", `${livraison}:.skraft/us-12/deliver/derogations.md`)).toContain(ANCIEN);
+    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us12-f15ade30): livraison de la story"))!.split(" ")[0]!;
+    expect(git(root, "show", `${livraison}:.skraft/us12-f15ade30/deliver/derogations.md`)).toContain(ANCIEN);
     const bilan = app.posted.at(-1)!;
     expect(bilan).toContain("À corriger après le cycle");
     expect(bilan).toContain(`- mettre à jour ${ANCIEN} : déclaré obsolète au scénario ac-1 (la story plafonne la dose).`);
@@ -100,7 +100,7 @@ describe("skraft en workflow — escalade d'un scénario selon sa cause (ADR 006
 
     await fin(app, id, 90_000);
     expect(await arbitrages(app, id)).toContainEqual(["couverture du diff", `${CODE}:1`, "dérogation", "humain", "garde défensive"]);
-    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us-12): livraison de la story"))!.split(" ")[0]!;
-    expect(git(root, "show", `${livraison}:.skraft/us-12/deliver/derogations.md`)).toContain(`${CODE}:1`);
+    const livraison = git(root, "log", "--format=%H %s").split("\n").find((l) => l.endsWith("feat(us12-f15ade30): livraison de la story"))!.split(" ")[0]!;
+    expect(git(root, "show", `${livraison}:.skraft/us12-f15ade30/deliver/derogations.md`)).toContain(`${CODE}:1`);
   }, 120_000);
 });

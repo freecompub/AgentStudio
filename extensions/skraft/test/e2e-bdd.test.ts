@@ -62,7 +62,7 @@ describe("skraft — BDD au choix (ADR 0074)", () => {
     expect(stateOf(await app.engine.status(id))!.escalation?.reason).toBeUndefined();
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
     expect(git(root, "show", `HEAD:${FEATURES}/plafond.feature`)).toMatch(/Scénario: AC-1 critère 1/);
-    expect(git(root, "ls-files", ".skraft/us-12/distill/features")).toBe("");
+    expect(git(root, "ls-files", ".skraft/us12-f15ade30/distill/features")).toBe("");
   }, 150_000);
 
   it("titres sans critère : DISTILL refusée par la porte gherkin, qui nomme le scénario", async () => {

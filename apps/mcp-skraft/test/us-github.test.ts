@@ -70,7 +70,19 @@ describe("preparerUsGithub", () => {
   it("la story et son contexte sont commités seuls, sur la branche skraft/<slug>, avant le run", async () => {
     const m = monter();
     await m.preparer();
-    expect(m.commits).toEqual([{ branche: "skraft/us-12", chemins: [".skraft/github/US-12.md", ".skraft/github/US-12-contexte.md"], message: "docs(us-12): story US-12 depuis org/app#12" }]);
+    expect(m.commits).toEqual([{ branche: "skraft/us12-783786d6", chemins: [".skraft/github/US-12.md", ".skraft/github/US-12-contexte.md"], message: "docs(us12-783786d6): story US-12 depuis org/app#12" }]);
+  });
+
+  it("mise en forme qui change le titre : la branche est celle du titre écrit, celle que le run retrouvera", async () => {
+    const m = monter({
+      us: us({ issue: issue(12, { titre: "Payer par carte", corps: "Le client paie par carte. Montant mini 10 €." }), commentaires: [{ auteur: "po", corps: "Plafond : 500 €.", date: "2026-11-01" }] }),
+      mettreEnForme: async (e) => {
+        m.fichiers.set(e.chemin, "# US-12 — Payer par carte bancaire\n\nLe client paie par carte.\n\n## Critères d'acceptation\n\n1. Un paiement de 10 € est accepté.\n2. Un paiement au-delà de 500 € est refusé.\n");
+        return { ok: true };
+      },
+    });
+    await m.preparer();
+    expect(m.commits.map((c) => c.branche)).toEqual(["skraft/us12-2a055c67"]);
   });
 
   it("une préparation refusée ne commite rien", async () => {

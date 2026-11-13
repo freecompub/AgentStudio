@@ -34,14 +34,14 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
       const bad = researchPrompts.length === 1;
       await put(
         root,
-        ".skraft/us-12/research/research.md",
+        ".skraft/us12-f15ade30/research/research.md",
         researchDoc({ Découvertes: bad ? "Le calcul vit dans `src/domain/bolus-calculator.ts:40-72`." : "Le calcul vit dans `src/domain/bolus-calculator.ts:40-55`." }),
       );
-      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us-12/research/research.md"] });
+      await t.callTool("report_phase", { summary: "recherche écrite", files: [".skraft/us12-f15ade30/research/research.md"] });
     };
     const model: ScriptedBehavior = async (t) => {
       designBrief = t.prompt;
-      await put(root, ".skraft/us-12/design/event-model.md", "`BolusCapped`\n");
+      await put(root, ".skraft/us12-f15ade30/design/event-model.md", "`BolusCapped`\n");
       await t.callTool("report_phase", { summary: "modèle", files: [] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-researcher": researcher, "skraft-architect-model": model });
@@ -84,7 +84,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
 
     // DESIGN démarre, avec les réponses dans le dossier de passation.
     await until(async () => designBrief !== "");
-    expect(designBrief).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us-12/passation.md`, à citer comme source) :");
+    expect(designBrief).toContain("Réponses de l'utilisateur (écrites dans `.skraft/us12-f15ade30/passation.md`, à citer comme source) :");
     expect(designBrief).toContain("Le plafond s'applique-t-il par prise ou par jour ? → par prise");
     expect(designBrief).toContain("Le plafond est-il rappelé au patient ? → (question reportée par l'utilisateur)");
     // La recherche validée est transmise par le code, pas seulement son chemin (skraft-plugin v1.15.1).
@@ -94,7 +94,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     expect(designBrief).toContain("Architecture du projet : clean architecture par défaut, skill `architecture-patterns`.");
 
     await until(async () => stateOf(await app.engine.status(id))?.stage === "DONE", 60_000);
-    expect(stateOf(await app.engine.status(id))!.artifacts.RESEARCH.map((a) => [a.path, a.attempt])).toEqual([[".skraft/us-12/research/research.md", 2]]);
+    expect(stateOf(await app.engine.status(id))!.artifacts.RESEARCH.map((a) => [a.path, a.attempt])).toEqual([[".skraft/us12-f15ade30/research/research.md", 2]]);
   }, 120_000);
 
   it("recherche sans document : rejet explicite", async () => {
@@ -108,7 +108,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     await until(async () => stateOf((await app.engine.list())[0] ?? null)?.stage === "ESCALATED", 60_000);
     const s = stateOf((await app.engine.list())[0]!)!;
     // Le même refus deux fois de suite : le disjoncteur escalade au deuxième essai (ADR 0073).
-    expect(s.lastRejection).toEqual({ gate: "citations", reasons: ["Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md"] });
+    expect(s.lastRejection).toEqual({ gate: "citations", reasons: ["Même refus deux fois de suite : Document de recherche absent : .skraft/us12-f15ade30/research/research.md"] });
     expect(s.attempts).toBe(2);
   }, 60_000);
 
@@ -117,14 +117,14 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     let briefDecide = "";
     const decide: ScriptedBehavior = async (t) => {
       briefDecide = t.prompt;
-      await put(root, ".skraft/us-12/design/contracts.md", "`BolusCapped`\n");
-      await t.callTool("report_phase", { summary: "contrats", files: [".skraft/us-12/design/contracts.md"] });
+      await put(root, ".skraft/us12-f15ade30/design/contracts.md", "`BolusCapped`\n");
+      await t.callTool("report_phase", { summary: "contrats", files: [".skraft/us12-f15ade30/design/contracts.md"] });
     };
     const runtime = simulatedAgents(new ScriptedRuntime(), root, { "skraft-architect-decide": decide });
     const app = await assemble(root, runtime, tasksDir);
     answerQuestions(app);
     await app.registry.command("skraft")!.handler("--auto stories/us-12.md");
     await until(async () => briefDecide !== "", 60_000);
-    expect(briefDecide).toContain("Noms définis par le modèle (`.skraft/us-12/design/event-model.md`, `.skraft/us-12/design/domain-model.md`) : `BolusCapped`.");
+    expect(briefDecide).toContain("Noms définis par le modèle (`.skraft/us12-f15ade30/design/event-model.md`, `.skraft/us12-f15ade30/design/domain-model.md`) : `BolusCapped`.");
   }, 90_000);
 });

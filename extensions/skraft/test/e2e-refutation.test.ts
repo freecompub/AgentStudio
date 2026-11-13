@@ -64,7 +64,7 @@ describe("skraft — réfutateur des défauts de revue (ADR 0069)", () => {
     expect(refuterPrompts).toHaveLength(1);
     expect(refuterPrompts[0]).toContain(`[${DEFAUT}] (major) nom vague : BolusCap (src/domain/bolus-cap.ts:1) — gravité : Le nom cache la règle du plafond.`);
     expect(devPrompts.some((p) => p.includes(`[${DEFAUT}`))).toBe(false);
-    const dossier = join(root, ".skraft/us-12/reviews");
+    const dossier = join(root, ".skraft/us12-f15ade30/reviews");
     const fichier = (await readdir(dossier)).find((f) => f.startsWith("deliver-review-") && f.endsWith(".md"))!;
     expect(await readFile(join(dossier, fichier), "utf8")).toContain(`- réfuté : \`${DEFAUT}\` **major** nom vague : BolusCap — ${raison}`);
   }, 90_000);
