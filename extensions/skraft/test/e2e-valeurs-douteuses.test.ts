@@ -53,8 +53,8 @@ describe("skraft — valeurs douteuses soumises à l'humain (ADR 0080)", () => {
     expect(researchPrompts).toHaveLength(0);
 
     const question = (await app.interactions.pending()).find((p) => p.title.startsWith("Question ouverte"))!;
-    await app.interactions.respond(question.id, "answer:q1", "par prise", { role: "po" });
-    await app.interactions.respond(valeur.id, "drop:v1", undefined, { role: "po" });
+    await app.interactions.respond(question.id, "answer:q1", "par prise");
+    await app.interactions.respond(valeur.id, "drop:v1");
 
     await until(async () => researchPrompts.length >= 1);
     expect(stateOf(await app.engine.status(id))?.story?.criteria[2]?.literals).toEqual([]);

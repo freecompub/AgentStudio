@@ -92,8 +92,8 @@ export interface PermissionArbiterDeps {
   /** Hooks `onPreToolUse` des extensions actives, relus à chaque appel. */
   extensionGuards: () => ToolCallGuard[];
   hookTimeoutMs?: number;
-  /** Politique du profil (§10.3) : « souple » autorise sans question les commandes de test. */
-  profilePolicy?: "prudente" | "souple";
+  /** Politique de permissions (réglage, ADR 0087) : « souple » autorise sans question les commandes de test. */
+  permissionPolicy?: "prudente" | "souple";
 }
 
 /** Commande de test seule, sans enchaînement ni redirection. */
@@ -116,7 +116,7 @@ export function createPermissionArbiter(deps: PermissionArbiterDeps): ToolCallGu
         if (d.decision === "deny") return d;
       }
       if (verdict.decision === "allow") return allow;
-      if (deps.profilePolicy === "souple" && req.kind === "shell" && TEST_COMMAND.test(req.command ?? "")) return allow;
+      if (deps.permissionPolicy === "souple" && req.kind === "shell" && TEST_COMMAND.test(req.command ?? "")) return allow;
 
       const rule = verdict.rule;
       if (rule && (await deps.rules.list()).some((r) => r.kind === rule.kind && r.value === rule.value)) return allow;

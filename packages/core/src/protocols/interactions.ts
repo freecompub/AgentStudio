@@ -1,4 +1,3 @@
-import type { Role } from "./profile.js";
 
 /**
  * Demandes d'interaction persistées (§7.1, D31) : décisions longues sans attente bloquante.
@@ -19,8 +18,6 @@ export interface InteractionRequest {
   options: InteractionOption[];
   /** La réponse attend un texte libre (commentaire) en plus de l'option choisie. */
   freeText?: boolean;
-  /** Profils autorisés à répondre (ex. seul un architecte ratifie un ADR, §10.3) ; absent = tous. */
-  requiredRoles?: Role[];
   createdAt: string;
   status: "pending" | "answered" | "cancelled";
   answer?: { option: string; comment?: string; answeredAt: string };

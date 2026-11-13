@@ -126,8 +126,8 @@ async function fetchRevocationList(rev: { file?: string; url?: string } | null):
 
 async function createController(): Promise<AppController> {
   const admin = await loadAdminConfig(defaultAdminConfigPath(process.platform, process.env));
-  if (admin.error) logger.error("configuration administrateur invalide : profil restreint appliqué", { source: admin.source, error: admin.error });
-  logger.info("profil", { role: admin.profile.role, source: admin.source });
+  if (admin.error) logger.error("configuration administrateur invalide : politique prudente appliquée", { source: admin.source, error: admin.error });
+  logger.info("configuration administrateur", { source: admin.source, permissionPolicy: admin.permissionPolicy, defaultMode: admin.defaultMode });
 
   const { loaded, rejected } = await loadExtensions(EXTENSIONS_DIR, { appApi: API_VERSION });
   for (const r of rejected) logger.error("extension écartée : manifeste invalide", { directory: r.directory, errors: r.errors.join(" ; ") });
@@ -227,7 +227,7 @@ async function createController(): Promise<AppController> {
         return r.canceled ? null : (r.filePaths[0] ?? null);
       },
     },
-    profile: { profile: admin.profile, developerMode: admin.developerMode, source: admin.source },
+    admin: { permissionPolicy: admin.permissionPolicy, defaultMode: admin.defaultMode, developerMode: admin.developerMode, source: admin.source },
     installer,
     builtInExtensions: async () =>
       loaded.map((e) => ({ id: e.manifest.id, version: e.manifest.version, publisher: e.manifest.publisher, commands: (e.manifest.contributes.commands ?? []).map((c) => c.title) })),

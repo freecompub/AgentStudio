@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { interactionSchema, roleSchema, taskCardSchema, usageRowSchema } from "@agent-studio/project-services/dto";
+import { interactionSchema, taskCardSchema, usageRowSchema } from "@agent-studio/project-services/dto";
 
 // Schémas des cartes de tâche et des interactions : partagés avec le serveur MCP (ADR 0068).
-export { interactionSchema, roleSchema, taskCardSchema, usageRowSchema };
+export { interactionSchema, taskCardSchema, usageRowSchema };
 export type { InteractionDto, TaskCardDto, UsageRowDto } from "@agent-studio/project-services/dto";
 import { EVENT_CHANNELS as EVENT_NAMES, REQUEST_CHANNELS as REQUEST_NAMES } from "./channels.js";
 
@@ -104,16 +104,15 @@ export const runtimeStatusSchema = z.object({
 });
 export type RuntimeStatusDto = z.infer<typeof runtimeStatusSchema>;
 
-export const profileInfoSchema = z.object({
-  role: roleSchema,
-  roleLabel: z.string(),
+/** Réglages posés par l'administrateur, en lecture seule (ADR 0087 : plus de profil). */
+export const adminInfoSchema = z.object({
   defaultMode: uiModeSchema,
   permissionPolicy: z.enum(["prudente", "souple"]),
   developerMode: z.boolean(),
   /** Origine de la configuration : fichier de l'administrateur ou valeurs par défaut. */
   adminSource: z.string(),
 });
-export type ProfileInfoDto = z.infer<typeof profileInfoSchema>;
+export type AdminInfoDto = z.infer<typeof adminInfoSchema>;
 
 export const extensionInfoSchema = z.object({
   id: z.string(),
@@ -179,7 +178,7 @@ export const requests = {
   "tasks:list": { input: empty, output: z.array(taskCardSchema) },
   "task:cancel": { input: z.object({ taskId: text(200).min(1) }).strict(), output: z.void() },
   "interactions:list": { input: empty, output: z.array(interactionSchema) },
-  "profile:get": { input: empty, output: profileInfoSchema },
+  "admin:get": { input: empty, output: adminInfoSchema },
   "ui:get-mode": { input: empty, output: uiModeSchema },
   "ui:set-mode": { input: z.object({ mode: uiModeSchema }).strict(), output: z.void() },
   "extensions:list": { input: empty, output: z.array(extensionInfoSchema) },

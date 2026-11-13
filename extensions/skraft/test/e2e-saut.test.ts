@@ -35,7 +35,7 @@ describe("skraft — phase sautée (D18)", () => {
     await until(async () => (await app.interactions.pending()).some((p) => p.title === "Pipeline skraft bloqué (RESEARCH)"), 60_000);
     const q = (await app.interactions.pending()).find((p) => p.title === "Pipeline skraft bloqué (RESEARCH)")!;
     expect(q.detail).toContain("Document de recherche absent");
-    await app.interactions.respond(q.id, "skip", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "skip");
     await until(async () => ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
     const decide = runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-decide")).map((h) => h.sent.join("\n"));

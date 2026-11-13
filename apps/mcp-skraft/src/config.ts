@@ -1,7 +1,7 @@
 /**
  * Configuration du serveur MCP (`~/.agent-studio/mcp-skraft.json`, ou `SKRAFT_MCP_CONFIG`) : les
  * dossiers où il accepte un projet en plus des roots du client (ADR 0068, point 6), et l'hôte
- * GitHub (point 7). Les programmes autorisés et le profil viennent d'`admin.json`, comme pour
+ * GitHub (point 7). Les programmes autorisés et la politique de permissions viennent d'`admin.json`, comme pour
  * l'application.
  */
 import { readFile } from "node:fs/promises";

@@ -59,12 +59,12 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     // reçoive sa réponse au lieu de s'arrêter pour la poser.
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
     const [avant] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
-    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
+    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true });
+    expect(avant).not.toHaveProperty("requiredRoles"); // ADR 0087 : n'importe qui répond
     expect(stateOf(await app.engine.status(id))).toMatchObject({ stage: "ROUTE", phasesCompleted: [] });
     expect(researchPrompts).toHaveLength(0);
-    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond.
-    await expect(app.interactions.respond(avant!.id, avant!.options[0]!.id, "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
-    await app.interactions.respond(avant!.id, "answer:q1", "par prise", { role: "po" });
+    // N'importe qui répond (ADR 0087).
+    await app.interactions.respond(avant!.id, "answer:q1", "par prise");
 
     // Présélection par le code, et la réponse, dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
@@ -80,7 +80,7 @@ describe("skraft — critères de sortie de S2 (RESEARCH)", () => {
     const questions = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
     expect(questions.map((q) => q.detail)).toEqual(["Le plafond est-il rappelé au patient ?"]);
     expect(stateOf(await app.engine.status(id))).toMatchObject({ stage: "ROUTE", phasesCompleted: ["RESEARCH"] });
-    await app.interactions.respond(questions[0]!.id, "defer:q2", undefined, { role: "po" });
+    await app.interactions.respond(questions[0]!.id, "defer:q2");
 
     // DESIGN démarre, avec les réponses dans le dossier de passation.
     await until(async () => designBrief !== "");

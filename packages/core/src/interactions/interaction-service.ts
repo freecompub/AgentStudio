@@ -1,6 +1,5 @@
 import type { Clock, IdGenerator } from "../protocols/conversation.js";
 import type { InteractionOption, InteractionRequest, InteractionStore } from "../protocols/interactions.js";
-import { ROLE_LABELS, type Role } from "../protocols/profile.js";
 
 export interface InteractionServiceDeps {
   store: InteractionStore;
@@ -16,14 +15,13 @@ export interface NewInteraction {
   title: string;
   detail?: string;
   options: InteractionOption[];
-  requiredRoles?: Role[];
   freeText?: boolean;
 }
 
 export interface InteractionService {
   request(req: NewInteraction): Promise<string>;
-  /** `by` : profil de l'utilisateur qui répond, vérifié contre `requiredRoles`. */
-  respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
+  /** Quiconque peut répondre : aucune demande n'est réservée à un profil (ADR 0087). */
+  respond(id: string, option: string, comment?: string): Promise<void>;
   pending(): Promise<InteractionRequest[]>;
   cancelForTask(taskId: string): Promise<void>;
   onChange(cb: (pending: InteractionRequest[]) => void): () => void;
@@ -58,7 +56,6 @@ export function createInteractionService(deps: InteractionServiceDeps): Interact
         title: req.title,
         options: req.options,
         ...(req.detail ? { detail: req.detail } : {}),
-        ...(req.requiredRoles?.length ? { requiredRoles: req.requiredRoles } : {}),
         ...(req.freeText ? { freeText: true } : {}),
       };
       await deps.store.save(record);
@@ -66,14 +63,14 @@ export function createInteractionService(deps: InteractionServiceDeps): Interact
       return record.id;
     },
 
-    async respond(id, option, comment, by) {
+    async respond(id, option, comment) {
       // Deux réponses simultanées liraient toutes deux « pending » avant que l'une n'écrive :
       // l'état du disque ne les départage pas. Ce verrou le fait — le service vit dans le seul
       // processus principal, qui est aussi le seul à écrire.
       if (enCours.has(id)) throw new Error("Cette demande a déjà été traitée");
       enCours.add(id);
       try {
-        await repondre(id, option, comment, by);
+        await repondre(id, option, comment);
       } finally {
         enCours.delete(id);
       }
@@ -90,13 +87,11 @@ export function createInteractionService(deps: InteractionServiceDeps): Interact
     },
   };
 
-  async function repondre(id: string, option: string, comment: string | undefined, by: Parameters<InteractionService["respond"]>[3]): Promise<void> {
+  async function repondre(id: string, option: string, comment: string | undefined): Promise<void> {
       const req = (await deps.store.list()).find((r) => r.id === id);
       if (!req) throw new Error(`Demande introuvable : ${id}`);
       if (req.status !== "pending") throw new Error("Cette demande a déjà été traitée");
       if (!req.options.some((o) => o.id === option)) throw new Error(`Option non autorisée : ${option}`);
-      if (req.requiredRoles?.length && (!by || !req.requiredRoles.includes(by.role)))
-        throw new Error(`Seul le profil ${req.requiredRoles.map((r) => ROLE_LABELS[r]).join(" ou ")} peut répondre à cette demande.`);
       // La demande est marquée répondue **avant** la livraison : deux réponses concurrentes
       // (double clic, renvoi du renderer) verraient sinon toutes deux « pending » et
       // injecteraient deux fois la décision dans la tâche.

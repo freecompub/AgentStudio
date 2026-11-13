@@ -78,8 +78,8 @@ describe("skraft en workflow — dialogue de revue en DESIGN", () => {
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Arbitrer")), 60_000);
     const arbitrage = (await app.interactions.pending()).find((p) => p.title.startsWith("Arbitrer"))!;
     expect(arbitrage.title).toBe(`Arbitrer un désaccord de revue (${DEFAUT})`);
-    expect(arbitrage.requiredRoles).toEqual(["developpeur", "architecte", "administrateur"]);
-    await app.interactions.respond(arbitrage.id, arbitrage.options.find((o) => o.id.endsWith(":maintain"))!.id, undefined, { role: "architecte" });
+    expect(arbitrage).not.toHaveProperty("requiredRoles"); // ADR 0087 : réservée à personne
+    await app.interactions.respond(arbitrage.id, arbitrage.options.find((o) => o.id.endsWith(":maintain"))!.id);
 
     // Essai 4, accordé : la correction, sans recours ; puis la revue approuve et la phase se termine.
     await until(async () => decidePrompts.length >= 4);

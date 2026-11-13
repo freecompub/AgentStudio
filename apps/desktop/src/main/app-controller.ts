@@ -11,7 +11,7 @@ import {
   type Logger,
   type MainSession,
 } from "@agent-studio/core";
-import { resolveModel, ROLE_LABELS, type Profile } from "@agent-studio/core";
+import { resolveModel } from "@agent-studio/core";
 import type { ExtensionInstaller } from "@agent-studio/extension-installer";
 import type { GitHubAuth } from "@agent-studio/github-auth";
 import { MODELES_CLAUDE } from "@agent-studio/runtime-claude";
@@ -51,8 +51,8 @@ export interface AppControllerDeps {
   systemPrompt: string;
   /** Règles « toujours autoriser » de l'utilisateur (arbitre, D27). */
   permissionRules?: PermissionRules;
-  /** Profil attribué par l'administrateur (D6) ; l'utilisateur ne peut pas le modifier. */
-  profile?: { profile: Profile; developerMode: boolean; source: string };
+  /** Réglages posés par l'administrateur (`admin.json`) ; l'utilisateur ne peut pas les modifier. Plus de profil (ADR 0087). */
+  admin?: { permissionPolicy: "prudente" | "souple"; defaultMode: "simple" | "advanced"; developerMode: boolean; source: string };
   /** Installation d'extensions tierces depuis un fichier (J6). */
   installer?: ExtensionInstaller;
   /** Extensions internes livrées avec l'application (affichage). */
@@ -83,7 +83,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
   const confirmer = createIpcConfirmer(deps.sink);
   const permissionRules = deps.permissionRules ?? createMemoryPermissionRules();
   const consent = createIpcConsent(deps.sink);
-  const profileInfo = deps.profile ?? { profile: { role: "developpeur" as const, defaultMode: "advanced" as const, permissionPolicy: "souple" as const }, developerMode: false, source: "défaut" };
+  const admin = deps.admin ?? { permissionPolicy: "souple" as const, defaultMode: "advanced" as const, developerMode: false, source: "défaut" };
   let workspace: Workspace | null = null;
   let services: WorkspaceServices | null = null;
   let runtime: AgentRuntime | null = null;
@@ -422,7 +422,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
           confirmer,
           rules: permissionRules,
           extensionGuards: () => services?.hookGuards() ?? [],
-          profilePolicy: profileInfo.profile.permissionPolicy,
+          permissionPolicy: admin.permissionPolicy,
         }),
         clock: deps.clock,
         ids: deps.ids,
@@ -494,18 +494,16 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     "interactions:list": () => requireServices().pendingInteractions(),
 
-    "interaction:respond": ({ id, option, comment }) => requireServices().respond(id, option, comment, { role: profileInfo.profile.role }),
+    "interaction:respond": ({ id, option, comment }) => requireServices().respond(id, option, comment),
 
-    "profile:get": async () => ({
-      role: profileInfo.profile.role,
-      roleLabel: ROLE_LABELS[profileInfo.profile.role],
-      defaultMode: profileInfo.profile.defaultMode,
-      permissionPolicy: profileInfo.profile.permissionPolicy,
-      developerMode: profileInfo.developerMode,
-      adminSource: profileInfo.source,
+    "admin:get": async () => ({
+      defaultMode: admin.defaultMode,
+      permissionPolicy: admin.permissionPolicy,
+      developerMode: admin.developerMode,
+      adminSource: admin.source,
     }),
 
-    "ui:get-mode": async () => (await deps.settings.load()).uiMode ?? profileInfo.profile.defaultMode,
+    "ui:get-mode": async () => (await deps.settings.load()).uiMode ?? admin.defaultMode,
 
     "ui:set-mode": async ({ mode }) => deps.settings.save({ ...(await deps.settings.load()), uiMode: mode }),
 

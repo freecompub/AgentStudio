@@ -7,7 +7,6 @@ import { isAbsolute, join, normalize } from "node:path";
 import { z } from "zod";
 
 const NOM = /^[a-z][a-z0-9-]{0,39}$/;
-const PROFILS = ["testeur", "po", "developpeur", "architecte", "administrateur"] as const;
 /** Outils que la plateforme fournit aux agents ; un workflow peut en apporter d'autres, déclarés dans `outils` (ADR 0082). */
 export const OUTILS_PLATEFORME = ["list_files", "run_tests", "run_lint", "report_blocker"] as const;
 const SKILL = /^[a-z][a-z0-9-]*(#.+)?$/;
@@ -41,7 +40,8 @@ export const schemaMeta = z
       )
       .default({}),
     phases: z.record(z.string().regex(/^[A-ZÉ][A-Z0-9_É]*$/), texte(80)).default({}),
-    humains: z.record(z.string().regex(NOM), z.array(z.enum(PROFILS))).default({}),
+    /** Retiré (ADR 0087) : refusé avec sa raison plutôt que comme un champ inconnu. */
+    humains: z.unknown().refine(() => false, "humains n'existe plus (ADR 0087) : aucune question n'est réservée à un profil, n'importe qui y répond. Retire ce champ du meta.").optional(),
     permissions: z
       .object({ ecriture: z.array(texte(200)).default([]), tests: z.boolean().default(false), git: z.array(z.enum(["branche", "commit", "revert"])).default([]) })
       .strict()

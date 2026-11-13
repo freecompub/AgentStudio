@@ -46,7 +46,7 @@ RESEARCH, par-dessus les commits des phases déjà approuvées.
 
 - Une phase à moitié faite est refaite entière : la reprise se fait à la phase, pas au scénario.
 - Une story livrée qu'on relance propose de continuer (rien n'est refait) ou de recommencer.
-- La question de reprise est déclarée dans `meta.humains` (`reprise`), ouverte à tous.
+- La question de reprise, comme toute question depuis l'ADR 0087, est ouverte à tous.
 - Un run arrêté par le moteur seul garde ses questions en attente ; `skraft_arreter`, qui passe par les
   services, les annule.
 

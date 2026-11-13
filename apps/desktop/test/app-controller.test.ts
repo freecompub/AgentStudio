@@ -105,7 +105,7 @@ function setup(opts: { status?: AuthStatus; settings?: AppSettings; quota?: Copi
         tasks: async () => [],
         cancelTask: async (id) => void serviceLog.push(`annule:${id}`),
         pendingInteractions: async () => [],
-        respond: async (id, option, _c, by) => void serviceLog.push(`réponse:${id}:${option}${by ? `:${by.role}` : ""}`),
+        respond: async (id, option, ...reste) => void serviceLog.push(`réponse:${id}:${option}${reste.length > 1 ? ":avec-identité" : ""}`),
         dispose: async () => void serviceLog.push(`libérés:${args.workspace.root}`),
         demarrer: async () => void serviceLog.push(`démarrés:${args.workspace.root}`),
       };
@@ -691,7 +691,7 @@ describe("AppController — commandes, tâches et interactions (J2)", () => {
     expect(serviceLog).toEqual([
       "créés:/projets/demo",
       "démarrés:/projets/demo",
-      "réponse:int-1:approve:developpeur",
+      "réponse:int-1:approve",
       "annule:t1",
       "créés:/projets/autre",
       "libérés:/projets/demo",
@@ -721,14 +721,12 @@ describe("AppController — arbitre de permissions (J4)", () => {
   });
 });
 
-describe("AppController — profils, modes et extensions (J6)", () => {
-  it("profil en lecture seule ; mode par défaut du profil, modifiable par l'utilisateur", async () => {
+describe("AppController — réglages, modes et extensions (J6, ADR 0087)", () => {
+  it("réglages de l'administrateur en lecture seule, sans profil ; mode par défaut modifiable par l'utilisateur", async () => {
     const { controller, getSettings } = setup({
-      extra: { profile: { profile: { role: "po", defaultMode: "simple", permissionPolicy: "prudente" }, developerMode: false, source: "/etc/agent-studio/admin.json" } },
+      extra: { admin: { defaultMode: "simple", permissionPolicy: "prudente", developerMode: false, source: "/etc/agent-studio/admin.json" } },
     });
-    expect(await controller["profile:get"]({})).toEqual({
-      role: "po",
-      roleLabel: "PO / BA",
+    expect(await controller["admin:get"]({})).toEqual({
       defaultMode: "simple",
       permissionPolicy: "prudente",
       developerMode: false,
@@ -740,13 +738,11 @@ describe("AppController — profils, modes et extensions (J6)", () => {
     expect(getSettings().uiMode).toBe("advanced");
   });
 
-  it("la réponse à une demande porte le rôle du profil", async () => {
-    const { controller, serviceLog } = setup({
-      extra: { profile: { profile: { role: "architecte", defaultMode: "advanced", permissionPolicy: "souple" }, developerMode: false, source: "x" } },
-    });
+  it("la réponse à une demande ne porte aucune identité : n'importe qui peut répondre", async () => {
+    const { controller, serviceLog } = setup();
     await controller["workspace:open"]({ path: "/projets/demo" });
     await controller["interaction:respond"]({ id: "int-9", option: "accept" });
-    expect(serviceLog).toContain("réponse:int-9:accept:architecte");
+    expect(serviceLog).toContain("réponse:int-9:accept");
   });
 
   it("installation depuis un fichier : accord demandé dans la fenêtre, puis services rechargés", async () => {

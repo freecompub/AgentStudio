@@ -27,8 +27,8 @@ export function lancerEnfantWorkflow(canal: MessageChannelLike): RpcEndpoint {
     async rejouer([etat, opts]) {
       if (!script) throw new Error("aucun script chargé");
       const e = etat as EtatWorkflow;
-      const o = (opts ?? {}) as { humains?: Record<string, never[]>; agents?: string[] };
-      const nouveaux = await rejouer({ nom: e.script.nom, script, ...(o.humains ? { humains: o.humains } : {}), ...(o.agents ? { agents: o.agents } : {}) }, e);
+      const o = (opts ?? {}) as { agents?: string[] };
+      const nouveaux = await rejouer({ nom: e.script.nom, script, ...(o.agents ? { agents: o.agents } : {}) }, e);
       return { etat: e, nouveaux };
     },
   });

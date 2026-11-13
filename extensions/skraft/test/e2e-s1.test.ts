@@ -430,7 +430,7 @@ describe("skraft — critères de sortie de S1", () => {
     await app2.engine.resumeAll();
     const question = (await app2.interactions.pending()).find((p) => p.title.startsWith("Question de l'agent"));
     expect(question?.detail).toBe("Le plafond est-il par prise ou par jour ?");
-    await app2.interactions.respond(question!.id, "par prise", undefined, { role: "po" });
+    await app2.interactions.respond(question!.id, "par prise");
     await done(app2, id);
     expect(briefAfterAnswer).toContain("Le plafond est-il par prise ou par jour ? → par prise");
     expect(stateOf(await app2.engine.status(id))?.stage).toBe("DONE");

@@ -7,8 +7,6 @@
  */
 import type { ArchitectureReport, DependencyRule, Evidence, FormatReport, LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
 
-/** Profils qui peuvent répondre à une question humaine (D6). */
-export type Profil = "testeur" | "po" | "developpeur" | "architecte" | "administrateur";
 
 /** Valeur JSON : seul ce qui se sérialise entre dans le journal. */
 export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
@@ -97,14 +95,14 @@ export interface Arbitrage {
 }
 
 /** Effet émis vers le moteur : seulement le numéro d'appel, les arguments sont dans le journal. */
-export interface EffetWorkflow {
-  kind: Exclude<NomAppel, "phase">;
-  n: number;
-}
+export type EffetWorkflow =
+  | { kind: Exclude<NomAppel, "phase">; n: number }
+  /** Tours d'agents en lecture seule appelés ensemble : ils tournent en même temps (ADR 0086). */
+  | { kind: "agents"; ns: number[] };
 
-export type EvenementWorkflow =
-  | { type: "RESULTAT"; n: number; resultat: Json }
-  | { type: "ERREUR"; n: number; nature: NatureErreur; message: string };
+type ResultatUnique = { type: "RESULTAT"; n: number; resultat: Json } | { type: "ERREUR"; n: number; nature: NatureErreur; message: string };
+
+export type EvenementWorkflow = ResultatUnique | { type: "RESULTATS"; resultats: ResultatUnique[] };
 
 /** Sortie d'un tour d'agent : la sortie validée de son outil terminal, ou sa question bloquante. */
 export type ResultatAgent<S = Record<string, unknown>> = (
@@ -248,10 +246,10 @@ export interface DeclarationWorkflow<E = Json> {
    * autre script. Absente : empreinte du texte de la fonction `script`.
    */
   empreinte?: string;
-  /** Qui peut répondre à quelle question (D6). Une question non déclarée est refusée. */
-  humains?: Record<string, readonly Profil[]>;
   /** Agents déclarés (meta du workflow) : un agent absent est refusé à l'appel. Absent : pas de contrôle. */
   agents?: readonly string[];
+  /** Agents qui n'écrivent rien ni ne lancent de tests : appelés ensemble, ils tournent en même temps (ADR 0086). */
+  agentsEnLectureSeule?: readonly string[];
   /** Outils apportés par le workflow (ADR 0082), exécutés à la demande de l'hôte. */
   outils?: OutilsWorkflow;
 }

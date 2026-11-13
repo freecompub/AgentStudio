@@ -12,7 +12,7 @@ export function fauxContexte(agents: Record<string, Agent> = {}, fichiers: Recor
   const consignes: { nom: string; consigne: string; opts: unknown }[] = [];
   const oublis: string[][] = [];
   const rembobinages: string[] = [];
-  const demandes: { title: string; options: { id: string; label: string }[]; requiredRoles?: string[]; detail?: string }[] = [];
+  const demandes: { title: string; options: { id: string; label: string }[]; detail?: string }[] = [];
   const messages: string[] = [];
   const archives: { label: string; files: { path: string; content: string }[] }[] = [];
   /** Fichiers « modifiés depuis le checkpoint », pour l'archivage avant rembobinage. */

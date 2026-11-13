@@ -57,9 +57,6 @@ export function resumeAccord(w: WorkflowTrouve): { title: string; detail: string
     ...Object.entries(m.agents).map(
       ([nom, a]) => `  - ${nom} : ${a.ecriture?.length ? `écrit dans ${a.ecriture.join(", ")}` : "lecture seule"}${a.outils?.length ? ` ; outils ${a.outils.join(", ")}` : ""}`,
     ),
-    ...(Object.keys(m.humains).length
-      ? ["", "Questions et profils qui peuvent y répondre :", ...Object.entries(m.humains).map(([q, p]) => `  - ${q} : ${p.length ? p.join(", ") : "tout profil"}`)]
-      : []),
   ];
   return { title: `Exécuter le workflow « ${w.nom} » (${w.origine}) ?`, detail: lignes.join("\n") };
 }

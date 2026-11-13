@@ -4,7 +4,6 @@
  * `skraft_etat` rend du JSON.
  */
 import { fileURLToPath } from "node:url";
-import type { Role } from "@agent-studio/core";
 import { AucunePile } from "@agent-studio/project-services";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -22,8 +21,6 @@ export interface OptionsServeur {
   projets: Projets;
   /** Nom du workflow lancé par `skraft_demarrer` (`skraft-workflow`). */
   workflow: string;
-  /** Profil de l'utilisateur, pour les questions réservées à certains profils (`admin.json`). */
-  role: Role;
   /** Dossiers autorisés par la configuration du serveur, en plus des roots du client. */
   autorises: readonly string[];
   cwd: string;
@@ -193,7 +190,6 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
     title: q.title,
     ...(q.detail ? { detail: q.detail } : {}),
     options: q.options,
-    ...(q.requiredRoles ? { profils: q.requiredRoles } : {}),
     ...(q.freeText ? { texteLibre: true } : {}),
   });
 
@@ -313,7 +309,7 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
       // Répondre réveille le run, qui s'exécute dans le serveur qui répond : seul le pilote le peut.
       const refus = enConsultation(p.mode(), "Réponds");
       if (refus) return refus;
-      await p.services.respond(a.question, a.option, a.texte, { role: o.role });
+      await p.services.respond(a.question, a.option, a.texte);
       return texte("Réponse enregistrée : le run reprend. Suis-le avec skraft_etat.");
     }, { agents: true }),
   );
@@ -433,8 +429,8 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
 
   /**
    * Les leçons du projet (LEC-2, critères 11 à 14). Ratifier ou retirer est demandé à l'utilisateur par
-   * le client, jamais décidé par un argument : l'action dit seulement quoi lui proposer. Réservé aux
-   * profils architecte et administrateur, celui déclaré au serveur (`admin.json`).
+   * le client, jamais décidé par un argument : l'action dit seulement quoi lui proposer. Ouvert à
+   * tous : aucune action n'est réservée à un profil (ADR 0087).
    */
   mcp.registerTool(
     "skraft_lecons",
@@ -456,8 +452,6 @@ export function createServeurSkraft(o: OptionsServeur): McpServer {
         const liste = listeDesLecons(lecons, a.statut as StatutDeLecon | undefined);
         if (!a.action) return texte(liste);
         if (!a.lecon) return erreur(`Dis quelle leçon ${a.action} dans \`lecon\` (ex. L-03).\n\n${liste}`);
-        if (o.role !== "architecte" && o.role !== "administrateur")
-          return erreur(`Ratifier ou retirer une leçon est réservé aux profils architecte et administrateur ; ton profil est « ${o.role} » (admin.json). Rien n'a changé.`);
         const l = lecons.find((x) => x.id === a.lecon);
         if (!l) return erreur(`Leçon inconnue dans ce projet : ${a.lecon}.\n\n${liste}`);
         if (a.action === "ratifier" && !("nouvelle" in l.catalogue)) return erreur(`${l.id} se rattache à une section existante de catalogue : elle n'a rien à ratifier. Rien n'a changé.`);

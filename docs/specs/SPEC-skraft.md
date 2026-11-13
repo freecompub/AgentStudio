@@ -387,9 +387,9 @@ L'extraction des noms repose sur une convention imposée dans les prompts : iden
 
 **Numéro d'un ADR** : calculé par le code, après tous les ADR de `docs/adr/` (ADR 0079) ; `render_adr` le prend lui-même. Dans le workflow, où l'architecte écrit ses fichiers, le dossier de passation le lui donne, et la garde refuse un nom hors convention ou un numéro déjà pris.
 
-**Ratification** : une demande d'interaction par ADR, réservée au profil architecte ; options `accept`, `reject`, `amend` (avec texte). Tant qu'un ADR est `Proposed`, DISTILL est inatteignable (invariant 7).
+**Ratification** : une demande d'interaction par ADR, à laquelle n'importe qui répond (ADR 0087) ; options `accept`, `reject`, `amend` (avec texte). Tant qu'un ADR est `Proposed`, DISTILL est inatteignable (invariant 7).
 
-**US-12** : `contracts.md` cite `BolusLimited`, absent du modèle qui définit `BolusCapped` → rejet « `BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ». Après correction et approbation, l'`ADR-008 — Plafond appliqué dans le domaine` est ratifié par l'architecte.
+**US-12** : `contracts.md` cite `BolusLimited`, absent du modèle qui définit `BolusCapped` → rejet « `BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ». Après correction et approbation, l'`ADR-008 — Plafond appliqué dans le domaine` est ratifié.
 
 ### 7.3 DISTILL
 

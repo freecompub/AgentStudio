@@ -41,7 +41,7 @@ describe("skraft en workflow — réponses de l'utilisateur écrites dans passat
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
     await until(async () => (await app.interactions.pending()).some((p) => p.title === "Question de l'agent (DELIVER)"), 90_000);
     const q = (await app.interactions.pending()).find((p) => p.title === "Question de l'agent (DELIVER)")!;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":oui"))!.id, undefined, { role: "developpeur" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":oui"))!.id);
     await fin(app, id, 90_000);
     const passation = git(root, "show", "HEAD:.skraft/us12-f15ade30/passation.md");
     expect(passation).toMatch(/^# Réponses de l'utilisateur — US-12/);

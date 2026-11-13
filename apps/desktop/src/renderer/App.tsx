@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AuthStatusDto, ProfileInfoDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../shared/ipc-contract";
+import type { AdminInfoDto, AuthStatusDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../shared/ipc-contract";
 import { api } from "./api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ConsentDialog } from "./components/ConsentDialog";
@@ -17,13 +17,13 @@ type Phase =
 
 export function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
-  const [profile, setProfile] = useState<ProfileInfoDto | null>(null);
+  const [admin, setAdmin] = useState<AdminInfoDto | null>(null);
   const [mode, setMode] = useState<UiMode>("simple");
 
   const boot = useCallback(async () => {
     try {
-      const [p, m] = await Promise.all([api.call("profile:get", {}), api.call("ui:get-mode", {})]);
-      setProfile(p);
+      const [a, m] = await Promise.all([api.call("admin:get", {}), api.call("ui:get-mode", {})]);
+      setAdmin(a);
       setMode(m);
       const [status, runtime] = await Promise.all([api.call("auth:status", {}), api.call("runtime:status", {})]);
       // Avec Claude (ADR 0070), seule compte la connexion de Claude Code : GitHub n'est pas demandé.
@@ -72,7 +72,7 @@ export function App() {
           runtime={phase.runtime}
           onRuntimeChanged={() => void boot()}
           workspace={phase.workspace}
-          profile={profile}
+          admin={admin}
           mode={mode}
           onModeChange={changeMode}
           onProjectClosed={() => setPhase({ kind: "project", user: phase.user, runtime: phase.runtime })}

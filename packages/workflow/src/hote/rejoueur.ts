@@ -4,7 +4,7 @@
  */
 import { dirname } from "node:path";
 import { createRpcEndpoint, type ChildHandle, type ProcessLauncher, type RpcEndpoint } from "@agent-studio/extension-host";
-import type { DeclarationWorkflow, EntreeJournal, EntreeOutil, EtatWorkflow, Profil } from "../protocols.js";
+import type { DeclarationWorkflow, EntreeJournal, EntreeOutil, EtatWorkflow } from "../protocols.js";
 import { rejouer } from "../rejeu.js";
 
 export interface Rejoueur {
@@ -39,7 +39,6 @@ export interface OptionsRejoueurIsole {
   launcher: ProcessLauncher;
   /** Bundle de `enfant-entree.ts`. */
   runtimeEntry: string;
-  humains?: Record<string, readonly Profil[]>;
   agents?: readonly string[];
   /** Délai d'un rejeu : au-delà, le script est tenu pour bloqué (boucle). Défaut : 30 s. */
   delaiMs?: number;
@@ -83,7 +82,7 @@ export function createRejoueurIsole(o: OptionsRejoueurIsole): Rejoueur {
     async rejouer(etat) {
       try {
         const e = enfant ?? (await demarrer());
-        const opts = { ...(o.humains ? { humains: o.humains } : {}), ...(o.agents ? { agents: [...o.agents] } : {}) };
+        const opts = { ...(o.agents ? { agents: [...o.agents] } : {}) };
         return (await e.rpc.call("rejouer", [etat, opts], { timeoutMs: delai })) as { etat: EtatWorkflow; nouveaux: EntreeJournal[] };
       } catch (err) {
         arreter();

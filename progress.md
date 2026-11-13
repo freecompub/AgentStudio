@@ -20,12 +20,39 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
     fichiers non suivis laissés et nommés) ; API des extensions, hôtes et runtime enfant ; moteur :
     `w.tete`, `w.historique`, `w.revenirA`, `w.brancher(…, { ecraser })` ;
   - workflow : `reprise.mjs` (pur, sauf `noterLEtat` et `proposerLaReprise`) ; état noté en fin de chaque
-    phase, commité avec elle ; question `reprise` déclarée dans `meta.humains` (ouverte à tous).
+    phase, commité avec elle ; question `reprise` ouverte à tous (plus de `meta.humains` depuis l'ADR 0087).
 - **Piège** : au départ d'une session continuée après DISTILL, les tests d'acceptance de la story sont
   rouges : le précontrôle bloquait. `releveDeDepart` les met à part, sans masquer un autre test rouge.
 - **Piège** : ouvrir le registre après la reprise, pas avant : le retour au commit de phase change le disque.
 - **Prochaine étape** : un essai réel (arrêter un run en DELIVER, le relancer) ; la reprise au scénario si
   le besoin se confirme.
+## 13/11 — Plus de profil : aucune action réservée (ADR 0087)
+
+- **Demande du responsable** : enlever toutes les restrictions par profil, dans tout le code, puis
+  supprimer le profil lui-même. Branche `feat/sans-restriction-de-profil`, partie de `main`.
+- **Fait** :
+  - cœur : `Role`, `Profile`, `profileFor`, `ROLE_LABELS` supprimés ; `requiredRoles` retiré ;
+    `respond` sans identité ; l'arbitre prend `permissionPolicy` ;
+  - workflow : `meta.humains` retiré, refusé avec sa raison ; plus de question à déclarer ;
+  - extension et workflow skraft, serveur MCP (questions et leçons), application (`admin:get`
+    remplace `profile:get`), scripts d'essai et répondeur du banc ;
+  - `admin.json` : `permissionPolicy` et `defaultMode` à la racine.
+- **Piège évité** : un `admin.json` existant qui posait `profile.permissionPolicy: "prudente"` aurait
+  été ignoré, et le poste serait passé en « souple ». L'ancienne forme est donc relue (rôle technique :
+  souple et avancé ; sinon prudente et simple). Vérifié en cassant la ligne.
+- **Numéro d'ADR** : 0087, parce que 0086 est pris sur `feat/revue-lentilles`, qui n'est pas encore
+  mergée.
+- **Prochaine étape** : pousser et ouvrir la PR quand le responsable le demande.
+## 12/11 — Revue : les lentilles en parallèle
+
+- **Demande du responsable** : paralléliser les lentilles, puis retirer celles qui n'apportent rien
+  à leur phase.
+- **Fait** (branche `feat/revue-lentilles`, ADR 0086) : la tâche de workflow regroupe les tours
+  d'agents en lecture seule en attente ensemble en un seul effet `agents`, qui les lance en même
+  temps et rend `RESULTATS`. « En lecture seule » est déduit du `meta` (`agentsEnLectureSeule`) :
+  ni écriture, ni `run_tests`, ni `run_lint`.
+- **Piège** : le `Promise.all` du script ne suffisait pas. Chaque appel devient un effet, et le
+  moteur de tâches (`drain`) les exécute un par un.
 
 ## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
 

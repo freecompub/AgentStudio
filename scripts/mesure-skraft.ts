@@ -361,9 +361,9 @@ const repondre = async () => {
     const label = q.options.find((o) => o.id === c.option)?.label ?? c.option;
     if (c.nature === "inconnue") console.log(`§ ⚠ question inconnue du répondeur : « ${q.title} » — première option`);
     if (c.nature === "escalade" && /abort|abandonner/.test(c.option)) console.log(`§ ✖ même escalade relancée ${reponses.relancesParEscalade} fois : abandon de la tâche.`);
-    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${label.slice(0, 110)}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${c.role === "po" ? "" : ` (profil ${c.role})`}`);
+    console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ❓ ${q.title}\n        → ${label.slice(0, 110)}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}`);
     try {
-      await interactions.respond(q.id, c.option, c.commentaire, { role: c.role as never });
+      await interactions.respond(q.id, c.option, c.commentaire);
     } catch (err) {
       // JAMAIS en silence : c'est le seul mécanisme qui débloque la tâche. Un refus avalé ne se
       // distingue pas d'un agent qui réfléchit, et le banc attend jusqu'au plafond.

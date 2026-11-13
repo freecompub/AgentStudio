@@ -109,7 +109,7 @@ describe("skraft — reprise d'une correction ciblée (D12)", () => {
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Pipeline skraft bloqué")));
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Pipeline skraft bloqué"))!;
     const avant = runtime.history.length;
-    await app.interactions.respond(q.id, "retry", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "retry");
     await until(async () => runtime.history.length > avant && ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
     expect(stateOf(await app.engine.status(id))!.stage).toBe("DONE");
     const apres = runtime.history.slice(avant).map((h) => runtime.configs.get(h.id)!.role.split("/")[1]!);

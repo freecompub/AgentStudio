@@ -275,7 +275,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
           { id: `accept:${t.id}`, label: "Donner raison à l'agent : le défaut tombe" },
           { id: `maintain:${t.id}`, label: "Donner raison à la lentille : à corriger" },
         ],
-        requiredRoles: ["developpeur", "architecte", "administrateur"],
       });
       return;
     }
@@ -290,7 +289,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
           { id: `reject:${effect.adr.id}`, label: "Rejeter" },
           { id: `amend:${effect.adr.id}`, label: "Demander un amendement" },
         ],
-        requiredRoles: ["architecte"],
       });
       return;
 
@@ -304,7 +302,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
         title: effect.lens ? `Question de la revue (${state.phase ?? "skraft"}, ${effect.lens})` : `Question de l'agent (${state.phase ?? "skraft"})`,
         detail: effect.question,
         options: (effect.choices.length ? effect.choices : ["Répondre"]).map((c) => ({ id: c, label: c })),
-        requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
       });
       return;
 
@@ -330,7 +327,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
               ],
               freeText: true,
             }),
-        requiredRoles: ["po", "developpeur", "architecte", "administrateur"],
       });
       // Demande créée : une panne sur une question suivante ne la fera pas reposer (D17 de docs/12).
       return { type: "QUESTION_ASKED", id: effect.id };
@@ -352,7 +348,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
             exempt: "Exempter ces lignes et continuer",
           }[id],
         })),
-        requiredRoles: ["developpeur", "architecte", "administrateur"],
       });
       return;
 
@@ -419,7 +414,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
             { id: `corriger:${t.id}`, label: "À tester : le testeur doit les couvrir" },
           ],
           freeText: true,
-          requiredRoles: ["developpeur", "architecte", "administrateur"],
         });
         return;
       }
@@ -435,7 +429,6 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
           { id: `corriger:${t.id}`, label: "Non équivalent : le testeur doit le tuer" },
         ],
         freeText: true,
-        requiredRoles: ["developpeur", "architecte", "administrateur"],
       });
       return;
     }

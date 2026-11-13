@@ -31,20 +31,6 @@ export const meta = {
     DISTILL: "Scénarios d'acceptance",
     DELIVER: "Implémentation en TDD",
   },
-  humains: {
-    "confirmer-difficulte": [],
-    // Continuer une session précédente de la story, ou l'écraser (ADR 0089).
-    reprise: [],
-    "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
-    "valeur-a-tester": ["po", "developpeur", "architecte", "administrateur"],
-    blocage: ["po", "developpeur", "architecte", "administrateur"],
-    "question-de-revue": ["po", "developpeur", "architecte", "administrateur"],
-    escalade: ["developpeur", "architecte", "administrateur"],
-    arbitrer: ["developpeur", "architecte", "administrateur"],
-    "arbitrer-mutation": ["developpeur", "architecte", "administrateur"],
-    "arbitrer-couverture": ["developpeur", "architecte", "administrateur"],
-    "ratifier-adr": ["architecte"],
-  },
   // Tout ce que le script et ses agents peuvent écrire. `revert` : les phases rembobinent à l'escalade.
   permissions: {
     ecriture: [".skraft/**", "docs/adr/**", "docs/adr/adr-???-*.md", "docs/adr/supersessions.md", ".agent-studio/lecons/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],
