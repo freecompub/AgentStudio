@@ -31,7 +31,7 @@ export const REQUEST_CHANNELS = [
   "task:cancel",
   "interactions:list",
   "interaction:respond",
-  "profile:get",
+  "admin:get",
   "ui:get-mode",
   "ui:set-mode",
   "extensions:list",

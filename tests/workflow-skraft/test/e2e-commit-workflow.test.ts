@@ -41,7 +41,7 @@ describe("skraft en workflow — commit de phase en échec (D19)", () => {
     const q = await escaladeDuCommit(app);
     expect(q.title).toContain("index.lock");
     expect(q.options.map((o) => o.label)).toEqual(["Relancer le commit", "Continuer sans commiter", "Abandonner la tâche"]);
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await fin(app, id, 60_000);
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-model"))).toHaveLength(1);
     expect(git(root, "log", "--format=%s")).toContain(DESIGN);
@@ -53,7 +53,7 @@ describe("skraft en workflow — commit de phase en échec (D19)", () => {
     answerQuestions(app);
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium");
     const q = await escaladeDuCommit(app);
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("continuer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("continuer"))!.id);
     await fin(app, id, 60_000);
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-model"))).toHaveLength(1);
     expect(git(root, "log", "--format=%s")).not.toContain(DESIGN);
@@ -70,7 +70,7 @@ describe("skraft en workflow — commit de phase en échec (D19)", () => {
     answerQuestions(app);
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium");
     const q = await escaladeDuCommit(app);
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("continuer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("continuer"))!.id);
     await fin(app, id, 60_000);
     const testeur = runtime.history.find((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-test"))!;
     expect(testeur.sent[0]).toContain("Les tests d'acceptance sont gelés : ne les modifie jamais.");

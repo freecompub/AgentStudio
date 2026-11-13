@@ -210,7 +210,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
         for (const p of await app.interactions.pending()) {
           if (!p.title.startsWith("Question de l'agent") || faites.has(p.id)) continue;
           faites.add(p.id);
-          await app.interactions.respond(p.id, p.options[0]!.id, undefined, { role: "po" });
+          await app.interactions.respond(p.id, p.options[0]!.id);
         }
       };
       app.interactions.onChange(() => void tick());
@@ -314,7 +314,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     relance = true;
     const avant = testPrompts.length;
     const q = (await app.interactions.pending()).find((p) => p.title.includes("Revue sans défaut à corriger"))!;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await fin(app, id, 60_000);
     expect(testPrompts[avant]).toContain("Revue « changements demandés » sans défaut bloquant ni majeur à corriger");
   }, 90_000);
@@ -425,14 +425,14 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     // reçoive sa réponse au lieu de s'arrêter pour la poser.
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Question ouverte")));
     const [avant] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Question ouverte"));
-    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true, requiredRoles: ["po", "developpeur", "architecte", "administrateur"] });
+    expect(avant).toMatchObject({ detail: "Le plafond s'applique-t-il par prise ou par jour ?", freeText: true });
+    expect(avant).not.toHaveProperty("requiredRoles"); // ADR 0087 : n'importe qui répond
     // Comme l'extension (stade ROUTE) : les questions ouvertes sont une étape à part (docs/10 §3).
     expect((await app.engine.status(id))!.phase).toBe("ROUTE");
     expect(researchPrompts).toHaveLength(0);
     const option = (q: NonNullable<typeof avant>, action: string) => q.options.find((o) => o.id.endsWith(`:${action}`))!.id;
-    // Un testeur ne peut pas trancher une question métier (§11) ; le PO répond.
-    await expect(app.interactions.respond(avant!.id, option(avant!, "answer"), "par prise", { role: "testeur" })).rejects.toThrow(/PO \/ BA/);
-    await app.interactions.respond(avant!.id, option(avant!, "answer"), "par prise", { role: "po" });
+    // N'importe qui répond (ADR 0087).
+    await app.interactions.respond(avant!.id, option(avant!, "answer"), "par prise");
 
     // Présélection par le code, et la réponse, dans le dossier de passation de RESEARCH.
     await until(async () => researchPrompts.length >= 1);
@@ -453,7 +453,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     expect((await app.engine.status(id))!.phase).toBe("ROUTE");
     // RESEARCH est commitée avant les questions, avec le message du réducteur.
     expect(git(root, "log", "--format=%s", "-1")).toBe("docs(skraft): research de us-12");
-    await app.interactions.respond(questions[0]!.id, option(questions[0]!, "defer"), undefined, { role: "po" });
+    await app.interactions.respond(questions[0]!.id, option(questions[0]!, "defer"));
 
     // DESIGN reçoit les réponses et la phase RESEARCH dans son dossier de passation.
     await until(async () => designBrief !== "");
@@ -482,7 +482,7 @@ describe("skraft en workflow — critères de S2 (RESEARCH), script isolé", () 
     const [escalade] = (await app.interactions.pending()).filter((p) => p.title.startsWith("Phase RESEARCH"));
     expect(escalade!.title).toBe("Phase RESEARCH : Même refus deux fois de suite : Document de recherche absent : .skraft/us-12/research/research.md");
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role.endsWith("skraft-researcher"))).toHaveLength(2);
-    expect(escalade!.requiredRoles).toEqual(["developpeur", "architecte", "administrateur"]);
+    expect(escalade).not.toHaveProperty("requiredRoles"); // ADR 0087 : réservée à personne
   }, 60_000);
 
   // 08/11 : l'architecte qui décide reçoit la liste des noms que la porte de cohérence acceptera.

@@ -148,27 +148,19 @@ describe("Workflow rejouable (ADR 0052)", () => {
     expect(f.oublis).toEqual([["x", "y"]]);
   });
 
-  it("humain : profils pris dans la déclaration, décision rendue au script", async () => {
+  it("humain : la question n'est réservée à personne, la décision est rendue au script (ADR 0087)", async () => {
     const f = fauxContexte();
     const t = await lancer(
-      decl(async (w) => (await w.humain("ratifier-adr", "Ratifier ADR-0007 ?", [{ id: "accepter", label: "Accepter" }, { id: "refuser", label: "Refuser" }])).decision, {
-        humains: { "ratifier-adr": ["architecte"] },
-      }),
+      decl(async (w) => (await w.humain("ratifier-adr", "Ratifier ADR-0007 ?", [{ id: "accepter", label: "Accepter" }, { id: "refuser", label: "Refuser" }])).decision),
       f.ctx,
     );
     expect((await t.record()).status).toBe("waiting");
-    expect(f.demandes[0]).toMatchObject({ title: "Ratifier ADR-0007 ?", requiredRoles: ["architecte"] });
+    expect(f.demandes[0]).toMatchObject({ title: "Ratifier ADR-0007 ?" });
+    expect(f.demandes[0]).not.toHaveProperty("requiredRoles");
 
     await t.engine.dispatch(t.id, { type: "HUMAN_DECISION", decision: f.demandes[0]!.options[1]!.id });
     await t.engine.idle(t.id);
     expect((await t.record()).state.fin).toEqual({ statut: "fini", valeur: { clair: "refuser" } });
-  });
-
-  it("humain : une question absente de la déclaration fait échouer la tâche", async () => {
-    const f = fauxContexte();
-    const t = await lancer(decl(async (w) => w.humain("inconnue", "?", [{ id: "a", label: "A" }]), { humains: { autre: ["po"] } }), f.ctx);
-    expect((await t.record()).state.fin).toMatchObject({ statut: "echec", motif: expect.stringMatching(/inconnue.*non déclarée/) });
-    expect(f.demandes).toEqual([]);
   });
 
   it("magasin de contenus : un gros fichier lu deux fois n'est stocké qu'une fois, le journal ne garde qu'un renvoi", async () => {

@@ -17,7 +17,6 @@ const META: MetaWorkflow = {
   entrees: {},
   outils: {},
   phases: {},
-  humains: { "ratifier-adr": ["architecte"] },
   permissions: { ecriture: [".skraft/**", "@stack:unitTests"], tests: true, git: ["branche", "commit"] },
   agents: { "skraft-test": { prompt: "agents/skraft-test.agent.md", ecriture: ["@stack:unitTests"], outils: ["run_tests"], sortie: "report_phase" } },
 };
@@ -37,7 +36,7 @@ const confirmeur = (reponse: "allow-once" | "allow-always" | "deny") => {
 };
 
 describe("accord par empreinte", () => {
-  it("le résumé montre d'où vient le workflow, ce que le script peut faire, ses agents et ses questions", () => {
+  it("le résumé montre d'où vient le workflow, ce que le script peut faire et ses agents ; plus de profils (ADR 0087)", () => {
     const r = resumeAccord(wf());
     expect(r.title).toBe("Exécuter le workflow « skraft » (projet) ?");
     expect(r.detail).toContain("/projet/.agent-studio/workflows/skraft");
@@ -45,7 +44,7 @@ describe("accord par empreinte", () => {
     expect(r.detail).toContain("Lancer les tests");
     expect(r.detail).toContain("Git : branche, commit");
     expect(r.detail).toContain("skraft-test : écrit dans @stack:unitTests ; outils run_tests");
-    expect(r.detail).toContain("ratifier-adr : architecte");
+    expect(r.detail).not.toMatch(/profil/);
   });
 
   it("« toujours » : l'accord est retenu pour cette empreinte, et survit à une nouvelle instance", async () => {

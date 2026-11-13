@@ -67,7 +67,7 @@ async function trancher(app: App, choix: "derogation" | "corriger", commentaire?
   await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Arbitrer un défaut de couverture")), 60_000);
   const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Arbitrer un défaut de couverture"))!;
   expect(q.detail).toContain("ligne défensive");
-  await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${choix}`))!.id, commentaire, { role: "architecte" });
+  await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${choix}`))!.id, commentaire);
 }
 
 describe("skraft en workflow — couverture du diff contestée, arbitrée par l'humain", () => {

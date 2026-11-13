@@ -54,7 +54,7 @@ describe("skraft — commit de phase en échec (D19)", () => {
     const q = await escaladeDuCommit(app);
     expect(q.detail).toContain("index.lock");
     expect(q.options.map((o) => o.label)).toEqual(["Relancer le commit", "Continuer sans commiter", "Abandonner"]);
-    await app.interactions.respond(q.id, "retry", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "retry");
     await finie(app, id);
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-model"))).toHaveLength(1);
     expect(git(root, "log", "--format=%s")).toContain(DESIGN);
@@ -66,7 +66,7 @@ describe("skraft — commit de phase en échec (D19)", () => {
     answerQuestions(app);
     const id = await lancer(app);
     const q = await escaladeDuCommit(app);
-    await app.interactions.respond(q.id, "continue", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "continue");
     await finie(app, id);
     expect(runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-model"))).toHaveLength(1);
     expect(git(root, "log", "--format=%s")).not.toContain(DESIGN);
@@ -83,7 +83,7 @@ describe("skraft — commit de phase en échec (D19)", () => {
     answerQuestions(app);
     const id = await lancer(app);
     const q = await escaladeDuCommit(app);
-    await app.interactions.respond(q.id, "continue", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "continue");
     await finie(app, id);
     const testeur = runtime.history.find((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-test"))!;
     expect(testeur.sent[0]).toContain("Les tests d'acceptance sont gelés : ne les modifie jamais.");

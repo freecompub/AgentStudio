@@ -5,7 +5,6 @@
  */
 import { z } from "zod";
 
-export const roleSchema = z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"]);
 
 export const usageRowSchema = z.object({
   phase: z.string(),
@@ -41,7 +40,6 @@ export const interactionSchema = z.object({
   title: z.string(),
   detail: z.string().optional(),
   options: z.array(z.object({ id: z.string(), label: z.string() })),
-  requiredRoles: z.array(roleSchema).optional(),
   freeText: z.boolean().optional(),
   createdAt: z.string(),
 });

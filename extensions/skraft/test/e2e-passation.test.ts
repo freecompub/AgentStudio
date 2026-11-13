@@ -43,7 +43,7 @@ describe("skraft — réponses de l'utilisateur écrites dans passation.md", () 
     const id = (await app.engine.list())[0]!.id;
     await until(async () => (await app.interactions.pending()).some((p) => p.title === "Question de l'agent (DELIVER)"), 60_000);
     const q = (await app.interactions.pending()).find((p) => p.title === "Question de l'agent (DELIVER)")!;
-    await app.interactions.respond(q.id, "oui", undefined, { role: "developpeur" });
+    await app.interactions.respond(q.id, "oui");
     await until(async () => ["DONE", "ESCALATED", "ABORTED"].includes(stateOf(await app.engine.status(id))?.stage ?? ""), 60_000);
 
     expect(stateOf(await app.engine.status(id))!.escalation?.reason).toBeUndefined();

@@ -3,7 +3,7 @@
  * indépendants de l'application qui les héberge : l'application de bureau et le serveur MCP
  * (ADR 0068).
  */
-import type { AgentRuntime, CommandListing, ModelClass, ResumeEtape, Role, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
+import type { AgentRuntime, CommandListing, ModelClass, ResumeEtape, ToolCallGuard, ToolSpec, UserConfirmer } from "@agent-studio/core";
 import type { RapportWorkflow } from "@agent-studio/workflow";
 import type { Workspace } from "@agent-studio/workspace";
 import type { InteractionDto, TaskCardDto } from "./dto.js";
@@ -55,7 +55,7 @@ export interface WorkspaceServices {
   tasks(): Promise<TaskCardDto[]>;
   cancelTask(taskId: string): Promise<void>;
   pendingInteractions(): Promise<InteractionDto[]>;
-  respond(id: string, option: string, comment?: string, by?: { role: Role }): Promise<void>;
+  respond(id: string, option: string, comment?: string): Promise<void>;
   /**
    * Démarre ce qui touche aux sessions d'agent : purge des sessions orphelines, puis reprise des
    * tâches. Appelé **après** la libération des services précédents du même projet : sinon leur

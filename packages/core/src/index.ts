@@ -61,5 +61,3 @@ export {
 } from "./guards/permission-arbiter.js";
 export type * from "./protocols/usage.js";
 export { createUsageRecorder, sumUsage } from "./usage/usage-recorder.js";
-export type * from "./protocols/profile.js";
-export { profileFor, ROLE_LABELS } from "./protocols/profile.js";

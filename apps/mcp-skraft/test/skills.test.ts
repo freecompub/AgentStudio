@@ -15,7 +15,7 @@ import { createServeurSkraft } from "../src/serveur.js";
 const SKILLS = join(import.meta.dirname, "../skills");
 
 async function outils(): Promise<string[]> {
-  const mcp = createServeurSkraft({ projets: {} as never, workflow: "x", role: "developpeur", autorises: [], cwd: "/", connexion: { verifier: async () => ({ ok: true }), connecter: async () => ({ ok: true, texte: "" }) } });
+  const mcp = createServeurSkraft({ projets: {} as never, workflow: "x", autorises: [], cwd: "/", connexion: { verifier: async () => ({ ok: true }), connecter: async () => ({ ok: true, texte: "" }) } });
   const client = new Client({ name: "test", version: "0" });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await mcp.connect(b);

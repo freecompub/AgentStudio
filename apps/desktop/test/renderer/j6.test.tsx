@@ -12,7 +12,7 @@ import { FakeApi } from "./fake-api";
 
 const OAUTH = { loggedIn: true, user: "claire", tokenKind: "oauth", copilotCompatible: true } as const;
 const WS = { root: "/projets/bolus", name: "bolus" };
-const PO = { role: "po", roleLabel: "PO / BA", defaultMode: "simple", permissionPolicy: "prudente", developerMode: false, adminSource: "/etc/agent-studio/admin.json" } as const;
+const PO = { defaultMode: "simple", permissionPolicy: "prudente", developerMode: false, adminSource: "/etc/agent-studio/admin.json" } as const;
 const TDD = { invocation: "tdd", title: "Implémenter en TDD", description: "Découpe la fonctionnalité en comportements, puis écrit tests et code sous contrôle." };
 
 let api: FakeApi;
@@ -29,7 +29,7 @@ beforeEach(() => {
   };
   Element.prototype.scrollIntoView = () => {};
   api
-    .handle("profile:get", () => PO)
+    .handle("admin:get", () => PO)
     .handle("ui:get-mode", () => mode)
     .handle("ui:set-mode", (i) => void (mode = (i as { mode: typeof mode }).mode))
     .handle("auth:status", () => OAUTH)
@@ -48,7 +48,7 @@ afterEach(cleanup);
  * Attendre que `TaskPanel` soit ABONNÉ avant d'émettre.
  *
  * `FakeApi.emit` parcourt les auditeurs enregistrés et ne garde rien : un événement émis avant le
- * montage du panneau est perdu en silence. Attendre « (PO / BA) » ne suffit pas — ce libellé vient
+ * montage du panneau est perdu en silence. Attendre l'écran de discussion ne suffit pas — il vient
  * d'un autre composant. Dans l'effet du panneau, les abonnements précèdent les appels
  * `tasks:list` / `interactions:list` : voir l'appel prouve que les auditeurs sont là.
  */
@@ -70,8 +70,9 @@ describe("Un profil non-développeur mène une tâche sans aide (J6)", () => {
   it("PO en mode simple : action guidée, décision en une phrase, suivi jusqu'au bout, sans détail technique", async () => {
     render(<App />);
 
-    // Profil attribué, affiché mais pas modifiable ; mode simple par défaut.
-    expect(await screen.findByText("(PO / BA)")).toBeTruthy();
+    // Plus de profil affiché (ADR 0087) ; mode simple par défaut, posé par l'administrateur.
+    expect(await screen.findByText("claire")).toBeTruthy();
+    expect(screen.queryByText("(PO / BA)")).toBeNull();
     expect(screen.getByRole("button", { name: "Simple" }).getAttribute("aria-pressed")).toBe("true");
 
     // Lancer une tâche sans connaître la syntaxe « / ».
@@ -150,7 +151,7 @@ describe("Un profil non-développeur mène une tâche sans aide (J6)", () => {
 describe("Question ouverte à réponse libre (S2)", () => {
   it("le texte saisi accompagne la réponse", async () => {
     render(<App />);
-    await screen.findByText("(PO / BA)");
+    await screen.findByText("claire");
     await panneauAbonne();
     act(() =>
       api.emit("interactions:changed", {
@@ -252,7 +253,7 @@ describe("Démarrage : l'instantané initial ne périme pas un événement déj�
     let resoudre!: (l: unknown[]) => void;
     api.handle("interactions:list", () => new Promise((r) => (resoudre = r as (l: unknown[]) => void)));
     render(<App />);
-    await screen.findByText("(PO / BA)");
+    await screen.findByText("claire");
     await panneauAbonne();
 
     act(() => api.emit("interactions:changed", { pending: [DEMANDE] }));
@@ -267,7 +268,7 @@ describe("Démarrage : l'instantané initial ne périme pas un événement déj�
     let resoudre!: (l: unknown[]) => void;
     api.handle("tasks:list", () => new Promise((r) => (resoudre = r as (l: unknown[]) => void)));
     render(<App />);
-    await screen.findByText("(PO / BA)");
+    await screen.findByText("claire");
     await panneauAbonne();
 
     act(() => api.emit("task:update", card({ id: "t9", title: "Cycle TDD : plafonner la dose" })));

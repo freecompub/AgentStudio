@@ -16,7 +16,6 @@ const META = `{
   commande: "skraft",
   entrees: { story: { type: "fichier", obligatoire: true, aide: "La story." } },
   phases: { RESEARCH: "Enquête", DESIGN: "Conception" },
-  humains: { "ratifier-adr": ["architecte"], escalade: ["developpeur", "architecte"] },
   permissions: { ecriture: [".skraft/**", "docs/adr/**", "@stack:unitTests"], tests: true, git: ["branche", "commit"] },
   agents: {
     "skraft-test": {
@@ -188,8 +187,12 @@ describe("validation du meta", () => {
     expect(await motifsDe(META.replace('ecriture: ["@stack:unitTests"]', 'ecriture: ["src/**"]'))).toEqual([expect.stringMatching(/skraft-test.*src\/\*\*.*permissions\.ecriture/)]);
   });
 
-  it("profil, sortie, classe ou mémoire inconnus : refusés", async () => {
-    expect(await motifsDe(META.replace('["architecte"]', '["chef"]'))).toEqual([expect.stringMatching(/humains/)]);
+  it("`humains` n'existe plus : refusé, avec la raison (ADR 0087)", async () => {
+    const avecHumains = META.replace("permissions:", 'humains: { "ratifier-adr": ["architecte"] },\n  permissions:');
+    expect(await motifsDe(avecHumains)).toEqual([expect.stringMatching(/humains.*ADR 0087.*aucune question n'est réservée/)]);
+  });
+
+  it("sortie, classe ou mémoire inconnues : refusées", async () => {
     expect(await motifsDe(META.replace('sortie: "report_phase"', 'sortie: "rapport"'))).toEqual([expect.stringMatching(/sortie/)]);
   });
 });

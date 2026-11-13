@@ -28,7 +28,6 @@ export interface Demande {
   title: string;
   detail?: string;
   options: { id: string; label: string }[];
-  requiredRoles?: string[];
 }
 
 export type Nature = "difficulte" | "question" | "ratification" | "arbitrage" | "escalade" | "blocage" | "inconnue";
@@ -37,7 +36,6 @@ export interface Choix {
   nature: Nature;
   option: string;
   commentaire?: string;
-  role: string;
 }
 
 const correspond = (id: string, action: string) => id === action || id.startsWith(`${action}:`) || id.endsWith(`:${action}`);
@@ -55,44 +53,40 @@ function nature(d: Demande): Nature {
   return "inconnue";
 }
 
-/** Profil accepté par la demande : le PO si possible, sinon le premier profil requis. */
-const profil = (d: Demande) => (!d.requiredRoles?.length || d.requiredRoles.includes("po") ? "po" : d.requiredRoles[0]!);
-
 const cherche = <T extends { motif: string }>(motifs: T[], texte: string): T | undefined => motifs.find((m) => new RegExp(m.motif, "i").test(texte));
 
 /**
- * Choisit l'option, le commentaire éventuel et le profil. `memoire` compte les escalades par motif,
+ * Choisit l'option et le commentaire éventuel. `memoire` compte les escalades par motif,
  * d'une demande à l'autre, pour abandonner après `relancesParEscalade` relances.
  */
 export function repondre(d: Demande, r: Reponses, memoire: Map<string, number>): Choix {
   const n = nature(d);
-  const role = profil(d);
   const premiere = d.options[0]!.id;
   switch (n) {
     case "difficulte":
-      return { nature: n, option: option(d, [r.difficulte])?.id ?? premiere, role };
+      return { nature: n, option: option(d, [r.difficulte])?.id ?? premiere };
     case "question": {
       const texte = cherche(r.questions, `${d.title}\n${d.detail ?? ""}`)?.reponse ?? r.questionParDefaut;
-      return { nature: n, option: option(d, ["answer"])?.id ?? premiere, commentaire: texte, role };
+      return { nature: n, option: option(d, ["answer"])?.id ?? premiere, commentaire: texte };
     }
     case "ratification":
-      return { nature: n, option: option(d, [r.ratification === "accepter" ? "accept" : "reject"])?.id ?? premiere, role };
+      return { nature: n, option: option(d, [r.ratification === "accepter" ? "accept" : "reject"])?.id ?? premiere };
     case "arbitrage":
-      return { nature: n, option: option(d, [r.arbitrage === "lentille" ? "maintain" : "accept"])?.id ?? premiere, role };
+      return { nature: n, option: option(d, [r.arbitrage === "lentille" ? "maintain" : "accept"])?.id ?? premiere };
     case "escalade": {
       // Même escalade : même motif, que le titre le porte (workflow) ou le détail (extension).
       const cle = `${d.title.replace(/^Phase [A-ZÉ]+ : /, "")}\n${d.detail ?? ""}`.trim();
       const vues = (memoire.get(cle) ?? 0) + 1;
       memoire.set(cle, vues);
       const actions = vues > r.relancesParEscalade ? ["abort", "abandonner"] : ["retry", "relancer"];
-      return { nature: n, option: option(d, actions)?.id ?? premiere, role };
+      return { nature: n, option: option(d, actions)?.id ?? premiere };
     }
     case "blocage": {
       const voulu = cherche(r.blocages, `${d.title}\n${d.detail ?? ""}`)?.choix;
       const o = voulu ? d.options.find((x) => x.label === voulu) : undefined;
-      return { nature: n, option: o?.id ?? premiere, role };
+      return { nature: n, option: o?.id ?? premiere };
     }
     default:
-      return { nature: n, option: premiere, role };
+      return { nature: n, option: premiere };
   }
 }

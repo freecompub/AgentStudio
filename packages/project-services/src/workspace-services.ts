@@ -279,7 +279,6 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
       options: r.options,
       createdAt: r.createdAt,
       ...(r.detail ? { detail: r.detail } : {}),
-      ...(r.requiredRoles ? { requiredRoles: r.requiredRoles } : {}),
       ...(r.freeText ? { freeText: true } : {}),
     });
     const offInteractions = interactions.onChange((pending) => onInteractions(pending.map(toDto)));
@@ -571,7 +570,7 @@ export function workspaceServicesFactory(cfg: WorkspaceServicesConfig): Workspac
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       cancelTask: (taskId) => engine.cancel(taskId),
       pendingInteractions: async () => (await interactions.pending()).map(toDto),
-      respond: (id, option, comment, by) => interactions.respond(id, option, comment, by),
+      respond: (id, option, comment) => interactions.respond(id, option, comment),
       async dispose() {
         offTasks();
         offUsage();

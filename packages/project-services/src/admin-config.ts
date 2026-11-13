@@ -1,11 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { profileFor, type Profile } from "@agent-studio/core";
 import type { TrustedPublisher } from "@agent-studio/extension-packaging";
 import { z } from "zod";
 
 /**
- * Configuration posée par l'administrateur (D6, §12) : profil de l'utilisateur, éditeurs approuvés,
- * mode développeur, liste de révocation. Lue depuis un emplacement système que l'utilisateur ne
+ * Configuration posée par l'administrateur (§12) : politique de permissions et mode d'affichage par
+ * défaut, éditeurs approuvés, mode développeur, liste de révocation. Plus de profil (ADR 0087). Lue depuis un emplacement système que l'utilisateur ne
  * modifie pas ; l'application ne l'écrit jamais. Mécanisme d'attribution : O5 (choix provisoire).
  */
 /**
@@ -33,10 +32,20 @@ const nomDeProgramme = z
   .min(1)
   .refine((v) => !/[/\\]/.test(v) && v !== "." && v !== "..", "doit être un nom de commande, sans chemin");
 
+export type PermissionPolicy = "prudente" | "souple";
+export type UiMode = "simple" | "advanced";
+
 const schema = z.object({
+  /** « souple » : les commandes de test passent sans question ; « prudente » : tout est demandé. */
+  permissionPolicy: z.enum(["prudente", "souple"]).optional(),
+  defaultMode: z.enum(["simple", "advanced"]).optional(),
+  /**
+   * Ancienne forme, d'avant l'ADR 0087 : lue pour ne pas changer la politique d'un poste administré.
+   * Le rôle ne sert plus qu'à retrouver la politique et le mode qu'il donnait.
+   */
   profile: z
     .object({
-      role: z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"]),
+      role: z.string(),
       defaultMode: z.enum(["simple", "advanced"]).optional(),
       permissionPolicy: z.enum(["prudente", "souple"]).optional(),
     })
@@ -55,7 +64,8 @@ const schema = z.object({
 export interface AdminConfig {
   /** Chemin du fichier lu, ou « défaut ». */
   source: string;
-  profile: Profile;
+  permissionPolicy: PermissionPolicy;
+  defaultMode: UiMode;
   trustedPublishers: TrustedPublisher[];
   developerMode: boolean;
   /** Programmes qu'un profil de stack peut lancer (D47, O12). */
@@ -83,7 +93,8 @@ export async function loadAdminConfig(path: string): Promise<AdminConfig> {
     // Poste personnel sans administration : développeur, sans éditeur tiers approuvé.
     return {
       source: "défaut",
-      profile: profileFor("developpeur"),
+      permissionPolicy: "souple",
+      defaultMode: "advanced",
       trustedPublishers: [],
       developerMode: false,
       allowedPrograms: [...DEFAULT_ALLOWED_PROGRAMS],
@@ -98,20 +109,22 @@ export async function loadAdminConfig(path: string): Promise<AdminConfig> {
     if (!r.success) throw new Error(r.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; "));
     parsed = r.data;
   } catch (err) {
-    // Fichier présent mais illisible : profil le plus restreint, jamais le plus permissif.
+    // Fichier présent mais illisible : la politique la plus restreinte, jamais la plus permissive.
     // Configuration refusée : on n'autorise aucun programme. Retomber sur la liste par défaut
     // appliquerait des permissions que l'administrateur n'a pas relues.
     const error = err instanceof Error ? err.message : String(err);
-    return { source: path, profile: profileFor("testeur"), trustedPublishers: [], developerMode: false, allowedPrograms: [], programConsent: false, origineDesProgrammes: `${path} est refusé (${error}) : aucun programme n'est autorisé.`, revocation: null, error };
+    return { source: path, permissionPolicy: "prudente", defaultMode: "simple", trustedPublishers: [], developerMode: false, allowedPrograms: [], programConsent: false, origineDesProgrammes: `${path} est refusé (${error}) : aucun programme n'est autorisé.`, revocation: null, error };
   }
-  const p = parsed.profile;
-  const profile = p
-    ? profileFor(p.role, { ...(p.defaultMode ? { defaultMode: p.defaultMode } : {}), ...(p.permissionPolicy ? { permissionPolicy: p.permissionPolicy } : {}) })
-    : profileFor("developpeur");
+  // Ancienne forme : un rôle technique donnait « souple » et le mode avancé, les autres « prudente » et simple.
+  const ancien = parsed.profile;
+  const technique = ancien ? ["developpeur", "architecte", "administrateur"].includes(ancien.role) : true;
+  const permissionPolicy = parsed.permissionPolicy ?? ancien?.permissionPolicy ?? (technique ? "souple" : "prudente");
+  const defaultMode = parsed.defaultMode ?? ancien?.defaultMode ?? (technique ? "advanced" : "simple");
   const rev = parsed.revocation;
   return {
     source: path,
-    profile,
+    permissionPolicy,
+    defaultMode,
     trustedPublishers: parsed.trustedPublishers,
     developerMode: parsed.developerMode,
     // Le fichier remplace la liste ; sans mention, celle par défaut s'applique.

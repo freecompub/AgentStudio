@@ -1,7 +1,7 @@
 // Repris de extensions/skraft-workflow/test/e2e-s3-workflow.test.ts (2026-10-10) : teste le workflow en dossier (ADR 0055).
 /**
  * Jumeau de `extensions/skraft/test/e2e-s3.test.ts` pour `/skraft-workflow` (DESIGN) : incohérence
- * rejetée par la porte, ratification réservée à l'architecte, amendement qui ne relance que les
+ * rejetée par la porte, ratification bloquante, amendement qui ne relance que les
  * décisions. Le workflow s'arrête après DESIGN : on vérifie le dossier de DISTILL au lieu de
  * l'agent d'acceptance.
  */
@@ -213,7 +213,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(decidePrompts[1]).not.toContain("Rejet précédent");
     expect(probes[0]).toEqual(expect.objectContaining({ decision: "deny" }));
   }, 120_000);
-  it("incohérence rejetée, ratification bloquante réservée à l'architecte, amendement relance les décisions", async () => {
+  it("incohérence rejetée, ratification bloquante, amendement relance les décisions", async () => {
     const decidePrompts: string[] = [];
     const model: ScriptedBehavior = async (t) => {
       await put(root, ".skraft/us-12/design/event-model.md", "Commande `CapBolus` → événement `BolusCapped`.\n");
@@ -250,19 +250,18 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     expect(decidePrompts).toHaveLength(2);
     expect(decidePrompts[1]).toContain("`BolusLimited` cité dans contracts.md n'existe pas dans event-model.md ni dans domain-model.md.");
 
-    // 2. Pas de suite avant la ratification ; seul l'architecte peut ratifier.
+    // 2. Pas de suite avant la ratification .
     expect((await app.engine.status(id))!.status).toBe("waiting");
-    await expect(app.interactions.respond((await ratify()).id, await option("accept"), undefined, { role: "po" })).rejects.toThrow(/Architecte/);
 
     // 3. Amendement : seule la session de décisions est relancée, avec la demande.
-    await app.interactions.respond((await ratify()).id, await option("amend"), "préciser que le plafond est par prise", { role: "architecte" });
+    await app.interactions.respond((await ratify()).id, await option("amend"), "préciser que le plafond est par prise");
     await until(async () => decidePrompts.length === 3);
     expect(decidePrompts[2]).toContain("Amendement demandé sur ADR-001 : préciser que le plafond est par prise");
     const roles = runtime.history.map((h) => runtime.configs.get(h.id)?.role);
     expect(roles.filter((r) => r === ROLE("skraft-architect-model"))).toHaveLength(2);
 
     // 4. Acceptation : statut basculé dans le fichier, phase commitée, la suite déroulée jusqu'au bilan.
-    await app.interactions.respond((await ratify()).id, await option("accept"), undefined, { role: "architecte" });
+    await app.interactions.respond((await ratify()).id, await option("accept"));
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     const adr = await readFile(join(root, "docs/adr/adr-001-plafond-applique-dans-le-domaine.md"), "utf8");
     expect(adr).toContain("- Statut : Accepted");
@@ -319,7 +318,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     const ratifier = async (adr: string, action: string, commentaire?: string) => {
       await until(async () => (await app.interactions.pending()).some((x) => x.title === `Ratifier ${adr}`), 60_000);
       const q = (await app.interactions.pending()).find((x) => x.title === `Ratifier ${adr}`)!;
-      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, commentaire, { role: "architecte" });
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, commentaire);
     };
     await ratifier("ADR-001", "accept");
     await ratifier("ADR-002", "amend", "alerte par prise");
@@ -358,7 +357,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     for (const action of ["amend", "accept"]) {
       await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
       const q = (await app.interactions.pending()).find((x) => x.title === "Ratifier ADR-001")!;
-      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, action === "amend" ? "alerte par prise" : undefined, { role: "architecte" });
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${action}`))!.id, action === "amend" ? "alerte par prise" : undefined);
     }
     expect(await rapportsDuDesign(root)).toEqual(["design-review-1.json", "design-review-1.md", "design-review-2.json", "design-review-2.md"]);
   }, 120_000);
@@ -401,7 +400,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
       await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
       escalade = true;
       const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
-      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(decision))!.id, undefined, { role: "architecte" });
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(decision))!.id);
       return { app, id };
     };
 
@@ -410,7 +409,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
       await until(async () => (await app.interactions.pending()).some((x) => x.title === "Ratifier ADR-001"), 60_000);
       const q = (await app.interactions.pending()).find((x) => x.title === "Ratifier ADR-001")!;
       expect(q.detail).toContain(INTERFACE);
-      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":accept"))!.id, undefined, { role: "architecte" });
+      await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(":accept"))!.id);
       await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
       expect(((await app.engine.status(id))!.state as { fin?: { statut: string } }).fin?.statut).toBe("fini");
       expect(await readFile(join(root, INTERFACE), "utf8")).toContain("- Statut : Accepted");
@@ -454,7 +453,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
     relance = true;
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(modelPrompts.at(-1)).toContain("Revue : verdict REJECTED (test-integrity : REJECTED — conception hors sujet");
   }, 120_000);
@@ -502,7 +501,7 @@ describe("skraft en workflow — critères de S3 (DESIGN), script isolé", () =>
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase DESIGN")), 60_000);
     relance = true;
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(prompts).toHaveLength(3);
     // Revue 2 : le rapport de la revue 1 est sur le disque, mais ce n'est pas un livrable.

@@ -66,14 +66,7 @@ contributes: {
       auto:  { type: "booleen", defaut: false, aide: "Difficulté retenue sans confirmation." },
     },
     phases: { RESEARCH: "Enquête sur le code existant", DESIGN: "Conception", DISTILL: "Scénarios d'acceptance", DELIVER: "Implémentation en TDD" },
-    humains: {                                            // qui peut répondre à quoi (D6)
-      "confirmer-difficulte": ["po", "developpeur", "architecte"],
-      "question-ouverte":     ["po"],
-      "blocage":              ["po", "developpeur", "architecte"],
-      "ratifier-adr":         ["architecte"],
-      "arbitrer":             ["developpeur", "architecte", "administrateur"],
-      "escalade":             ["developpeur", "architecte", "administrateur"],
-    },
+    // `humains` (qui peut répondre à quoi, D6) : retiré par l'ADR 0087, n'importe qui répond.
   }],
 }
 ```
@@ -139,7 +132,7 @@ portes de skraft (`checkDesign`, `planScenarios`…) appelées directement, avec
 | Appel | Rôle | S'appuie sur |
 |---|---|---|
 | `w.agent(nom, consigne, { motifs, lectureSeule, gelApresRouge })` | un tour d'un agent **déclaré** ; rend sa sortie validée, ou sa question bloquante | `ctx.agents.run` |
-| `w.humain(id, question, options, { detail, texteLibre })` | une décision humaine ; `id` déclaré dans `humains`, profils imposés | `ctx.interactions.request` |
+| `w.humain(id, question, options, { detail, texteLibre })` | une décision humaine, à laquelle n'importe qui répond (ADR 0087) | `ctx.interactions.request` |
 | `w.lireFichier`, `w.listerFichiers`, `w.diff(depuis)` | lire le dépôt | `ctx.workspace` |
 | `w.ecrireFichier`, `w.creerDossier` | écrire, borné par les permissions `fs:write` | `ctx.workspace` |
 | `w.lancerTests(filtre?)`, `w.lint()`, `w.couverture()`, `w.mutation()` | les preuves (D20) | `ctx.stack`, `ctx.evidence` |

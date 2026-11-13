@@ -47,7 +47,6 @@ const DEMO = `export const meta = {
     archi: { type: "texte", aide: "Skill d'architecture." },
   },
   phases: { REDACTION: "Rédaction" },
-  humains: { valider: ["architecte"] },
   permissions: { ecriture: [".skraft/**"] },
   agents: { redacteur: { prompt: "agents/redacteur.agent.md", ecriture: [".skraft/**"], sortie: "report_phase" } },
 };
@@ -117,7 +116,7 @@ type Projet = Awaited<ReturnType<typeof projet>>;
  * `repondre` : le client annonce l'elicitation (ADR 0075) et l'utilisateur répond par cette fonction,
  * qui reçoit la question ; `null` : il la refuse. `depots` : dépôts acceptés « toujours ».
  */
-async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; role?: "architecte" | "developpeur"; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots; preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }>; publierPr?: (o: { root: string; ref: { owner: string; repo: string; numero: number }; branche: string; bilan: string }) => Promise<{ ok: true; url: string; nouvelle: boolean } | { ok: false; motif: string }> }) {
+async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?: string[]; nonConnecte?: boolean; detecte?: boolean; repondre?: (question: string) => string | null; depots?: Depots; preparerUs?: (texte: string, root: string) => Promise<{ ok: true; chemin: string; notes: string[] } | { ok: false; motif: string }>; publierPr?: (o: { root: string; ref: { owner: string; repo: string; numero: number }; branche: string; bilan: string }) => Promise<{ ok: true; url: string; nouvelle: boolean } | { ok: false; motif: string }> }) {
   const factory = workspaceServicesFactory({
     extensions: [],
     stacks: [{ id: "typescript", layout: { acceptanceTests: [], unitTests: ["tests/**"], sources: ["src/**"] }, infrastructureModules: [], detect: async () => o.detecte ?? true, isTestFile: () => false, testFilePattern: "^tests/", runTests: async () => ({ results: [], exitCode: 0, timedOut: false, output: "", durationMs: 0 }) }],
@@ -138,7 +137,6 @@ async function serveur(p: Projet, o: { pid: number; vivants: Set<number>; roots?
   const mcp = createServeurSkraft({
     projets,
     workflow: "demo",
-    role: o.role ?? "architecte",
     autorises: [],
     cwd: p.root,
     pid: o.pid,
@@ -278,14 +276,15 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
     await s.fermer();
   }, 60_000);
 
-  it("une réponse refusée (profil, option inconnue) est une erreur de l'outil, avec la raison", async () => {
+  it("une option inconnue est une erreur de l'outil ; une option connue est acceptée, sans condition de profil (ADR 0087)", async () => {
     const p = await projet();
-    const s = await serveur(p, { pid: 1, vivants: new Set([1]), role: "developpeur" });
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     await s.appel("skraft_demarrer", { story: "x.md", accord: "une-fois" });
     await until(async () => (await s.etat()).questions.length === 1);
     const q = (await s.etat()).questions[0]!;
-    expect(await s.appel("skraft_repondre", { question: q.id, option: q.options[0]!.id })).toEqual({ erreur: true, texte: expect.stringMatching(/Seul le profil/) });
+    expect(q).not.toHaveProperty("profils");
     expect(await s.appel("skraft_repondre", { question: q.id, option: "peut-etre" })).toMatchObject({ erreur: true });
+    expect(await s.appel("skraft_repondre", { question: q.id, option: q.options[0]!.id })).toMatchObject({ erreur: false });
     await s.fermer();
   }, 30_000);
 
@@ -684,7 +683,7 @@ describe("Serveur MCP skraft (ADR 0068)", () => {
 });
 
 // LEC-2 (freecompub/AgentStudio#33, critères 11 à 14) : les leçons d'un projet, listées par statut ;
-// ratifier ou retirer passe par une question du client, réservée aux profils architecte et administrateur.
+// ratifier ou retirer passe par une question du client, à qui que ce soit (ADR 0087).
 describe("skraft_lecons", () => {
   const FICHIER = ".agent-studio/lecons/lecons.jsonl";
   const CLEAN = "architecture-review-criteria/references/clean-arch-violations.md";
@@ -709,7 +708,7 @@ describe("skraft_lecons", () => {
   it("ratifier ou retirer, après l'accord de l'utilisateur demandé par le client", async () => {
     const p = await avecLecons();
     const questions: string[] = [];
-    const s = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte", repondre: (q) => (questions.push(q), "Oui, cette fois") });
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]), repondre: (q) => (questions.push(q), "Oui, cette fois") });
     expect((await s.appel("skraft_lecons", { action: "ratifier", lecon: "L-02" })).erreur).toBe(false);
     expect(questions.at(-1)).toMatch(/^Ratifier la leçon L-02 \?[\s\S]*Port déclaré hors du domaine/);
     expect((await s.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).erreur).toBe(false);
@@ -719,22 +718,17 @@ describe("skraft_lecons", () => {
     await s.fermer();
   }, 30_000);
 
-  it("refusé par l'utilisateur, ou par un profil autre qu'architecte ou administrateur : rien ne change", async () => {
+  it("refusé par l'utilisateur : rien ne change", async () => {
     const p = await avecLecons();
-    const non = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte", repondre: () => "Non" });
+    const non = await serveur(p, { pid: 1, vivants: new Set([1]), repondre: () => "Non" });
     expect(await non.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).toEqual({ erreur: true, texte: expect.stringMatching(/rien n'a changé/i) });
     await non.fermer();
-    const questions: string[] = [];
-    const dev = await serveur(p, { pid: 2, vivants: new Set([2]), role: "developpeur", repondre: (q) => (questions.push(q), "Oui, cette fois") });
-    expect(await dev.appel("skraft_lecons", { action: "retirer", lecon: "L-01" })).toEqual({ erreur: true, texte: expect.stringMatching(/architecte[\s\S]*administrateur/) });
-    expect(questions).toEqual([]);
-    await dev.fermer();
     expect((await lues(p.root)).find((l) => l.id === "L-01")).toMatchObject({ statut: "validee" });
   }, 30_000);
 
   it("sans question possible, la liste est rendue, rien n'est ratifié ni retiré, et c'est dit", async () => {
     const p = await avecLecons();
-    const s = await serveur(p, { pid: 1, vivants: new Set([1]), role: "architecte" });
+    const s = await serveur(p, { pid: 1, vivants: new Set([1]) });
     const r = await s.appel("skraft_lecons", { action: "ratifier", lecon: "L-02" });
     expect(r.erreur).toBe(true);
     expect(r.texte).toMatch(/ne sait pas[\s\S]*Candidates[\s\S]*L-02/);

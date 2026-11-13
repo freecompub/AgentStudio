@@ -62,7 +62,7 @@ describe("skraft — annonce du gel des tests d'acceptance (D1)", () => {
     await lancer(app);
     await until(async () => (await app.interactions.pending()).some((p) => p.title === "Pipeline skraft bloqué (DISTILL)"), 60_000);
     const q = (await app.interactions.pending()).find((p) => p.title === "Pipeline skraft bloqué (DISTILL)")!;
-    await app.interactions.respond(q.id, "skip", undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, "skip");
     await until(async () => app.posted.some((p) => p.includes("DISTILL a été sautée")), 60_000);
     expect(app.posted.find((p) => p.includes("DISTILL a été sautée"))).toContain("les tests d'acceptance ne sont pas gelés");
   }, 90_000);

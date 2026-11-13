@@ -41,6 +41,9 @@ Le principe directeur de tout le projet :
 | Développeur | Piloter des workflows de développement, voir le détail technique |
 | Architecte | Ratifier les décisions d'architecture, revoir les conceptions |
 
+Ces publics décrivent des besoins, pas des profils : depuis l'ADR 0087, l'application n'attribue
+aucun profil et ne réserve aucune action à l'un d'eux.
+
 Deux niveaux de lecture de l'interface servent ces publics : **mode simple** (non-développeurs) et **mode avancé** (développeurs). Voir section 12.
 
 ### 1.2 Hors périmètre (pour l'instant)
@@ -83,7 +86,7 @@ Marketplace en ligne, synchronisation multi-postes, édition collaborative, web 
 | D3 | Premier runtime : **Copilot SDK** (`@github/copilot-sdk`), qui pilote le binaire Copilot CLI en JSON-RPC | DÉCIDÉ | Abonnement Copilot de l'utilisateur, SDK riche (hooks, outils, permissions) |
 | D4 | Authentification GitHub via **GitHub CLI** (`gh auth login`), plutôt qu'une OAuth App ou `copilot login` | DÉCIDÉ | Réutilise un outil standard, jetons gérés hors de l'application |
 | D5 | Interface pensée pour **non-développeurs et développeurs** : mode simple et mode avancé | DÉCIDÉ | Public mixte (section 1.1) |
-| D6 | **Un utilisateur ne peut pas changer lui-même de profil** (rôle) ; le profil est attribué par un administrateur | DÉCIDÉ | Règle produit |
+| D6 | ~~Un utilisateur ne peut pas changer lui-même de profil (rôle) ; le profil est attribué par un administrateur~~ | REMPLACÉ par l'ADR 0087 (2026-11-13) : plus de profil, aucune action réservée | Règle produit |
 | D7 | Gestion Git **simplifiée** intégrée : connexion au dépôt, clonage, push, synchronisation, checkpoints, annulation | DÉCIDÉ | Les non-développeurs doivent pouvoir travailler sans connaître Git |
 
 ### 3.2 Extensions
@@ -191,7 +194,7 @@ Règles de communication :
 | Routeur d'intention | `/commande` → handler d'extension ; `@agent` → session de tâche ; texte libre → session principale enrichie ; action de panneau → handler |
 | Gestionnaire de sessions | Session principale (persistante, reprise au lancement) ; sessions de tâche (éphémères, fermées puis supprimées) ; limite de parallélisme ; purge des sessions orphelines au démarrage |
 | Moteur de tâches | Exécute les réducteurs des extensions : persistance, effets, reprise, annulation, délais, budget |
-| Arbitre de permissions | Manifeste → règles utilisateur → politique par profil → demande à l'écran. Fournit l'unique `onPermissionRequest` et compose les hooks |
+| Arbitre de permissions | Manifeste → règles utilisateur → politique de permissions (`admin.json`, ADR 0087) → demande à l'écran. Fournit l'unique `onPermissionRequest` et compose les hooks |
 | Workspace | Lecture/écriture sous la racine du projet, commandes, checkpoints, diff, commit, rollback, branches |
 | Bus d'événements et journal | Timeline unique : messages, appels d'outils, transitions, vérifications, décisions de permission ; sert à l'affichage, la reprise, l'audit, le bilan |
 | Interactions | Demandes d'interaction persistées, liste « En attente de vous », notifications système |
@@ -486,7 +489,7 @@ Forme d'une demande d'interaction :
 }
 ```
 
-La réponse est validée (option autorisée, profil autorisé à décider) puis injectée comme `HUMAN_DECISION` dans la tâche. Des rappels sont envoyés ; au-delà d'une durée configurable, la tâche passe en pause (pas en échec).
+La réponse est validée (option autorisée ; n'importe qui peut répondre, ADR 0087) puis injectée comme `HUMAN_DECISION` dans la tâche. Des rappels sont envoyés ; au-delà d'une durée configurable, la tâche passe en pause (pas en échec).
 
 ### 7.2 Progression (D33)
 
@@ -778,7 +781,7 @@ Quatre niveaux : `simple`, `medium`, `medium-hard`, `challenging`. Écrite une s
 | RESEARCH | Porte citations | Sections du gabarit présentes ; chaque chemin cité existe ; chaque plage de lignes est dans les limites du fichier ; URL bien formées ; une recommandation unique ; questions ouvertes extraites et posées à l'utilisateur. **Pas de reviewer LLM** |
 | RESEARCH | Préparation | Fichiers candidats présélectionnés par mots-clés de la story, placés dans le dossier de passation |
 | DESIGN | Porte cohérence | En-tête valide sur chaque nouvel ADR ; chaque événement et agrégat cité dans les contrats existe dans le modèle d'événements ; remplacements présents dans le nouvel ADR **et** dans le registre ; numérotation continue |
-| DESIGN | Ratification | État bloquant et persisté ; décision `accept` / `reject` / `amend` par ADR, par un profil autorisé (architecte) |
+| DESIGN | Ratification | État bloquant et persisté ; décision `accept` / `reject` / `amend` par ADR, par l'utilisateur, quel qu'il soit (ADR 0087) |
 | DISTILL | Porte valeurs | Chaque littéral des critères d'acceptation apparaît dans le `.feature` et dans le test d'acceptance correspondant |
 | DISTILL | Porte RED d'acceptance | Le code exécute les tests d'acceptance : échec sur assertion ou symbole manquant accepté ; test qui passe déjà signalé et requalifié en non-régression |
 | DELIVER | Sous-machine | Voir 9.6 |
@@ -840,9 +843,9 @@ Comportements attendus : difficulté proposée `medium-hard` (question ouverte) 
 
 `contextIsolation`, `sandbox`, pas de `nodeIntegration` ; preload minimal ; CSP stricte ; navigation externe interdite, liens ouverts dans le navigateur système ; jetons GitHub gardés dans le processus principal et le trousseau du système, jamais dans le renderer.
 
-### 11.3 Profils (D6)
+### 11.3 Réglages de l'administrateur (ADR 0087, remplace D6)
 
-Le profil (testeur, PO/BA, développeur, architecte, administrateur) conditionne : le mode d'affichage par défaut, la politique de permissions par défaut (prudente ou souple), et **qui peut répondre à quelle demande d'interaction** (par exemple, seul un architecte ratifie un ADR). L'utilisateur ne peut pas modifier son propre profil. Mécanisme d'attribution : OUVERT O5.
+Il n'y a plus de profil : n'importe qui répond à toute demande d'interaction, ratification d'ADR comprise. L'administrateur règle dans `admin.json` la politique de permissions par défaut (`permissionPolicy` : prudente ou souple) et le mode d'affichage par défaut (`defaultMode`), que l'utilisateur peut changer dans l'interface. L'ancienne forme (`profile`) est encore lue pour ne pas changer la politique d'un poste administré.
 
 ---
 
@@ -961,7 +964,7 @@ Constatés sur les versions utilisées pendant la conception ; **À VÉRIFIER** 
 | O2 | Nombre de lentilles de revue par niveau de difficulté | Deux pour `simple`, toutes pour les autres |
 | O3 | Confirmation de la difficulté : toujours, ou seulement en mode simple ? | Mode simple seulement |
 | O4 | Garder une variante par hooks pour Claude Code et Copilot CLI, réutilisant les politiques pures ? | Non dans un premier temps |
-| O5 | Attribution des profils : fichier de configuration signé, annuaire d'entreprise, ou administrateur local ? | Fichier de configuration géré par un administrateur |
+| O5 | ~~Attribution des profils~~ : sans objet depuis l'ADR 0087 (plus de profil) | — |
 | O6 | Stockage de l'état des tâches : JSON dans le projet ou SQLite dans le profil utilisateur ? | **Tranchée** (ADR 0019) : SQLite dans le profil, aligné sur VS Code. Décidée, pas encore implémentée |
 | O7 | Framework du renderer | Au choix, à consigner dans un ADR au jalon J1 |
 | O8 | Backlog Discoverer et Backlog Planner de skraft : intégrés au pipeline ou agents autonomes ? | Autonomes |
