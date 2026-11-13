@@ -40,7 +40,7 @@ function humans(app: App): void {
         await app.interactions.respond(p.id, p.options[0]!.id);
       } else if (p.title.startsWith("Ratifier")) {
         done.add(p.id);
-        await app.interactions.respond(p.id, p.options.find((o) => o.id.endsWith(":accept"))!.id, undefined, { role: "architecte" });
+        await app.interactions.respond(p.id, p.options.find((o) => o.id.endsWith(":accept"))!.id);
       }
     }
   };

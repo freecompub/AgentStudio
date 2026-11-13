@@ -45,7 +45,7 @@ describe("skraft en workflow — panne pendant les questions ouvertes (D17)", ()
     const q = (await app.interactions.pending()).find((p) => p.title.includes("bloqué (ROUTE)"))!;
     expect(q.detail).toContain("magasin d'interactions indisponible");
     expect(q.options.map((o) => o.label)).toEqual(["Relancer : reposer les questions", "Abandonner"]);
-    await app.interactions.respond(q.id, q.options[0]!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options[0]!.id);
     await fin(app, id, 60_000);
     // Chaque question n'est posée qu'une fois ; la troisième vient de la recherche (« Passage de relais »).
     expect(posees.sort()).toEqual(["L'alerte bloque-t-elle la validation ?", "Le délai minimal dépend-il de l'insuline utilisée ?", "Le plafond est-il rappelé au patient ?"]);

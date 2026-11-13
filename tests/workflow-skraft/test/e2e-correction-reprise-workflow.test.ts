@@ -104,7 +104,7 @@ describe("skraft en workflow — reprise d'une correction ciblée (D12, D15)", (
     const q = (await app.interactions.pending()).find((p) => /bloqué|^Phase /.test(p.title))!;
     expect(q.detail ?? q.title).toContain("Copilot injoignable");
     const avant = runtime.history.length;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await fin(app, id, 60_000);
     const apres = runtime.history.slice(avant).map((h) => runtime.configs.get(h.id)!.role.split("/")[1]!);
     // La correction reprend : d'abord le développeur ; ni testeur des scénarios, ni lentille avant lui.

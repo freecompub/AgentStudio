@@ -15,7 +15,7 @@ const schema = z.object({
   detail: z.string().optional(),
   options: z.array(z.object({ id: z.string(), label: z.string() })),
   freeText: z.boolean().optional(),
-  requiredRoles: z.array(z.enum(["testeur", "po", "developpeur", "architecte", "administrateur"])).optional(),
+  // `requiredRoles` d'une demande enregistrée avant l'ADR 0087 : ignoré à la lecture.
   createdAt: z.string(),
   status: z.enum(["pending", "answered", "cancelled"]),
   answer: z.object({ option: z.string(), comment: z.string().optional(), answeredAt: z.string() }).optional(),

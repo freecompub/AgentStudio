@@ -70,7 +70,7 @@ const arbitrages = async (app: App, id: string) =>
 const repondreArbitrage = async (app: App, choix: "derogation" | "corriger", commentaire?: string) => {
   await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Arbitrer un mutant")), 60_000);
   const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Arbitrer un mutant"))!;
-  await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${choix}`))!.id, commentaire, { role: "architecte" });
+  await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith(`:${choix}`))!.id, commentaire);
   return q;
 };
 

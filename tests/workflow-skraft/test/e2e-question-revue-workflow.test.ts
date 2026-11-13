@@ -21,7 +21,7 @@ function repondreAuxQuestionsDeRevue(app: App): void {
     for (const p of await app.interactions.pending()) {
       if (!p.title.startsWith("Question de la revue") || faites.has(p.id)) continue;
       faites.add(p.id);
-      await app.interactions.respond(p.id, p.options[0]!.id, undefined, { role: "po" });
+      await app.interactions.respond(p.id, p.options[0]!.id);
     }
   };
   app.interactions.onChange(() => void tick());

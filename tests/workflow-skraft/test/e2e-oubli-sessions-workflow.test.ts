@@ -50,7 +50,7 @@ describe("skraft en workflow — escalade de scénario et sessions (D20, contrô
     const id = await lancerWorkflow(app, "stories/us-12.md", "medium-hard");
     await until(async () => (await app.interactions.pending()).some((p) => p.title === "Pipeline skraft bloqué (DELIVER)"), 60_000);
     const q = (await app.interactions.pending()).find((p) => p.title === "Pipeline skraft bloqué (DELIVER)")!;
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("relancer"))!.id);
     await fin(app, id, 60_000);
     const sessions = runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-test"));
     expect(sessions.length).toBeGreaterThanOrEqual(2);

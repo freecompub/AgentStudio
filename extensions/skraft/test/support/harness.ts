@@ -118,7 +118,7 @@ export function answerQuestions(app: { interactions: import("@agent-studio/core"
     for (const q of await app.interactions.pending()) {
       if (!q.title.startsWith("Question ouverte") || answered.has(q.id)) continue;
       answered.add(q.id);
-      await app.interactions.respond(q.id, q.options[0]!.id, answer, { role: "po" }).catch(() => answered.delete(q.id));
+      await app.interactions.respond(q.id, q.options[0]!.id, answer).catch(() => answered.delete(q.id));
     }
   };
   const off = app.interactions.onChange(() => void tick());

@@ -88,7 +88,6 @@ export async function rejouer(decl: DeclarationWorkflow<never>, etat: EtatWorkfl
       });
     },
     humain: async (id, question, options, opts = {}) => {
-      if (decl.humains && !(id in decl.humains)) throw new Error(`Question humaine « ${id} » non déclarée dans le workflow ${decl.nom}`);
       return appeler("humain", { id, question, options: options.map((o) => ({ id: o.id, label: o.label })), ...opts });
     },
     lireFichier: (chemin) => appeler("lireFichier", { chemin }),

@@ -301,15 +301,14 @@ export interface ToolsApi {
 
 export interface InteractionsApi {
   /**
-   * Demande persistée ; la réponse arrive dans la tâche comme `HUMAN_DECISION`.
-   * `requiredRoles` réserve la réponse à certains profils (ex. un architecte ratifie un ADR).
+   * Demande persistée ; la réponse arrive dans la tâche comme `HUMAN_DECISION`. N'importe qui
+   * peut y répondre : aucune demande n'est réservée à un profil (ADR 0087).
    */
   request(req: {
     taskId: string;
     title: string;
     detail?: string;
     options: { id: string; label: string }[];
-    requiredRoles?: ("testeur" | "po" | "developpeur" | "architecte" | "administrateur")[];
     /** Une réponse en texte libre est attendue (question ouverte, précision d'un amendement). */
     freeText?: boolean;
   }): Promise<string>;

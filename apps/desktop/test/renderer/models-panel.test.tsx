@@ -10,7 +10,7 @@ import { FakeApi } from "./fake-api";
 
 const OAUTH = { loggedIn: true, user: "claire", tokenKind: "oauth", copilotCompatible: true } as const;
 const WS = { root: "/projets/bolus", name: "bolus" };
-const DEV = { role: "developpeur", roleLabel: "Développeur", defaultMode: "advanced", permissionPolicy: "prudente", developerMode: false, adminSource: "/etc/agent-studio/admin.json" } as const;
+const DEV = { defaultMode: "advanced", permissionPolicy: "prudente", developerMode: false, adminSource: "/etc/agent-studio/admin.json" } as const;
 const MODELS = [
   { id: "gpt-5-mini", name: "GPT-5 mini", multiplier: 0.33 },
   { id: "claude-sonnet-5.5", name: "Claude Sonnet 5.5" },
@@ -30,7 +30,7 @@ beforeEach(() => {
   };
   Element.prototype.scrollIntoView = () => {};
   api
-    .handle("profile:get", () => DEV)
+    .handle("admin:get", () => DEV)
     .handle("ui:get-mode", () => mode)
     .handle("ui:set-mode", (i) => void (mode = (i as { mode: typeof mode }).mode))
     .handle("auth:status", () => OAUTH)

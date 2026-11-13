@@ -34,7 +34,7 @@ describe("skraft en workflow — phase sautée (D18, contrôle)", () => {
     await until(async () => (await app.interactions.pending()).some((p) => p.title.startsWith("Phase RESEARCH")), 60_000);
     const q = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase RESEARCH"))!;
     expect(q.title).toContain("Document de recherche absent");
-    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("sauter"))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(q.id, q.options.find((o) => o.id.endsWith("sauter"))!.id);
     await fin(app, id, 60_000);
     const decide = runtime.history.filter((h) => runtime.configs.get(h.id)!.role === ROLE("skraft-architect-decide")).map((h) => h.sent.join("\n"));
     expect(decide.length).toBeGreaterThan(0);

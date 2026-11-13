@@ -142,7 +142,7 @@ export async function assemblerServeur(o: OptionsAssemblage): Promise<{ ok: true
     const complet = /^\s*\[?[A-Za-z]\w*-\d+\]?\s*[—–:-]/.test(titre) ? titre : `US-${q.ref.numero} — ${titre || "user story"}`;
     return publierPr({ ...q, titre: complet }, avecAide);
   };
-  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, role: admin.profile.role, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, publierPr: publier, version: o.version });
-  logger.info("serveur MCP skraft prêt", { version: o.version, role: admin.profile.role, autorises: config.autorises.length, runtime: config.runtime });
+  const mcp = createServeurSkraft({ projets, workflow: WORKFLOW_SKRAFT, autorises: config.autorises, depots: createDepotsFichier(join(donnees, "depots-acceptes.json")), cwd: o.cwd, connexion, preparerUs, publierPr: publier, version: o.version });
+  logger.info("serveur MCP skraft prêt", { version: o.version, autorises: config.autorises.length, runtime: config.runtime });
   return { ok: true, mcp, projets };
 }

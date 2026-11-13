@@ -21,7 +21,7 @@ async function lancer(app: App): Promise<string> {
     for (const p of await app.interactions.pending()) {
       if (faites.has(p.id) || !(p.title.startsWith("Difficulté") || p.title.startsWith("Question de la revue"))) continue;
       faites.add(p.id);
-      await app.interactions.respond(p.id, p.options[0]!.id, undefined, { role: "po" });
+      await app.interactions.respond(p.id, p.options[0]!.id);
     }
   };
   app.interactions.onChange(() => void tick());

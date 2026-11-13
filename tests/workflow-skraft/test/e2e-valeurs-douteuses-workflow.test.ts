@@ -48,7 +48,7 @@ describe("skraft en workflow — valeurs douteuses soumises à l'humain (ADR 008
     expect(valeur.options.map((o) => o.label)).toEqual(["Oui : la garder dans la porte des valeurs", "Non : la retirer de la porte des valeurs"]);
     expect(valeur.freeText).toBeFalsy();
     expect(researchPrompts).toHaveLength(0);
-    await app.interactions.respond(valeur.id, valeur.options[1]!.id, undefined, { role: "po" });
+    await app.interactions.respond(valeur.id, valeur.options[1]!.id);
 
     await until(async () => researchPrompts.length >= 1, 60_000);
     const reponse = "→ Non : « 3 » n'est pas une valeur à tester ; la porte des valeurs ne l'exige pas.";

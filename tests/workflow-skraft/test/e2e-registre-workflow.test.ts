@@ -92,7 +92,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
     expect(lignes.length).toBeGreaterThanOrEqual(2);
     expect(lignes.every((e) => e.type === "refus" && e.phase === "DESIGN" && e.story === "us-12")).toBe(true);
     const escalade = (await app.interactions.pending()).find((p) => p.title.startsWith("Phase DESIGN"))!;
-    await app.interactions.respond(escalade.id, escalade.options.find((o) => /abandon/.test(o.id))!.id, undefined, { role: "architecte" });
+    await app.interactions.respond(escalade.id, escalade.options.find((o) => /abandon/.test(o.id))!.id);
     await until(async () => (await app.engine.status(id))?.status === "finished", 60_000);
     expect(((await app.engine.status(id))!.state as { fin?: { statut: string } }).fin?.statut).toBe("echec");
     expect((await readFile(join(root, REGISTRE), "utf8")).trim().split("\n")).toHaveLength(lignes.length);

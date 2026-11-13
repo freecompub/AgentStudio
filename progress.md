@@ -5,6 +5,24 @@ Pour le prochain moi. Texte libre : ce qui a été fait, pourquoi, et surtout ce
 
 ---
 
+## 13/11 — Plus de profil : aucune action réservée (ADR 0087)
+
+- **Demande du responsable** : enlever toutes les restrictions par profil, dans tout le code, puis
+  supprimer le profil lui-même. Branche `feat/sans-restriction-de-profil`, partie de `main`.
+- **Fait** :
+  - cœur : `Role`, `Profile`, `profileFor`, `ROLE_LABELS` supprimés ; `requiredRoles` retiré ;
+    `respond` sans identité ; l'arbitre prend `permissionPolicy` ;
+  - workflow : `meta.humains` retiré, refusé avec sa raison ; plus de question à déclarer ;
+  - extension et workflow skraft, serveur MCP (questions et leçons), application (`admin:get`
+    remplace `profile:get`), scripts d'essai et répondeur du banc ;
+  - `admin.json` : `permissionPolicy` et `defaultMode` à la racine.
+- **Piège évité** : un `admin.json` existant qui posait `profile.permissionPolicy: "prudente"` aurait
+  été ignoré, et le poste serait passé en « souple ». L'ancienne forme est donc relue (rôle technique :
+  souple et avancé ; sinon prudente et simple). Vérifié en cassant la ligne.
+- **Numéro d'ADR** : 0087, parce que 0086 est pris sur `feat/revue-lentilles`, qui n'est pas encore
+  mergée.
+- **Prochaine étape** : pousser et ouvrir la PR quand le responsable le demande.
+
 ## 12/11 — LEC-3 : les leçons réinjectées au début de chaque phase
 
 - **Demande du responsable** : continuer après LEC-2 (freecompub/AgentStudio#34, ADR 0085).

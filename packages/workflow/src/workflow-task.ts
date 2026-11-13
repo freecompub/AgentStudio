@@ -1,7 +1,7 @@
 import { EnvFailureError, WorkDefectError, type ExtensionContext, type TaskDefinition, type TaskEvent } from "@agent-studio/extension-api";
 import { empreinteDe, ranger, relire } from "./contenus.js";
 import { createRejoueurLocal, type Rejoueur } from "./hote/rejoueur.js";
-import type { Arbitrage, DeclarationWorkflow, EffetWorkflow, EntreeJournal, EtatWorkflow, EvenementWorkflow, Json, NatureErreur, NomAppel, Profil } from "./protocols.js";
+import type { Arbitrage, DeclarationWorkflow, EffetWorkflow, EntreeJournal, EtatWorkflow, EvenementWorkflow, Json, NatureErreur, NomAppel } from "./protocols.js";
 
 /** Appels qui écrivent ou lancent un agent : checkpoint avant (D23). */
 const AVEC_CHECKPOINT = new Set<NomAppel>(["agent", "ecrireFichier", "creerDossier", "commiter", "brancher"]);
@@ -19,7 +19,6 @@ export function createWorkflowTask<E>(declaration: DeclarationWorkflow<E>): Task
   return createWorkflowTaskDepuis({
     nom: decl.nom,
     empreinte: decl.empreinte ?? empreinteDe(decl.script.toString()),
-    ...(decl.humains ? { humains: decl.humains } : {}),
     rejoueur: createRejoueurLocal(decl),
   });
 }
@@ -28,8 +27,6 @@ export interface OptionsTache {
   nom: string;
   /** Empreinte du script (ou du dossier du workflow) : une tâche refuse de reprendre avec un autre. */
   empreinte: string;
-  /** Profils autorisés par question humaine (meta du workflow). */
-  humains?: Record<string, readonly Profil[]>;
   /** Qui rejoue le script : dans ce processus, ou dans un processus isolé (`docs/11` §8). */
   rejoueur: Rejoueur;
   /** Workflow en dossier : un refus de permission se dit en termes du `meta` (ADR 0055). */
@@ -76,7 +73,7 @@ export function createWorkflowTaskDepuis(o: OptionsTache): TaskDefinition<EtatWo
       if (!entree) throw new Error(`Appel ${effet.n} absent du journal`);
       const args = relire(entree.args, state.contenus) as unknown as Args;
       try {
-        const r = await executer(effet.kind, args, { ctx, taskId, state, signal, n: effet.n, humains: o.humains });
+        const r = await executer(effet.kind, args, { ctx, taskId, state, signal, n: effet.n });
         if (r === ATTENTE) return;
         return { type: "RESULTAT", n: effet.n, resultat: (r ?? null) as Json };
       } catch (err) {
@@ -194,7 +191,6 @@ interface Execution {
   state: EtatWorkflow;
   signal: AbortSignal;
   n: number;
-  humains: Record<string, readonly Profil[]> | undefined;
 }
 
 /** Agents lancés depuis un checkpoint, dans l'ordre de leur premier tour (ADR 0053). */
@@ -224,14 +220,12 @@ async function executer(kind: EffetWorkflow["kind"], a: Args, x: Execution): Pro
       return r.blocker ? { blocage: { question: r.blocker.question, choix: r.blocker.choices }, ...verifiees } : { sortie: r.output, ...verifiees };
     }
     case "humain": {
-      const roles = x.humains?.[a.id];
       await ctx.interactions.request({
         taskId,
         title: a.question,
         options: a.options.map((o) => ({ id: `${x.n}:${o.id}`, label: o.label })),
         ...(a.detail ? { detail: a.detail } : {}),
         ...(a.texteLibre ? { freeText: true } : {}),
-        ...(roles?.length ? { requiredRoles: [...roles] } : {}),
       });
       return ATTENTE;
     }

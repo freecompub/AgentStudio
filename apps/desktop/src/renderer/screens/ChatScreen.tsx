@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { ChatMessageDto, CommandListingDto, ModelListingDto, ProfileInfoDto, RuntimeKindDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
+import type { ChatMessageDto, CommandListingDto, ModelListingDto, AdminInfoDto, RuntimeKindDto, RuntimeStatusDto, UiMode, WorkspaceInfoDto } from "../../shared/ipc-contract";
 import { api } from "../api";
 import { ExtensionsPanel } from "../components/ExtensionsPanel";
 import { ModelsPanel } from "../components/ModelsPanel";
@@ -20,7 +20,7 @@ export function ChatScreen(props: {
   runtime: RuntimeStatusDto;
   onRuntimeChanged: () => void;
   workspace: WorkspaceInfoDto;
-  profile: ProfileInfoDto | null;
+  admin: AdminInfoDto | null;
   mode: UiMode;
   onModeChange: (m: UiMode) => void;
   onProjectClosed: () => void;
@@ -213,10 +213,7 @@ export function ChatScreen(props: {
             Avancé
           </button>
         </div>
-        <span className="user" title={props.profile ? `Profil attribué par l'administrateur (${props.profile.adminSource})` : undefined}>
-          {props.user}
-          {props.profile && <span className="hint"> ({props.profile.roleLabel})</span>}
-        </span>
+        <span className="user">{props.user}</span>
         {/* La déconnexion est celle de GitHub : avec Claude, elle se fait dans le terminal. */}
         {props.runtime.choisi === "copilot" && (
           <button className="link" onClick={() => void logout()}>
@@ -327,7 +324,7 @@ export function ChatScreen(props: {
         />
         <div className="row end">
           <span className="hint">Entrée pour envoyer, Maj+Entrée pour aller à la ligne</span>
-          <ExtensionsPanel open={extensionsOpen} onClose={() => setExtensionsOpen(false)} developerMode={props.profile?.developerMode ?? false} />
+          <ExtensionsPanel open={extensionsOpen} onClose={() => setExtensionsOpen(false)} developerMode={props.admin?.developerMode ?? false} />
           <ModelsPanel open={modelsOpen} onClose={() => setModelsOpen(false)} />
           {busy ? (
             <button type="button" onClick={() => void api.call("chat:abort", {})}>

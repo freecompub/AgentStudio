@@ -5,16 +5,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defaultAdminConfigPath, loadAdminConfig } from "../src/admin-config.js";
 import { DEFAULT_ALLOWED_PROGRAMS_FOR_TESTS } from "../../stack-adapters/test/support/programmes.js";
 
-describe("Configuration administrateur (D6, O5)", () => {
+describe("Configuration administrateur (ADR 0087 : plus de profil)", () => {
   let dir: string;
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "agent-studio-admin-"));
   });
   afterEach(() => rm(dir, { recursive: true, force: true }));
 
-  it("sans fichier : profil développeur, aucun éditeur approuvé, pas de mode développeur (choix provisoire)", async () => {
+  it("sans fichier : politique souple, mode avancé, aucun éditeur approuvé, pas de mode développeur (choix provisoire)", async () => {
     const c = await loadAdminConfig(join(dir, "absent.json"));
-    expect(c).toMatchObject({ source: "défaut", profile: { role: "developpeur", defaultMode: "advanced", permissionPolicy: "souple" }, trustedPublishers: [], developerMode: false, revocation: null });
+    expect(c).toMatchObject({ source: "défaut", permissionPolicy: "souple", defaultMode: "advanced", trustedPublishers: [], developerMode: false, revocation: null });
+    expect(c).not.toHaveProperty("profile");
   });
 
   it("programmes autorisés par défaut : lanceurs de tests, linters, outils de format et de mutation courants (O12)", async () => {
@@ -51,7 +52,7 @@ describe("Configuration administrateur (D6, O5)", () => {
 
     it("fichier sans `allowedPrograms` : la liste par défaut, et le fichier lu", async () => {
       const file = join(dir, "admin.json");
-      await writeFile(file, JSON.stringify({ profile: { role: "architecte" } }));
+      await writeFile(file, JSON.stringify({ developerMode: false }));
       expect((await loadAdminConfig(file)).origineDesProgrammes).toBe(
         `Liste par défaut : ${file} ne contient pas \`allowedPrograms\`. L'y ajouter remplace la liste par défaut, sans s'y ajouter.`,
       );
@@ -77,7 +78,7 @@ describe("Configuration administrateur (D6, O5)", () => {
     const file = join(dir, "admin.json");
     await writeFile(file, JSON.stringify({ programConsent: false }));
     expect((await loadAdminConfig(file)).programConsent).toBe(false);
-    await writeFile(file, JSON.stringify({ profile: { role: "po" } }));
+    await writeFile(file, JSON.stringify({ defaultMode: "simple" }));
     expect((await loadAdminConfig(file)).programConsent).toBe(true);
     // Fichier refusé : rien de plus que ce que l'administrateur a pu relire, donc aucun accord.
     await writeFile(file, "{ pas du json");
@@ -99,12 +100,13 @@ describe("Configuration administrateur (D6, O5)", () => {
     expect(c.allowedPrograms).toEqual([]); // configuration refusée : on n'autorise rien
   });
 
-  it("profil attribué par l'administrateur, avec surcharges ; éditeurs approuvés ; révocation", async () => {
+  it("politique et mode posés par l'administrateur ; éditeurs approuvés ; révocation", async () => {
     const file = join(dir, "admin.json");
     await writeFile(
       file,
       JSON.stringify({
-        profile: { role: "po", defaultMode: "simple" },
+        permissionPolicy: "prudente",
+        defaultMode: "simple",
         trustedPublishers: [{ publisher: "tiers", keyId: "abc", publicKeyPem: "PEM", trustedUpdates: true }],
         developerMode: false,
         revocation: { file: "/etc/agent-studio/revocation.json", rootPublicKeyPem: "ROOT" },
@@ -112,17 +114,28 @@ describe("Configuration administrateur (D6, O5)", () => {
     );
     const c = await loadAdminConfig(file);
     expect(c.source).toBe(file);
-    expect(c.profile).toEqual({ role: "po", defaultMode: "simple", permissionPolicy: "prudente" });
+    expect(c).toMatchObject({ permissionPolicy: "prudente", defaultMode: "simple" });
     expect(c.trustedPublishers).toHaveLength(1);
     expect(c.revocation).toEqual({ file: "/etc/agent-studio/revocation.json", rootPublicKeyPem: "ROOT" });
   });
 
-  it("fichier invalide : profil le plus restreint (testeur), avec l'erreur", async () => {
+  it("ancienne forme (`profile`) : la politique et le mode qu'elle donnait sont gardés, le rôle ne sert plus à rien d'autre", async () => {
+    // Un poste administré en « prudente » ne doit pas passer en « souple » parce que le format a changé.
     const file = join(dir, "admin.json");
-    await writeFile(file, JSON.stringify({ profile: { role: "pirate" } }));
+    await writeFile(file, JSON.stringify({ profile: { role: "po" } }));
+    expect(await loadAdminConfig(file)).toMatchObject({ permissionPolicy: "prudente", defaultMode: "simple" });
+    await writeFile(file, JSON.stringify({ profile: { role: "architecte", permissionPolicy: "prudente" } }));
+    expect(await loadAdminConfig(file)).toMatchObject({ permissionPolicy: "prudente", defaultMode: "advanced" });
+    await writeFile(file, JSON.stringify({ profile: { role: "po" }, permissionPolicy: "souple" }));
+    expect((await loadAdminConfig(file)).permissionPolicy).toBe("souple");
+  });
+
+  it("fichier invalide : politique prudente, mode simple, avec l'erreur", async () => {
+    const file = join(dir, "admin.json");
+    await writeFile(file, JSON.stringify({ permissionPolicy: "laxiste" }));
     const c = await loadAdminConfig(file);
-    expect(c.profile.role).toBe("testeur");
-    expect(c.error).toMatch(/profile\.role/);
+    expect(c).toMatchObject({ permissionPolicy: "prudente", defaultMode: "simple" });
+    expect(c.error).toMatch(/permissionPolicy/);
   });
 
   it("emplacement système par défaut selon la plateforme", () => {

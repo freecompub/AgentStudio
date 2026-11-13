@@ -10,7 +10,7 @@ export class FakeApi implements RendererApi {
 
   constructor() {
     // Par défaut : développeur en mode avancé (les tests de profil surchargent).
-    this.handle("profile:get", () => ({ role: "developpeur", roleLabel: "Développeur", defaultMode: "advanced", permissionPolicy: "souple", developerMode: false, adminSource: "défaut" }));
+    this.handle("admin:get", () => ({ defaultMode: "advanced", permissionPolicy: "souple", developerMode: false, adminSource: "défaut" }));
     this.handle("ui:get-mode", () => "advanced");
     this.handle("ui:set-mode", () => undefined);
     // Par défaut : Copilot seul, comme une application sans Claude (ADR 0070).

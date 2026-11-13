@@ -7,8 +7,6 @@
  */
 import type { ArchitectureReport, DependencyRule, Evidence, FormatReport, LintReport, MutationReport, TestRun } from "@agent-studio/extension-api";
 
-/** Profils qui peuvent répondre à une question humaine (D6). */
-export type Profil = "testeur" | "po" | "developpeur" | "architecte" | "administrateur";
 
 /** Valeur JSON : seul ce qui se sérialise entre dans le journal. */
 export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
@@ -238,8 +236,6 @@ export interface DeclarationWorkflow<E = Json> {
    * autre script. Absente : empreinte du texte de la fonction `script`.
    */
   empreinte?: string;
-  /** Qui peut répondre à quelle question (D6). Une question non déclarée est refusée. */
-  humains?: Record<string, readonly Profil[]>;
   /** Agents déclarés (meta du workflow) : un agent absent est refusé à l'appel. Absent : pas de contrôle. */
   agents?: readonly string[];
   /** Outils apportés par le workflow (ADR 0082), exécutés à la demande de l'hôte. */

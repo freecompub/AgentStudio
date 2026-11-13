@@ -59,14 +59,7 @@ export const meta = {
     auto: { type: "booleen", defaut: false, aide: "Difficulté retenue sans confirmation." },
   },
   phases: { RESEARCH: "Enquête sur le code existant", DESIGN: "Conception", DISTILL: "Scénarios d'acceptance", DELIVER: "Implémentation en TDD" },
-  humains: {
-    "confirmer-difficulte": [],
-    "question-ouverte": ["po", "developpeur", "architecte", "administrateur"],
-    "ratifier-adr": ["architecte"],
-    arbitrer: ["developpeur", "architecte", "administrateur"],
-    escalade: ["developpeur", "architecte", "administrateur"],
-    blocage: ["po", "developpeur", "architecte", "administrateur"],
-  },
+  // `humains` (qui répond à quelle question) a été retiré par l'ADR 0087 : n'importe qui répond.
   permissions: {
     // tout ce que le script ET ses agents peuvent écrire : un agent ne déclare rien qui n'y soit pas
     ecriture: [".skraft/**", "docs/adr/**", "@stack:acceptanceTests", "@stack:unitTests", "@stack:sources"],

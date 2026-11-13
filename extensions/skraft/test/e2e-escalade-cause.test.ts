@@ -87,7 +87,7 @@ describe("skraft — escalade d'un scénario selon sa cause (ADR 0066)", () => {
     expect(q.detail).toContain(`Tests qui passaient avant DELIVER et que la story fait échouer : ${ANCIEN}`);
     expect(q.options.map((o) => o.id)).toEqual(["obsolete", "retry", "skip", "abort"]);
     expect(q.options[0]!.label).toBe("Déclarer ces tests obsolètes et continuer");
-    await app.interactions.respond(q.id, "obsolete", "la story plafonne la dose", { role: "architecte" });
+    await app.interactions.respond(q.id, "obsolete", "la story plafonne la dose");
 
     const bilan = await finie(app, id);
     expect(await arbitrages(app, id)).toContainEqual(["tests existants", ANCIEN, "obsolète", "humain", "la story plafonne la dose"]);
@@ -109,7 +109,7 @@ describe("skraft — escalade d'un scénario selon sa cause (ADR 0066)", () => {
     expect(q.detail).toContain(`Lignes du scénario non couvertes : ${CODE}:1`);
     expect(q.options.map((o) => o.id)).toEqual(["exempt", "retry", "skip", "abort"]);
     expect(q.options[0]!.label).toBe("Exempter ces lignes et continuer");
-    await app.interactions.respond(q.id, "exempt", "garde défensive", { role: "architecte" });
+    await app.interactions.respond(q.id, "exempt", "garde défensive");
 
     await finie(app, id);
     expect(await arbitrages(app, id)).toContainEqual(["couverture du diff", `${CODE}:1`, "dérogation", "humain", "garde défensive"]);

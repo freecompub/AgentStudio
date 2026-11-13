@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
-  "updated": "2026-11-10",
-  "branch": "main",
+  "updated": "2026-11-13",
+  "branch": "feat/sans-restriction-de-profil",
   "items": [
     {
       "id": "banc-modeles-par-role",
@@ -1366,6 +1366,13 @@
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft design-gate",
       "passes": true,
       "notes": "Fait le 2026-11-12, après un essai d'US-2 sur l'exemple .NET : `TreatWarningsAsErrors` (`Directory.Build.props:7-8`), cité dans contracts.md, a refusé DESIGN et coûté 2,61 $. Application de la décision du 11/11 : la porte juge ce que la story produit, pas l'existant."
+    },
+    {
+      "id": "sans-profil",
+      "title": "Plus de profil (ADR 0087) : aucune demande d'interaction n'est réservée (requiredRoles et meta.humains retirés, une ancienne demande réservée reçoit la réponse de quiconque) ; ratifier une leçon est ouvert à tous ; admin.json pose permissionPolicy et defaultMode, et l'ancienne forme `profile` garde sa politique",
+      "verify": "pnpm vitest run --project core politique-et-reponses && pnpm vitest run --project project-services admin-config && pnpm vitest run --project workflow chargeur rejeu accord && pnpm vitest run --project mcp-skraft serveur && pnpm vitest run --project desktop app-controller j6",
+      "passes": true,
+      "notes": "Fait le 2026-11-13, à la demande du responsable. Remplace D6 ; O5 devient sans objet."
     }
   ]
 }

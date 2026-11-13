@@ -37,10 +37,9 @@ const projet = join(base, "projet");
 execFileSync("git", ["clone", "-q", "--no-hardlinks", /^[a-z]+:\/\//.test(source) ? source : resolve(source), projet]);
 if (baseRun) execFileSync("git", ["checkout", "-q", "-b", `base-${baseRun.slice(0, 7)}`, baseRun], { cwd: projet });
 if (installer) execFileSync("pnpm", ["install", "--frozen-lockfile"], { cwd: projet, stdio: "inherit" });
-// Configuration propre à l'essai : seul le clone est autorisé ; profil architecte (ratification
-// d'ADR), programmes par défaut.
+// Configuration propre à l'essai : seul le clone est autorisé ; programmes par défaut.
 await writeFile(join(base, "mcp-skraft.json"), JSON.stringify({ autorises: [base], runtime }));
-await writeFile(join(base, "admin.json"), JSON.stringify({ profile: { role: "architecte" } }));
+await writeFile(join(base, "admin.json"), JSON.stringify({}));
 
 const reponses = JSON.parse(await readFile(fichierReponses, "utf8")) as Reponses;
 const memoire = new Map<string, number>();
@@ -78,7 +77,7 @@ console.log(`${h()} ${lance.texte}\n`);
 if (lance.erreur) process.exit(1);
 const tache = /tâche (\S+)\./.exec(lance.texte)![1]!;
 
-type Etat = { taches: { id: string; status: string; phase: string; phaseLabel: string; etape?: { index: number; total: number }; dernierRejet?: string; usage?: { requests: number } }[]; questions: { id: string; title: string; detail?: string; options: { id: string; label: string }[]; profils?: string[] }[]; messages: string[] };
+type Etat = { taches: { id: string; status: string; phase: string; phaseLabel: string; etape?: { index: number; total: number }; dernierRejet?: string; usage?: { requests: number } }[]; questions: { id: string; title: string; detail?: string; options: { id: string; label: string }[] }[]; messages: string[] };
 let derniere = "";
 let messagesVus = 0;
 const repondues = new Set<string>();
@@ -89,7 +88,7 @@ for (; parAttente; ) {
   for (const l of r.progression) console.log(`        ⏵ ${l}`);
   for (const q of r.questions) {
     if (repondues.has(q.id)) continue;
-    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options, ...(q.profils ? { requiredRoles: q.profils } : {}) }, reponses, memoire);
+    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options }, reponses, memoire);
     const rep = await appel("skraft_repondre", { question: q.id, option: c.option, ...(c.commentaire ? { texte: c.commentaire } : {}) });
     console.log(`${h()} ↳ réponse : ${q.options.find((o) => o.id === c.option)?.label ?? c.option}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${rep.erreur ? `\n        ✖ ${rep.texte}` : ""}`);
     if (!rep.erreur) repondues.add(q.id);
@@ -106,7 +105,7 @@ for (; !parAttente; ) {
   messagesVus = e.messages.length;
   for (const q of e.questions) {
     if (repondues.has(q.id)) continue;
-    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options, ...(q.profils ? { requiredRoles: q.profils } : {}) }, reponses, memoire);
+    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options }, reponses, memoire);
     const r = await appel("skraft_repondre", { question: q.id, option: c.option, ...(c.commentaire ? { texte: c.commentaire } : {}) });
     console.log(`${h()} ❓ ${q.title}\n        → ${q.options.find((o) => o.id === c.option)?.label ?? c.option}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${r.erreur ? `\n        ✖ ${r.texte}` : ""}`);
     if (!r.erreur) repondues.add(q.id);
