@@ -18,7 +18,7 @@ import { SUPERSESSIONS } from "./render-adr-tool.js";
 import { artifactsDuRun, latestArtifacts, lensBrief, refuterBrief, reviewFacts, type LensFiles } from "./review-brief.js";
 import { reviewReport } from "./review.js";
 import type { LensName } from "./difficulty.js";
-import { ligneValeursRetirees, parseStory, slugOf } from "./story.js";
+import { parseStory, slugOf } from "./story.js";
 import { contractSymbolsPresent, defectTargetOf, loadQualityBar, phaseEndMutation, planDeliver, runDeliverAgent, scenarioGate, verifyFixTests, verifyUnitGreen, verifyUnitRed } from "./deliver-effects.js";
 import { checkCoverage, lignesSousLeSeuil, sansLignesExemptees, sansTestsObsoletes } from "./deliver.js";
 import { appliquerRefutations, defautsARefuter, lensHistory, numberDefects, rangerHorsChangement, verifierOccurrences } from "./review-thread.js";
@@ -308,25 +308,13 @@ export async function runSkraftEffect(effect: SkraftEffect, ctx: ExtensionContex
     case "askQuestion":
       await ctx.interactions.request({
         taskId,
-        // Valeur douteuse (ADR 0080) : la garder d'abord, c'est ce que retient un répondeur qui ne lit pas.
-        ...(effect.valeur
-          ? {
-              title: `Valeur à tester (${state.story?.id ?? "skraft"}, critère ${effect.valeur.critere})`,
-              detail: effect.text,
-              options: [
-                { id: `keep:${effect.id}`, label: "Oui : la garder dans la porte des valeurs" },
-                { id: `drop:${effect.id}`, label: "Non : la retirer de la porte des valeurs" },
-              ],
-            }
-          : {
-              title: `Question ouverte (${state.story?.id ?? "skraft"})`,
-              detail: effect.text,
-              options: [
-                { id: `answer:${effect.id}`, label: "Répondre" },
-                { id: `defer:${effect.id}`, label: "Reporter" },
-              ],
-              freeText: true,
-            }),
+        title: `Question ouverte (${state.story?.id ?? "skraft"})`,
+        detail: effect.text,
+        options: [
+          { id: `answer:${effect.id}`, label: "Répondre" },
+          { id: `defer:${effect.id}`, label: "Reporter" },
+        ],
+        freeText: true,
       });
       // Demande créée : une panne sur une question suivante ne la fera pas reposer (D17 de docs/12).
       return { type: "QUESTION_ASKED", id: effect.id };
@@ -607,6 +595,9 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   for (const path of (await ctx.workspace.listFiles()).filter((f) => matchesAny(motifs, f))) fichiers[path] = await ctx.workspace.readFile(path);
   const forme = motifsDesScenarios({ fichiers, ...donneesDesScenarios(ctx, state) });
   if (forme.motifs.length) return { type: "GATE_FAIL", gate: forme.porte, reasons: forme.motifs };
+  const avertissementsDeValeurs = forme.avertissements ?? [];
+  if (avertissementsDeValeurs.length)
+    await ctx.chat.post(`**Porte des valeurs — avertissement non bloquant** (ADR 0090) : ces valeurs des critères ne sont pas écrites telles quelles. La revue de DISTILL jugera si elles sont bien testées sous une autre forme.\n${avertissementsDeValeurs.map((a) => `- ${a}`).join("\n")}`);
   const testPlan = fichiers[`${dir}/test-plan.md`]!;
   const run = await ctx.stack.runTests({ signal, evidence: { taskId, phase: "DISTILL_RED" } });
   if (run.timedOut) return { type: "GATE_FAIL", gate: "RED d'acceptance", reasons: ["Les tests ont dépassé le délai."] };
@@ -621,7 +612,7 @@ async function distillGate(ctx: ExtensionContext, state: SkraftState, attempt: n
   const artifacts: ArtifactRecord[] = [];
   for (const f of changed.filter(pasUnRapport)) artifacts.push({ path: f.path, sha256: await sha256(ctx, f.path), producedBy: "skraft-acceptance", attempt });
   // La matrice du plan de test est gardée : DELIVER y vérifie les écarts déclarés (ADR 0067).
-  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, testsDeLaStory: testsDeLaStory(run.results, state.testsAvant), planDeTest: planDeTest(testPlan) };
+  return { type: "GATE_OK", artifacts, acceptanceHash: await ctx.workspace.fingerprint(["@stack:acceptanceTests"]), regressions: red.regressions, testsDeLaStory: testsDeLaStory(run.results, state.testsAvant), planDeTest: planDeTest(testPlan), avertissementsDeValeurs };
 }
 
 /** Notes hors du changement de toutes les revues du run, une fois chacune. */
@@ -806,7 +797,6 @@ function finalReport(s: SkraftState): string {
     `Phases exécutées : ${executed} ; sautées : ${skipped}.`,
     `ADR : ${adrs}. Revues demandant des changements : ${retries}.`,
     `Réessais par phase : ${Object.entries(s.retries ?? {}).map(([p, n]) => `${p} ${n}`).join(", ") || "aucun"}.`,
-    ...[ligneValeursRetirees(s.openQuestions)].filter((l): l is string => l !== null),
     ...(s.verifications?.length ? [`Vérifications par les agents (ADR 0082) : ${s.verifications.map((v) => `${v.phase ?? "?"} ${v.role} ${v.appels} appel(s)`).join(" ; ")}.`] : []),
     ...(s.nonCommitees?.length ? [`Phases non commitées : ${s.nonCommitees.join(", ")} (commit impossible ; leurs fichiers sont inclus dans le commit suivant, ou restent à commiter).`] : []),
     ...(s.derogationsCouverture?.length

@@ -25,7 +25,7 @@ export function fichiersDesScenarios(slug: string, bdd: Bdd, globsAcceptance: re
   return [`.skraft/${slug}/distill/**`, ...dossiersDesFeatures(slug, bdd).map((x) => `${x}/**`), ...globsAcceptance];
 }
 
-export function motifsDesScenarios(i: { fichiers: Record<string, string> } & DonneesDesScenarios): { motifs: string[]; porte: string } {
+export function motifsDesScenarios(i: { fichiers: Record<string, string> } & DonneesDesScenarios): { motifs: string[]; porte: string; avertissements?: string[] } {
   const dir = `.skraft/${i.slug}/distill`;
   const bdd = i.bdd ?? undefined;
   const chemins = Object.keys(i.fichiers).sort();
@@ -40,20 +40,24 @@ export function motifsDesScenarios(i: { fichiers: Record<string, string> } & Don
   const gherkin = [...checkGherkin(features), ...(bdd?.length ? checkTitresBdd(features) : [])];
   if (gherkin.length) return { motifs: gherkin, porte: "gherkin" };
   const valeurs = checkValues({ criteria: i.criteria, features, acceptanceTests: lus((f) => matchesAny(i.globsAcceptance, f)) });
-  if (valeurs.length) return { motifs: valeurs, porte: "valeurs" };
+  // Les valeurs absentes avertissent sans bloquer (ADR 0090) : elles suivent jusqu'à la revue.
+  const avertissements = valeurs.avertissements;
+  if (valeurs.motifs.length) return { motifs: valeurs.motifs, porte: "valeurs", avertissements };
   const testPlan = i.fichiers[`${dir}/test-plan.md`];
-  if (testPlan === undefined) return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test" };
+  if (testPlan === undefined) return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test", avertissements };
   // Plans vérifiés avant d'exécuter quoi que ce soit (option C de docs/15 §4.5).
   const plans = checkPlans({ criteria: i.criteria, testPlan, implPlan: i.fichiers[`${dir}/impl-plan.md`] ?? null });
-  if (plans.length) return { motifs: plans, porte: "plan de test" };
-  return { motifs: [], porte: "" };
+  if (plans.length) return { motifs: plans, porte: "plan de test", avertissements };
+  return { motifs: [], porte: "", avertissements };
 }
 
 /** Réponse de l'outil à l'agent : ce que la porte dirait de son travail. */
-export function texteDeVerification({ motifs, porte }: { motifs: string[]; porte: string }): string {
+export function texteDeVerification({ motifs, porte, avertissements = [] }: { motifs: string[]; porte: string; avertissements?: string[] }): string {
+  // Non bloquants (ADR 0090) : signalés à l'agent, qui peut écrire la valeur telle que le critère la cite.
+  const avertir = avertissements.length ? ["Avertissements non bloquants de la porte des valeurs (la revue en jugera) :", ...avertissements.map((a) => `- ${a}`)] : [];
   if (!motifs.length)
-    return "Aucun motif : les portes gherkin, valeurs et plan de test accepteraient ce travail en l'état. Le RED d'acceptance reste à prouver : le code lancera les tests après ton tour.";
-  return [`La porte « ${porte} » refuserait ce travail :`, ...motifs.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau."].join("\n");
+    return ["Aucun motif : les portes gherkin, valeurs et plan de test accepteraient ce travail en l'état. Le RED d'acceptance reste à prouver : le code lancera les tests après ton tour.", ...avertir].join("\n");
+  return [`La porte « ${porte} » refuserait ce travail :`, ...motifs.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau.", ...avertir].join("\n");
 }
 
 /** L'outil `verifier_scenarios` : il ne lit que ce que l'hôte lui passe pendant le tour de l'agent d'acceptance. */

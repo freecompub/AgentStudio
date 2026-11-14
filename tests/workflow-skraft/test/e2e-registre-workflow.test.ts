@@ -44,7 +44,7 @@ describe("skraft en workflow — registre des erreurs commises (LEC-1)", () => {
       await ecrire({ ...t, callTool: async (n, a) => (n === "report_phase" ? undefined : t.callTool(n, a)) });
       if (essais === 1) {
         const feature = ".skraft/us12-f15ade30/distill/features/plafond.feature";
-        await put(root, feature, (await readFile(join(root, feature), "utf8")).replace("12,5 U", "douze unités"));
+        await put(root, feature, (await readFile(join(root, feature), "utf8")).replace("@ac-2", "@autre")); // un critère sans scénario : la porte des valeurs refuse toujours (ADR 0090)
       }
       await t.callTool("report_phase", { summary: "scénarios", files: [] });
     };

@@ -49,29 +49,32 @@ describe("Porte valeurs (SPEC-skraft §7.3, fixture §13.2)", () => {
     expect([...featureScenarios(FEATURE).keys()]).toEqual([1, 2, 3]);
   });
 
-  it("valeurs copiées mot pour mot : aucun rejet", () => {
-    expect(checkValues(files())).toEqual([]);
+  it("valeurs copiées mot pour mot : ni refus, ni avertissement", () => {
+    expect(checkValues(files())).toEqual({ motifs: [], avertissements: [] });
   });
 
-  it("« 12 U » au lieu de « 12,5 U » dans le scénario : rejet nommant le critère 2", () => {
-    expect(checkValues(files(FEATURE.replace("12,5 U", "12 U")))).toEqual([
-      "La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us12-f15ade30/distill/features/plafond.feature).",
-    ]);
+  // ADR 0090 : une valeur absente avertit sans bloquer ; la revue juge si elle est testée sous une autre forme.
+  it("« 12 U » au lieu de « 12,5 U » dans le scénario : avertissement nommant le critère 2, pas de refus", () => {
+    expect(checkValues(files(FEATURE.replace("12,5 U", "12 U")))).toEqual({
+      motifs: [],
+      avertissements: ["La valeur « 12,5 U » du critère 2 n'apparaît pas dans le scénario @ac-2 (.skraft/us12-f15ade30/distill/features/plafond.feature)."],
+    });
   });
 
-  it("valeur absente du test d'acceptance du critère", () => {
-    expect(checkValues(files(FEATURE, TESTS.replace("12.5", "12")))).toEqual([
-      "La valeur « 12,5 U » du critère 2 n'apparaît pas dans le test d'acceptance du critère 2 (tests/acceptance/plafond.test.ts).",
-    ]);
+  it("valeur absente du test d'acceptance du critère : avertissement, pas de refus", () => {
+    expect(checkValues(files(FEATURE, TESTS.replace("12.5", "12")))).toEqual({
+      motifs: [],
+      avertissements: ["La valeur « 12,5 U » du critère 2 n'apparaît pas dans le test d'acceptance du critère 2 (tests/acceptance/plafond.test.ts)."],
+    });
   });
 
   it("séparateur décimal et espaces normalisés", () => {
-    expect(checkValues(files(FEATURE.replace("12,5 U", "12.5 U")))).toEqual([]);
+    expect(checkValues(files(FEATURE.replace("12,5 U", "12.5 U")))).toEqual({ motifs: [], avertissements: [] });
   });
 
-  it("critère sans scénario ni test d'acceptance", () => {
+  it("critère sans scénario ni test d'acceptance : refus, toujours bloquant", () => {
     const r = checkValues(files(FEATURE.replace("@ac-3", "@autre"), TESTS.replace("ac-3", "autre")));
-    expect(r).toEqual(["Aucun scénario tagué @ac-3 pour le critère 3.", "Aucun test d'acceptance ne porte le marqueur ac-3 (critère 3)."]);
+    expect(r.motifs).toEqual(["Aucun scénario tagué @ac-3 pour le critère 3.", "Aucun test d'acceptance ne porte le marqueur ac-3 (critère 3)."]);
   });
 });
 

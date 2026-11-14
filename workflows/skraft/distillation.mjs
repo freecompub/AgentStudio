@@ -45,6 +45,7 @@ export async function distiller(w, d, lentilles, max) {
 }
 async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
   d.acceptanceHash = null;
+  d.avertissementsDeValeurs = [];
   d.regressions = [];
   let approuve = false;
   try {
@@ -61,6 +62,8 @@ async function unEssai(w, d, s, cp, lentilles, motifs, essai) {
       // Le gel n'est définitif qu'au commit de DISTILL : la revue peut encore faire corriger un test (D1 de docs/12).
       `Empreinte des tests d'acceptance prise (${d.acceptanceHash.slice(0, 12)}) : le gel devient définitif au commit de DISTILL.`,
       ...d.regressions.map((r) => `Test d'acceptance requalifié en non-régression, avec justification dans test-plan.md : ${r}.`),
+      // Non bloquants, jugés par la revue (ADR 0090).
+      ...d.avertissementsDeValeurs.map((a) => `Avertissement de la porte des valeurs, non bloquant (à juger : la valeur est-elle testée sous une autre forme ?) : ${a}`),
       ...(d.derniereExecution ? [d.derniereExecution] : []),
     ];
     const rejet = await reviser(w, d, s, cp, "DISTILL", lentilles, essai, faits);
@@ -99,22 +102,26 @@ export function motifsDesScenarios({ fichiers, slug, bdd, gherkinAvant, criteria
   if (gherkin.length)
     return { motifs: gherkin, porte: "gherkin" };
   const valeurs = checkValues({ criteria, features, acceptanceTests: lus((f) => matchesAny(globsAcceptance, f)) });
-  if (valeurs.length)
-    return { motifs: valeurs, porte: "valeurs" };
+  // Les valeurs absentes avertissent sans bloquer (ADR 0090) : elles suivent jusqu'à la revue.
+  const avertissements = valeurs.avertissements;
+  if (valeurs.motifs.length)
+    return { motifs: valeurs.motifs, porte: "valeurs", avertissements };
   const testPlan = fichiers[`${dir}/test-plan.md`];
   if (testPlan === undefined)
-    return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test" };
+    return { motifs: [`Plan de test absent : ${dir}/test-plan.md`], porte: "plan de test", avertissements };
   // Plans vérifiés avant d'exécuter quoi que ce soit (option C de docs/15 §4.5).
   const plans = checkPlans({ criteria, testPlan, implPlan: fichiers[`${dir}/impl-plan.md`] ?? null });
   if (plans.length)
-    return { motifs: plans, porte: "plan de test" };
-  return { motifs: [], porte: "" };
+    return { motifs: plans, porte: "plan de test", avertissements };
+  return { motifs: [], porte: "", avertissements };
 }
 /** Réponse de l'outil `verifier_scenarios` à l'agent : ce que la porte dirait de son travail. */
-export function texteDeVerification({ motifs, porte }) {
+export function texteDeVerification({ motifs, porte, avertissements = [] }) {
+  // Non bloquants (ADR 0090) : signalés à l'agent, qui peut écrire la valeur telle que le critère la cite.
+  const avertir = avertissements.length ? ["Avertissements non bloquants de la porte des valeurs (la revue en jugera) :", ...avertissements.map((a) => `- ${a}`)] : [];
   if (!motifs.length)
-    return "Aucun motif : les portes gherkin, valeurs et plan de test accepteraient ce travail en l'état. Le RED d'acceptance reste à prouver : le code lancera les tests après ton tour.";
-  return [`La porte « ${porte} » refuserait ce travail :`, ...motifs.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau."].join("\n");
+    return ["Aucun motif : les portes gherkin, valeurs et plan de test accepteraient ce travail en l'état. Le RED d'acceptance reste à prouver : le code lancera les tests après ton tour.", ...avertir].join("\n");
+  return [`La porte « ${porte} » refuserait ce travail :`, ...motifs.map((m) => `- ${m}`), "Corrige, puis vérifie de nouveau.", ...avertir].join("\n");
 }
 /** Les données de la vérification d'un tour de DISTILL : ce que la porte sait, hors fichiers. */
 export function donneesDesScenarios(d, globsAcceptance, bdd) {
@@ -128,6 +135,9 @@ async function portes(w, d, s, cp, globsAcceptance, essai, bdd) {
   const forme = motifsDesScenarios({ fichiers, ...donneesDesScenarios(d, globsAcceptance, bdd) });
   if (forme.motifs.length)
     return forme;
+  d.avertissementsDeValeurs = forme.avertissements;
+  if (forme.avertissements.length)
+    await w.informer(`**Porte des valeurs — avertissement non bloquant** (ADR 0090) : ces valeurs des critères ne sont pas écrites telles quelles. La revue de DISTILL jugera si elles sont bien testées sous une autre forme.\n${forme.avertissements.map((a) => `- ${a}`).join("\n")}`);
   const testPlan = fichiers[`.skraft/${d.slug}/distill/test-plan.md`];
   const run = await w.lancerTests({ etiquette: "DISTILL_RED" });
   if (run.timedOut)

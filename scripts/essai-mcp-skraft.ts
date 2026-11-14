@@ -7,6 +7,11 @@
  *
  *   pnpm --filter @agent-studio/mcp-skraft build
  *   pnpm tsx scripts/essai-mcp-skraft.ts <projet ou adresse Git> <story> <reponses.json> [--auto] [--runtime=claude] [--base=<commit>] [--pile=<fichier yaml>] [--suivi=attendre] [--installer]
+ *     [--arreter-en=DELIVER:120] [--reprise=continuer|nouvelle]
+ *
+ * `--arreter-en=<PHASE>:<secondes>` (avec `--suivi=attendre`) : arrête le run (`skraft_arreter`) ce temps
+ * après son entrée dans la phase, puis relance la même story sur le même clone ; `--reprise` dit quoi
+ * répondre à la question de reprise (ADR 0089), « continuer » par défaut.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
@@ -29,6 +34,9 @@ const fichierPile = args.find((a) => a.startsWith("--pile="))?.slice("--pile=".l
 // Installer les dépendances du clone avant de démarrer (11/11) : un projet Node n'a pas son node_modules.
 const installer = args.includes("--installer");
 const pile = fichierPile ? await readFile(fichierPile, "utf8") : undefined;
+// Reprise d'une story arrêtée (ADR 0089) : arrêter en cours de phase, puis relancer.
+const [phaseArret, secondesArret] = (args.find((a) => a.startsWith("--arreter-en="))?.slice("--arreter-en=".length) ?? "").split(":");
+const choixReprise = args.find((a) => a.startsWith("--reprise="))?.slice("--reprise=".length) ?? "continuer";
 const [source, story, fichierReponses] = args.filter((a) => !a.startsWith("--"));
 if (!source || !story || !fichierReponses) throw new Error("Utilisation : essai-mcp-skraft.ts <projet> <story> <reponses.json> [--auto]");
 
@@ -75,7 +83,17 @@ console.log(`${h()} skraft_demarrer →\n${premier.texte}\n`);
 const lance = premier.texte.startsWith("Accord requis") ? await appel("skraft_demarrer", { ...demarrage, accord: "une-fois" }) : premier;
 console.log(`${h()} ${lance.texte}\n`);
 if (lance.erreur) process.exit(1);
-const tache = /tâche (\S+)\./.exec(lance.texte)![1]!;
+let tache = /tâche (\S+)\./.exec(lance.texte)![1]!;
+let arrete = false;
+let entreeEnPhase: number | null = null;
+/** Relance la story après l'arrêt : l'accord est redonné une fois, comme au premier lancement. */
+async function relancerLaStory(): Promise<string> {
+  const p = await appel("skraft_demarrer", demarrage);
+  const l = p.texte.startsWith("Accord requis") ? await appel("skraft_demarrer", { ...demarrage, accord: "une-fois" }) : p;
+  console.log(`${h()} relance → ${l.texte}\n`);
+  if (l.erreur) process.exit(1);
+  return /tâche (\S+)\./.exec(l.texte)![1]!;
+}
 
 type Etat = { taches: { id: string; status: string; phase: string; phaseLabel: string; etape?: { index: number; total: number }; dernierRejet?: string; usage?: { requests: number } }[]; questions: { id: string; title: string; detail?: string; options: { id: string; label: string }[] }[]; messages: string[] };
 let derniere = "";
@@ -88,10 +106,24 @@ for (; parAttente; ) {
   for (const l of r.progression) console.log(`        ⏵ ${l}`);
   for (const q of r.questions) {
     if (repondues.has(q.id)) continue;
-    const c = repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options }, reponses, memoire);
+    const reprise = /a déjà une session/.test(q.title) ? q.options.find((o) => o.id.endsWith(choixReprise)) : undefined;
+    const c = reprise ? { option: reprise.id } as { option: string; commentaire?: string } : repondre({ title: q.title, ...(q.detail ? { detail: q.detail } : {}), options: q.options }, reponses, memoire);
+    if (reprise) console.log(`${h()} ❓ ${q.title}\n${(q.detail ?? "").replace(/^/gm, "        ")}`);
     const rep = await appel("skraft_repondre", { question: q.id, option: c.option, ...(c.commentaire ? { texte: c.commentaire } : {}) });
     console.log(`${h()} ↳ réponse : ${q.options.find((o) => o.id === c.option)?.label ?? c.option}${c.commentaire ? ` — « ${c.commentaire.slice(0, 80)} »` : ""}${rep.erreur ? `\n        ✖ ${rep.texte}` : ""}`);
     if (!rep.erreur) repondues.add(q.id);
+  }
+  if (phaseArret && !arrete && !r.termine) {
+    const e = JSON.parse((await appel("skraft_etat")).texte) as Etat;
+    if (e.taches.find((x) => x.id === tache)?.phase === phaseArret) entreeEnPhase ??= Date.now();
+    if (entreeEnPhase !== null && Date.now() - entreeEnPhase >= Number(secondesArret ?? 0) * 1000) {
+      const a = await appel("skraft_arreter", { tache });
+      console.log(`${h()} ■ ${a.texte}`);
+      await writeFile(join(base, "rapport-1.json"), (await appel("skraft_rapport", { tache })).texte);
+      arrete = true;
+      tache = await relancerLaStory();
+      continue;
+    }
   }
   if (r.termine) break;
 }

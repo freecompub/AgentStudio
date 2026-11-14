@@ -1,7 +1,7 @@
 {
   "$comment": "Tâches vérifiables du projet. `passes` dit si le critère est SATISFAIT AUJOURD'HUI, vérifié par `verify`. Mettre à jour après chaque tâche (voir CLAUDE.md). Ne pas cocher sur intention : seulement après avoir lancé `verify`.",
   "updated": "2026-11-13",
-  "branch": "feat/reprise-us",
+  "branch": "feat/valeurs-avertissement",
   "items": [
     {
       "id": "banc-modeles-par-role",
@@ -1294,8 +1294,8 @@
       "id": "valeurs-douteuses-a-l-humain",
       "title": "Porte des valeurs (ADR 0080) : une référence (« ADR 0069 », « #32 ») n'est pas une valeur ; un nombre seul est soumis à l'humain en ROUTE, avant RESEARCH (« Valeur à tester », la garder d'abord), qui le retire valeur par valeur ; la réponse va dans le dossier de passation et le bilan nomme les valeurs retirées (extension et workflow)",
       "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft story.test reducer.test e2e-valeurs-douteuses",
-      "passes": true,
-      "notes": "Fait le 2026-11-11, décision du responsable, après le run 4 de LEC-1 : « (ADR 0069) » dans le critère 3 faisait exiger « 0069 » dans le scénario. Remplacer la porte par une lentille a été écarté."
+      "passes": false,
+      "notes": "Fait le 2026-11-11, décision du responsable, après le run 4 de LEC-1 : « (ADR 0069) » dans le critère 3 faisait exiger « 0069 » dans le scénario. Remplacer la porte par une lentille a été écarté. Remplacé le 2026-11-13 par l'ADR 0090 : plus de question sur les nombres."
     },
     {
       "id": "revue-sans-defaut-hors-deliver",
@@ -1394,6 +1394,13 @@
       "verify": "pnpm vitest run --project workspace reprise && pnpm vitest run --project workflow reprise && pnpm vitest run --project workflow-skraft test/reprise e2e-reprise",
       "passes": true,
       "notes": "Fait le 2026-11-13 (ADR 0089). Reprise à la phase, pas au scénario."
+    },
+    {
+      "id": "valeurs-avertissement",
+      "title": "Porte des valeurs : un critère sans scénario tagué ou sans test marqué est refusé ; une valeur absente du scénario ou du test est un avertissement non bloquant, montré à l'utilisateur, à l'agent (verifier_scenarios) et à la revue de DISTILL ; plus de question sur les nombres avant RESEARCH (extension et workflow)",
+      "verify": "pnpm vitest run --project ext-skraft --project workflow-skraft distill-gates e2e-valeurs-avertissement verification-avertissements e2e-s4 reducer",
+      "passes": true,
+      "notes": "Fait le 2026-11-13 (ADR 0090, remplace l'ADR 0080)."
     }
   ]
 }
